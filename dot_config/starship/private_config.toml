@@ -1,0 +1,368 @@
+palette = "catppuccin_mocha"
+continuation_prompt = "[∙](mauve) "
+
+"$schema" = 'https://starship.rs/config-schema.json'
+
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"
+vimcmd_symbol = "[❮](bold subtext1)"
+
+[directory]
+style = "bold lavender"
+home_symbol = ""
+read_only = " 󰌾"
+
+[directory.substitutions]
+"Documents" = "󰈙"
+"Downloads" = "󱑢"
+"Music" = "󰝚"
+"Pictures" = "󰉏"
+"Videos" = "󰨜"
+"Projects" = "󱔗"
+"GitHub" = ""
+".config" = "󱁊"
+"Desktop" = "󰇄"
+"Work" = "󰃟"
+"Dev" = "󰲒"
+
+[aws]
+symbol = " "
+style = "bold peach"
+
+[buf]
+symbol = " "
+style = "bold teal"
+
+[bun]
+symbol = " "
+style = "bold rosewater"
+
+[c]
+symbol = " "
+style = "bold sapphire"
+
+[cpp]
+symbol = " "
+style = "bold sapphire"
+
+[cmake]
+symbol = " "
+style = "bold sapphire"
+
+[conda]
+symbol = " "
+style = "bold green"
+format = "via [$symbol$environment]($style) "
+
+[crystal]
+symbol = " "
+style = "bold maroon"
+
+[dart]
+symbol = " "
+style = "bold blue"
+
+[deno]
+symbol = " "
+style = "bold green"
+
+[docker_context]
+symbol = " "
+style = "bold blue"
+
+[elixir]
+symbol = " "
+style = "bold mauve"
+
+[elm]
+symbol = " "
+style = "bold teal"
+
+[fennel]
+symbol = " "
+style = "bold yellow"
+
+[fortran]
+symbol = " "
+style = "bold yellow"
+
+[fossil_branch]
+symbol = " "
+style = "bold mauve"
+
+[gcloud]
+symbol = " "
+style = "bold blue"
+
+[git_branch]
+symbol = "󰊢 "
+style = "fg:mauve"
+format = "on [$symbol$branch]($style) "
+
+[git_commit]
+tag_symbol = '  '
+style = "bold mauve"
+
+[git_status]
+conflicted = "[󰞇 ](fg:red)"
+ahead = "[󰶣 ${count}](fg:mauve)"
+behind = "[󰶡 ${count}](fg:mauve)"
+diverged = "[󰹹 ](fg:mauve)"
+up_to_date = "[󰄬 ](fg:green)"
+untracked = "[󰇘 ](fg:peach)"
+stashed = "[󰏗 ](fg:yellow)"
+modified = "[󰏫 ](fg:yellow)"
+staged = "[󰐗 ](fg:green)"
+renamed = "[󰑕 ](fg:sky)"
+deleted = "[󰆴 ](fg:red)"
+format = '([\[$all_status$ahead_behind\]]($style) )'
+style = "fg:mauve"
+
+[git_metrics]
+added_style = "bold green"
+deleted_style = "bold red"
+only_nonzero_diffs = true
+format = '[+$added]($added_style) [-$deleted]($deleted_style) '
+disabled = false
+
+[golang]
+symbol = " "
+style = "bold sky"
+
+[gradle]
+symbol = " "
+style = "bold peach"
+
+[guix_shell]
+symbol = " "
+style = "bold yellow"
+
+[haskell]
+symbol = " "
+style = "bold mauve"
+
+[haxe]
+symbol = " "
+style = "bold peach"
+
+[hg_branch]
+symbol = " "
+style = "bold mauve"
+
+[username]
+style_user = "bold sky"
+style_root = "bold red"
+format = "[$user]($style) "
+disabled = false
+show_always = false
+
+[hostname]
+ssh_only = true
+ssh_symbol = " "
+style = "bold maroon"
+format = "on [$ssh_symbol$hostname]($style) "
+trim_at = "."
+disabled = false
+
+[sudo]
+disabled = false
+style = "bold red"
+symbol = "󱊞 "
+format = "[$symbol]($style)"
+
+[java]
+symbol = " "
+style = "bold red"
+
+[julia]
+symbol = " "
+style = "bold mauve"
+
+[kotlin]
+symbol = " "
+style = "bold mauve"
+
+[kubernetes]
+symbol = "󱃾 "
+style = "bold sapphire"
+disabled = false
+format = 'at [$symbol$context( \($namespace\))]($style) '
+
+[lua]
+symbol = " "
+style = "bold blue"
+
+[memory_usage]
+symbol = "󰍛 "
+style = "bold mauve"
+
+[meson]
+symbol = "󰔷 "
+style = "bold teal"
+
+[nim]
+symbol = "󰆥 "
+style = "bold yellow"
+
+[nix_shell]
+symbol = " "
+style = "bold peach"
+
+[nodejs]
+symbol = " "
+style = "bold green"
+
+[ocaml]
+symbol = " "
+style = "bold peach"
+
+[openstack]
+symbol = "󰗚 "
+style = "bold peach"
+format = 'on [$symbol$cloud(\($project\))]($style) '
+
+[os.symbols]
+Alpaquita = " "
+Alpine = " "
+AlmaLinux = " "
+Amazon = " "
+Android = " "
+AOSC = " "
+Arch = " "
+Artix = " "
+CachyOS = " "
+CentOS = " "
+Debian = " "
+DragonFly = " "
+Elementary = " "
+Emscripten = " "
+EndeavourOS = " "
+Fedora = " "
+FreeBSD = " "
+Garuda = "󰛓 "
+Gentoo = " "
+HardenedBSD = "󰞌 "
+Illumos = "󰈸 "
+Ios = "󰀷 "
+Kali = " "
+Linux = " "
+Mabox = " "
+Macos = " "
+Manjaro = " "
+Mariner = " "
+MidnightBSD = " "
+Mint = " "
+NetBSD = " "
+NixOS = " "
+Nobara = " "
+OpenBSD = "󰈺 "
+openSUSE = " "
+OracleLinux = "󰌷 "
+Pop = " "
+Raspbian = " "
+Redhat = " "
+RedHatEnterprise = " "
+RockyLinux = " "
+Redox = "󰀘 "
+Solus = "󰠳 "
+SUSE = " "
+Ubuntu = " "
+Unknown = " "
+Void = " "
+Windows = "󰍲 "
+Zorin = " "
+
+[package]
+symbol = "󰏗 "
+style = "bold flamingo"
+
+[perl]
+symbol = " "
+style = "bold mauve"
+
+[php]
+symbol = " "
+style = "bold mauve"
+
+[pijul_channel]
+symbol = " "
+style = "bold mauve"
+
+[pixi]
+symbol = "󰏗 "
+style = "bold mauve"
+
+[python]
+symbol = " "
+style = "bold yellow"
+format = 'via [${symbol}${pyenv_prefix}(${version} )(\($virtualenv\) )]($style)'
+pyenv_prefix = "venv "
+python_binary = ["python3", "python", "python2"]
+detect_extensions = ["py"]
+detect_files = [".python-version", "Pipfile", "tox.ini", "pyproject.toml", "setup.py", "setup.cfg", "requirements.txt", "Pipfile.lock", "pyrightconfig.json"]
+
+[rlang]
+symbol = "󰟔 "
+style = "bold blue"
+
+[ruby]
+symbol = " "
+style = "bold red"
+
+[rust]
+symbol = "󱘗 "
+style = "bold peach"
+
+[scala]
+symbol = " "
+style = "bold red"
+
+[status]
+symbol = " "
+style = "bold red"
+
+[swift]
+symbol = " "
+style = "bold peach"
+
+[terraform]
+format = "via [󱁢 $workspace]($style) "
+style = "bold mauve"
+disabled = false
+
+[xmake]
+symbol = " "
+style = "bold teal"
+
+[zig]
+symbol = " "
+style = "bold teal"
+
+[palettes.catppuccin_mocha]
+rosewater = "#f5e0dc"
+flamingo = "#f2cdcd"
+pink = "#f5c2e7"
+mauve = "#cba6f7"
+red = "#f38ba8"
+maroon = "#eba0ac"
+peach = "#fab387"
+yellow = "#f9e2af"
+green = "#a6e3a1"
+teal = "#94e2d5"
+sky = "#89dceb"
+sapphire = "#74c7ec"
+blue = "#89b4fa"
+lavender = "#b4befe"
+text = "#cdd6f4"
+subtext1 = "#bac2de"
+subtext0 = "#a6adc8"
+overlay2 = "#9399b2"
+overlay1 = "#7f849c"
+overlay0 = "#6c7086"
+surface2 = "#585b70"
+surface1 = "#45475a"
+surface0 = "#313244"
+base = "#1e1e2e"
+mantle = "#181825"
+crust = "#11111b"

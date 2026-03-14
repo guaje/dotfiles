@@ -3,6 +3,8 @@ continuation_prompt = "[∙](mauve) "
 
 "$schema" = 'https://starship.rs/config-schema.json'
 
+format = '$username$hostname$sudo$directory$git_branch$git_commit$git_status$git_metrics$hg_branch$fossil_branch$pijul_channel$aws$gcloud$openstack$docker_context$kubernetes$terraform$nix_shell$conda$guix_shell$pixi$python$nodejs$bun$deno$ruby$perl$php$java$julia$haskell$rlang$scala$kotlin$elixir$elm$crystal$swift$c$cpp$cmake$rust$golang$nim$fortran$haxe$lua$fennel$zig$xmake$meson$buf$package$os$memory_usage$status$character'
+
 [character]
 success_symbol = "[❯](bold green)"
 error_symbol = "[❯](bold red)"
@@ -105,17 +107,17 @@ tag_symbol = '  '
 style = "bold mauve"
 
 [git_status]
-conflicted = "[󰞇 ](fg:red)"
+conflicted = "[󰞇](fg:red)"
 ahead = "[󰶣 ${count}](fg:mauve)"
 behind = "[󰶡 ${count}](fg:mauve)"
-diverged = "[󰹹 ](fg:mauve)"
-up_to_date = "[󰄬 ](fg:green)"
-untracked = "[󰇘 ](fg:peach)"
-stashed = "[󰏗 ](fg:yellow)"
-modified = "[󰏫 ](fg:yellow)"
-staged = "[󰐗 ](fg:green)"
-renamed = "[󰑕 ](fg:sky)"
-deleted = "[󰆴 ](fg:red)"
+diverged = "[󰹹](fg:mauve)"
+up_to_date = "[󰄬](fg:green)"
+untracked = "[󰇘](fg:peach)"
+stashed = "[󰏗](fg:yellow)"
+modified = "[󰏫](fg:yellow)"
+staged = "[󰐗](fg:green)"
+renamed = "[󰑕](fg:sky)"
+deleted = "[󰆴](fg:red)"
 format = '([\[$all_status$ahead_behind\]]($style) )'
 style = "fg:mauve"
 

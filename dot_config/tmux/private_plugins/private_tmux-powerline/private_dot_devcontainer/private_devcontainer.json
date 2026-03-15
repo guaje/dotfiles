@@ -1,0 +1,19 @@
+{
+	"image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+	"features": {
+		"ghcr.io/devcontainers-extra/features/apt-get-packages:1": {
+			"packages": ["ifstat", "golang-go", "shellcheck", "tmux"]
+		}
+	},
+	"postCreateCommand": "bash scripts/devcontainer_postCreateCommand.sh",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"EditorConfig.EditorConfig",
+				"mads-hartmann.bash-ide-vscode",
+				"rogalmic.bash-debug",
+				"timonwong.shellcheck"
+			]
+		}
+	}
+}

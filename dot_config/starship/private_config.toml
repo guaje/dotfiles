@@ -3,7 +3,7 @@ continuation_prompt = "[∙](mauve) "
 
 "$schema" = 'https://starship.rs/config-schema.json'
 
-format = '$username$hostname$sudo$directory$git_branch$git_commit$git_status$git_metrics$hg_branch$fossil_branch$pijul_channel$aws$gcloud$openstack$docker_context$kubernetes$terraform$nix_shell$conda$guix_shell$pixi$python$nodejs$bun$deno$ruby$perl$php$java$julia$haskell$rlang$scala$kotlin$elixir$elm$crystal$swift$c$cpp$cmake$rust$golang$nim$fortran$haxe$lua$fennel$zig$xmake$meson$buf$package$os$memory_usage$status$character'
+format = '$username$hostname$sudo$directory$git_branch$git_commit$git_status$git_metrics$hg_branch$fossil_branch$pijul_channel$openstack$docker_context$kubernetes$terraform$nix_shell$conda$guix_shell$pixi$python$nodejs$bun$deno$ruby$perl$php$java$julia$haskell$rlang$scala$kotlin$elixir$elm$crystal$swift$c$cpp$cmake$rust$golang$nim$fortran$haxe$lua$fennel$zig$xmake$meson$buf$package$os$memory_usage$status$character'
 
 [character]
 success_symbol = "[❯](bold green)"
@@ -27,10 +27,6 @@ read_only = " 󰌾"
 "Desktop" = "󰇄"
 "Work" = "󰃟"
 "Dev" = "󰲒"
-
-[aws]
-symbol = " "
-style = "bold peach"
 
 [buf]
 symbol = " "
@@ -92,10 +88,6 @@ style = "bold yellow"
 [fossil_branch]
 symbol = " "
 style = "bold mauve"
-
-[gcloud]
-symbol = " "
-style = "bold blue"
 
 [git_branch]
 symbol = "󰊢 "

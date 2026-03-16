@@ -75,7 +75,6 @@ fi
 if [ -z "$TMUX_POWERLINE_RIGHT_STATUS_SEGMENTS" ]; then
 	TMUX_POWERLINE_RIGHT_STATUS_SEGMENTS=(
 		"pwd $thm_peach $thm_bg"
-		"load $thm_yellow $thm_bg"
 		"utc_with_diff $thm_lavender $thm_bg ${TMUX_POWERLINE_SEPARATOR_LEFT_THIN}"
 	)
 fi

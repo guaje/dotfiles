@@ -3,9 +3,9 @@
 # Match catppuccin_mocha_tmux.conf
 
 if tp_patched_font_in_use; then
-	TMUX_POWERLINE_SEPARATOR_LEFT_BOLD=""
+	TMUX_POWERLINE_SEPARATOR_LEFT_BOLD=""
 	TMUX_POWERLINE_SEPARATOR_LEFT_THIN=""
-	TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD=""
+	TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD=""
 	TMUX_POWERLINE_SEPARATOR_RIGHT_THIN=""
 else
 	TMUX_POWERLINE_SEPARATOR_LEFT_BOLD="◀"
@@ -37,9 +37,9 @@ TMUX_POWERLINE_DEFAULT_RIGHTSIDE_SEPARATOR=${TMUX_POWERLINE_DEFAULT_RIGHTSIDE_SE
 
 if [ -z "$TMUX_POWERLINE_WINDOW_STATUS_CURRENT" ]; then
 	TMUX_POWERLINE_WINDOW_STATUS_CURRENT=(
+		"#[fg=$thm_mauve,bg=$thm_bg,nobold]"
+		"$TMUX_POWERLINE_SEPARATOR_LEFT_BOLD"
 		"#[fg=$thm_bg,bg=$thm_mauve,bold]"
-		" $TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD "
-		"#[fg=$thm_fg,bg=$thm_mauve,bold]"
 		" #W "
 		"#[fg=$thm_mauve,bg=$thm_bg,nobold]"
 		"$TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD"
@@ -54,8 +54,12 @@ fi
 
 if [ -z "$TMUX_POWERLINE_WINDOW_STATUS_FORMAT" ]; then
 	TMUX_POWERLINE_WINDOW_STATUS_FORMAT=(
+		"#[fg=$thm_surface_0,bg=$thm_bg,nobold]"
+		"$TMUX_POWERLINE_SEPARATOR_LEFT_BOLD"
 		"#[fg=$thm_fg,bg=$thm_surface_0]"
-		"  #W  "
+		" #W "
+		"#[fg=$thm_surface_0,bg=$thm_bg,nobold]"
+		"$TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD"
 	)
 fi
 
@@ -65,7 +69,6 @@ if [ -z "$TMUX_POWERLINE_LEFT_STATUS_SEGMENTS" ]; then
 		"window_name $thm_blue $thm_bg"
 		"lan_ip $thm_teal $thm_bg ${TMUX_POWERLINE_SEPARATOR_RIGHT_THIN}"
 		"wan_ip $thm_teal $thm_bg"
-		"vcs_branch $thm_green $thm_bg"
 	)
 fi
 
@@ -73,10 +76,7 @@ if [ -z "$TMUX_POWERLINE_RIGHT_STATUS_SEGMENTS" ]; then
 	TMUX_POWERLINE_RIGHT_STATUS_SEGMENTS=(
 		"pwd $thm_peach $thm_bg"
 		"load $thm_yellow $thm_bg"
-		"battery $thm_green $thm_bg"
-		"weather $thm_sky $thm_bg"
-		"date_day $thm_lavender $thm_bg"
 		"date $thm_lavender $thm_bg ${TMUX_POWERLINE_SEPARATOR_LEFT_THIN}"
-		"time $thm_lavender $thm_bg ${TMUX_POWERLINE_SEPARATOR_LEFT_THIN}"
+		"utc_with_diff $thm_lavender $thm_bg ${TMUX_POWERLINE_SEPARATOR_LEFT_THIN}"
 	)
 fi

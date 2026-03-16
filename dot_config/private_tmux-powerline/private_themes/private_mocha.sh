@@ -37,13 +37,14 @@ TMUX_POWERLINE_DEFAULT_RIGHTSIDE_SEPARATOR=${TMUX_POWERLINE_DEFAULT_RIGHTSIDE_SE
 
 if [ -z "$TMUX_POWERLINE_WINDOW_STATUS_CURRENT" ]; then
 	TMUX_POWERLINE_WINDOW_STATUS_CURRENT=(
-		"#[$(tp_format inverse)]"
-		"$TMUX_POWERLINE_DEFAULT_LEFTSIDE_SEPARATOR"
-		" #I#F "
-		"$TMUX_POWERLINE_SEPARATOR_RIGHT_THIN"
+		"#[fg=$thm_bg,bg=$thm_mauve,bold]"
+		" #I "
+		"#[fg=$thm_mauve,bg=$thm_surface_1,nobold]"
+		"$TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD"
+		"#[fg=$thm_fg,bg=$thm_surface_1,bold]"
 		" #W "
-		"#[$(tp_format regular)]"
-		"$TMUX_POWERLINE_DEFAULT_LEFTSIDE_SEPARATOR"
+		"#[fg=$thm_surface_1,bg=$thm_bg,nobold]"
+		"$TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD"
 	)
 fi
 
@@ -55,10 +56,10 @@ fi
 
 if [ -z "$TMUX_POWERLINE_WINDOW_STATUS_FORMAT" ]; then
 	TMUX_POWERLINE_WINDOW_STATUS_FORMAT=(
-		"#[$(tp_format regular)]"
-		"  #I#{?window_flags,#F, } "
+		"#[fg=$thm_fg,bg=$thm_surface_0]"
+		"  #I "
 		"$TMUX_POWERLINE_SEPARATOR_RIGHT_THIN"
-		" #W "
+		" #W  "
 	)
 fi
 

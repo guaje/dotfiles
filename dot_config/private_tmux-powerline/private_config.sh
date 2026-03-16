@@ -14,7 +14,7 @@
 	export TMUX_POWERLINE_PATCHED_FONT_IN_USE="true"
 
 	# The theme to use.
-	export TMUX_POWERLINE_THEME="default"
+	export TMUX_POWERLINE_THEME="mocha"
 	# Overlay directory to look for themes. There you can put your own themes outside the repo. Fallback will still be the "themes" directory in the repo.
 	export TMUX_POWERLINE_DIR_USER_THEMES="${XDG_CONFIG_HOME:-$HOME/.config}/tmux-powerline/themes"
 	# Overlay directory to look for segments. There you can put your own segments outside the repo. Fallback will still be the "segments" directory in the repo.
@@ -30,7 +30,7 @@
 	export TMUX_POWERLINE_STATUS_INTERVAL="1"
 	# The location of the window list. Can be {"absolute-centre, centre, left, right"}.
 	# Note that "absolute-centre" is only supported on `tmux -V` >= 3.2.
-	export TMUX_POWERLINE_STATUS_JUSTIFICATION="centre"
+	export TMUX_POWERLINE_STATUS_JUSTIFICATION="left"
 
 	# The maximum length of the left status bar.
 	export TMUX_POWERLINE_STATUS_LEFT_LENGTH="60"

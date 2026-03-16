@@ -38,12 +38,10 @@ TMUX_POWERLINE_DEFAULT_RIGHTSIDE_SEPARATOR=${TMUX_POWERLINE_DEFAULT_RIGHTSIDE_SE
 if [ -z "$TMUX_POWERLINE_WINDOW_STATUS_CURRENT" ]; then
 	TMUX_POWERLINE_WINDOW_STATUS_CURRENT=(
 		"#[fg=$thm_bg,bg=$thm_mauve,bold]"
-		" #I "
-		"#[fg=$thm_mauve,bg=$thm_surface_1,nobold]"
-		"$TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD"
-		"#[fg=$thm_fg,bg=$thm_surface_1,bold]"
+		" $TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD "
+		"#[fg=$thm_fg,bg=$thm_mauve,bold]"
 		" #W "
-		"#[fg=$thm_surface_1,bg=$thm_bg,nobold]"
+		"#[fg=$thm_mauve,bg=$thm_bg,nobold]"
 		"$TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD"
 	)
 fi
@@ -57,16 +55,14 @@ fi
 if [ -z "$TMUX_POWERLINE_WINDOW_STATUS_FORMAT" ]; then
 	TMUX_POWERLINE_WINDOW_STATUS_FORMAT=(
 		"#[fg=$thm_fg,bg=$thm_surface_0]"
-		"  #I "
-		"$TMUX_POWERLINE_SEPARATOR_RIGHT_THIN"
-		" #W  "
+		"  #W  "
 	)
 fi
 
 if [ -z "$TMUX_POWERLINE_LEFT_STATUS_SEGMENTS" ]; then
 	TMUX_POWERLINE_LEFT_STATUS_SEGMENTS=(
 		"tmux_session_info $thm_mauve $thm_bg"
-		"hostname $thm_blue $thm_bg"
+		"window_name $thm_blue $thm_bg"
 		"lan_ip $thm_teal $thm_bg ${TMUX_POWERLINE_SEPARATOR_RIGHT_THIN}"
 		"wan_ip $thm_teal $thm_bg"
 		"vcs_branch $thm_green $thm_bg"

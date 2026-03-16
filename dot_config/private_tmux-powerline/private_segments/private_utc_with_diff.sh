@@ -7,6 +7,6 @@ run_segment() {
 	diff=$(date +"%z")
 	# Format +HHMM to +HH:MM
 	formatted_diff="${diff:0:3}:${diff:3:2}"
-	echo "${utc_date} ${utc_time} UTC (${formatted_diff})"
+	echo "󰥔 ${utc_date} ${utc_time} UTC (${formatted_diff})"
 	return 0
 }

@@ -67,14 +67,14 @@ if [ -z "$TMUX_POWERLINE_LEFT_STATUS_SEGMENTS" ]; then
 	TMUX_POWERLINE_LEFT_STATUS_SEGMENTS=(
 		"tmux_session_info $thm_mauve $thm_bg"
 		"window_name $thm_blue $thm_bg"
-		"lan_ip $thm_teal $thm_bg ${TMUX_POWERLINE_SEPARATOR_RIGHT_THIN}"
-		"wan_ip $thm_teal $thm_bg"
+		"pwd $thm_peach $thm_bg"
 	)
 fi
 
 if [ -z "$TMUX_POWERLINE_RIGHT_STATUS_SEGMENTS" ]; then
 	TMUX_POWERLINE_RIGHT_STATUS_SEGMENTS=(
-		"pwd $thm_peach $thm_bg"
-		"utc_with_diff $thm_lavender $thm_bg ${TMUX_POWERLINE_SEPARATOR_LEFT_THIN}"
+		"utc_with_diff $thm_lavender $thm_bg"
+		"lan_ip $thm_teal $thm_bg"
+		"wan_ip $thm_teal $thm_bg"
 	)
 fi

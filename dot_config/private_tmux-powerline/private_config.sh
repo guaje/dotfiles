@@ -376,7 +376,7 @@
 
 # utc_time.sh {
 	# date(1) format for the UTC time.
-	export TMUX_POWERLINE_SEG_UTC_TIME_FORMAT="%H:%M %Z"
+	export TMUX_POWERLINE_SEG_UTC_TIME_FORMAT="%I:%M %P %Z"
 # }
 
 # vcs_branch.sh {

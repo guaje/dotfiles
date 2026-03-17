@@ -3,7 +3,7 @@
 
 run_segment() {
 	utc_date=$(date -u +"%m-%d")
-	utc_time=$(date -u +"%H:%M")
+	utc_time=$(date -u +"%I:%M %P")
 	diff=$(date +"%z")
 	# Format +HHMM to +HH:MM
 	formatted_diff="${diff:0:3}:${diff:3:2}"

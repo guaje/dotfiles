@@ -14,20 +14,37 @@ else
 	TMUX_POWERLINE_SEPARATOR_RIGHT_THIN="❯"
 fi
 
-# Colors
+# --> Catppuccin (Mocha)
 thm_bg="#1e1e2e"
 thm_fg="#cdd6f4"
+
+# Colors
+thm_rosewater="#f5e0dc"
+thm_flamingo="#f2cdcd"
+thm_pink="#f5c2e7"
 thm_mauve="#cba6f7"
 thm_red="#f38ba8"
+thm_maroon="#eba0ac"
 thm_peach="#fab387"
 thm_yellow="#f9e2af"
 thm_green="#a6e3a1"
 thm_teal="#94e2d5"
 thm_sky="#89dceb"
+thm_sapphire="#74c7ec"
 thm_blue="#89b4fa"
 thm_lavender="#b4befe"
-thm_surface_0="#313244"
+
+# Surfaces and overlays
+thm_subtext_1="#a6adc8"
+thm_subtext_0="#bac2de"
+thm_overlay_2="#9399b2"
+thm_overlay_1="#7f849c"
+thm_overlay_0="#6c7086"
+thm_surface_2="#585b70"
 thm_surface_1="#45475a"
+thm_surface_0="#313244"
+thm_mantle="#181825"
+thm_crust="#11111b"
 
 TMUX_POWERLINE_DEFAULT_BACKGROUND_COLOR=${TMUX_POWERLINE_DEFAULT_BACKGROUND_COLOR:-$thm_bg}
 TMUX_POWERLINE_DEFAULT_FOREGROUND_COLOR=${TMUX_POWERLINE_DEFAULT_FOREGROUND_COLOR:-$thm_fg}
@@ -60,13 +77,13 @@ fi
 
 if [ -z "$TMUX_POWERLINE_WINDOW_STATUS_FORMAT" ]; then
 	TMUX_POWERLINE_WINDOW_STATUS_FORMAT=(
-		"#[fg=$thm_surface_0,bg=$thm_bg,nobold]"
+		"#[fg=$thm_overlay_2,bg=$thm_bg,nobold]"
 		"$TMUX_POWERLINE_SEPARATOR_LEFT_BOLD"
-		"#[fg=$thm_fg,bg=$thm_surface_0,nobold]"
+		"#[fg=$thm_bg,bg=$thm_overlay_2,nobold]"
 		" #I#F "
-		"#[fg=$thm_fg,bg=$thm_surface_1,nobold]"
+		"#[fg=$thm_fg,bg=$thm_surface_0,nobold]"
 		" #W#{?window_zoomed_flag,(Z),} "
-		"#[fg=$thm_surface_1,bg=$thm_bg,nobold]"
+		"#[fg=$thm_surface_0,bg=$thm_bg,nobold]"
 		"$TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD"
 	)
 fi

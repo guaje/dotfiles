@@ -63,7 +63,7 @@ if [ -z "$TMUX_POWERLINE_WINDOW_STATUS_CURRENT" ]; then
 		"#[fg=$thm_bg,bg=$thm_green,nobold]"
 		" #I#F "
 		"#[fg=$thm_fg,bg=$thm_surface_1,nobold]"
-		" #W#{?window_zoomed_flag,(Z),} "
+		" #W#{?window_zoomed_flag,(󰊓),} "
 		"#[fg=$thm_surface_1,bg=$thm_bg,nobold]"
 		"$TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD"
 	)
@@ -82,7 +82,7 @@ if [ -z "$TMUX_POWERLINE_WINDOW_STATUS_FORMAT" ]; then
 		"#[fg=$thm_bg,bg=$thm_overlay_2,nobold]"
 		" #I#F "
 		"#[fg=$thm_fg,bg=$thm_surface_0,nobold]"
-		" #W#{?window_zoomed_flag,(Z),} "
+		" #W#{?window_zoomed_flag,(󰊓),} "
 		"#[fg=$thm_surface_0,bg=$thm_bg,nobold]"
 		"$TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD"
 	)

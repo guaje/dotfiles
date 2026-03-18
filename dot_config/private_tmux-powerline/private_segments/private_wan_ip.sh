@@ -36,7 +36,7 @@ run_segment() {
         fi
 
         if [ -n "$wan_ip" ]; then
-                echo "#[fg=$thm_teal,bg=$thm_bg,nobold]${TMUX_POWERLINE_SEPARATOR_LEFT_BOLD}#[fg=$thm_bg,bg=$thm_teal,bold] ${TMUX_POWERLINE_SEG_WAN_IP_SYMBOL}#[fg=$thm_fg,bg=$thm_surface_0,nobold] ${wan_ip} #[fg=$thm_surface_0,bg=$thm_bg,nobold]${TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD}"
+                echo "#[fg=$thm_teal,bg=$thm_bg,nobold]${TMUX_POWERLINE_SEPARATOR_LEFT_BOLD}#[fg=$thm_bg,bg=$thm_teal,bold]${TMUX_POWERLINE_SEG_WAN_IP_SYMBOL}#[fg=$thm_fg,bg=$thm_surface_0,nobold] ${wan_ip}#[fg=$thm_surface_0,bg=$thm_bg,nobold]${TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD}"
         fi
 
         return 0

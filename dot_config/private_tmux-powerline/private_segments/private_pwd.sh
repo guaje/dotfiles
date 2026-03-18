@@ -14,6 +14,6 @@ run_segment() {
 		path="…${path: -$((max_len - 1))}"
 	fi
 
-	echo "#[fg=$thm_peach,bg=$thm_bg,nobold]${TMUX_POWERLINE_SEPARATOR_LEFT_BOLD}#[fg=$thm_bg,bg=$thm_peach,bold]  #[fg=$thm_fg,bg=$thm_surface_0,nobold] $path #[fg=$thm_surface_0,bg=$thm_bg,nobold]${TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD}"
+	echo "#[fg=$thm_peach,bg=$thm_bg,nobold]${TMUX_POWERLINE_SEPARATOR_LEFT_BOLD}#[fg=$thm_bg,bg=$thm_peach,bold]#[fg=$thm_fg,bg=$thm_surface_0,nobold] $path#[fg=$thm_surface_0,bg=$thm_bg,nobold]${TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD}"
 	return 0
 }

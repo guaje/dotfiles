@@ -52,18 +52,18 @@ TMUX_POWERLINE_DEFAULT_FOREGROUND_COLOR=${TMUX_POWERLINE_DEFAULT_FOREGROUND_COLO
 TMUX_POWERLINE_DEFAULT_LEFTSIDE_SEPARATOR=""
 TMUX_POWERLINE_DEFAULT_RIGHTSIDE_SEPARATOR=""
 
-export TMUX_POWERLINE_SEG_TMUX_SESSION_INFO_FORMAT="#[fg=$thm_mauve,bg=$thm_bg,nobold]$TMUX_POWERLINE_SEPARATOR_LEFT_BOLD#[fg=$thm_bg,bg=$thm_mauve,bold]  #[fg=$thm_fg,bg=$thm_surface_0,nobold] #S:#I.#P #[fg=$thm_surface_0,bg=$thm_bg,nobold]$TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD"
-export TMUX_POWERLINE_SEG_LAN_IP_SYMBOL="󰩠 "
-export TMUX_POWERLINE_SEG_WAN_IP_SYMBOL="󰖈 "
+export TMUX_POWERLINE_SEG_TMUX_SESSION_INFO_FORMAT="#[fg=$thm_mauve,bg=$thm_bg,nobold]$TMUX_POWERLINE_SEPARATOR_LEFT_BOLD#[fg=$thm_bg,bg=$thm_mauve,bold]#[fg=$thm_fg,bg=$thm_surface_0,nobold] #S:#I.#P#[fg=$thm_surface_0,bg=$thm_bg,nobold]$TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD"
+export TMUX_POWERLINE_SEG_LAN_IP_SYMBOL="󰩠"
+export TMUX_POWERLINE_SEG_WAN_IP_SYMBOL="󰖈"
 
 if [ -z "$TMUX_POWERLINE_WINDOW_STATUS_CURRENT" ]; then
 	TMUX_POWERLINE_WINDOW_STATUS_CURRENT=(
 		"#[fg=$thm_mauve,bg=$thm_bg,nobold]"
 		"$TMUX_POWERLINE_SEPARATOR_LEFT_BOLD"
 		"#[fg=$thm_bg,bg=$thm_mauve,nobold]"
-		" #I#F "
+		"#I#F"
 		"#[fg=$thm_fg,bg=$thm_surface_1,nobold]"
-		" #W#{?window_zoomed_flag,(󰊓),} "
+		" #W#{?window_zoomed_flag,(󰊓),}"
 		"#[fg=$thm_surface_1,bg=$thm_bg,nobold]"
 		"$TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD"
 	)
@@ -80,9 +80,9 @@ if [ -z "$TMUX_POWERLINE_WINDOW_STATUS_FORMAT" ]; then
 		"#[fg=$thm_overlay_2,bg=$thm_bg,nobold]"
 		"$TMUX_POWERLINE_SEPARATOR_LEFT_BOLD"
 		"#[fg=$thm_bg,bg=$thm_overlay_2,nobold]"
-		" #I#F "
+		"#I#F"
 		"#[fg=$thm_fg,bg=$thm_surface_0,nobold]"
-		" #W#{?window_zoomed_flag,(󰊓),} "
+		" #W#{?window_zoomed_flag,(󰊓),}"
 		"#[fg=$thm_surface_0,bg=$thm_bg,nobold]"
 		"$TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD"
 	)

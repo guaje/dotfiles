@@ -36,6 +36,6 @@ run_segment() {
                 done
         fi
 
-        echo "#[fg=$thm_teal,bg=$thm_bg,nobold]${TMUX_POWERLINE_SEPARATOR_LEFT_BOLD}#[fg=$thm_bg,bg=$thm_teal,bold] ${TMUX_POWERLINE_SEG_LAN_IP_SYMBOL}#[fg=$thm_fg,bg=$thm_surface_0,nobold] ${lan_ip-N/a} #[fg=$thm_surface_0,bg=$thm_bg,nobold]${TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD}"
+        echo "#[fg=$thm_teal,bg=$thm_bg,nobold]${TMUX_POWERLINE_SEPARATOR_LEFT_BOLD}#[fg=$thm_bg,bg=$thm_teal,bold]${TMUX_POWERLINE_SEG_LAN_IP_SYMBOL}#[fg=$thm_fg,bg=$thm_surface_0,nobold] ${lan_ip-N/a}#[fg=$thm_surface_0,bg=$thm_bg,nobold]${TMUX_POWERLINE_SEPARATOR_RIGHT_BOLD}"
         return 0
 }

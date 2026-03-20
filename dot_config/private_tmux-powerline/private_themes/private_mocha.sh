@@ -86,15 +86,15 @@ fi
 
 if [ -z "$TMUX_POWERLINE_LEFT_STATUS_SEGMENTS" ]; then
 	TMUX_POWERLINE_LEFT_STATUS_SEGMENTS=(
-		"tmux_session_info $thm_bg $thm_bg"
-		"window_name $thm_bg $thm_bg"
+		"session_info $thm_bg $thm_bg"
+		#"window_name $thm_bg $thm_bg"
 		"pwd $thm_bg $thm_bg"
 	)
 fi
 
 if [ -z "$TMUX_POWERLINE_RIGHT_STATUS_SEGMENTS" ]; then
 	TMUX_POWERLINE_RIGHT_STATUS_SEGMENTS=(
-		"utc_with_diff $thm_bg $thm_bg"
+		#"utc_with_diff $thm_bg $thm_bg"
 		"lan_ip $thm_bg $thm_bg"
 		"wan_ip $thm_bg $thm_bg"
 	)

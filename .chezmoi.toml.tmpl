@@ -3,3 +3,6 @@ encryption = "age"
     identity = "~/.config/chezmoi/key.txt"
     recipient = "age1ykg448l6aj2znrqc4y00uzjfzkx7v7gdpj7xjymnjsg7vh4mjd7sj4mney"
 
+# Ensure SOPS knows where to find the key when called from template
+[env]
+    SOPS_AGE_KEY_FILE = "$HOME/.config/chezmoi/key.txt"

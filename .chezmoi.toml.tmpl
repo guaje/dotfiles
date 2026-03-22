@@ -11,4 +11,4 @@ encryption = "age"
 
 [hooks.add.pre]
     command = "bash"
-    args = ["-c", "exec '{{ .chezmoi.sourceDir }}/scripts/check-secrets.sh' \"$@\"", "--"]
+    args = ["-c", "exec '~/.config/chezmoi/scripts/check-secrets.sh' \"$@\"", "--"]

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Configuration: Sensitive patterns to look for
 SENSITIVE_PATTERNS=("API_KEY" "PASSWORD" "SECRET" "TOKEN" "AUTH")
@@ -8,9 +8,12 @@ AGE_KEY=$(grep "public key:" ~/.config/chezmoi/key.txt | cut -d: -f2 | xargs)
 
 # --- LOOP PREVENTION ---
 # Check if --encrypt or -e is present in the command arguments
-# This prevents the hook from re-triggering itself in an infinite loop
+# Also add an exception for .tmpl files to avoid re-triggering the hook
 for arg in "$@"; do
     if [[ "$arg" == "--encrypt" ]] || [[ "$arg" == "-e" ]]; then
+        exit 0
+    fi
+    if [[ "$arg" == *.tmpl ]]; then
         exit 0
     fi
 done
@@ -56,7 +59,7 @@ for file in "${FILES_TO_ADD[@]}"; do
         echo "⚠️  WARNING: Sensitive information detected in $file (pattern: $MATCHED_PATTERN)" > /dev/tty
         echo "How would you like to proceed?" > /dev/tty
         echo "1) Full Encryption: chezmoi add --encrypt $file" > /dev/tty
-        echo "2) SOPS Strategy: Encrypt with SOPS and move to source as .sops.yaml" > /dev/tty
+        echo "2) SOPS Strategy: Partial encryption using sops and templates" > /dev/tty
         echo "3) Plain: Add as a plain file (NOT RECOMMENDED)" > /dev/tty
         echo "4) Abort" > /dev/tty
         
@@ -71,17 +74,57 @@ for file in "${FILES_TO_ADD[@]}"; do
         case $choice in
             1)
                 echo "Running: chezmoi add --encrypt $file" > /dev/tty
-                # This call triggers the hook again, but the loop prevention above will catch it
                 chezmoi add --encrypt "$file"
-                exit 1 # Stop the original unencrypted 'add' command
+                exit 1 
                 ;;
             2)
-                DEST_NAME="$(basename "$file").sops.yaml"
-                DEST_PATH="$SOURCE_DIR/$DEST_NAME"
-                echo "Encrypting with SOPS to $DEST_PATH..." > /dev/tty
-                sops --encrypt --age "$AGE_KEY" "$file" > "$DEST_PATH"
-                echo "✅ File encrypted and moved to source directory." > /dev/tty
-                echo "You can now reference it in templates using: (secret \"-d\" (joinPath .chezmoi.sourceDir \"$DEST_NAME\") | fromYaml)" > /dev/tty
+                # Ensure the secrets directory exists in the source directory
+                mkdir -p "$SOURCE_DIR/secrets"
+                
+                SOPS_FILE_NAME="$(basename "$file").sops.yaml"
+                SOPS_SOURCE_PATH="$SOURCE_DIR/secrets/$SOPS_FILE_NAME"
+                TMP_SECRETS_FILE=$(mktemp)
+                
+                TMP_TEMPLATE_FILE="${file}.tmpl"
+                cp "$file" "$TMP_TEMPLATE_FILE"
+                
+                echo "Identifying and extracting secrets..." > /dev/tty
+                
+                # Simplified extraction for KEY=VALUE or KEY: VALUE patterns
+                for pattern in "${SENSITIVE_PATTERNS[@]}"; do
+                    # Find all lines matching the pattern and extract keys/values
+                    # Assumes patterns are like API_KEY=value or password: value
+                    grep -Ei "$pattern" "$file" | while read -r line; do
+                        # Extract key and value using basic delimiters
+                        key=$(echo "$line" | cut -d'=' -f1 | cut -d':' -f1 | xargs)
+                        value=$(echo "$line" | cut -d'=' -f2- | cut -d':' -f2- | xargs)
+                        
+                        if [ -n "$key" ] && [ -n "$value" ]; then
+                            # Store in temporary yaml for sops
+                            echo "${key}: ${value}" >> "$TMP_SECRETS_FILE"
+                            
+                            # Update the template file with the reference
+                            template_ref="{{ (secret \"-d\" (joinPath .chezmoi.sourceDir \"secrets/$SOPS_FILE_NAME\") | fromYaml).${key} }}"
+                            # Use sed to replace the literal value with the template reference
+                            # This is a bit naive but works for simple values. Escaping might be needed.
+                            sed -i "s|${value}|${template_ref}|g" "$TMP_TEMPLATE_FILE"
+                        fi
+                    done
+                done
+                
+                # Encrypt the secrets file to the source directory
+                echo "Creating sops-encrypted file at $SOPS_SOURCE_PATH..." > /dev/tty
+                sops --encrypt --age "$AGE_KEY" "$TMP_SECRETS_FILE" > "$SOPS_SOURCE_PATH"
+                
+                # Add the template to chezmoi
+                echo "Adding template $TMP_TEMPLATE_FILE to chezmoi..." > /dev/tty
+                chezmoi add "$TMP_TEMPLATE_FILE"
+                
+                # Cleanup: Delete the original file and the temporary template
+                echo "Cleaning up..." > /dev/tty
+                rm "$file" "$TMP_TEMPLATE_FILE" "$TMP_SECRETS_FILE"
+                
+                echo "✅ SOPS strategy complete." > /dev/tty
                 exit 1
                 ;;
             3)

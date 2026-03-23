@@ -12,11 +12,17 @@ export SOPS_AGE_KEY_FILE="$HOME/.config/chezmoi/key.txt"
 # Helper function to clean up test files
 cleanup() {
     echo "Cleaning up test files..."
+    # Clean home directory
     rm -f test_abort.yaml test_plain.yaml test_full.yaml test_data.yaml test_data.json test_data.toml
-    rm -rf "$SOURCE_DIR/secrets/test_data.*.sops.yaml"
-    rm -f "$SOURCE_DIR/private_test_data.*.tmpl"
-    rm -f "$SOURCE_DIR/encrypted_private_test_full.yaml.age"
-    rm -f "$SOURCE_DIR/test_plain.yaml"
+    
+    # Clean source directory - handle private_ and encrypted_ prefixes
+    rm -f "$SOURCE_DIR/"*test_abort*
+    rm -f "$SOURCE_DIR/"*test_plain*
+    rm -f "$SOURCE_DIR/"*test_full*
+    rm -f "$SOURCE_DIR/"*test_data*
+    
+    # Clean secrets in source
+    rm -f "$SOURCE_DIR/secrets/"*test_data*
 }
 
 trap cleanup EXIT

@@ -86,7 +86,9 @@ for file in "${FILES_TO_ADD[@]}"; do
                 # Ensure the secrets directory exists in the source directory
                 mkdir -p "$SOURCE_DIR/secrets"
                 
-                SOPS_FILE_NAME="$(basename "$file").sops.yaml"
+                # Strip extension from the filename (e.g., config.yaml -> config.sops.yaml)
+                BASE_NAME="$(basename "$file")"
+                SOPS_FILE_NAME="${BASE_NAME%.*}.sops.yaml"
                 SOPS_SOURCE_PATH="$SOURCE_DIR/secrets/$SOPS_FILE_NAME"
                 TMP_SECRETS_FILE=$(mktemp)
                 

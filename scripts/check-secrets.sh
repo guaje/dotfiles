@@ -106,19 +106,24 @@ for file in "${FILES_TO_ADD[@]}"; do
                     # Find all lines matching the pattern and extract keys/values
                     while read -r line; do
                         # Extract key and value using basic delimiters
-                        key=$(echo "$line" | cut -d'=' -f1 | cut -d':' -f1 | xargs)
-                        value=$(echo "$line" | cut -d'=' -f2- | cut -d':' -f2- | xargs)
-                        
-                        if [ -n "$key" ] && [ -n "$value" ] && [ -z "${EXTRACTED_KEYS[$key]}" ]; then
-                            # Store in temporary yaml for sops
-                            echo "${key}: ${value}" >> "$TMP_SECRETS_FILE"
-                            EXTRACTED_KEYS[$key]=1
-                            
-                            # Update the template file with the reference
-                            template_ref="{{ (index ((secret \"-d\" (joinPath .chezmoi.sourceDir \"secrets/$SOPS_FILE_NAME\") | fromYaml).data | fromYaml) \"${key}\") }}"
-                            # Use '@' as delimiter as it's less likely to be in the value or ref
-                            sed -i "s@${value}@${template_ref}@g" "$TMP_TEMPLATE_FILE"
-                        fi
+                        key_raw=$(echo "$line" | cut -d'=' -f1 | cut -d':' -f1 | xargs)
+                    # Strip quotes from key
+                    key=$(echo "$key_raw" | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+
+                    value_raw=$(echo "$line" | cut -d'=' -f2- | cut -d':' -f2- | xargs)
+                    # Strip trailing comma, then strip quotes
+                    value=$(echo "$value_raw" | sed -e 's/,$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+
+                    if [ -n "$key" ] && [ -n "$value" ] && [ -z "${EXTRACTED_KEYS[$key]}" ]; then
+                        # Store in temporary yaml for sops
+                        echo "${key}: ${value}" >> "$TMP_SECRETS_FILE"
+                        EXTRACTED_KEYS[$key]=1
+
+                        # Update the template file with the reference
+                        template_ref="{{ (index ((secret \"-d\" (joinPath .chezmoi.sourceDir \"secrets/$SOPS_FILE_NAME\") | fromYaml).data | fromYaml) \"${key}\") }}"
+                        # Use '@' as delimiter as it's less likely to be in the value or ref
+                        sed -i "s@${value}@${template_ref}@g" "$TMP_TEMPLATE_FILE"
+                    fi
                     done < <(grep -Ei "$pattern" "$file")
                 done
                 

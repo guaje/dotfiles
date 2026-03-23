@@ -14,15 +14,12 @@ cleanup() {
     echo "Cleaning up test files..."
     # Clean home directory
     rm -f test_abort.yaml test_plain.yaml test_full.yaml test_data.yaml test_data.json test_data.toml
+    rm -rf .config/test_dir
     
-    # Clean source directory - handle private_ and encrypted_ prefixes
-    rm -f "$SOURCE_DIR/"*test_abort*
-    rm -f "$SOURCE_DIR/"*test_plain*
-    rm -f "$SOURCE_DIR/"*test_full*
-    rm -f "$SOURCE_DIR/"*test_data*
-    
-    # Clean secrets in source
-    rm -f "$SOURCE_DIR/secrets/"*test_data*
+    # Clean source directory - find all files/dirs with 'test_' in their name 
+    # (excluding the test script itself) and remove them.
+    # We use -name "*test_*" to catch private_test_, etc.
+    find "$SOURCE_DIR" -name "*test_*" -not -name "test_check-secrets.sh" -exec rm -rf {} +
 }
 
 trap cleanup EXIT
@@ -120,6 +117,22 @@ if sops --decrypt "$SOURCE_DIR/secrets/test_data.toml.sops.yaml" | grep -q "toml
     echo "✅ Option 2 (TOML) passed"
 else
     echo "❌ Option 2 (TOML) failed"
+    exit 1
+fi
+
+# 7. Test Option 2: SOPS Strategy (Subdirectory)
+echo "Testing Option 2 (Subdirectory)..."
+mkdir -p .config/test_dir
+cat <<EOF > .config/test_dir/test_sub.yaml
+API_KEY: sub-secret-key
+EOF
+set +e
+chezmoi add .config/test_dir/test_sub.yaml >/dev/null 2>&1
+set -e
+if sops --decrypt "$SOURCE_DIR/secrets/test_sub.yaml.sops.yaml" | grep -q "sub-secret-key"; then
+    echo "✅ Option 2 (Subdirectory) passed"
+else
+    echo "❌ Option 2 (Subdirectory) failed"
     exit 1
 fi
 

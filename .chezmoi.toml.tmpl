@@ -4,7 +4,8 @@ encryption = "age"
     recipient = "age1ykg448l6aj2znrqc4y00uzjfzkx7v7gdpj7xjymnjsg7vh4mjd7sj4mney"
 
 [secret]
-    command = "sops"
+    command = "sh"
+    args = ["-c", "export SOPS_AGE_KEY_FILE=$(eval echo \"$SOPS_AGE_KEY_FILE\"); exec sops \"$@\"", "--"]
 
 [env]
     SOPS_AGE_KEY_FILE = "~/.config/chezmoi/key.txt"

@@ -119,8 +119,11 @@ for file in "${FILES_TO_ADD[@]}"; do
 
                         # Update the template file with the reference
                         template_ref="{{ (index ((secret \"-d\" (joinPath .chezmoi.sourceDir \"secrets/$SOPS_FILE_NAME\") | fromYaml).data | fromYaml) \"${key}\") }}"
-                        # Use '@' as delimiter as it's less likely to be in the value or ref
-                        sed -i "s@${value}@${template_ref}@g" "$TMP_TEMPLATE_FILE"
+                        
+                        # Replace only on lines that look like KEY: VALUE or KEY = VALUE
+                        # Escaping dots in key for regex
+                        esc_key=$(echo "$key" | sed 's/\./\\./g')
+                        sed -i "/^[[:space:]]*[\"']\?${esc_key}[\"']\?[[:space:]]*[:=]/ s@${value}@${template_ref}@" "$TMP_TEMPLATE_FILE"
                     fi
                     done < <(grep -Ei "$pattern" "$file")
                 done

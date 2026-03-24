@@ -4,7 +4,7 @@
 # Verifies that 'chezmoi apply' correctly renders secrets using SOPS and templates.
 # Relying on chezmoi.toml configuration for SOPS_AGE_KEY_FILE and secret command.
 
-set -e
+# set -e  # Disabled to allow capturing failures manually
 
 SOURCE_DIR=$(chezmoi source-path)
 
@@ -43,18 +43,20 @@ db_password: yaml-db-pass
 EOF
 export TEST_CHOICE=2
 
-set +e
-chezmoi add test_data.yaml >/dev/null 2>&1
-set -e
-# Ensure file is gone before apply to avoid prompt and ensure it's recreated
+echo "Running: chezmoi add test_data.yaml"
+# We expect exit 1 from the hook, so we don't check exit status here
+chezmoi add test_data.yaml || true
+
+# Ensure file is gone before apply to ensure it's recreated
 rm -f test_data.yaml
 
-# Relying on chezmoi.toml [env] for SOPS_AGE_KEY_FILE during apply
-chezmoi apply --force test_data.yaml >/dev/null 2>&1
-if grep -q "yaml-secret-key" test_data.yaml; then
+echo "Running: chezmoi apply --force test_data.yaml"
+if chezmoi apply --force test_data.yaml && [ -f test_data.yaml ] && grep -q "yaml-secret-key" test_data.yaml; then
     echo "✅ Apply Rendering (YAML) passed"
 else
     echo "❌ Apply Rendering (YAML) failed"
+    # ls -l "$SOURCE_DIR"
+    # ls -l "$SOURCE_DIR/secrets"
     exit 1
 fi
 
@@ -68,13 +70,10 @@ cat <<EOF > test_data.json
   "db_password": "json-db-pass"
 }
 EOF
-set +e
-chezmoi add test_data.json >/dev/null 2>&1
-set -e
+chezmoi add test_data.json || true
 rm -f test_data.json
 
-chezmoi apply --force test_data.json >/dev/null 2>&1
-if grep -q "json-secret-key" test_data.json; then
+if chezmoi apply --force test_data.json && [ -f test_data.json ] && grep -q "json-secret-key" test_data.json; then
     echo "✅ Apply Rendering (JSON) passed"
 else
     echo "❌ Apply Rendering (JSON) failed"
@@ -89,13 +88,10 @@ API_KEY = "toml-secret-key"
 port = 8080
 db_password = "toml-db-pass"
 EOF
-set +e
-chezmoi add test_data.toml >/dev/null 2>&1
-set -e
+chezmoi add test_data.toml || true
 rm -f test_data.toml
 
-chezmoi apply --force test_data.toml >/dev/null 2>&1
-if grep -q "toml-secret-key" test_data.toml; then
+if chezmoi apply --force test_data.toml && [ -f test_data.toml ] && grep -q "toml-secret-key" test_data.toml; then
     echo "✅ Apply Rendering (TOML) passed"
 else
     echo "❌ Apply Rendering (TOML) failed"
@@ -108,13 +104,10 @@ mkdir -p .config/test_dir
 cat <<EOF > .config/test_dir/test_sub.yaml
 API_KEY: sub-secret-key
 EOF
-set +e
-chezmoi add .config/test_dir/test_sub.yaml >/dev/null 2>&1
-set -e
+chezmoi add .config/test_dir/test_sub.yaml || true
 rm -f .config/test_dir/test_sub.yaml
 
-chezmoi apply --force .config/test_dir/test_sub.yaml >/dev/null 2>&1
-if grep -q "sub-secret-key" .config/test_dir/test_sub.yaml; then
+if chezmoi apply --force .config/test_dir/test_sub.yaml && [ -f .config/test_dir/test_sub.yaml ] && grep -q "sub-secret-key" .config/test_dir/test_sub.yaml; then
     echo "✅ Apply Rendering (Subdirectory) passed"
 else
     echo "❌ Apply Rendering (Subdirectory) failed"

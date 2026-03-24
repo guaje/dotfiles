@@ -22,11 +22,6 @@ cleanup() {
 
 trap cleanup EXIT
 
-# We explicitly DO NOT export SOPS_AGE_KEY_FILE here to test chezmoi.toml integration.
-# However, for 'chezmoi add', the hook might need it if it's not inherited.
-# Actually, the hook is run by bash, and chezmoi.toml [env] should handle it for chezmoi commands.
-# Let's see if the hook works without it. If not, we'll only export it for 'add' and unset it for 'apply'.
-
 echo "Starting apply-rendering tests for check-secrets.sh (Option 2)..."
 
 # 1. Test Option 2: SOPS Strategy (YAML)
@@ -38,17 +33,15 @@ port: 8080
 db_password: yaml-db-pass
 EOF
 export TEST_CHOICE=2
-# We export it briefly for the 'add' phase just in case, but will unset for 'apply'
-export SOPS_AGE_KEY_FILE="$HOME/.config/chezmoi/key.txt"
+
 set +e
 chezmoi add test_data.yaml >/dev/null 2>&1
 set -e
-# check-secrets.sh already deleted the file
+# Ensure file is gone before apply to avoid prompt and ensure it's recreated
+rm -f test_data.yaml
 
-# Unset to ensure we test chezmoi.toml's [env] and [secret]
-unset SOPS_AGE_KEY_FILE
-
-chezmoi apply test_data.yaml >/dev/null 2>&1
+# Relying on chezmoi.toml [env] for SOPS_AGE_KEY_FILE during apply
+chezmoi apply --force test_data.yaml >/dev/null 2>&1
 if grep -q "yaml-secret-key" test_data.yaml; then
     echo "✅ Apply Rendering (YAML) passed"
 else
@@ -66,13 +59,12 @@ cat <<EOF > test_data.json
   "db_password": "json-db-pass"
 }
 EOF
-export SOPS_AGE_KEY_FILE="$HOME/.config/chezmoi/key.txt"
 set +e
 chezmoi add test_data.json >/dev/null 2>&1
 set -e
-unset SOPS_AGE_KEY_FILE
+rm -f test_data.json
 
-chezmoi apply test_data.json >/dev/null 2>&1
+chezmoi apply --force test_data.json >/dev/null 2>&1
 if grep -q "json-secret-key" test_data.json; then
     echo "✅ Apply Rendering (JSON) passed"
 else
@@ -88,13 +80,12 @@ API_KEY = "toml-secret-key"
 port = 8080
 db_password = "toml-db-pass"
 EOF
-export SOPS_AGE_KEY_FILE="$HOME/.config/chezmoi/key.txt"
 set +e
 chezmoi add test_data.toml >/dev/null 2>&1
 set -e
-unset SOPS_AGE_KEY_FILE
+rm -f test_data.toml
 
-chezmoi apply test_data.toml >/dev/null 2>&1
+chezmoi apply --force test_data.toml >/dev/null 2>&1
 if grep -q "toml-secret-key" test_data.toml; then
     echo "✅ Apply Rendering (TOML) passed"
 else
@@ -108,13 +99,12 @@ mkdir -p .config/test_dir
 cat <<EOF > .config/test_dir/test_sub.yaml
 API_KEY: sub-secret-key
 EOF
-export SOPS_AGE_KEY_FILE="$HOME/.config/chezmoi/key.txt"
 set +e
 chezmoi add .config/test_dir/test_sub.yaml >/dev/null 2>&1
 set -e
-unset SOPS_AGE_KEY_FILE
+rm -f .config/test_dir/test_sub.yaml
 
-chezmoi apply .config/test_dir/test_sub.yaml >/dev/null 2>&1
+chezmoi apply --force .config/test_dir/test_sub.yaml >/dev/null 2>&1
 if grep -q "sub-secret-key" .config/test_dir/test_sub.yaml; then
     echo "✅ Apply Rendering (Subdirectory) passed"
 else

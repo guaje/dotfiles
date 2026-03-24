@@ -12,12 +12,21 @@ SOURCE_DIR=$(chezmoi source-path)
 cleanup() {
     echo "Cleaning up test files..."
     # Clean home directory
-    rm -f test_data.yaml test_data.json test_data.toml
-    rm -rf .config/test_dir
+    rm -f test_data.yaml test_data.json test_data.toml 2>/dev/null
+    rm -rf .config/test_dir 2>/dev/null
     
-    # Clean source directory - find all files/dirs with 'test_data' or 'test_sub' in their name
-    find "$SOURCE_DIR" -name "*test_data*" -exec rm -rf {} +
-    find "$SOURCE_DIR" -name "*test_sub*" -exec rm -rf {} +
+    # Clean source directory - handle specific test prefixes surgically
+    for prefix in test_data test_sub; do
+        # Remove files in the root of the source dir with these prefixes
+        find "$SOURCE_DIR" -maxdepth 1 -name "*${prefix}*" -exec rm -rf {} + 2>/dev/null
+        # Remove files in the secrets dir with these prefixes
+        if [ -d "$SOURCE_DIR/secrets" ]; then
+            find "$SOURCE_DIR/secrets" -maxdepth 1 -name "*${prefix}*" -exec rm -rf {} + 2>/dev/null
+        fi
+    done
+    
+    # Specifically clean the test_dir in dot_config
+    rm -rf "$SOURCE_DIR/dot_config/private_test_dir" 2>/dev/null
 }
 
 trap cleanup EXIT

@@ -13,12 +13,22 @@ export SOPS_AGE_KEY_FILE="$HOME/.config/chezmoi/key.txt"
 cleanup() {
     echo "Cleaning up test files..."
     # Clean home directory
-    rm -f test_abort.yaml test_plain.yaml test_full.yaml test_data.yaml test_data.json test_data.toml
-    rm -rf .config/test_dir
+    rm -f test_abort.yaml test_plain.yaml test_full.yaml test_data.yaml test_data.json test_data.toml 2>/dev/null
+    rm -rf .config/test_dir 2>/dev/null
     
-    # Clean source directory - find all files/dirs with 'test_' in their name 
-    # (excluding scripts) and remove them.
-    find "$SOURCE_DIR" -name "*test_*" -not -name "*.sh" -exec rm -rf {} +
+    # Clean source directory - handle specific test prefixes surgically
+    # We avoid matching the scripts folder by not using a generic *test_* at the root
+    for prefix in test_abort test_plain test_full test_data test_sub; do
+        # Remove files in the root of the source dir with these prefixes (including private_ and encrypted_)
+        find "$SOURCE_DIR" -maxdepth 1 -name "*${prefix}*" -exec rm -rf {} + 2>/dev/null
+        # Remove files in the secrets dir with these prefixes
+        if [ -d "$SOURCE_DIR/secrets" ]; then
+            find "$SOURCE_DIR/secrets" -maxdepth 1 -name "*${prefix}*" -exec rm -rf {} + 2>/dev/null
+        fi
+    done
+    
+    # Specifically clean the test_dir in dot_config
+    rm -rf "$SOURCE_DIR/dot_config/private_test_dir" 2>/dev/null
 }
 
 trap cleanup EXIT

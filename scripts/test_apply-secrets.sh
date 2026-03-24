@@ -51,12 +51,11 @@ chezmoi add test_data.yaml || true
 rm -f test_data.yaml
 
 echo "Running: chezmoi apply --force test_data.yaml"
-if chezmoi apply --force test_data.yaml && [ -f test_data.yaml ] && grep -q "yaml-secret-key" test_data.yaml; then
+if chezmoi apply --force test_data.yaml && [ -f test_data.yaml ] && \
+   grep -q "yaml-secret-key" test_data.yaml && grep -q "yaml-db-pass" test_data.yaml; then
     echo "✅ Apply Rendering (YAML) passed"
 else
     echo "❌ Apply Rendering (YAML) failed"
-    # ls -l "$SOURCE_DIR"
-    # ls -l "$SOURCE_DIR/secrets"
     exit 1
 fi
 
@@ -73,7 +72,8 @@ EOF
 chezmoi add test_data.json || true
 rm -f test_data.json
 
-if chezmoi apply --force test_data.json && [ -f test_data.json ] && grep -q "json-secret-key" test_data.json; then
+if chezmoi apply --force test_data.json && [ -f test_data.json ] && \
+   grep -q "json-secret-key" test_data.json && grep -q "json-db-pass" test_data.json; then
     echo "✅ Apply Rendering (JSON) passed"
 else
     echo "❌ Apply Rendering (JSON) failed"
@@ -91,7 +91,8 @@ EOF
 chezmoi add test_data.toml || true
 rm -f test_data.toml
 
-if chezmoi apply --force test_data.toml && [ -f test_data.toml ] && grep -q "toml-secret-key" test_data.toml; then
+if chezmoi apply --force test_data.toml && [ -f test_data.toml ] && \
+   grep -q "toml-secret-key" test_data.toml && grep -q "toml-db-pass" test_data.toml; then
     echo "✅ Apply Rendering (TOML) passed"
 else
     echo "❌ Apply Rendering (TOML) failed"
@@ -103,11 +104,13 @@ echo "Testing Apply Rendering (Subdirectory)..."
 mkdir -p .config/test_dir
 cat <<EOF > .config/test_dir/test_sub.yaml
 API_KEY: sub-secret-key
+db_password: sub-db-pass
 EOF
 chezmoi add .config/test_dir/test_sub.yaml || true
 rm -f .config/test_dir/test_sub.yaml
 
-if chezmoi apply --force .config/test_dir/test_sub.yaml && [ -f .config/test_dir/test_sub.yaml ] && grep -q "sub-secret-key" .config/test_dir/test_sub.yaml; then
+if chezmoi apply --force .config/test_dir/test_sub.yaml && [ -f .config/test_dir/test_sub.yaml ] && \
+   grep -q "sub-secret-key" .config/test_dir/test_sub.yaml && grep -q "sub-db-pass" .config/test_dir/test_sub.yaml; then
     echo "✅ Apply Rendering (Subdirectory) passed"
 else
     echo "❌ Apply Rendering (Subdirectory) failed"

@@ -17,9 +17,8 @@ cleanup() {
     rm -rf .config/test_dir
     
     # Clean source directory - find all files/dirs with 'test_' in their name 
-    # (excluding the test script itself) and remove them.
-    # We use -name "*test_*" to catch private_test_, etc.
-    find "$SOURCE_DIR" -name "*test_*" -not -name "test_check-secrets.sh" -exec rm -rf {} +
+    # (excluding scripts) and remove them.
+    find "$SOURCE_DIR" -name "*test_*" -not -name "*.sh" -exec rm -rf {} +
 }
 
 trap cleanup EXIT

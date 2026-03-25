@@ -13,9 +13,8 @@ When you run `chezmoi add <file>`, the script triggers and provides several opti
 1.  **Full Encryption:** Encrypts the entire file using `chezmoi`'s built-in `age` support.
 2.  **SOPS Strategy (Recommended):** 
     *   Extracts only the sensitive key-value pairs.
-    *   Saves them into a SOPS-encrypted YAML file in the `secrets/` directory.
+    *   Saves them into a SOPS-encrypted YAML file in subdirectories within `secrets/` mirroring their relative `$HOME` path (e.g., `secrets/dot_config/app/settings.yaml.sops.yaml`).
     *   Converts the original file into a `chezmoi` template that retrieves values from the encrypted secrets at `chezmoi apply` time.
-    *   **New:** Secrets are organized into subdirectories within `secrets/` mirroring their relative `$HOME` path (e.g., `secrets/dot_config/app/settings.yaml.sops.yaml`).
 3.  **Plain:** Adds the file as-is (not recommended for secrets).
 4.  **Abort:** Cancels the `add` operation.
 

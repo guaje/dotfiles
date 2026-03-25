@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    paths:
+      - 'scripts/**'
+      - '.chezmoi.toml.tmpl'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - '.chezmoi.toml.tmpl'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [bash, zsh, fish]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zsh fish age curl
+          mkdir -p $HOME/.local/bin
+          # Install chezmoi
+          sh -c "$(curl -fsLS get.chezmoi.io)" -- -b $HOME/.local/bin
+          # Install sops
+          SOPS_VERSION=3.8.1
+          curl -LO https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.amd64
+          mv sops-v${SOPS_VERSION}.linux.amd64 $HOME/.local/bin/sops
+          chmod +x $HOME/.local/bin/sops
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Setup environment and age key
+        shell: ${{ matrix.shell }}
+        run: |
+          mkdir -p $HOME/.config/chezmoi
+          # Generate a new age key for CI
+          age-keygen -o $HOME/.config/chezmoi/key.txt
+          # Extract public key and save to GITHUB_ENV
+          if test "${{ matrix.shell }}" = "fish"
+            set -l pubkey (grep "public key:" $HOME/.config/chezmoi/key.txt | cut -d: -f2 | xargs)
+            echo "CI_PUBKEY=$pubkey" >> $GITHUB_ENV
+          else
+            PUBKEY=$(grep "public key:" $HOME/.config/chezmoi/key.txt | cut -d: -f2 | xargs)
+            echo "CI_PUBKEY=$PUBKEY" >> $GITHUB_ENV
+          fi
+
+      - name: Initialize chezmoi
+        run: |
+          # Use current directory as source
+          chezmoi init --source .
+          # Ensure the generated config uses the CI age key and recipient
+          sed -i "s/recipient = \".*\"/recipient = \"$CI_PUBKEY\"/" ~/.config/chezmoi/chezmoi.toml
+          # Verify sops can use the key (sanity check)
+          export SOPS_AGE_KEY_FILE=$HOME/.config/chezmoi/key.txt
+          echo "test: value" > test_sops.yaml
+          sops --encrypt --age $CI_PUBKEY test_sops.yaml > test_sops.enc.yaml
+          sops --decrypt test_sops.enc.yaml | grep -q "test: value"
+
+      - name: Run tests
+        shell: ${{ matrix.shell }}
+        run: |
+          # Ensure scripts are executable
+          chmod +x ./scripts/*.sh
+          # Run tests
+          ./scripts/test_check-secrets.sh
+          ./scripts/test_apply-secrets.sh

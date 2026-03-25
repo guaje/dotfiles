@@ -13,22 +13,20 @@ export SOPS_AGE_KEY_FILE="$HOME/.config/chezmoi/key.txt"
 cleanup() {
     echo "Cleaning up test files..."
     # Clean home directory
-    rm -f test_abort.yaml test_plain.yaml test_full.yaml test_data.yaml test_data.json test_data.toml 2>/dev/null
+    rm -f test_data.yaml test_data.json test_data.toml 2>/dev/null
     rm -rf .config/test_dir 2>/dev/null
+    rm -f test_abort.yaml test_plain.yaml test_full.yaml 2>/dev/null
     
     # Clean source directory - handle specific test prefixes surgically
-    # We avoid matching the scripts folder by not using a generic *test_* at the root
     for prefix in test_abort test_plain test_full test_data test_sub; do
-        # Remove files in the root of the source dir with these prefixes (including private_ and encrypted_)
         find "$SOURCE_DIR" -maxdepth 1 -name "*${prefix}*" -exec rm -rf {} + 2>/dev/null
-        # Remove files in the secrets dir with these prefixes
         if [ -d "$SOURCE_DIR/secrets" ]; then
-            find "$SOURCE_DIR/secrets" -maxdepth 1 -name "*${prefix}*" -exec rm -rf {} + 2>/dev/null
+            find "$SOURCE_DIR/secrets" -name "*${prefix}*" -exec rm -rf {} + 2>/dev/null
         fi
     done
     
     # Specifically clean the test_dir in dot_config
-    rm -rf "$SOURCE_DIR/dot_config/private_test_dir" 2>/dev/null
+    rm -rf "$SOURCE_DIR/dot_config/test_dir" 2>/dev/null
 }
 
 trap cleanup EXIT
@@ -61,7 +59,6 @@ fi
 echo "Testing Option 1 (Full Encryption)..."
 echo "API_KEY: full-encrypt-test" > test_full.yaml
 export TEST_CHOICE=1
-# chezmoi add will return 1 because the pre-hook exits with 1 after running the recursive add
 set +e
 chezmoi add test_full.yaml >/dev/null 2>&1
 set -e
@@ -84,6 +81,7 @@ export TEST_CHOICE=2
 set +e
 chezmoi add test_data.yaml >/dev/null 2>&1
 set -e
+# Expected path: secrets/test_data.yaml.sops.yaml (no dot_ because it's not a dotfile)
 if sops --decrypt "$SOURCE_DIR/secrets/test_data.yaml.sops.yaml" | grep -q "yaml-secret-key"; then
     echo "✅ Option 2 (YAML) passed"
 else
@@ -138,10 +136,12 @@ EOF
 set +e
 chezmoi add .config/test_dir/test_sub.yaml >/dev/null 2>&1
 set -e
-if sops --decrypt "$SOURCE_DIR/secrets/test_sub.yaml.sops.yaml" | grep -q "sub-secret-key"; then
+# Expected path: secrets/dot_config/test_dir/test_sub.yaml.sops.yaml
+if sops --decrypt "$SOURCE_DIR/secrets/dot_config/test_dir/test_sub.yaml.sops.yaml" | grep -q "sub-secret-key"; then
     echo "✅ Option 2 (Subdirectory) passed"
 else
     echo "❌ Option 2 (Subdirectory) failed"
+    echo "Expected secret at: $SOURCE_DIR/secrets/dot_config/test_dir/test_sub.yaml.sops.yaml"
     exit 1
 fi
 

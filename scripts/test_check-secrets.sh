@@ -19,14 +19,16 @@ cleanup() {
     
     # Clean source directory - handle specific test prefixes surgically
     for prefix in test_abort test_plain test_full test_data test_sub; do
-        find "$SOURCE_DIR" -maxdepth 1 -name "*${prefix}*" -exec rm -rf {} + 2>/dev/null
+        # Remove files in the root of the source dir with these prefixes (including private_ and encrypted_)
+        find "$SOURCE_DIR" -maxdepth 1 \( -name "*${prefix}*" -o -name "private_*${prefix}*" -o -name "encrypted_*${prefix}*" \) -exec rm -rf {} + 2>/dev/null
+        # Remove files in the secrets dir with these prefixes
         if [ -d "$SOURCE_DIR/secrets" ]; then
             find "$SOURCE_DIR/secrets" -name "*${prefix}*" -exec rm -rf {} + 2>/dev/null
         fi
     done
     
-    # Specifically clean the test_dir in dot_config
-    rm -rf "$SOURCE_DIR/dot_config/test_dir" 2>/dev/null
+    # Specifically clean the test_dir in dot_config (including private_ prefix)
+    rm -rf "$SOURCE_DIR/dot_config/test_dir" "$SOURCE_DIR/dot_config/private_test_dir" 2>/dev/null
 }
 
 trap cleanup EXIT

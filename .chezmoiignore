@@ -1,4 +1,9 @@
+# Ignore the age private key backup (if any)
 key.txt.age
+
+# Ignore documentation
 README.md
+
+# Ignore internal scripts and secret source files
 scripts/
 secrets/

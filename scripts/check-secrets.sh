@@ -83,11 +83,21 @@ for file in "${FILES_TO_ADD[@]}"; do
                 exit 1 
                 ;;
             2)
-                # Ensure the secrets directory exists in the source directory
-                mkdir -p "$SOURCE_DIR/secrets"
+                # Calculate relative path from HOME and transform to chezmoi-style path
+                # e.g., /home/user/.config/test.yaml -> dot_config/test.yaml
+                ABS_FILE=$(realpath "$file")
+                REL_PATH=$(realpath --relative-to="$HOME" "$ABS_FILE")
                 
-                SOPS_FILE_NAME="$(basename "$file").sops.yaml"
+                # Transform path: replace starting dot with dot_, and any /dot with /dot_
+                # This mirrors how chezmoi stores files in the source directory
+                CHEZMOI_REL_PATH=$(echo "$REL_PATH" | sed -e 's/^\./dot_/' -e 's/\/\./\/dot_/g')
+                
+                SOPS_FILE_NAME="${CHEZMOI_REL_PATH}.sops.yaml"
                 SOPS_SOURCE_PATH="$SOURCE_DIR/secrets/$SOPS_FILE_NAME"
+                
+                # Ensure the target directory for the secret exists
+                mkdir -p "$(dirname "$SOPS_SOURCE_PATH")"
+                
                 TMP_SECRETS_FILE=$(mktemp)
                 
                 # Create the template file

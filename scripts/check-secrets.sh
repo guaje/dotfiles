@@ -11,9 +11,21 @@ AUTH'
 SOURCE_DIR=$(chezmoi source-path)
 AGE_KEY=$(awk -F: '/public key:/ {gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); print $2; exit}' "$HOME/.config/chezmoi/key.txt" 2>/dev/null)
 
+TTY_AVAILABLE=false
+if { exec 3</dev/tty 4>/dev/tty; } 2>/dev/null; then
+    TTY_AVAILABLE=true
+fi
+
+cleanup_tty() {
+    if [ "$TTY_AVAILABLE" = true ]; then
+        exec 3<&-
+        exec 4>&-
+    fi
+}
+
 log() {
-    if tty -s 2>/dev/null; then
-        printf '%s\n' "$*" > /dev/tty
+    if [ "$TTY_AVAILABLE" = true ]; then
+        printf '%s\n' "$*" >&4
     else
         printf '%s\n' "$*" >&2
     fi
@@ -26,9 +38,9 @@ prompt_choice() {
         return 0
     fi
 
-    if tty -s 2>/dev/null; then
-        printf 'Select an option [1-4]: ' > /dev/tty
-        IFS= read -r CHOICE < /dev/tty
+    if [ "$TTY_AVAILABLE" = true ]; then
+        printf 'Select an option [1-4]: ' >&4
+        IFS= read -r CHOICE <&3
         return 0
     fi
 
@@ -66,7 +78,7 @@ FILES_TO_ADD_TMP=$(mktemp "${TMPDIR:-/tmp}/check-secrets.files.XXXXXX") || exit 
 cleanup_files_tmp() {
     rm -f "$FILES_TO_ADD_TMP"
 }
-trap cleanup_files_tmp EXIT HUP INT TERM
+trap 'cleanup_files_tmp; cleanup_tty' EXIT HUP INT TERM
 
 collect_files() {
     for arg in "$@"; do

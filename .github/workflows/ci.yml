@@ -36,38 +36,47 @@ jobs:
           chmod +x $HOME/.local/bin/sops
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Setup environment and age key
+      - name: Smoke test selected shell
         shell: ${{ matrix.shell }}
         run: |
-          mkdir -p $HOME/.config/chezmoi
+          echo "Running matrix shell: ${{ matrix.shell }}"
+          command -v ${{ matrix.shell }}
+
+      - name: Setup environment and age key
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.config/chezmoi"
           # Generate a new age key for CI
-          age-keygen -o $HOME/.config/chezmoi/key.txt
+          age-keygen -o "$HOME/.config/chezmoi/key.txt"
           # Extract public key and save to GITHUB_ENV
-          if test "${{ matrix.shell }}" = "fish"
-            set -l pubkey (grep "public key:" $HOME/.config/chezmoi/key.txt | cut -d: -f2 | xargs)
-            echo "CI_PUBKEY=$pubkey" >> $GITHUB_ENV
-          else
-            PUBKEY=$(grep "public key:" $HOME/.config/chezmoi/key.txt | cut -d: -f2 | xargs)
-            echo "CI_PUBKEY=$PUBKEY" >> $GITHUB_ENV
-          fi
+          PUBKEY=$(grep "public key:" "$HOME/.config/chezmoi/key.txt" | cut -d: -f2 | xargs)
+          echo "CI_PUBKEY=$PUBKEY" >> "$GITHUB_ENV"
 
       - name: Initialize chezmoi
+        shell: bash
         run: |
-          # Use current directory as source
+          set -euo pipefail
+          # Generate config for this checkout
           chezmoi init --source .
+          # Point chezmoi's default source path at the checked out repository so hooks resolve correctly
+          mkdir -p "$HOME/.local/share"
+          rm -rf "$HOME/.local/share/chezmoi"
+          ln -s "$PWD" "$HOME/.local/share/chezmoi"
           # Ensure the generated config uses the CI age key and recipient
-          sed -i "s/recipient = \".*\"/recipient = \"$CI_PUBKEY\"/" ~/.config/chezmoi/chezmoi.toml
+          sed -i "s/recipient = \".*\"/recipient = \"$CI_PUBKEY\"/" "$HOME/.config/chezmoi/chezmoi.toml"
           # Verify sops can use the key (sanity check)
-          export SOPS_AGE_KEY_FILE=$HOME/.config/chezmoi/key.txt
+          export SOPS_AGE_KEY_FILE="$HOME/.config/chezmoi/key.txt"
           echo "test: value" > test_sops.yaml
-          sops --encrypt --age $CI_PUBKEY test_sops.yaml > test_sops.enc.yaml
+          sops --encrypt --age "$CI_PUBKEY" test_sops.yaml > test_sops.enc.yaml
           sops --decrypt test_sops.enc.yaml | grep -q "test: value"
+          test "$(chezmoi source-path)" = "$HOME/.local/share/chezmoi"
 
-      - name: Run tests
+      - name: Run tests from selected shell
         shell: ${{ matrix.shell }}
         run: |
           # Ensure scripts are executable
           chmod +x ./scripts/*.sh
-          # Run tests
-          ./scripts/test_check-secrets.sh
-          ./scripts/test_apply-secrets.sh
+          # Run from the destination directory; the scripts look up the source via `chezmoi source-path`
+          cd "$HOME"
+          sh "$GITHUB_WORKSPACE/scripts/test_check-secrets.sh"
+          sh "$GITHUB_WORKSPACE/scripts/test_apply-secrets.sh"

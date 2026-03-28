@@ -12,7 +12,8 @@ SOURCE_DIR=$(chezmoi source-path)
 AGE_KEY=$(awk -F: '/public key:/ {gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); print $2; exit}' "$HOME/.config/chezmoi/key.txt" 2>/dev/null)
 
 TTY_AVAILABLE=false
-if { exec 3</dev/tty 4>/dev/tty; } 2>/dev/null; then
+if ( : </dev/tty >/dev/tty ) 2>/dev/null; then
+    exec 3</dev/tty 4>/dev/tty
     TTY_AVAILABLE=true
 fi
 
@@ -61,14 +62,18 @@ iter_all_args() {
 }
 
 is_bypass=false
-for arg in $(iter_all_args "$@"); do
-    case "$arg" in
-        --encrypt|-e|*.tmpl|*.sops.yaml)
-            is_bypass=true
-            break
-            ;;
-    esac
-done
+if [ "${CHECK_SECRETS_BYPASS:-}" = 1 ]; then
+    is_bypass=true
+else
+    for arg in $(iter_all_args "$@"); do
+        case "$arg" in
+            --encrypt|-e|*.tmpl|*.sops.yaml)
+                is_bypass=true
+                break
+                ;;
+        esac
+    done
+fi
 
 if [ "$is_bypass" = true ]; then
     exit 0
@@ -96,13 +101,17 @@ if [ ! -s "$FILES_TO_ADD_TMP" ] && [ -n "${CHEZMOI_ARGS:-}" ]; then
     collect_files $CHEZMOI_ARGS
 fi
 
-relpath_from_home() {
-    python3 - "$1" "$HOME" <<'PY'
+relpath() {
+    python3 - "$1" "$2" <<'PY'
 import os, sys
 path = os.path.abspath(sys.argv[1])
-home = os.path.abspath(sys.argv[2])
-print(os.path.relpath(path, home))
+base = os.path.abspath(sys.argv[2])
+print(os.path.relpath(path, base))
 PY
+}
+
+relpath_from_home() {
+    relpath "$1" "$HOME"
 }
 
 chezmoi_relpath() {
@@ -177,6 +186,8 @@ while IFS= read -r file; do
             if chezmoi add --encrypt "$file"; then
                 SOURCE_FILE=$(chezmoi source-path "$file" 2>/dev/null)
                 case "$(basename "$SOURCE_FILE")" in
+                    encrypted_private_*)
+                        ;;
                     encrypted_*)
                         dir=$(dirname "$SOURCE_FILE")
                         base=$(basename "$SOURCE_FILE")
@@ -195,9 +206,20 @@ import os, sys
 print(os.path.abspath(sys.argv[1]))
 PY
 )
-            REL_PATH=$(relpath_from_home "$ABS_FILE") || exit 1
-            CHEZMOI_REL_PATH=$(chezmoi_relpath "$REL_PATH")
-            SOPS_FILE_NAME=${CHEZMOI_REL_PATH}.sops.yaml
+
+            log "Adding $file to chezmoi to determine source naming..."
+            CHECK_SECRETS_BYPASS=1 chezmoi add "$file" || exit 1
+
+            SOURCE_FILE=$(chezmoi source-path "$file" 2>/dev/null) || exit 1
+            SOURCE_FILE_BASE=$SOURCE_FILE
+            case "$SOURCE_FILE_BASE" in
+                *.literal)
+                    SOURCE_FILE_BASE=${SOURCE_FILE_BASE%.literal}
+                    ;;
+            esac
+
+            SOURCE_REL_PATH=$(relpath "$SOURCE_FILE_BASE" "$SOURCE_DIR") || exit 1
+            SOPS_FILE_NAME=${SOURCE_REL_PATH}.sops.yaml
             SOPS_SOURCE_PATH=$SOURCE_DIR/secrets/$SOPS_FILE_NAME
 
             mkdir -p "$(dirname "$SOPS_SOURCE_PATH")" || exit 1
@@ -259,37 +281,32 @@ PY
 
             if [ ! -s "$TMP_SECRETS_FILE" ]; then
                 log 'No extractable secrets found; aborting.'
-                rm -f "$TMP_SECRETS_FILE" "$TMP_TEMPLATE_FILE" "$TMP_KEYS_FILE"
+                rm -f "$TMP_SECRETS_FILE" "$TMP_TEMPLATE_FILE" "$TMP_KEYS_FILE" "$SOURCE_FILE"
                 exit 1
             fi
 
             log "Creating sops-encrypted file at $SOPS_SOURCE_PATH..."
             if ! sops --encrypt --age "$AGE_KEY" "$TMP_SECRETS_FILE" > "$SOPS_SOURCE_PATH"; then
-                rm -f "$TMP_SECRETS_FILE" "$TMP_TEMPLATE_FILE" "$TMP_KEYS_FILE"
+                rm -f "$TMP_SECRETS_FILE" "$TMP_TEMPLATE_FILE" "$TMP_KEYS_FILE" "$SOURCE_FILE"
                 exit 1
             fi
 
-            FINAL_TMPL_NAME=${file}.tmpl
-            log "Adding template $FINAL_TMPL_NAME to chezmoi..."
-            cp "$TMP_TEMPLATE_FILE" "$FINAL_TMPL_NAME" || {
-                rm -f "$TMP_SECRETS_FILE" "$TMP_TEMPLATE_FILE" "$TMP_KEYS_FILE"
-                exit 1
-            }
-            chezmoi add "$FINAL_TMPL_NAME" || {
-                rm -f "$TMP_SECRETS_FILE" "$TMP_TEMPLATE_FILE" "$TMP_KEYS_FILE" "$FINAL_TMPL_NAME"
+            log "Replacing $SOURCE_FILE with template content..."
+            cp "$TMP_TEMPLATE_FILE" "$SOURCE_FILE" || {
+                rm -f "$TMP_SECRETS_FILE" "$TMP_TEMPLATE_FILE" "$TMP_KEYS_FILE" "$SOURCE_FILE"
                 exit 1
             }
 
-            SOURCE_FILE=$(chezmoi source-path "$FINAL_TMPL_NAME" 2>/dev/null)
-            case "$SOURCE_FILE" in
-                *.literal)
-                    NEW_SOURCE_FILE=${SOURCE_FILE%.literal}
-                    mv "$SOURCE_FILE" "$NEW_SOURCE_FILE"
-                    ;;
-            esac
+            FINAL_SOURCE_FILE=${SOURCE_FILE_BASE}.tmpl
+            if [ "$SOURCE_FILE" != "$FINAL_SOURCE_FILE" ]; then
+                mv "$SOURCE_FILE" "$FINAL_SOURCE_FILE" || {
+                    rm -f "$TMP_SECRETS_FILE" "$TMP_TEMPLATE_FILE" "$TMP_KEYS_FILE" "$SOURCE_FILE"
+                    exit 1
+                }
+            fi
 
             log 'Cleaning up...'
-            rm -f "$file" "$FINAL_TMPL_NAME" "$TMP_TEMPLATE_FILE" "$TMP_SECRETS_FILE" "$TMP_KEYS_FILE"
+            rm -f "$file" "$TMP_TEMPLATE_FILE" "$TMP_SECRETS_FILE" "$TMP_KEYS_FILE"
 
             log '✅ SOPS strategy complete.'
             exit 1

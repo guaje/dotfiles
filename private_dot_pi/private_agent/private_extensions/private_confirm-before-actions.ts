@@ -1,6 +1,5 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { DynamicBorder, isToolCallEventType } from "@mariozechner/pi-coding-agent";
-import { Container, SelectList, Spacer, Text, type SelectItem } from "@mariozechner/pi-tui";
+import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -8,7 +7,7 @@ function summarizeWrite(content: string | undefined) {
   if (!content) return "";
   const lines = content.split("\n").length;
   const chars = content.length;
-  return `\n\nNew content: ${lines} line${lines === 1 ? "" : "s"}, ${chars} char${chars === 1 ? "" : "s"}`;
+  return `\n\n${uiLabel("New content:")} ${colorize(`${lines} line${lines === 1 ? "" : "s"}, ${chars} char${chars === 1 ? "" : "s"}`, UI_PALETTE.hint)}`;
 }
 
 const COLOR_RESET = "\x1b[0m";
@@ -45,10 +44,6 @@ type UiPalette = {
   separator: string;
   hint: string;
   hintKey: string;
-  selectedYesBg: string;
-  selectedNoBg: string;
-  selectedYesText: string;
-  selectedNoText: string;
 };
 
 type BashWarningLevel = "danger" | "warning" | "caution";
@@ -150,10 +145,6 @@ function getUiPalette(theme: ThemeFile | undefined): UiPalette {
       separator: resolveThemeColor(theme, theme.colors?.dim ?? theme.colors?.muted) ?? "\x1b[38;5;245m",
       hint: resolveThemeColor(theme, theme.colors?.dim ?? theme.colors?.muted) ?? "\x1b[38;5;245m",
       hintKey: resolveThemeColor(theme, theme.colors?.accent ?? theme.colors?.mdLink) ?? "\x1b[38;5;183m",
-      selectedYesBg: resolveThemeBgColor(theme, theme.vars?.green) ?? "\x1b[48;5;151m",
-      selectedNoBg: resolveThemeBgColor(theme, theme.vars?.red) ?? "\x1b[48;5;210m",
-      selectedYesText: resolveThemeColor(theme, theme.vars?.base ?? theme.colors?.text) ?? "\x1b[38;5;235m",
-      selectedNoText: resolveThemeColor(theme, theme.vars?.base ?? theme.colors?.text) ?? "\x1b[38;5;235m",
     };
   }
 
@@ -170,10 +161,6 @@ function getUiPalette(theme: ThemeFile | undefined): UiPalette {
     separator: "\x1b[38;5;245m",
     hint: "\x1b[38;5;245m",
     hintKey: "\x1b[38;5;183m",
-    selectedYesBg: "\x1b[48;5;151m",
-    selectedNoBg: "\x1b[48;5;210m",
-    selectedYesText: "\x1b[38;5;235m",
-    selectedNoText: "\x1b[38;5;235m",
   };
 }
 
@@ -463,30 +450,6 @@ function uiHintKey(text: string) {
   return colorize(text, UI_PALETTE.hintKey);
 }
 
-function uiPrimaryAction(text: string) {
-  return colorize(bold(text), UI_PALETTE.primaryAction);
-}
-
-function uiSecondaryAction(text: string) {
-  return colorize(text, UI_PALETTE.secondaryAction);
-}
-
-function uiDangerAction(text: string) {
-  return colorize(bold(text), UI_PALETTE.danger);
-}
-
-function stripAnsi(text: string) {
-  return text.replace(/\x1b\[[0-9;]*m/g, "");
-}
-
-function styleSelectedOption(text: string) {
-  const plain = stripAnsi(text).trim();
-  const isYes = /\bYes\b/.test(plain);
-  const bg = isYes ? UI_PALETTE.selectedYesBg : UI_PALETTE.selectedNoBg;
-  const fg = isYes ? UI_PALETTE.selectedYesText : UI_PALETTE.selectedNoText;
-  return `${bg}${colorize(bold(`[ ${plain} ]`), fg)}${COLOR_RESET}`;
-}
-
 function formatConfirmTitle(text: string) {
   return colorize(bold(text), UI_PALETTE.title);
 }
@@ -686,47 +649,6 @@ function summarizeBash(command: string | undefined) {
   return `${uiLabel("Command:")}\n\n${highlightWholeCommand(command, commandNames)}\n\n${uiLabel("Programs to run:")} ${commandList}${warningBlock}`;
 }
 
-async function confirmBashCommand(ctx: any, command: string | undefined) {
-  const body = summarizeBash(command);
-  const items: SelectItem[] = [
-    { value: "yes", label: uiHint("Yes") },
-    { value: "no", label: colorize("No", UI_PALETTE.hint) },
-  ];
-
-  const result = await ctx.ui.custom<string | null>((tui, theme, _kb, done) => {
-    const container = new Container();
-    container.addChild(new DynamicBorder((s: string) => theme.fg("warning", s)));
-    container.addChild(new Text(colorize(bold("Allow bash command?"), UI_PALETTE.title), 1, 0));
-    container.addChild(new Spacer(1));
-    container.addChild(new Text(body, 1, 0));
-    container.addChild(new Spacer(1));
-
-    const selectList = new SelectList(items, items.length, {
-      selectedPrefix: () => colorize(bold("❯"), UI_PALETTE.primaryAction),
-      selectedText: (t) => styleSelectedOption(t),
-      description: (t) => colorize(t, UI_PALETTE.hint),
-      scrollInfo: (t) => colorize(t, UI_PALETTE.hint),
-      noMatch: (t) => colorize(t, UI_PALETTE.warning),
-    });
-    selectList.onSelect = (item) => done(String(item.value));
-    selectList.onCancel = () => done(null);
-    container.addChild(selectList);
-    container.addChild(new Spacer(1));
-    container.addChild(new Text(`${uiHintKey("↑↓ navigate")} ${colorize("•", UI_PALETTE.separator)} ${uiHintKey("enter select")} ${colorize("•", UI_PALETTE.separator)} ${uiHintKey("escape/ctrl+c cancel")}`, 1, 0));
-    container.addChild(new DynamicBorder((s: string) => theme.fg("borderMuted", s)));
-
-    return {
-      render: (width) => container.render(width),
-      invalidate: () => container.invalidate(),
-      handleInput: (data) => {
-        selectList.handleInput?.(data);
-        tui.requestRender();
-      },
-    };
-  }, { overlay: true, overlayOptions: { width: "92%", minWidth: 40, maxHeight: "80%" } });
-
-  return result === "yes";
-}
 
 export default function (pi: ExtensionAPI) {
   pi.on("tool_call", async (event, ctx) => {
@@ -735,7 +657,10 @@ export default function (pi: ExtensionAPI) {
         return { block: true, reason: "Bash command blocked (no UI available for confirmation)" };
       }
 
-      const ok = await confirmBashCommand(ctx, event.input.command);
+      const ok = await ctx.ui.confirm(
+        formatConfirmTitle("Allow bash command?"),
+        summarizeBash(event.input.command),
+      );
 
       if (!ok) return { block: true, reason: "Bash command blocked by user" };
       return undefined;
@@ -747,8 +672,8 @@ export default function (pi: ExtensionAPI) {
       }
 
       const ok = await ctx.ui.confirm(
-        "Allow file write?",
-        `Path:\n\n${event.input.path}${summarizeWrite(event.input.content)}`,
+        formatConfirmTitle("Allow file write?"),
+        `${uiLabel("Path:")}\n\n${colorize(event.input.path, SYNTAX_PALETTE.text)}${summarizeWrite(event.input.content)}`,
       );
 
       if (!ok) return { block: true, reason: "File write blocked by user" };
@@ -761,8 +686,8 @@ export default function (pi: ExtensionAPI) {
       }
 
       const ok = await ctx.ui.confirm(
-        "Allow file edit?",
-        `Path:\n\n${event.input.path}`,
+        formatConfirmTitle("Allow file edit?"),
+        `${uiLabel("Path:")}\n\n${colorize(event.input.path, SYNTAX_PALETTE.text)}`,
       );
 
       if (!ok) return { block: true, reason: "File edit blocked by user" };

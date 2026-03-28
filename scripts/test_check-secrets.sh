@@ -16,8 +16,8 @@ cleanup() {
     rm -f "$TEST_ROOT/test_abort.yaml" "$TEST_ROOT/test_plain.yaml" "$TEST_ROOT/test_full.yaml" 2>/dev/null || true
     rm -rf "$TEST_ROOT/.config/test_dir" 2>/dev/null || true
     rm -rf "$HOME/.pi/agent/themes/test_check_secrets" 2>/dev/null || true
-    rm -rf "$SOURCE_DIR/private_dot_pi/private_agent/private_themes/private_test_check_secrets" 2>/dev/null || true
-    rm -rf "$SOURCE_DIR/secrets/private_dot_pi/private_agent/private_themes/private_test_check_secrets" 2>/dev/null || true
+    rm -rf "$SOURCE_DIR/private_dot_pi/private_agent/private_themes/test_check_secrets" 2>/dev/null || true
+    rm -rf "$SOURCE_DIR/secrets/private_dot_pi/private_agent/private_themes/test_check_secrets" 2>/dev/null || true
 
     for prefix in test_abort test_plain test_full test_data test_sub; do
         find "$SOURCE_DIR" -maxdepth 1 \( -name "*${prefix}*" -o -name "private_*${prefix}*" -o -name "encrypted_*${prefix}*" \) -exec rm -rf {} + 2>/dev/null || true
@@ -165,10 +165,14 @@ cat <<'EOF' > "$HOME/.pi/agent/themes/test_check_secrets/catppuccin-mocha.json"
 }
 EOF
 chezmoi add "$HOME/.pi/agent/themes/test_check_secrets/catppuccin-mocha.json" >/dev/null 2>&1 || true
-if [ -f "$SOURCE_DIR/private_dot_pi/private_agent/private_themes/private_test_check_secrets/private_catppuccin-mocha.json.tmpl" ] \
-   && sops --decrypt "$SOURCE_DIR/secrets/private_dot_pi/private_agent/private_themes/private_test_check_secrets/private_catppuccin-mocha.json.sops.yaml" | grep -q "theme-secret-key"; then
+THEME_TMPL=$(template_source_path "$HOME/.pi/agent/themes/test_check_secrets/catppuccin-mocha.json")
+THEME_SOPS=$(sops_source_path "$HOME/.pi/agent/themes/test_check_secrets/catppuccin-mocha.json")
+if [ -f "$THEME_TMPL" ] \
+   && sops --decrypt "$THEME_SOPS" | grep -q "theme-secret-key"; then
     pass "Option 2 (chezmoi source naming) passed"
 else
+    echo "Expected template at: $THEME_TMPL"
+    echo "Expected secret at: $THEME_SOPS"
     fail "Option 2 (chezmoi source naming) failed"
 fi
 

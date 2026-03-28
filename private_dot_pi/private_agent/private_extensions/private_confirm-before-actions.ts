@@ -45,6 +45,10 @@ type UiPalette = {
   separator: string;
   hint: string;
   hintKey: string;
+  selectedYesBg: string;
+  selectedNoBg: string;
+  selectedYesText: string;
+  selectedNoText: string;
 };
 
 type BashWarningLevel = "danger" | "warning" | "caution";
@@ -60,20 +64,39 @@ type RiskyToken = {
   level: BashWarningLevel;
 };
 
-function hexToAnsiColor(hex: string) {
+function parseHexColor(hex: string) {
   const normalized = hex.trim().replace(/^#/, "");
   if (!/^[0-9a-fA-F]{6}$/.test(normalized)) return undefined;
 
   const r = Number.parseInt(normalized.slice(0, 2), 16);
   const g = Number.parseInt(normalized.slice(2, 4), 16);
   const b = Number.parseInt(normalized.slice(4, 6), 16);
-  return `\x1b[38;2;${r};${g};${b}m`;
+  return { r, g, b };
+}
+
+function hexToAnsiColor(hex: string) {
+  const rgb = parseHexColor(hex);
+  return rgb ? `\x1b[38;2;${rgb.r};${rgb.g};${rgb.b}m` : undefined;
+}
+
+function hexToAnsiBgColor(hex: string) {
+  const rgb = parseHexColor(hex);
+  return rgb ? `\x1b[48;2;${rgb.r};${rgb.g};${rgb.b}m` : undefined;
+}
+
+function resolveThemeRawColor(theme: ThemeFile, colorName: string | undefined) {
+  if (!colorName) return undefined;
+  return colorName.startsWith("#") ? colorName : theme.vars?.[colorName];
 }
 
 function resolveThemeColor(theme: ThemeFile, colorName: string | undefined) {
-  if (!colorName) return undefined;
-  const resolvedColor = colorName.startsWith("#") ? colorName : theme.vars?.[colorName];
+  const resolvedColor = resolveThemeRawColor(theme, colorName);
   return resolvedColor ? hexToAnsiColor(resolvedColor) : undefined;
+}
+
+function resolveThemeBgColor(theme: ThemeFile, colorName: string | undefined) {
+  const resolvedColor = resolveThemeRawColor(theme, colorName);
+  return resolvedColor ? hexToAnsiBgColor(resolvedColor) : undefined;
 }
 
 function getThemeFile() {
@@ -127,6 +150,10 @@ function getUiPalette(theme: ThemeFile | undefined): UiPalette {
       separator: resolveThemeColor(theme, theme.colors?.dim ?? theme.colors?.muted) ?? "\x1b[38;5;245m",
       hint: resolveThemeColor(theme, theme.colors?.dim ?? theme.colors?.muted) ?? "\x1b[38;5;245m",
       hintKey: resolveThemeColor(theme, theme.colors?.accent ?? theme.colors?.mdLink) ?? "\x1b[38;5;183m",
+      selectedYesBg: resolveThemeBgColor(theme, theme.vars?.green) ?? "\x1b[48;5;151m",
+      selectedNoBg: resolveThemeBgColor(theme, theme.vars?.red) ?? "\x1b[48;5;210m",
+      selectedYesText: resolveThemeColor(theme, theme.vars?.base ?? theme.colors?.text) ?? "\x1b[38;5;235m",
+      selectedNoText: resolveThemeColor(theme, theme.vars?.base ?? theme.colors?.text) ?? "\x1b[38;5;235m",
     };
   }
 
@@ -143,6 +170,10 @@ function getUiPalette(theme: ThemeFile | undefined): UiPalette {
     separator: "\x1b[38;5;245m",
     hint: "\x1b[38;5;245m",
     hintKey: "\x1b[38;5;183m",
+    selectedYesBg: "\x1b[48;5;151m",
+    selectedNoBg: "\x1b[48;5;210m",
+    selectedYesText: "\x1b[38;5;235m",
+    selectedNoText: "\x1b[38;5;235m",
   };
 }
 
@@ -440,6 +471,22 @@ function uiSecondaryAction(text: string) {
   return colorize(text, UI_PALETTE.secondaryAction);
 }
 
+function uiDangerAction(text: string) {
+  return colorize(bold(text), UI_PALETTE.danger);
+}
+
+function stripAnsi(text: string) {
+  return text.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
+function styleSelectedOption(text: string) {
+  const plain = stripAnsi(text).trim();
+  const isYes = /\bYes\b/.test(plain);
+  const bg = isYes ? UI_PALETTE.selectedYesBg : UI_PALETTE.selectedNoBg;
+  const fg = isYes ? UI_PALETTE.selectedYesText : UI_PALETTE.selectedNoText;
+  return `${bg}${colorize(bold(`[ ${plain} ]`), fg)}${COLOR_RESET}`;
+}
+
 function formatConfirmTitle(text: string) {
   return colorize(bold(text), UI_PALETTE.title);
 }
@@ -642,8 +689,8 @@ function summarizeBash(command: string | undefined) {
 async function confirmBashCommand(ctx: any, command: string | undefined) {
   const body = summarizeBash(command);
   const items: SelectItem[] = [
-    { value: "yes", label: uiPrimaryAction("Yes") },
-    { value: "no", label: colorize("No", UI_PALETTE.danger) },
+    { value: "yes", label: uiHint("Yes") },
+    { value: "no", label: colorize("No", UI_PALETTE.hint) },
   ];
 
   const result = await ctx.ui.custom<string | null>((tui, theme, _kb, done) => {
@@ -655,8 +702,8 @@ async function confirmBashCommand(ctx: any, command: string | undefined) {
     container.addChild(new Spacer(1));
 
     const selectList = new SelectList(items, items.length, {
-      selectedPrefix: (t) => colorize(t, UI_PALETTE.primaryAction),
-      selectedText: (t) => t,
+      selectedPrefix: () => colorize(bold("❯"), UI_PALETTE.primaryAction),
+      selectedText: (t) => styleSelectedOption(t),
       description: (t) => colorize(t, UI_PALETTE.hint),
       scrollInfo: (t) => colorize(t, UI_PALETTE.hint),
       noMatch: (t) => colorize(t, UI_PALETTE.warning),

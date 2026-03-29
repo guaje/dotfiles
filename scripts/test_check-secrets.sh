@@ -6,27 +6,32 @@
 set -eu
 
 SOURCE_DIR=$(chezmoi source-path)
-TEST_ROOT=$HOME
+TEST_ROOT="$HOME/.test"
+CONFIG_TEST_ROOT="$HOME/.config/test"
 export SOPS_AGE_KEY_FILE="$HOME/.config/chezmoi/key.txt"
 
 cleanup() {
     echo "Cleaning up test files..."
 
-    rm -f "$TEST_ROOT/test_data.yaml" "$TEST_ROOT/test_data.json" "$TEST_ROOT/test_data.toml" 2>/dev/null || true
-    rm -f "$TEST_ROOT/test_abort.yaml" "$TEST_ROOT/test_plain.yaml" "$TEST_ROOT/test_full.yaml" 2>/dev/null || true
-    rm -rf "$TEST_ROOT/.config/test_dir" 2>/dev/null || true
+    rm -rf "$TEST_ROOT" "$CONFIG_TEST_ROOT" 2>/dev/null || true
     rm -rf "$HOME/.pi/agent/themes/test_check_secrets" 2>/dev/null || true
     rm -rf "$SOURCE_DIR/private_dot_pi/private_agent/private_themes/test_check_secrets" 2>/dev/null || true
     rm -rf "$SOURCE_DIR/secrets/private_dot_pi/private_agent/private_themes/test_check_secrets" 2>/dev/null || true
 
     for prefix in test_abort test_plain test_full test_data test_sub; do
-        find "$SOURCE_DIR" -maxdepth 1 \( -name "*${prefix}*" -o -name "private_*${prefix}*" -o -name "encrypted_*${prefix}*" \) -exec rm -rf {} + 2>/dev/null || true
+        find "$SOURCE_DIR" -maxdepth 2 \( -name "*${prefix}*" -o -name "private_*${prefix}*" -o -name "encrypted_*${prefix}*" \) -exec rm -rf {} + 2>/dev/null || true
         if [ -d "$SOURCE_DIR/secrets" ]; then
             find "$SOURCE_DIR/secrets" -name "*${prefix}*" -exec rm -rf {} + 2>/dev/null || true
         fi
     done
 
-    rm -rf "$SOURCE_DIR/dot_config/test_dir" "$SOURCE_DIR/dot_config/private_test_dir" 2>/dev/null || true
+    rm -rf "$SOURCE_DIR/dot_test" "$SOURCE_DIR/private_dot_test" 2>/dev/null || true
+    rm -rf "$SOURCE_DIR/dot_config/test" "$SOURCE_DIR/dot_config/private_test" 2>/dev/null || true
+}
+
+prepare_test_dirs() {
+    cleanup
+    mkdir -p "$TEST_ROOT" "$CONFIG_TEST_ROOT"
 }
 
 fail() {
@@ -55,6 +60,7 @@ echo "Starting tests for check-secrets.sh..."
 
 # 1. Test Option 4: Abort
 echo "Testing Option 4 (Abort)..."
+prepare_test_dirs
 printf '%s\n' 'AUTH: abort-test' > "$TEST_ROOT/test_abort.yaml"
 export TEST_CHOICE=4
 if chezmoi add "$TEST_ROOT/test_abort.yaml" 2>/dev/null; then
@@ -65,6 +71,7 @@ fi
 
 # 2. Test Option 3: Plain
 echo "Testing Option 3 (Plain)..."
+prepare_test_dirs
 printf '%s\n' 'SECRET: plain-test' > "$TEST_ROOT/test_plain.yaml"
 export TEST_CHOICE=3
 if chezmoi add "$TEST_ROOT/test_plain.yaml"; then
@@ -75,6 +82,7 @@ fi
 
 # 3. Test Option 1: Full Encryption
 echo "Testing Option 1 (Full Encryption)..."
+prepare_test_dirs
 printf '%s\n' 'API_KEY: full-encrypt-test' > "$TEST_ROOT/test_full.yaml"
 export TEST_CHOICE=1
 chezmoi add "$TEST_ROOT/test_full.yaml" >/dev/null 2>&1 || true
@@ -86,6 +94,7 @@ fi
 
 # 4. Test Option 2: SOPS Strategy (YAML)
 echo "Testing Option 2 (SOPS - YAML)..."
+prepare_test_dirs
 cat <<'EOF' > "$TEST_ROOT/test_data.yaml"
 app_name: MyTestApp
 API_KEY: yaml-secret-key
@@ -104,6 +113,7 @@ fi
 
 # 5. Test Option 2: SOPS Strategy (JSON)
 echo "Testing Option 2 (SOPS - JSON)..."
+prepare_test_dirs
 cat <<'EOF' > "$TEST_ROOT/test_data.json"
 {
   "app_name": "MyTestApp",
@@ -123,6 +133,7 @@ fi
 
 # 6. Test Option 2: SOPS Strategy (TOML)
 echo "Testing Option 2 (SOPS - TOML)..."
+prepare_test_dirs
 cat <<'EOF' > "$TEST_ROOT/test_data.toml"
 app_name = "MyTestApp"
 API_KEY = "toml-secret-key"
@@ -140,13 +151,13 @@ fi
 
 # 7. Test Option 2: SOPS Strategy (Subdirectory)
 echo "Testing Option 2 (Subdirectory)..."
-mkdir -p "$TEST_ROOT/.config/test_dir"
-cat <<'EOF' > "$TEST_ROOT/.config/test_dir/test_sub.yaml"
+prepare_test_dirs
+cat <<'EOF' > "$CONFIG_TEST_ROOT/test_sub.yaml"
 API_KEY: sub-secret-key
 EOF
-chezmoi add "$TEST_ROOT/.config/test_dir/test_sub.yaml" >/dev/null 2>&1 || true
-SUB_TMPL=$(template_source_path "$TEST_ROOT/.config/test_dir/test_sub.yaml")
-SUB_SOPS=$(sops_source_path "$TEST_ROOT/.config/test_dir/test_sub.yaml")
+chezmoi add "$CONFIG_TEST_ROOT/test_sub.yaml" >/dev/null 2>&1 || true
+SUB_TMPL=$(template_source_path "$CONFIG_TEST_ROOT/test_sub.yaml")
+SUB_SOPS=$(sops_source_path "$CONFIG_TEST_ROOT/test_sub.yaml")
 if [ -f "$SUB_TMPL" ] && sops --decrypt "$SUB_SOPS" | grep -q "sub-secret-key"; then
     pass "Option 2 (Subdirectory) passed"
 else
@@ -157,6 +168,7 @@ fi
 # 8. Test Option 2: SOPS Strategy follows chezmoi source naming
 
 echo "Testing Option 2 (chezmoi source naming)..."
+prepare_test_dirs
 mkdir -p "$HOME/.pi/agent/themes/test_check_secrets"
 cat <<'EOF' > "$HOME/.pi/agent/themes/test_check_secrets/catppuccin-mocha.json"
 {

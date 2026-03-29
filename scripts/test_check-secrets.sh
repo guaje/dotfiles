@@ -14,10 +14,6 @@ cleanup() {
     echo "Cleaning up test files..."
 
     rm -rf "$TEST_ROOT" "$CONFIG_TEST_ROOT" 2>/dev/null || true
-    rm -rf "$HOME/.pi/agent/themes/test_check_secrets" 2>/dev/null || true
-    rm -rf "$SOURCE_DIR/private_dot_pi/private_agent/private_themes/test_check_secrets" 2>/dev/null || true
-    rm -rf "$SOURCE_DIR/secrets/private_dot_pi/private_agent/private_themes/test_check_secrets" 2>/dev/null || true
-
     for prefix in test_abort test_plain test_full test_data test_sub; do
         find "$SOURCE_DIR" -maxdepth 2 \( -name "*${prefix}*" -o -name "private_*${prefix}*" -o -name "encrypted_*${prefix}*" \) -exec rm -rf {} + 2>/dev/null || true
         if [ -d "$SOURCE_DIR/secrets" ]; then
@@ -43,6 +39,12 @@ pass() {
     echo "✅ $1"
 }
 
+run_chezmoi_add() {
+    choice=$1
+    shift
+    TEST_CHOICE=$choice chezmoi add "$@"
+}
+
 template_source_path() {
     chezmoi source-path "$1"
 }
@@ -62,8 +64,7 @@ echo "Starting tests for check-secrets.sh..."
 echo "Testing Option 4 (Abort)..."
 prepare_test_dirs
 printf '%s\n' 'AUTH: abort-test' > "$TEST_ROOT/test_abort.yaml"
-export TEST_CHOICE=4
-if chezmoi add "$TEST_ROOT/test_abort.yaml" 2>/dev/null; then
+if run_chezmoi_add 4 "$TEST_ROOT/test_abort.yaml" 2>/dev/null; then
     fail "Option 4 failed: chezmoi add should have been aborted"
 else
     pass "Option 4 passed"
@@ -73,8 +74,7 @@ fi
 echo "Testing Option 3 (Plain)..."
 prepare_test_dirs
 printf '%s\n' 'SECRET: plain-test' > "$TEST_ROOT/test_plain.yaml"
-export TEST_CHOICE=3
-if chezmoi add "$TEST_ROOT/test_plain.yaml"; then
+if run_chezmoi_add 3 "$TEST_ROOT/test_plain.yaml"; then
     pass "Option 3 passed"
 else
     fail "Option 3 failed"
@@ -84,9 +84,8 @@ fi
 echo "Testing Option 1 (Full Encryption)..."
 prepare_test_dirs
 printf '%s\n' 'API_KEY: full-encrypt-test' > "$TEST_ROOT/test_full.yaml"
-export TEST_CHOICE=1
-chezmoi add "$TEST_ROOT/test_full.yaml" >/dev/null 2>&1 || true
-if [ -f "$SOURCE_DIR/encrypted_private_test_full.yaml.age" ]; then
+run_chezmoi_add 1 "$TEST_ROOT/test_full.yaml" >/dev/null 2>&1 || true
+if [ -f "$SOURCE_DIR/private_dot_test/encrypted_private_test_full.yaml.age" ]; then
     pass "Option 1 passed"
 else
     fail "Option 1 failed: encrypted file not found in source"
@@ -101,8 +100,7 @@ API_KEY: yaml-secret-key
 port: 8080
 db_password: yaml-db-pass
 EOF
-export TEST_CHOICE=2
-chezmoi add "$TEST_ROOT/test_data.yaml" >/dev/null 2>&1 || true
+run_chezmoi_add 2 "$TEST_ROOT/test_data.yaml" >/dev/null 2>&1 || true
 YAML_TMPL=$(template_source_path "$TEST_ROOT/test_data.yaml")
 YAML_SOPS=$(sops_source_path "$TEST_ROOT/test_data.yaml")
 if [ -f "$YAML_TMPL" ] && sops --decrypt "$YAML_SOPS" | grep -q "yaml-secret-key"; then
@@ -122,7 +120,7 @@ cat <<'EOF' > "$TEST_ROOT/test_data.json"
   "db_password": "json-db-pass"
 }
 EOF
-chezmoi add "$TEST_ROOT/test_data.json" >/dev/null 2>&1 || true
+run_chezmoi_add 2 "$TEST_ROOT/test_data.json" >/dev/null 2>&1 || true
 JSON_TMPL=$(template_source_path "$TEST_ROOT/test_data.json")
 JSON_SOPS=$(sops_source_path "$TEST_ROOT/test_data.json")
 if [ -f "$JSON_TMPL" ] && sops --decrypt "$JSON_SOPS" | grep -q "json-secret-key"; then
@@ -140,7 +138,7 @@ API_KEY = "toml-secret-key"
 port = 8080
 db_password = "toml-db-pass"
 EOF
-chezmoi add "$TEST_ROOT/test_data.toml" >/dev/null 2>&1 || true
+run_chezmoi_add 2 "$TEST_ROOT/test_data.toml" >/dev/null 2>&1 || true
 TOML_TMPL=$(template_source_path "$TEST_ROOT/test_data.toml")
 TOML_SOPS=$(sops_source_path "$TEST_ROOT/test_data.toml")
 if [ -f "$TOML_TMPL" ] && sops --decrypt "$TOML_SOPS" | grep -q "toml-secret-key"; then
@@ -155,7 +153,7 @@ prepare_test_dirs
 cat <<'EOF' > "$CONFIG_TEST_ROOT/test_sub.yaml"
 API_KEY: sub-secret-key
 EOF
-chezmoi add "$CONFIG_TEST_ROOT/test_sub.yaml" >/dev/null 2>&1 || true
+run_chezmoi_add 2 "$CONFIG_TEST_ROOT/test_sub.yaml" >/dev/null 2>&1 || true
 SUB_TMPL=$(template_source_path "$CONFIG_TEST_ROOT/test_sub.yaml")
 SUB_SOPS=$(sops_source_path "$CONFIG_TEST_ROOT/test_sub.yaml")
 if [ -f "$SUB_TMPL" ] && sops --decrypt "$SUB_SOPS" | grep -q "sub-secret-key"; then
@@ -169,16 +167,15 @@ fi
 
 echo "Testing Option 2 (chezmoi source naming)..."
 prepare_test_dirs
-mkdir -p "$HOME/.pi/agent/themes/test_check_secrets"
-cat <<'EOF' > "$HOME/.pi/agent/themes/test_check_secrets/catppuccin-mocha.json"
+cat <<'EOF' > "$TEST_ROOT/test_data.json"
 {
   "API_KEY": "theme-secret-key",
   "name": "Catppuccin Mocha"
 }
 EOF
-chezmoi add "$HOME/.pi/agent/themes/test_check_secrets/catppuccin-mocha.json" >/dev/null 2>&1 || true
-THEME_TMPL=$(template_source_path "$HOME/.pi/agent/themes/test_check_secrets/catppuccin-mocha.json")
-THEME_SOPS=$(sops_source_path "$HOME/.pi/agent/themes/test_check_secrets/catppuccin-mocha.json")
+run_chezmoi_add 2 "$TEST_ROOT/test_data.json" >/dev/null 2>&1 || true
+THEME_TMPL=$(template_source_path "$TEST_ROOT/test_data.json")
+THEME_SOPS=$(sops_source_path "$TEST_ROOT/test_data.json")
 if [ -f "$THEME_TMPL" ] \
    && sops --decrypt "$THEME_SOPS" | grep -q "theme-secret-key"; then
     pass "Option 2 (chezmoi source naming) passed"

@@ -9,7 +9,6 @@ SOURCE_DIR=$(chezmoi source-path)
 TEST_ROOT="$HOME/.test"
 CONFIG_TEST_ROOT="$HOME/.config/test"
 export SOPS_AGE_KEY_FILE="$HOME/.config/chezmoi/key.txt"
-export TEST_CHOICE=2
 
 cleanup() {
     echo "Cleaning up test files..."
@@ -41,6 +40,12 @@ pass() {
     echo "✅ $1"
 }
 
+run_chezmoi_add() {
+    choice=$1
+    shift
+    TEST_CHOICE=$choice chezmoi add "$@"
+}
+
 trap cleanup EXIT HUP INT TERM
 
 echo "Starting apply-rendering tests for check-secrets.sh (Option 2)..."
@@ -56,7 +61,7 @@ db_password: yaml-db-pass
 EOF
 
 echo "Running: chezmoi add $TEST_ROOT/test_data.yaml"
-chezmoi add "$TEST_ROOT/test_data.yaml" || true
+run_chezmoi_add 2 "$TEST_ROOT/test_data.yaml" || true
 rm -f "$TEST_ROOT/test_data.yaml"
 
 echo "Running: chezmoi apply --force $TEST_ROOT/test_data.yaml"
@@ -80,7 +85,7 @@ cat <<'EOF' > "$TEST_ROOT/test_data.json"
   "db_password": "json-db-pass"
 }
 EOF
-chezmoi add "$TEST_ROOT/test_data.json" || true
+run_chezmoi_add 2 "$TEST_ROOT/test_data.json" || true
 rm -f "$TEST_ROOT/test_data.json"
 
 if chezmoi apply --force "$TEST_ROOT/test_data.json" \
@@ -101,7 +106,7 @@ API_KEY = "toml-secret-key"
 port = 8080
 db_password = "toml-db-pass"
 EOF
-chezmoi add "$TEST_ROOT/test_data.toml" || true
+run_chezmoi_add 2 "$TEST_ROOT/test_data.toml" || true
 rm -f "$TEST_ROOT/test_data.toml"
 
 if chezmoi apply --force "$TEST_ROOT/test_data.toml" \
@@ -120,7 +125,7 @@ cat <<'EOF' > "$CONFIG_TEST_ROOT/test_sub.yaml"
 API_KEY: sub-secret-key
 db_password: sub-db-pass
 EOF
-chezmoi add "$CONFIG_TEST_ROOT/test_sub.yaml" || true
+run_chezmoi_add 2 "$CONFIG_TEST_ROOT/test_sub.yaml" || true
 rm -f "$CONFIG_TEST_ROOT/test_sub.yaml"
 
 if chezmoi apply --force "$CONFIG_TEST_ROOT/test_sub.yaml" \
@@ -130,6 +135,27 @@ if chezmoi apply --force "$CONFIG_TEST_ROOT/test_sub.yaml" \
     pass "Apply Rendering (Subdirectory) passed"
 else
     fail "Apply Rendering (Subdirectory) failed"
+fi
+
+# 5. Test Option 2: chezmoi source naming
+echo "Testing Apply Rendering (chezmoi source naming)..."
+prepare_test_dirs
+cat <<'EOF' > "$TEST_ROOT/test_data.json"
+{
+  "API_KEY": "theme-secret-key",
+  "name": "Catppuccin Mocha"
+}
+EOF
+run_chezmoi_add 2 "$TEST_ROOT/test_data.json" || true
+rm -f "$TEST_ROOT/test_data.json"
+
+if chezmoi apply --force "$TEST_ROOT/test_data.json" \
+    && [ -f "$TEST_ROOT/test_data.json" ] \
+    && grep -q "theme-secret-key" "$TEST_ROOT/test_data.json" \
+    && grep -q "Catppuccin Mocha" "$TEST_ROOT/test_data.json"; then
+    pass "Apply Rendering (chezmoi source naming) passed"
+else
+    fail "Apply Rendering (chezmoi source naming) failed"
 fi
 
 echo "All apply-rendering tests passed successfully!"

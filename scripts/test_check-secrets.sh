@@ -8,6 +8,7 @@ set -eu
 SOURCE_DIR=$(chezmoi source-path)
 TEST_ROOT="$HOME/.test"
 CONFIG_TEST_ROOT="$HOME/.config/test"
+SOURCE_NAMING_TEST_ROOT="$HOME/.test_dir/test_subdir"
 export SOPS_AGE_KEY_FILE="$HOME/.config/chezmoi/key.txt"
 
 cleanup() {
@@ -15,7 +16,7 @@ cleanup() {
 
     rm -f "$TEST_ROOT/test_data.yaml" "$TEST_ROOT/test_data.json" "$TEST_ROOT/test_data.toml" "$TEST_ROOT/test_multi.json" 2>/dev/null || true
     rm -f "$TEST_ROOT/test_abort.yaml" "$TEST_ROOT/test_plain.yaml" "$TEST_ROOT/test_full.yaml" 2>/dev/null || true
-    rm -rf "$TEST_ROOT/.config/test_dir" "$TEST_ROOT/.test_dir/test_subdir" 2>/dev/null || true
+    rm -rf "$CONFIG_TEST_ROOT" "$SOURCE_NAMING_TEST_ROOT" "$HOME/.test_dir" 2>/dev/null || true
 
     for prefix in test_abort test_plain test_full test_data test_multi test_sub test_chezmoi_naming; do
         find "$SOURCE_DIR" -maxdepth 1 \( -name "*${prefix}*" -o -name "private_*${prefix}*" -o -name "encrypted_*${prefix}*" \) -exec rm -rf {} + 2>/dev/null || true
@@ -24,7 +25,7 @@ cleanup() {
         fi
     done
 
-    rm -rf "$SOURCE_DIR/dot_config/test_dir" "$SOURCE_DIR/dot_config/private_test_dir" "$SOURCE_DIR/dot_test_dir/test_subdir" "$SOURCE_DIR/dot_test_dir" 2>/dev/null || true
+    rm -rf "$SOURCE_DIR/dot_test" "$SOURCE_DIR/dot_config/test" "$SOURCE_DIR/dot_config/test_dir" "$SOURCE_DIR/dot_config/private_test_dir" "$SOURCE_DIR/dot_test_dir/test_subdir" "$SOURCE_DIR/dot_test_dir" 2>/dev/null || true
 
     if [ -d "$SOURCE_DIR/secrets" ]; then
         find "$SOURCE_DIR/secrets" -depth -mindepth 1 -type d -empty -exec rmdir {} \; 2>/dev/null || true
@@ -44,6 +45,10 @@ run_chezmoi_add() {
     choice=$1
     shift
     TEST_CHOICE=$choice chezmoi add "$@"
+}
+
+prepare_test_dirs() {
+    mkdir -p "$TEST_ROOT" "$CONFIG_TEST_ROOT" "$SOURCE_NAMING_TEST_ROOT"
 }
 
 template_source_path() {
@@ -86,7 +91,7 @@ echo "Testing Option 1 (Full Encryption)..."
 prepare_test_dirs
 printf '%s\n' 'API_KEY: full-encrypt-test' > "$TEST_ROOT/test_full.yaml"
 run_chezmoi_add 1 "$TEST_ROOT/test_full.yaml" >/dev/null 2>&1 || true
-if [ -f "$SOURCE_DIR/private_dot_test/encrypted_private_test_full.yaml.age" ]; then
+if [ -f "$SOURCE_DIR/dot_test/encrypted_private_test_full.yaml.age" ]; then
     pass "Option 1 passed"
 else
     fail "Option 1 failed: encrypted file not found in source"
@@ -150,10 +155,11 @@ fi
 
 # 7. Test Option 2: SOPS Strategy (duplicate sensitive keys)
 echo "Testing Option 2 (duplicate sensitive keys)..."
+prepare_test_dirs
 cat <<'EOF' > "$TEST_ROOT/test_multi.json"
 {"hosts": [{"username": "username1", "password": "password1"}, {"username": "username2", "password": "password2"}]}
 EOF
-chezmoi add "$TEST_ROOT/test_multi.json" >/dev/null 2>&1 || true
+run_chezmoi_add 2 "$TEST_ROOT/test_multi.json" >/dev/null 2>&1 || true
 MULTI_TMPL=$(template_source_path "$TEST_ROOT/test_multi.json")
 MULTI_SOPS=$(sops_source_path "$TEST_ROOT/test_multi.json")
 if [ -f "$MULTI_TMPL" ] \
@@ -185,17 +191,17 @@ fi
 # 9. Test Option 2: SOPS Strategy follows chezmoi source naming
 
 echo "Testing Option 2 (chezmoi source naming)..."
-mkdir -p "$HOME/.test_dir/test_subdir"
-cat <<'EOF' > "$HOME/.test_dir/test_subdir/test_chezmoi_naming.json"
+prepare_test_dirs
+cat <<'EOF' > "$SOURCE_NAMING_TEST_ROOT/test_chezmoi_naming.json"
 {
   "service": "chezmoi-naming-test",
   "API_KEY": "chezmoi-naming-secret",
   "enabled": true
 }
 EOF
-chezmoi add "$HOME/.test_dir/test_subdir/test_chezmoi_naming.json" >/dev/null 2>&1 || true
-THEME_TMPL=$(template_source_path "$HOME/.test_dir/test_subdir/test_chezmoi_naming.json")
-THEME_SOPS=$(sops_source_path "$HOME/.test_dir/test_subdir/test_chezmoi_naming.json")
+run_chezmoi_add 2 "$SOURCE_NAMING_TEST_ROOT/test_chezmoi_naming.json" >/dev/null 2>&1 || true
+THEME_TMPL=$(template_source_path "$SOURCE_NAMING_TEST_ROOT/test_chezmoi_naming.json")
+THEME_SOPS=$(sops_source_path "$SOURCE_NAMING_TEST_ROOT/test_chezmoi_naming.json")
 if [ -f "$THEME_TMPL" ] \
    && sops --decrypt "$THEME_SOPS" | grep -q "chezmoi-naming-secret"; then
     pass "Option 2 (chezmoi source naming) passed"

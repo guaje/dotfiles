@@ -6,23 +6,25 @@
 set -eu
 
 SOURCE_DIR=$(chezmoi source-path)
-TEST_ROOT=$HOME
+TEST_ROOT="$HOME/.test"
+CONFIG_TEST_ROOT="$HOME/.config/test"
+SOURCE_NAMING_TEST_ROOT="$HOME/.test_dir/test_subdir"
 export TEST_CHOICE=2
 
 cleanup() {
     echo "Cleaning up test files..."
 
     rm -f "$TEST_ROOT/test_data.yaml" "$TEST_ROOT/test_data.json" "$TEST_ROOT/test_data.toml" "$TEST_ROOT/test_multi.json" 2>/dev/null || true
-    rm -rf "$TEST_ROOT/.config/test_dir" 2>/dev/null || true
+    rm -rf "$CONFIG_TEST_ROOT" "$SOURCE_NAMING_TEST_ROOT" "$HOME/.test_dir" 2>/dev/null || true
 
-    for prefix in test_data test_multi test_sub; do
+    for prefix in test_data test_multi test_sub test_chezmoi_naming; do
         find "$SOURCE_DIR" -maxdepth 1 \( -name "*${prefix}*" -o -name "private_*${prefix}*" -o -name "encrypted_*${prefix}*" \) -exec rm -rf {} + 2>/dev/null || true
         if [ -d "$SOURCE_DIR/secrets" ]; then
             find "$SOURCE_DIR/secrets" -name "*${prefix}*" -exec rm -rf {} + 2>/dev/null || true
         fi
     done
 
-    rm -rf "$SOURCE_DIR/dot_config/test_dir" "$SOURCE_DIR/dot_config/private_test_dir" 2>/dev/null || true
+    rm -rf "$SOURCE_DIR/dot_test" "$SOURCE_DIR/dot_config/test" "$SOURCE_DIR/dot_config/test_dir" "$SOURCE_DIR/dot_config/private_test_dir" "$SOURCE_DIR/dot_test_dir/test_subdir" "$SOURCE_DIR/dot_test_dir" 2>/dev/null || true
 
     if [ -d "$SOURCE_DIR/secrets" ]; then
         find "$SOURCE_DIR/secrets" -depth -mindepth 1 -type d -empty -exec rmdir {} \; 2>/dev/null || true
@@ -44,12 +46,17 @@ run_chezmoi_add() {
     TEST_CHOICE=$choice chezmoi add "$@"
 }
 
+prepare_test_dirs() {
+    mkdir -p "$TEST_ROOT" "$CONFIG_TEST_ROOT" "$SOURCE_NAMING_TEST_ROOT"
+}
+
 trap cleanup EXIT HUP INT TERM
 
 echo "Starting apply-rendering tests for check-secrets.sh (Option 2)..."
 
 # 1. Test Option 2: SOPS Strategy (YAML)
 echo "Testing Apply Rendering (YAML)..."
+prepare_test_dirs
 cat <<'EOF' > "$TEST_ROOT/test_data.yaml"
 app_name: MyTestApp
 API_KEY: yaml-secret-key
@@ -58,7 +65,7 @@ db_password: yaml-db-pass
 EOF
 
 echo "Running: chezmoi add $TEST_ROOT/test_data.yaml"
-chezmoi add "$TEST_ROOT/test_data.yaml" || true
+run_chezmoi_add 2 "$TEST_ROOT/test_data.yaml" || true
 rm -f "$TEST_ROOT/test_data.yaml"
 
 echo "Running: chezmoi apply --force $TEST_ROOT/test_data.yaml"
@@ -73,6 +80,7 @@ fi
 
 # 2. Test Option 2: SOPS Strategy (JSON)
 echo "Testing Apply Rendering (JSON)..."
+prepare_test_dirs
 cat <<'EOF' > "$TEST_ROOT/test_data.json"
 {
   "app_name": "MyTestApp",
@@ -81,7 +89,7 @@ cat <<'EOF' > "$TEST_ROOT/test_data.json"
   "db_password": "json-db-pass"
 }
 EOF
-chezmoi add "$TEST_ROOT/test_data.json" || true
+run_chezmoi_add 2 "$TEST_ROOT/test_data.json" || true
 rm -f "$TEST_ROOT/test_data.json"
 
 if chezmoi apply --force "$TEST_ROOT/test_data.json" \
@@ -95,13 +103,14 @@ fi
 
 # 3. Test Option 2: SOPS Strategy (TOML)
 echo "Testing Apply Rendering (TOML)..."
+prepare_test_dirs
 cat <<'EOF' > "$TEST_ROOT/test_data.toml"
 app_name = "MyTestApp"
 API_KEY = "toml-secret-key"
 port = 8080
 db_password = "toml-db-pass"
 EOF
-chezmoi add "$TEST_ROOT/test_data.toml" || true
+run_chezmoi_add 2 "$TEST_ROOT/test_data.toml" || true
 rm -f "$TEST_ROOT/test_data.toml"
 
 if chezmoi apply --force "$TEST_ROOT/test_data.toml" \
@@ -115,10 +124,11 @@ fi
 
 # 4. Test Option 2: SOPS Strategy (duplicate sensitive keys)
 echo "Testing Apply Rendering (duplicate sensitive keys)..."
+prepare_test_dirs
 cat <<'EOF' > "$TEST_ROOT/test_multi.json"
 {"hosts": [{"username": "username1", "password": "password1"}, {"username": "username2", "password": "password2"}]}
 EOF
-chezmoi add "$TEST_ROOT/test_multi.json" || true
+run_chezmoi_add 2 "$TEST_ROOT/test_multi.json" || true
 rm -f "$TEST_ROOT/test_multi.json"
 
 if chezmoi apply --force "$TEST_ROOT/test_multi.json" \
@@ -132,39 +142,40 @@ fi
 
 # 5. Test Option 2: SOPS Strategy (Subdirectory)
 echo "Testing Apply Rendering (Subdirectory)..."
-mkdir -p "$TEST_ROOT/.config/test_dir"
-cat <<'EOF' > "$TEST_ROOT/.config/test_dir/test_sub.yaml"
+prepare_test_dirs
+cat <<'EOF' > "$CONFIG_TEST_ROOT/test_sub.yaml"
 API_KEY: sub-secret-key
 db_password: sub-db-pass
 EOF
-chezmoi add "$TEST_ROOT/.config/test_dir/test_sub.yaml" || true
-rm -f "$TEST_ROOT/.config/test_dir/test_sub.yaml"
+run_chezmoi_add 2 "$CONFIG_TEST_ROOT/test_sub.yaml" || true
+rm -f "$CONFIG_TEST_ROOT/test_sub.yaml"
 
-if chezmoi apply --force "$TEST_ROOT/.config/test_dir/test_sub.yaml" \
-    && [ -f "$TEST_ROOT/.config/test_dir/test_sub.yaml" ] \
-    && grep -q "sub-secret-key" "$TEST_ROOT/.config/test_dir/test_sub.yaml" \
-    && grep -q "sub-db-pass" "$TEST_ROOT/.config/test_dir/test_sub.yaml"; then
+if chezmoi apply --force "$CONFIG_TEST_ROOT/test_sub.yaml" \
+    && [ -f "$CONFIG_TEST_ROOT/test_sub.yaml" ] \
+    && grep -q "sub-secret-key" "$CONFIG_TEST_ROOT/test_sub.yaml" \
+    && grep -q "sub-db-pass" "$CONFIG_TEST_ROOT/test_sub.yaml"; then
     pass "Apply Rendering (Subdirectory) passed"
 else
     fail "Apply Rendering (Subdirectory) failed"
 fi
 
-# 5. Test Option 2: chezmoi source naming
+# 6. Test Option 2: chezmoi source naming
 echo "Testing Apply Rendering (chezmoi source naming)..."
 prepare_test_dirs
-cat <<'EOF' > "$TEST_ROOT/test_data.json"
+cat <<'EOF' > "$SOURCE_NAMING_TEST_ROOT/test_chezmoi_naming.json"
 {
-  "API_KEY": "theme-secret-key",
-  "name": "Catppuccin Mocha"
+  "service": "chezmoi-naming-test",
+  "API_KEY": "chezmoi-naming-secret",
+  "enabled": true
 }
 EOF
-run_chezmoi_add 2 "$TEST_ROOT/test_data.json" || true
-rm -f "$TEST_ROOT/test_data.json"
+run_chezmoi_add 2 "$SOURCE_NAMING_TEST_ROOT/test_chezmoi_naming.json" || true
+rm -f "$SOURCE_NAMING_TEST_ROOT/test_chezmoi_naming.json"
 
-if chezmoi apply --force "$TEST_ROOT/test_data.json" \
-    && [ -f "$TEST_ROOT/test_data.json" ] \
-    && grep -q "theme-secret-key" "$TEST_ROOT/test_data.json" \
-    && grep -q "Catppuccin Mocha" "$TEST_ROOT/test_data.json"; then
+if chezmoi apply --force "$SOURCE_NAMING_TEST_ROOT/test_chezmoi_naming.json" \
+    && [ -f "$SOURCE_NAMING_TEST_ROOT/test_chezmoi_naming.json" ] \
+    && grep -q "chezmoi-naming-secret" "$SOURCE_NAMING_TEST_ROOT/test_chezmoi_naming.json" \
+    && grep -q "chezmoi-naming-test" "$SOURCE_NAMING_TEST_ROOT/test_chezmoi_naming.json"; then
     pass "Apply Rendering (chezmoi source naming) passed"
 else
     fail "Apply Rendering (chezmoi source naming) failed"

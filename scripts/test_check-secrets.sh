@@ -6,7 +6,8 @@
 set -eu
 
 SOURCE_DIR=$(chezmoi source-path)
-TEST_ROOT=$HOME
+TEST_ROOT="$HOME/.test"
+CONFIG_TEST_ROOT="$HOME/.config/test"
 export SOPS_AGE_KEY_FILE="$HOME/.config/chezmoi/key.txt"
 
 cleanup() {
@@ -39,6 +40,12 @@ pass() {
     echo "✅ $1"
 }
 
+run_chezmoi_add() {
+    choice=$1
+    shift
+    TEST_CHOICE=$choice chezmoi add "$@"
+}
+
 template_source_path() {
     chezmoi source-path "$1"
 }
@@ -56,9 +63,9 @@ echo "Starting tests for check-secrets.sh..."
 
 # 1. Test Option 4: Abort
 echo "Testing Option 4 (Abort)..."
+prepare_test_dirs
 printf '%s\n' 'AUTH: abort-test' > "$TEST_ROOT/test_abort.yaml"
-export TEST_CHOICE=4
-if chezmoi add "$TEST_ROOT/test_abort.yaml" 2>/dev/null; then
+if run_chezmoi_add 4 "$TEST_ROOT/test_abort.yaml" 2>/dev/null; then
     fail "Option 4 failed: chezmoi add should have been aborted"
 else
     pass "Option 4 passed"
@@ -66,9 +73,9 @@ fi
 
 # 2. Test Option 3: Plain
 echo "Testing Option 3 (Plain)..."
+prepare_test_dirs
 printf '%s\n' 'SECRET: plain-test' > "$TEST_ROOT/test_plain.yaml"
-export TEST_CHOICE=3
-if chezmoi add "$TEST_ROOT/test_plain.yaml"; then
+if run_chezmoi_add 3 "$TEST_ROOT/test_plain.yaml"; then
     pass "Option 3 passed"
 else
     fail "Option 3 failed"
@@ -76,10 +83,10 @@ fi
 
 # 3. Test Option 1: Full Encryption
 echo "Testing Option 1 (Full Encryption)..."
+prepare_test_dirs
 printf '%s\n' 'API_KEY: full-encrypt-test' > "$TEST_ROOT/test_full.yaml"
-export TEST_CHOICE=1
-chezmoi add "$TEST_ROOT/test_full.yaml" >/dev/null 2>&1 || true
-if [ -f "$SOURCE_DIR/encrypted_private_test_full.yaml.age" ]; then
+run_chezmoi_add 1 "$TEST_ROOT/test_full.yaml" >/dev/null 2>&1 || true
+if [ -f "$SOURCE_DIR/private_dot_test/encrypted_private_test_full.yaml.age" ]; then
     pass "Option 1 passed"
 else
     fail "Option 1 failed: encrypted file not found in source"
@@ -87,14 +94,14 @@ fi
 
 # 4. Test Option 2: SOPS Strategy (YAML)
 echo "Testing Option 2 (SOPS - YAML)..."
+prepare_test_dirs
 cat <<'EOF' > "$TEST_ROOT/test_data.yaml"
 app_name: MyTestApp
 API_KEY: yaml-secret-key
 port: 8080
 db_password: yaml-db-pass
 EOF
-export TEST_CHOICE=2
-chezmoi add "$TEST_ROOT/test_data.yaml" >/dev/null 2>&1 || true
+run_chezmoi_add 2 "$TEST_ROOT/test_data.yaml" >/dev/null 2>&1 || true
 YAML_TMPL=$(template_source_path "$TEST_ROOT/test_data.yaml")
 YAML_SOPS=$(sops_source_path "$TEST_ROOT/test_data.yaml")
 if [ -f "$YAML_TMPL" ] && sops --decrypt "$YAML_SOPS" | grep -q "yaml-secret-key"; then
@@ -105,6 +112,7 @@ fi
 
 # 5. Test Option 2: SOPS Strategy (JSON)
 echo "Testing Option 2 (SOPS - JSON)..."
+prepare_test_dirs
 cat <<'EOF' > "$TEST_ROOT/test_data.json"
 {
   "app_name": "MyTestApp",
@@ -113,7 +121,7 @@ cat <<'EOF' > "$TEST_ROOT/test_data.json"
   "db_password": "json-db-pass"
 }
 EOF
-chezmoi add "$TEST_ROOT/test_data.json" >/dev/null 2>&1 || true
+run_chezmoi_add 2 "$TEST_ROOT/test_data.json" >/dev/null 2>&1 || true
 JSON_TMPL=$(template_source_path "$TEST_ROOT/test_data.json")
 JSON_SOPS=$(sops_source_path "$TEST_ROOT/test_data.json")
 if [ -f "$JSON_TMPL" ] && sops --decrypt "$JSON_SOPS" | grep -q "json-secret-key"; then
@@ -124,13 +132,14 @@ fi
 
 # 6. Test Option 2: SOPS Strategy (TOML)
 echo "Testing Option 2 (SOPS - TOML)..."
+prepare_test_dirs
 cat <<'EOF' > "$TEST_ROOT/test_data.toml"
 app_name = "MyTestApp"
 API_KEY = "toml-secret-key"
 port = 8080
 db_password = "toml-db-pass"
 EOF
-chezmoi add "$TEST_ROOT/test_data.toml" >/dev/null 2>&1 || true
+run_chezmoi_add 2 "$TEST_ROOT/test_data.toml" >/dev/null 2>&1 || true
 TOML_TMPL=$(template_source_path "$TEST_ROOT/test_data.toml")
 TOML_SOPS=$(sops_source_path "$TEST_ROOT/test_data.toml")
 if [ -f "$TOML_TMPL" ] && sops --decrypt "$TOML_SOPS" | grep -q "toml-secret-key"; then
@@ -159,13 +168,13 @@ fi
 
 # 8. Test Option 2: SOPS Strategy (Subdirectory)
 echo "Testing Option 2 (Subdirectory)..."
-mkdir -p "$TEST_ROOT/.config/test_dir"
-cat <<'EOF' > "$TEST_ROOT/.config/test_dir/test_sub.yaml"
+prepare_test_dirs
+cat <<'EOF' > "$CONFIG_TEST_ROOT/test_sub.yaml"
 API_KEY: sub-secret-key
 EOF
-chezmoi add "$TEST_ROOT/.config/test_dir/test_sub.yaml" >/dev/null 2>&1 || true
-SUB_TMPL=$(template_source_path "$TEST_ROOT/.config/test_dir/test_sub.yaml")
-SUB_SOPS=$(sops_source_path "$TEST_ROOT/.config/test_dir/test_sub.yaml")
+run_chezmoi_add 2 "$CONFIG_TEST_ROOT/test_sub.yaml" >/dev/null 2>&1 || true
+SUB_TMPL=$(template_source_path "$CONFIG_TEST_ROOT/test_sub.yaml")
+SUB_SOPS=$(sops_source_path "$CONFIG_TEST_ROOT/test_sub.yaml")
 if [ -f "$SUB_TMPL" ] && sops --decrypt "$SUB_SOPS" | grep -q "sub-secret-key"; then
     pass "Option 2 (Subdirectory) passed"
 else

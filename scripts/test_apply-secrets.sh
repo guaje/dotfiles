@@ -84,9 +84,9 @@ prepare_test_dirs
 cat <<'EOF' > "$TEST_ROOT/test_data.json"
 {
   "app_name": "MyTestApp",
-  "API_KEY": "json-secret-key",
-  "port": 8080,
-  "db_password": "json-db-pass"
+  "apiKey": "json-secret-key",
+  "dbPassword": "json-db-pass",
+  "port": 8080
 }
 EOF
 run_chezmoi_add 2 "$TEST_ROOT/test_data.json" || true

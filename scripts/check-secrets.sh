@@ -122,6 +122,46 @@ strip_quotes() {
     printf '%s' "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//"
 }
 
+matches_sensitive_file() {
+    input_file=$1
+
+    SENSITIVE_PATTERNS="$SENSITIVE_PATTERNS" python3 - "$input_file" <<'PY'
+import os
+import re
+import sys
+
+input_file = sys.argv[1]
+patterns = [p.strip() for p in os.environ.get("SENSITIVE_PATTERNS", "").splitlines() if p.strip()]
+
+with open(input_file, "r", encoding="utf-8") as f:
+    content = f.read()
+
+assignment_re = re.compile(r'["\']?(?P<key>[A-Za-z0-9_.-]+)["\']?\s*[:=]', re.MULTILINE)
+
+
+def normalize(value):
+    return re.sub(r'[^A-Za-z0-9]+', '', value).upper()
+
+normalized_patterns = [(pattern, normalize(pattern)) for pattern in patterns]
+
+for match in assignment_re.finditer(content):
+    key = match.group("key")
+    normalized_key = normalize(key)
+    for pattern, normalized_pattern in normalized_patterns:
+        if normalized_pattern and normalized_pattern in normalized_key:
+            print(pattern)
+            sys.exit(0)
+
+normalized_content = normalize(content)
+for pattern, normalized_pattern in normalized_patterns:
+    if normalized_pattern and normalized_pattern in normalized_content:
+        print(pattern)
+        sys.exit(0)
+
+sys.exit(1)
+PY
+}
+
 extract_sensitive_values() {
     input_file=$1
     template_file=$2
@@ -135,7 +175,7 @@ import re
 import sys
 
 input_file, template_file, secrets_file, sops_file_name = sys.argv[1:5]
-patterns = [p.strip().upper() for p in os.environ.get("SENSITIVE_PATTERNS", "").splitlines() if p.strip()]
+patterns = [p.strip() for p in os.environ.get("SENSITIVE_PATTERNS", "").splitlines() if p.strip()]
 
 with open(input_file, "r", encoding="utf-8") as f:
     content = f.read()
@@ -145,11 +185,17 @@ assignment_re = re.compile(
     re.MULTILINE,
 )
 
+
+def normalize(value):
+    return re.sub(r'[^A-Za-z0-9]+', '', value).upper()
+
+normalized_patterns = [normalize(pattern) for pattern in patterns if pattern.strip()]
+
 occurrences = []
 for match in assignment_re.finditer(content):
     key = match.group("key").strip()
-    upper_key = key.upper()
-    if not any(pattern in upper_key for pattern in patterns):
+    normalized_key = normalize(key)
+    if not any(pattern and pattern in normalized_key for pattern in normalized_patterns):
         continue
 
     raw_value = match.group("value")
@@ -209,18 +255,10 @@ while IFS= read -r file; do
     [ -f "$file" ] || continue
 
     FOUND_SENSITIVE=false
-    MATCHED_PATTERN=
-    OLD_IFS=$IFS
-    IFS='
-'
-    for pattern in $SENSITIVE_PATTERNS; do
-        if grep -qi "$pattern" "$file"; then
-            FOUND_SENSITIVE=true
-            MATCHED_PATTERN=$pattern
-            break
-        fi
-    done
-    IFS=$OLD_IFS
+    MATCHED_PATTERN=$(matches_sensitive_file "$file" 2>/dev/null || true)
+    if [ -n "$MATCHED_PATTERN" ]; then
+        FOUND_SENSITIVE=true
+    fi
 
     if [ "$FOUND_SENSITIVE" != true ]; then
         continue

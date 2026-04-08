@@ -364,7 +364,7 @@ PY
             fi
 
             log 'Cleaning up...'
-            rm -f "$file" "$TMP_TEMPLATE_FILE" "$TMP_SECRETS_FILE" "$TMP_KEYS_FILE"
+            rm -f "$TMP_TEMPLATE_FILE" "$TMP_SECRETS_FILE" "$TMP_KEYS_FILE"
 
             log '✅ SOPS strategy complete.'
             exit 1

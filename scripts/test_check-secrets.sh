@@ -12,21 +12,22 @@ export SOPS_AGE_KEY_FILE="$HOME/.config/chezmoi/key.txt"
 cleanup() {
     echo "Cleaning up test files..."
 
-    rm -f "$TEST_ROOT/test_data.yaml" "$TEST_ROOT/test_data.json" "$TEST_ROOT/test_data.toml" 2>/dev/null || true
+    rm -f "$TEST_ROOT/test_data.yaml" "$TEST_ROOT/test_data.json" "$TEST_ROOT/test_data.toml" "$TEST_ROOT/test_multi.json" 2>/dev/null || true
     rm -f "$TEST_ROOT/test_abort.yaml" "$TEST_ROOT/test_plain.yaml" "$TEST_ROOT/test_full.yaml" 2>/dev/null || true
-    rm -rf "$TEST_ROOT/.config/test_dir" 2>/dev/null || true
-    rm -rf "$HOME/.pi/agent/themes/test_check_secrets" 2>/dev/null || true
-    rm -rf "$SOURCE_DIR/private_dot_pi/private_agent/private_themes/test_check_secrets" 2>/dev/null || true
-    rm -rf "$SOURCE_DIR/secrets/private_dot_pi/private_agent/private_themes/test_check_secrets" 2>/dev/null || true
+    rm -rf "$TEST_ROOT/.config/test_dir" "$TEST_ROOT/.test_dir/test_subdir" 2>/dev/null || true
 
-    for prefix in test_abort test_plain test_full test_data test_sub; do
+    for prefix in test_abort test_plain test_full test_data test_multi test_sub test_chezmoi_naming; do
         find "$SOURCE_DIR" -maxdepth 1 \( -name "*${prefix}*" -o -name "private_*${prefix}*" -o -name "encrypted_*${prefix}*" \) -exec rm -rf {} + 2>/dev/null || true
         if [ -d "$SOURCE_DIR/secrets" ]; then
             find "$SOURCE_DIR/secrets" -name "*${prefix}*" -exec rm -rf {} + 2>/dev/null || true
         fi
     done
 
-    rm -rf "$SOURCE_DIR/dot_config/test_dir" "$SOURCE_DIR/dot_config/private_test_dir" 2>/dev/null || true
+    rm -rf "$SOURCE_DIR/dot_config/test_dir" "$SOURCE_DIR/dot_config/private_test_dir" "$SOURCE_DIR/dot_test_dir/test_subdir" "$SOURCE_DIR/dot_test_dir" 2>/dev/null || true
+
+    if [ -d "$SOURCE_DIR/secrets" ]; then
+        find "$SOURCE_DIR/secrets" -depth -mindepth 1 -type d -empty -exec rmdir {} \; 2>/dev/null || true
+    fi
 }
 
 fail() {
@@ -138,7 +139,25 @@ else
     fail "Option 2 (TOML) failed"
 fi
 
-# 7. Test Option 2: SOPS Strategy (Subdirectory)
+# 7. Test Option 2: SOPS Strategy (duplicate sensitive keys)
+echo "Testing Option 2 (duplicate sensitive keys)..."
+cat <<'EOF' > "$TEST_ROOT/test_multi.json"
+{"hosts": [{"username": "username1", "password": "password1"}, {"username": "username2", "password": "password2"}]}
+EOF
+chezmoi add "$TEST_ROOT/test_multi.json" >/dev/null 2>&1 || true
+MULTI_TMPL=$(template_source_path "$TEST_ROOT/test_multi.json")
+MULTI_SOPS=$(sops_source_path "$TEST_ROOT/test_multi.json")
+if [ -f "$MULTI_TMPL" ] \
+   && grep -q 'password__1' "$MULTI_TMPL" \
+   && grep -q 'password__2' "$MULTI_TMPL" \
+   && sops --decrypt "$MULTI_SOPS" | grep -q 'password1' \
+   && sops --decrypt "$MULTI_SOPS" | grep -q 'password2'; then
+    pass "Option 2 (duplicate sensitive keys) passed"
+else
+    fail "Option 2 (duplicate sensitive keys) failed"
+fi
+
+# 8. Test Option 2: SOPS Strategy (Subdirectory)
 echo "Testing Option 2 (Subdirectory)..."
 mkdir -p "$TEST_ROOT/.config/test_dir"
 cat <<'EOF' > "$TEST_ROOT/.config/test_dir/test_sub.yaml"
@@ -154,21 +173,22 @@ else
     fail "Option 2 (Subdirectory) failed"
 fi
 
-# 8. Test Option 2: SOPS Strategy follows chezmoi source naming
+# 9. Test Option 2: SOPS Strategy follows chezmoi source naming
 
 echo "Testing Option 2 (chezmoi source naming)..."
-mkdir -p "$HOME/.pi/agent/themes/test_check_secrets"
-cat <<'EOF' > "$HOME/.pi/agent/themes/test_check_secrets/catppuccin-mocha.json"
+mkdir -p "$HOME/.test_dir/test_subdir"
+cat <<'EOF' > "$HOME/.test_dir/test_subdir/test_chezmoi_naming.json"
 {
-  "API_KEY": "theme-secret-key",
-  "name": "Catppuccin Mocha"
+  "service": "chezmoi-naming-test",
+  "API_KEY": "chezmoi-naming-secret",
+  "enabled": true
 }
 EOF
-chezmoi add "$HOME/.pi/agent/themes/test_check_secrets/catppuccin-mocha.json" >/dev/null 2>&1 || true
-THEME_TMPL=$(template_source_path "$HOME/.pi/agent/themes/test_check_secrets/catppuccin-mocha.json")
-THEME_SOPS=$(sops_source_path "$HOME/.pi/agent/themes/test_check_secrets/catppuccin-mocha.json")
+chezmoi add "$HOME/.test_dir/test_subdir/test_chezmoi_naming.json" >/dev/null 2>&1 || true
+THEME_TMPL=$(template_source_path "$HOME/.test_dir/test_subdir/test_chezmoi_naming.json")
+THEME_SOPS=$(sops_source_path "$HOME/.test_dir/test_subdir/test_chezmoi_naming.json")
 if [ -f "$THEME_TMPL" ] \
-   && sops --decrypt "$THEME_SOPS" | grep -q "theme-secret-key"; then
+   && sops --decrypt "$THEME_SOPS" | grep -q "chezmoi-naming-secret"; then
     pass "Option 2 (chezmoi source naming) passed"
 else
     echo "Expected template at: $THEME_TMPL"

@@ -122,30 +122,85 @@ strip_quotes() {
     printf '%s' "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//"
 }
 
-replace_value_in_template() {
-    key=$1
-    value=$2
-    template_ref=$3
-    template_file=$4
+extract_sensitive_values() {
+    input_file=$1
+    template_file=$2
+    secrets_file=$3
+    sops_file_name=$4
 
-    python3 - "$key" "$value" "$template_ref" "$template_file" <<'PY'
+    SENSITIVE_PATTERNS="$SENSITIVE_PATTERNS" python3 - "$input_file" "$template_file" "$secrets_file" "$sops_file_name" <<'PY'
+import collections
+import os
 import re
 import sys
 
-key, value, template_ref, path = sys.argv[1:5]
-with open(path, 'r', encoding='utf-8') as f:
-    lines = f.readlines()
+input_file, template_file, secrets_file, sops_file_name = sys.argv[1:5]
+patterns = [p.strip().upper() for p in os.environ.get("SENSITIVE_PATTERNS", "").splitlines() if p.strip()]
 
-key_re = re.escape(key)
-new_lines = []
-for line in lines:
-    if re.match(r'^\s*["\']?' + key_re + r'["\']?\s*[:=]', line):
-        new_lines.append(line.replace(value, template_ref, 1))
+with open(input_file, "r", encoding="utf-8") as f:
+    content = f.read()
+
+assignment_re = re.compile(
+    r'(?P<prefix>["\']?(?P<key>[A-Za-z0-9_.-]+)["\']?\s*[:=]\s*)(?P<value>"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|[^,\n\r}\]]+)',
+    re.MULTILINE,
+)
+
+occurrences = []
+for match in assignment_re.finditer(content):
+    key = match.group("key").strip()
+    upper_key = key.upper()
+    if not any(pattern in upper_key for pattern in patterns):
+        continue
+
+    raw_value = match.group("value")
+    trimmed_value = raw_value.strip()
+    if not trimmed_value:
+        continue
+
+    if len(trimmed_value) >= 2 and trimmed_value[0] == trimmed_value[-1] and trimmed_value[0] in ('"', "'"):
+        secret_value = trimmed_value[1:-1]
+        replace_start = match.start("value") + raw_value.find(trimmed_value) + 1
+        replace_end = replace_start + len(secret_value)
     else:
-        new_lines.append(line)
+        secret_value = trimmed_value
+        replace_start = match.start("value") + raw_value.find(trimmed_value)
+        replace_end = replace_start + len(trimmed_value)
 
-with open(path, 'w', encoding='utf-8') as f:
-    f.writelines(new_lines)
+    occurrences.append({
+        "key": key,
+        "value": secret_value,
+        "replace_start": replace_start,
+        "replace_end": replace_end,
+    })
+
+if not occurrences:
+    sys.exit(2)
+
+counts = collections.Counter(item["key"] for item in occurrences)
+seen = collections.Counter()
+secrets = []
+for item in occurrences:
+    seen[item["key"]] += 1
+    if counts[item["key"]] == 1:
+        secret_name = item["key"]
+    else:
+        secret_name = f'{item["key"]}__{seen[item["key"]]}'
+    item["secret_name"] = secret_name
+    secrets.append((secret_name, item["value"]))
+
+result = content
+for item in reversed(occurrences):
+    template_ref = '{{ (index ((secret "-d" (joinPath .chezmoi.sourceDir "secrets/' + sops_file_name + '") | fromYaml).data | fromYaml) "' + item["secret_name"] + '") }}'
+    result = result[:item["replace_start"]] + template_ref + result[item["replace_end"]:]
+
+with open(template_file, "w", encoding="utf-8") as f:
+    f.write('{{- /* chezmoi:template */ -}}\n')
+    f.write(result)
+
+with open(secrets_file, "w", encoding="utf-8") as f:
+    for key, value in secrets:
+        escaped = value.replace("'", "''")
+        f.write(f"{key}: '{escaped}'\n")
 PY
 }
 
@@ -234,50 +289,15 @@ PY
                 exit 1
             }
 
-            printf '%s\n' '{{- /* chezmoi:template */ -}}' > "$TMP_TEMPLATE_FILE"
-            cat "$file" >> "$TMP_TEMPLATE_FILE"
-
             log 'Identifying and extracting secrets...'
 
-            OLD_IFS=$IFS
-            IFS='
-'
-            for pattern in $SENSITIVE_PATTERNS; do
-                grep -Ei "$pattern" "$file" 2>/dev/null | while IFS= read -r line; do
-                    [ -n "$line" ] || continue
-
-                    case "$line" in
-                        *=*)
-                            key_raw=$(printf '%s\n' "$line" | cut -d'=' -f1)
-                            value_raw=$(printf '%s\n' "$line" | cut -d'=' -f2-)
-                            ;;
-                        *:*)
-                            key_raw=$(printf '%s\n' "$line" | cut -d':' -f1)
-                            value_raw=$(printf '%s\n' "$line" | cut -d':' -f2-)
-                            ;;
-                        *)
-                            continue
-                            ;;
-                    esac
-
-                    key=$(strip_quotes "$key_raw")
-                    value=$(strip_quotes "$(printf '%s' "$value_raw" | sed 's/,[[:space:]]*$//')")
-
-                    [ -n "$key" ] || continue
-                    [ -n "$value" ] || continue
-
-                    if grep -Fxq "$key" "$TMP_KEYS_FILE" 2>/dev/null; then
-                        continue
-                    fi
-
-                    printf '%s\n' "$key" >> "$TMP_KEYS_FILE"
-                    printf '%s: %s\n' "$key" "$value" >> "$TMP_SECRETS_FILE"
-
-                    template_ref="{{ (index ((secret \"-d\" (joinPath .chezmoi.sourceDir \"secrets/$SOPS_FILE_NAME\") | fromYaml).data | fromYaml) \"$key\") }}"
-                    replace_value_in_template "$key" "$value" "$template_ref" "$TMP_TEMPLATE_FILE"
-                done
-            done
-            IFS=$OLD_IFS
+            if ! extract_sensitive_values "$file" "$TMP_TEMPLATE_FILE" "$TMP_SECRETS_FILE" "$SOPS_FILE_NAME"; then
+                status=$?
+                if [ "$status" -ne 2 ]; then
+                    rm -f "$TMP_SECRETS_FILE" "$TMP_TEMPLATE_FILE" "$TMP_KEYS_FILE" "$SOURCE_FILE"
+                    exit 1
+                fi
+            fi
 
             if [ ! -s "$TMP_SECRETS_FILE" ]; then
                 log 'No extractable secrets found; aborting.'

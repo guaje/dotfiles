@@ -1,0 +1,32 @@
+{{- /* chezmoi:template */ -}}
+{
+  "providers": {
+    "reallms": {
+      "baseUrl": "https://reallms.rescloud.iu.edu/direct/v1",
+      "api": "openai-completions",
+      "apiKey": "{{ (index ((secret "-d" (joinPath .chezmoi.sourceDir "secrets/private_dot_pi/private_agent/models.json.sops.yaml") | fromYaml).data | fromYaml) "apiKey__1") }}",
+      "models": [
+        {
+          "id": "gpt-oss-120b",
+          "name": "gpt-oss-120b",
+          "reasoning": true
+        },
+        {
+          "id": "Qwen3-Coder-Next",
+          "name": "Qwen3-coder-next"
+        }
+      ]
+    },
+    "reallms-dev": {
+      "baseUrl": "https://reallms-dev.rescloud.iu.edu/direct/v1",
+      "api": "openai-completions",
+      "apiKey": "{{ (index ((secret "-d" (joinPath .chezmoi.sourceDir "secrets/private_dot_pi/private_agent/models.json.sops.yaml") | fromYaml).data | fromYaml) "apiKey__2") }}",
+      "models": [
+        {
+          "id": "Qwen3-Coder-Next-Dev",
+          "name": "Qwen3-coder-next-dev"
+        }
+      ]
+    }
+  }
+}

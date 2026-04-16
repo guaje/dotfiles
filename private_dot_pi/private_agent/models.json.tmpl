@@ -7,6 +7,11 @@
       "apiKey": "{{ (index ((secret "-d" (joinPath .chezmoi.sourceDir "secrets/private_dot_pi/private_agent/models.json.sops.yaml") | fromYaml).data | fromYaml) "apiKey__1") }}",
       "models": [
         {
+          "id": "gemma-4-31B-it",
+          "name": "gemma-4-31B-it",
+          "reasoning": true
+        },
+        {
           "id": "gpt-oss-120b",
           "name": "gpt-oss-120b",
           "reasoning": true

@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shell: [bash, zsh, fish]
+        shell_name: [bash, zsh, fish]
     steps:
       - uses: actions/checkout@v4
 
@@ -26,21 +26,26 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y zsh fish age curl
-          mkdir -p $HOME/.local/bin
+          mkdir -p "$HOME/.local/bin"
           # Install chezmoi
-          sh -c "$(curl -fsLS get.chezmoi.io)" -- -b $HOME/.local/bin
+          sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
           # Install sops
           SOPS_VERSION=3.8.1
-          curl -LO https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.amd64
-          mv sops-v${SOPS_VERSION}.linux.amd64 $HOME/.local/bin/sops
-          chmod +x $HOME/.local/bin/sops
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          curl -LO "https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.amd64"
+          mv "sops-v${SOPS_VERSION}.linux.amd64" "$HOME/.local/bin/sops"
+          chmod +x "$HOME/.local/bin/sops"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Smoke test selected shell
-        shell: ${{ matrix.shell }}
+        shell: bash
         run: |
-          echo "Running matrix shell: ${{ matrix.shell }}"
-          command -v ${{ matrix.shell }}
+          echo "Running matrix shell: ${{ matrix.shell_name }}"
+          command -v "${{ matrix.shell_name }}"
+          case "${{ matrix.shell_name }}" in
+            bash) bash -lc 'echo bash ready' ;;
+            zsh) zsh -lc 'echo zsh ready' ;;
+            fish) fish -c 'echo fish ready' ;;
+          esac
 
       - name: Setup environment and age key
         shell: bash
@@ -72,11 +77,14 @@ jobs:
           test "$(chezmoi source-path)" = "$HOME/.local/share/chezmoi"
 
       - name: Run tests from selected shell
-        shell: ${{ matrix.shell }}
+        shell: bash
         run: |
+          echo "Executing tests in ${matrix_shell} environment"
           # Ensure scripts are executable
           chmod +x ./scripts/*.sh
           # Run from the destination directory; the scripts look up the source via `chezmoi source-path`
           cd "$HOME"
           sh "$GITHUB_WORKSPACE/scripts/test_check-secrets.sh"
           sh "$GITHUB_WORKSPACE/scripts/test_apply-secrets.sh"
+        env:
+          matrix_shell: ${{ matrix.shell_name }}

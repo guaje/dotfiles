@@ -3,12 +3,89 @@ import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+const MAX_CONFIRM_COMMAND_LINES = 24;
+const MAX_CONFIRM_COMMAND_CHARS = 3000;
+const MAX_PROGRAMS_TO_SHOW = 12;
+
 function summarizeWrite(content: string | undefined) {
   if (!content) return "";
   const lines = content.split("\n").length;
   const chars = content.length;
   return `\n\n${uiLabel("New content:")} ${colorize(`${lines} line${lines === 1 ? "" : "s"}, ${chars} char${chars === 1 ? "" : "s"}`, UI_PALETTE.hint)}`;
 }
+
+function truncatePreview(text: string, maxLines: number, maxChars: number) {
+  const fullLines = text.split("\n").length;
+  const fullChars = text.length;
+
+  let preview = text;
+  const lines = preview.split("\n");
+  if (lines.length > maxLines) preview = lines.slice(0, maxLines).join("\n");
+  if (preview.length > maxChars) preview = `${preview.slice(0, maxChars)}\n…`;
+  else if (preview.length < text.length) preview = `${preview}\n…`;
+
+  const previewLines = preview.split("\n").length;
+  const previewChars = preview.replace(/\n…$/, "").length;
+  const truncated = previewChars < fullChars || previewLines < fullLines;
+
+  return {
+    preview,
+    truncated,
+    summary: truncated
+      ? `${uiHint("Preview truncated:")} ${colorize(`showing ${previewLines}/${fullLines} lines, ${previewChars}/${fullChars} chars`, UI_PALETTE.hint)}`
+      : "",
+  };
+}
+
+function summarizeEdit(edits: Array<{ oldText: string; newText: string }> | undefined) {
+  if (!edits || edits.length === 0) return "";
+  const replacements = edits.length;
+  return `\n\n${uiLabel("Changes:")} ${colorize(`${replacements} replacement${replacements === 1 ? "" : "s"}`, UI_PALETTE.hint)}`;
+}
+
+function formatPlainLineNumber(lineNumber: number, width: number) {
+  return String(lineNumber).padStart(width, " ");
+}
+
+function formatPlainNumberedLine(lineNumber: number, width: number, line: string) {
+  return `${formatPlainLineNumber(lineNumber, width)} │ ${line}`;
+}
+
+function buildWritePreviewText(content: string | undefined) {
+  if (content === undefined) return "";
+  if (content.length === 0) return "<empty file>";
+
+  const lines = content.split("\n");
+  const width = String(lines.length).length;
+  return lines.map((line, index) => formatPlainNumberedLine(index + 1, width, line)).join("\n");
+}
+
+function buildEditPreviewText(edits: Array<{ oldText: string; newText: string }> | undefined) {
+  if (!edits || edits.length === 0) return "<no diff available>";
+
+  const lines: string[] = [];
+
+  for (const [index, edit] of edits.entries()) {
+    if (index > 0) lines.push("");
+    lines.push(`@@ edit ${index + 1} @@`);
+
+    const removedLines = edit.oldText.length > 0 ? edit.oldText.split("\n") : ["<empty>"];
+    const addedLines = edit.newText.length > 0 ? edit.newText.split("\n") : ["<empty>"];
+    const removedWidth = String(removedLines.length).length;
+    const addedWidth = String(addedLines.length).length;
+
+    for (const [lineIndex, line] of removedLines.entries()) {
+      lines.push(`- ${formatPlainNumberedLine(lineIndex + 1, removedWidth, line)}`);
+    }
+
+    for (const [lineIndex, line] of addedLines.entries()) {
+      lines.push(`+ ${formatPlainNumberedLine(lineIndex + 1, addedWidth, line)}`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
 
 const COLOR_RESET = "\x1b[0m";
 const BASH_WRAPPERS = new Set(["sudo", "command", "builtin", "env", "nohup", "time", "nice"]);
@@ -640,13 +717,18 @@ function summarizeBash(command: string | undefined) {
   if (!command) return "No command provided.";
 
   const commandNames = extractCommandNames(command);
-  const commandList = commandNames.length
-    ? commandNames.map((name, index) => `${uiIndex(`${index + 1})`)} ${colorCommand(name)}`).join(", ")
+  const { preview, summary } = truncatePreview(command, MAX_CONFIRM_COMMAND_LINES, MAX_CONFIRM_COMMAND_CHARS);
+  const visibleCommandNames = commandNames.slice(0, MAX_PROGRAMS_TO_SHOW);
+  const commandList = visibleCommandNames.length
+    ? visibleCommandNames.map((name, index) => `${uiIndex(`${index + 1})`)} ${colorCommand(name)}`).join(", ")
     : `${uiIndex("1)")} ${uiHint("No command detected")}`;
+  const morePrograms = commandNames.length > MAX_PROGRAMS_TO_SHOW
+    ? ` ${uiHint(`(+${commandNames.length - MAX_PROGRAMS_TO_SHOW} more)`)}`
+    : "";
   const warnings = detectWarnings(command);
   const warningBlock = formatWarnings(warnings);
 
-  return `${uiLabel("Command:")}\n\n${highlightWholeCommand(command, commandNames)}\n\n${uiLabel("Programs to run:")} ${commandList}${warningBlock}`;
+  return `${uiLabel("Command:")}\n\n${highlightWholeCommand(preview, commandNames)}${summary ? `\n\n${summary}` : ""}\n\n${uiLabel("Programs to run:")} ${commandList}${morePrograms}${warningBlock}`;
 }
 
 
@@ -671,13 +753,20 @@ export default function (pi: ExtensionAPI) {
         return { block: true, reason: "File write blocked (no UI available for confirmation)" };
       }
 
-      const ok = await ctx.ui.confirm(
-        formatConfirmTitle("Allow file write?"),
-        `${uiLabel("Path:")}\n\n${colorize(event.input.path, SYNTAX_PALETTE.text)}${summarizeWrite(event.input.content)}`,
-      );
+      const previousEditorText = ctx.ui.getEditorText();
+      ctx.ui.setEditorText(buildWritePreviewText(event.input.content));
+      try {
+        const ok = await ctx.ui.confirm(
+          formatConfirmTitle("Allow file write?"),
+          `${uiLabel("Path:")}\n\n${colorize(event.input.path, SYNTAX_PALETTE.text)}${summarizeWrite(event.input.content)}`,
+        );
 
-      if (!ok) return { block: true, reason: "File write blocked by user" };
-      return undefined;
+        if (!ok) return { block: true, reason: "File write blocked by user" };
+        return undefined;
+      }
+      finally {
+        ctx.ui.setEditorText(previousEditorText);
+      }
     }
 
     if (isToolCallEventType("edit", event)) {
@@ -685,13 +774,20 @@ export default function (pi: ExtensionAPI) {
         return { block: true, reason: "File edit blocked (no UI available for confirmation)" };
       }
 
-      const ok = await ctx.ui.confirm(
-        formatConfirmTitle("Allow file edit?"),
-        `${uiLabel("Path:")}\n\n${colorize(event.input.path, SYNTAX_PALETTE.text)}`,
-      );
+      const previousEditorText = ctx.ui.getEditorText();
+      ctx.ui.setEditorText(buildEditPreviewText(event.input.edits));
+      try {
+        const ok = await ctx.ui.confirm(
+          formatConfirmTitle("Allow file edit?"),
+          `${uiLabel("Path:")}\n\n${colorize(event.input.path, SYNTAX_PALETTE.text)}${summarizeEdit(event.input.edits)}`,
+        );
 
-      if (!ok) return { block: true, reason: "File edit blocked by user" };
-      return undefined;
+        if (!ok) return { block: true, reason: "File edit blocked by user" };
+        return undefined;
+      }
+      finally {
+        ctx.ui.setEditorText(previousEditorText);
+      }
     }
 
     return undefined;

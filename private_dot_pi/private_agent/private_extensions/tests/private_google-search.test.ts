@@ -16,11 +16,7 @@ async function loadExtension() {
     type: "module",
     exports: "./index.js",
   }));
-  writeFileSync(resolve(piPackageDir, "index.js"), [
-    "export function getAgentDir() {",
-    "  return '';",
-    "}",
-  ].join("\n"));
+  writeFileSync(resolve(piPackageDir, "index.js"), "");
 
   const typeboxPackageDir = resolve(STUB_PACKAGE_DIR, "@sinclair/typebox");
   mkdirSync(typeboxPackageDir, { recursive: true });

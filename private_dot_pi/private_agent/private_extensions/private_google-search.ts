@@ -1,4 +1,4 @@
-import { type ExtensionAPI, getAgentDir } from "@mariozechner/pi-coding-agent";
+import { type ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 
 const PROVIDER = "google-antigravity";

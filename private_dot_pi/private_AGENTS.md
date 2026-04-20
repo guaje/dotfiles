@@ -27,6 +27,10 @@ These instructions apply to work in `~/.pi/`.
 
 ## Testing
 
+- Test files in the same language they are written in whenever practical.
+- Match the test language to the implementation language: TypeScript with TypeScript tests, shell scripts with shell tests, etc.
+- Do not replace a native-language test with a test in a different language unless the user explicitly wants that.
+
 Use the existing lightweight Node-native test style for extensions:
 
 - Use `node:test` with `assert/strict`.

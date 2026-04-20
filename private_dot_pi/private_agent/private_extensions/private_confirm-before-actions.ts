@@ -262,6 +262,10 @@ function escapeRegex(text: string) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function normalizeShellContinuations(command: string) {
+  return command.replace(/\\\n[ \t]*/g, " ");
+}
+
 function stripHeredocBodies(command: string) {
   const lines = command.split("\n");
   const result: string[] = [];
@@ -517,7 +521,7 @@ function getCommandNamesFromSegment(segment: string) {
 
 function extractCommandNames(command: string) {
   const names: string[] = [];
-  const normalizedCommand = stripHeredocBodies(command);
+  const normalizedCommand = normalizeShellContinuations(stripHeredocBodies(command));
 
   for (const segment of splitShellSegments(normalizedCommand)) {
     names.push(...getCommandNamesFromSegment(segment));
@@ -1017,6 +1021,12 @@ function highlightWholeCommandWithTheme(command: string, names: string[], theme:
       }
       result += styleRenderStringToken(theme, command.slice(i, j));
       i = j;
+      continue;
+    }
+
+    if (char === "\\") {
+      result += styleRenderOperatorToken(theme, char);
+      i++;
       continue;
     }
 

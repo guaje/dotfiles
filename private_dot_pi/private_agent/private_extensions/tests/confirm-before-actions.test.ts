@@ -372,6 +372,34 @@ test("bash programs list excludes heredoc script fragments", async () => {
   assert.doesNotMatch(body, /print\('/);
 });
 
+test("bash programs list ignores line-continuation paths and only includes actual commands", async () => {
+  const extension = await loadExtension();
+  const { pi, getHandler } = createPiHarness();
+  extension(pi as any);
+  const handler = getHandler("tool_call");
+
+  const uiHarness = createUiHarness(true);
+  const result = await handler(
+    {
+      toolName: "bash",
+      input: {
+        command: "cd ~/.local/share/chezmoi && git add \\\n  private_dot_pi/private_agent/settings.config.json \\\n  private_dot_pi/private_agent/private_extensions/reload-merged-settings.ts \\\n  private_dot_pi/private_agent/private_extensions/tests/reload-merged-settings.test.ts && \\\n git commit -m \"Split pi settings config\"",
+      },
+    },
+    {
+      hasUI: true,
+      ui: uiHarness.ui,
+    },
+  );
+
+  assert.equal(result, undefined);
+  const body = stripAnsi(uiHarness.confirmCalls[0]!.body);
+  assert.match(body, /Programs to run:/);
+  assert.match(body, /1\) cd, 2\) git, 3\) git/);
+  assert.doesNotMatch(body, /reload-merged-settings/);
+  assert.doesNotMatch(body, /settings\.config\.json/);
+});
+
 test("empty file write shows empty file preview in editor and confirms with path only summary", async () => {
   const extension = await loadExtension();
   const { pi, getHandler } = createPiHarness();

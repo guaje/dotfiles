@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
+import { createBashTool, isToolCallEventType } from "@mariozechner/pi-coding-agent";
+import { Text } from "@mariozechner/pi-tui";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -261,6 +262,27 @@ function escapeRegex(text: string) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function stripHeredocBodies(command: string) {
+  const lines = command.split("\n");
+  const result: string[] = [];
+
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index]!;
+    result.push(line);
+
+    const heredocMatch = line.match(/<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*|EOF)\1/);
+    if (!heredocMatch) continue;
+
+    const terminator = heredocMatch[2];
+    for (index += 1; index < lines.length; index++) {
+      const heredocLine = lines[index]!;
+      if (heredocLine.trim() === terminator) break;
+    }
+  }
+
+  return result.join("\n");
+}
+
 function splitShellSegments(command: string) {
   const segments: string[] = [];
   let current = "";
@@ -495,8 +517,9 @@ function getCommandNamesFromSegment(segment: string) {
 
 function extractCommandNames(command: string) {
   const names: string[] = [];
+  const normalizedCommand = stripHeredocBodies(command);
 
-  for (const segment of splitShellSegments(command)) {
+  for (const segment of splitShellSegments(normalizedCommand)) {
     names.push(...getCommandNamesFromSegment(segment));
   }
 
@@ -713,11 +736,399 @@ function formatWarnings(warnings: BashWarning[]) {
   return `\n\n${lines.join("\n")}`;
 }
 
+type RenderTheme = {
+  fg: (color: string, text: string) => string;
+  bold: (text: string) => string;
+  italic?: (text: string) => string;
+};
+
+function styleRenderCommandToken(theme: RenderTheme, text: string) {
+  return theme.fg("bashMode", theme.bold(text));
+}
+
+function styleRenderFlagToken(theme: RenderTheme, text: string) {
+  return theme.fg("warning", text);
+}
+
+function styleRenderStringToken(theme: RenderTheme, text: string) {
+  return theme.fg("syntaxString", text);
+}
+
+function styleRenderVariableToken(theme: RenderTheme, text: string) {
+  return theme.fg("mdLink", text);
+}
+
+function styleRenderValueToken(theme: RenderTheme, text: string) {
+  if (/^\d+(?:\.\d+)?$/.test(text)) return theme.fg("syntaxNumber", text);
+  return theme.fg("text", text);
+}
+
+function renderStructuredToken(theme: RenderTheme, token: string, leftStyle: (theme: RenderTheme, text: string) => string) {
+  const separatorMatch = token.match(/^([^=:]+)([=:])(.*)$/);
+  if (!separatorMatch) return leftStyle(theme, token);
+
+  const [, left, separator, right] = separatorMatch;
+  if (!left || right === undefined) return leftStyle(theme, token);
+
+  const leftPart = leftStyle(theme, left);
+  const separatorPart = styleRenderOperatorToken(theme, separator);
+  const rightPart = right.length > 0 ? styleRenderValueToken(theme, right) : "";
+  return `${leftPart}${separatorPart}${rightPart}`;
+}
+
+function styleRenderCommentToken(theme: RenderTheme, text: string) {
+  return theme.fg("syntaxComment", theme.italic ? theme.italic(text) : text);
+}
+
+function styleRenderOperatorToken(theme: RenderTheme, text: string) {
+  return theme.fg("dim", text);
+}
+
+function styleRenderKeywordToken(theme: RenderTheme, text: string) {
+  return theme.fg("accent", text);
+}
+
+function styleRenderScriptKeywordToken(theme: RenderTheme, text: string) {
+  return theme.fg("thinkingHigh", text);
+}
+
+function styleRenderScriptFunctionToken(theme: RenderTheme, text: string) {
+  return theme.fg("mdLink", text);
+}
+
+function styleRenderScriptNameToken(theme: RenderTheme, text: string) {
+  return theme.fg("mdCode", text);
+}
+
+function styleRenderScriptVariableToken(theme: RenderTheme, text: string) {
+  return theme.fg("customMessageLabel", text);
+}
+
+function styleRenderScriptOperatorToken(theme: RenderTheme, text: string) {
+  return theme.fg("thinkingLow", text);
+}
+
+function styleRenderScriptPunctuationToken(theme: RenderTheme, text: string) {
+  return theme.fg("toolTitle", text);
+}
+
+function getRenderWarningThemeColor(level: BashWarningLevel) {
+  if (level === "danger") return "error";
+  if (level === "warning") return "warning";
+  return "bashMode";
+}
+
+function inferHeredocLanguage(line: string) {
+  const lower = line.toLowerCase();
+  if (/\bpython(?:3)?\b/.test(lower)) return "python";
+  if (/\b(?:bash|sh|zsh|fish|ksh)\b/.test(lower)) return "shell";
+  return undefined;
+}
+
+function highlightShellScriptLineWithTheme(line: string, theme: RenderTheme) {
+  const commandNames = extractCommandNames(line);
+  const commandNameSet = new Set(commandNames);
+  let result = "";
+
+  for (let i = 0; i < line.length;) {
+    const char = line[i]!;
+
+    if (char === "#") {
+      result += styleRenderCommentToken(theme, line.slice(i));
+      break;
+    }
+
+    if (char === '"' || char === "'") {
+      const quote = char;
+      let j = i + 1;
+      while (j < line.length) {
+        const current = line[j]!;
+        if (current === quote && line[j - 1] !== "\\") {
+          j++;
+          break;
+        }
+        j++;
+      }
+      result += styleRenderStringToken(theme, line.slice(i, j));
+      i = j;
+      continue;
+    }
+
+    if (char === "$" && line[i + 1] === "(") {
+      result += styleRenderScriptOperatorToken(theme, "$(");
+      i += 2;
+      continue;
+    }
+
+    if (char === "$") {
+      const match = line.slice(i).match(/^\$[A-Za-z_][A-Za-z0-9_]*/);
+      if (match) {
+        result += styleRenderScriptVariableToken(theme, match[0]);
+        i += match[0].length;
+        continue;
+      }
+    }
+
+    if (/^[0-9]$/.test(char)) {
+      const match = line.slice(i).match(/^\d+(?:\.\d+)?/);
+      if (match) {
+        result += theme.fg("syntaxNumber", match[0]);
+        i += match[0].length;
+        continue;
+      }
+    }
+
+    const operatorMatch = line.slice(i).match(/^(?:&&|\|\||\|&|>>|<<|[|&;<>])/);
+    if (operatorMatch) {
+      result += styleRenderScriptOperatorToken(theme, operatorMatch[0]);
+      i += operatorMatch[0].length;
+      continue;
+    }
+
+    if (/[(){}\[\]]/.test(char)) {
+      result += styleRenderScriptPunctuationToken(theme, char);
+      i++;
+      continue;
+    }
+
+    if (/\s/.test(char)) {
+      result += char;
+      i++;
+      continue;
+    }
+
+    const tokenMatch = line.slice(i).match(/^[^\s|&;<>()[\]{}]+/);
+    if (tokenMatch) {
+      const token = tokenMatch[0];
+      if (isVariableAssignment(token)) result += renderStructuredToken(theme, token, styleRenderScriptVariableToken);
+      else if (commandNameSet.has(token)) result += styleRenderScriptFunctionToken(theme, token);
+      else if (token.startsWith("-") && token !== "-") result += styleRenderScriptKeywordToken(theme, token);
+      else if (/^[^=:]+[:=].+$/.test(token)) result += renderStructuredToken(theme, token, styleRenderScriptNameToken);
+      else result += styleRenderScriptNameToken(theme, token);
+      i += token.length;
+      continue;
+    }
+
+    result += theme.fg("text", char);
+    i++;
+  }
+
+  return result;
+}
+
+function highlightPythonLineWithTheme(line: string, theme: RenderTheme) {
+  let result = "";
+  const PYTHON_KEYWORDS = new Set([
+    "and", "as", "assert", "async", "await", "break", "class", "continue", "def", "del", "elif", "else", "except", "False", "finally", "for", "from", "global", "if", "import", "in", "is", "lambda", "None", "nonlocal", "not", "or", "pass", "raise", "return", "True", "try", "while", "with", "yield",
+  ]);
+
+  for (let i = 0; i < line.length;) {
+    const char = line[i]!;
+
+    if (char === "#") {
+      result += styleRenderCommentToken(theme, line.slice(i));
+      break;
+    }
+
+    if (char === '"' || char === "'") {
+      const quote = char;
+      let j = i + 1;
+      while (j < line.length) {
+        const current = line[j]!;
+        if (current === quote && line[j - 1] !== "\\") {
+          j++;
+          break;
+        }
+        j++;
+      }
+      result += styleRenderStringToken(theme, line.slice(i, j));
+      i = j;
+      continue;
+    }
+
+    if (/^[0-9]$/.test(char)) {
+      const match = line.slice(i).match(/^\d+(?:\.\d+)?/);
+      if (match) {
+        result += theme.fg("syntaxNumber", match[0]);
+        i += match[0].length;
+        continue;
+      }
+    }
+
+    const operatorMatch = line.slice(i).match(/^(?:==|!=|<=|>=|:=|\*\*|\/\/=|->|[-+*/%=<>])/);
+    if (operatorMatch) {
+      result += styleRenderScriptOperatorToken(theme, operatorMatch[0]);
+      i += operatorMatch[0].length;
+      continue;
+    }
+
+    if (/[(){}\[\].,:]/.test(char)) {
+      result += styleRenderScriptPunctuationToken(theme, char);
+      i++;
+      continue;
+    }
+
+    if (/\s/.test(char)) {
+      result += char;
+      i++;
+      continue;
+    }
+
+    const tokenMatch = line.slice(i).match(/^[A-Za-z_][A-Za-z0-9_]*/);
+    if (tokenMatch) {
+      const token = tokenMatch[0];
+      const nextNonSpace = line.slice(i + token.length).match(/^\s*(.)/)?.[1];
+      if (PYTHON_KEYWORDS.has(token)) result += styleRenderScriptKeywordToken(theme, token);
+      else if (nextNonSpace === "(") result += styleRenderScriptFunctionToken(theme, token);
+      else result += styleRenderScriptNameToken(theme, token);
+      i += token.length;
+      continue;
+    }
+
+    result += theme.fg("text", char);
+    i++;
+  }
+
+  return result;
+}
+
+function highlightWholeCommandWithTheme(command: string, names: string[], theme: RenderTheme) {
+  const commandNameSet = new Set(names);
+  let result = "";
+
+  for (let i = 0; i < command.length;) {
+    const char = command[i]!;
+
+    if (char === "#") {
+      result += styleRenderCommentToken(theme, command.slice(i));
+      break;
+    }
+
+    if (char === '"' || char === "'") {
+      const quote = char;
+      let j = i + 1;
+      while (j < command.length) {
+        const current = command[j]!;
+        if (current === quote && command[j - 1] !== "\\") {
+          j++;
+          break;
+        }
+        j++;
+      }
+      result += styleRenderStringToken(theme, command.slice(i, j));
+      i = j;
+      continue;
+    }
+
+    if (char === "$" && command[i + 1] === "(") {
+      result += styleRenderOperatorToken(theme, "$(");
+      i += 2;
+      continue;
+    }
+
+    if (/[$]/.test(char)) {
+      const match = command.slice(i).match(/^\$[A-Za-z_][A-Za-z0-9_]*/);
+      if (match) {
+        result += styleRenderVariableToken(theme, match[0]);
+        i += match[0].length;
+        continue;
+      }
+    }
+
+    if (/^[0-9]$/.test(char)) {
+      const match = command.slice(i).match(/^\d+(?:\.\d+)?/);
+      if (match) {
+        result += theme.fg("syntaxNumber", match[0]);
+        i += match[0].length;
+        continue;
+      }
+    }
+
+    const operatorMatch = command.slice(i).match(/^(?:&&|\|\||\|&|>>|<<|[|&;<>])/);
+    if (operatorMatch) {
+      result += styleRenderOperatorToken(theme, operatorMatch[0]);
+      i += operatorMatch[0].length;
+      continue;
+    }
+
+    if (/[(){}\[\]]/.test(char)) {
+      result += theme.fg("syntaxPunctuation", char);
+      i++;
+      continue;
+    }
+
+    if (/\s/.test(char)) {
+      result += char;
+      i++;
+      continue;
+    }
+
+    const tokenMatch = command.slice(i).match(/^[^\s|&;<>()[\]{}]+/);
+    if (tokenMatch) {
+      const token = tokenMatch[0];
+      if (isVariableAssignment(token)) result += renderStructuredToken(theme, token, styleRenderVariableToken);
+      else if (commandNameSet.has(token)) result += styleRenderCommandToken(theme, token);
+      else if (token.startsWith("-") && token !== "-") result += renderStructuredToken(theme, token, styleRenderFlagToken);
+      else if (/^[^=:]+[:=].+$/.test(token)) result += renderStructuredToken(theme, token, (currentTheme, text) => currentTheme.fg("text", text));
+      else result += theme.fg("text", token);
+      i += token.length;
+      continue;
+    }
+
+    result += theme.fg("text", char);
+    i++;
+  }
+
+  let highlighted = result;
+  for (const token of RISKY_TOKENS) {
+    highlighted = highlighted.replace(token.pattern, (match) => theme.fg(getRenderWarningThemeColor(token.level), theme.bold(match)));
+  }
+  return highlighted;
+}
+
+function buildBashRenderCallText(command: string | undefined, theme: RenderTheme) {
+  if (!command) return theme.fg("muted", "No command provided.");
+
+  const lines = command.split("\n");
+  const lineNumberWidth = String(lines.length).length;
+  const commandNames = extractCommandNames(command);
+  let heredocTerminator: string | undefined;
+  let heredocLanguage: string | undefined;
+
+  return lines.map((line, index) => {
+    const number = theme.fg("muted", formatPlainLineNumber(index + 1, lineNumberWidth));
+    const gutter = theme.fg("dim", "│");
+
+    let highlightedLine = line;
+    if (line.trim()) {
+      if (heredocTerminator) {
+        if (line.trim() === heredocTerminator) {
+          highlightedLine = styleRenderKeywordToken(theme, line);
+          heredocTerminator = undefined;
+          heredocLanguage = undefined;
+        }
+        else if (heredocLanguage === "python") highlightedLine = highlightPythonLineWithTheme(line, theme);
+        else if (heredocLanguage === "shell") highlightedLine = highlightShellScriptLineWithTheme(line, theme);
+        else highlightedLine = styleRenderScriptNameToken(theme, line);
+      }
+      else {
+        highlightedLine = highlightWholeCommandWithTheme(line, commandNames, theme);
+        const heredocMatch = line.match(/<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*|EOF)\1/);
+        if (heredocMatch) {
+          heredocTerminator = heredocMatch[2];
+          heredocLanguage = inferHeredocLanguage(line);
+        }
+      }
+    }
+
+    return `${number} ${gutter} ${highlightedLine}`;
+  }).join("\n");
+}
+
 function summarizeBash(command: string | undefined) {
   if (!command) return "No command provided.";
 
   const commandNames = extractCommandNames(command);
-  const { preview, summary } = truncatePreview(command, MAX_CONFIRM_COMMAND_LINES, MAX_CONFIRM_COMMAND_CHARS);
   const visibleCommandNames = commandNames.slice(0, MAX_PROGRAMS_TO_SHOW);
   const commandList = visibleCommandNames.length
     ? visibleCommandNames.map((name, index) => `${uiIndex(`${index + 1})`)} ${colorCommand(name)}`).join(", ")
@@ -728,11 +1139,23 @@ function summarizeBash(command: string | undefined) {
   const warnings = detectWarnings(command);
   const warningBlock = formatWarnings(warnings);
 
-  return `${uiLabel("Command:")}\n\n${highlightWholeCommand(preview, commandNames)}${summary ? `\n\n${summary}` : ""}\n\n${uiLabel("Programs to run:")} ${commandList}${morePrograms}${warningBlock}`;
+  return `${uiLabel("Programs to run:")} ${commandList}${morePrograms}${warningBlock}`;
 }
 
 
 export default function (pi: ExtensionAPI) {
+  const originalBash = createBashTool(process.cwd());
+
+  pi.registerTool({
+    ...originalBash,
+    async execute(toolCallId, params, signal, onUpdate, ctx) {
+      return createBashTool(ctx.cwd).execute(toolCallId, params, signal, onUpdate, ctx);
+    },
+    renderCall(args, theme) {
+      return new Text(buildBashRenderCallText(args.command, theme), 0, 0);
+    },
+  });
+
   pi.on("tool_call", async (event, ctx) => {
     if (isToolCallEventType("bash", event)) {
       if (!ctx.hasUI) {

@@ -3,10 +3,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+
+class StubText {
+  constructor(public text: string) {}
+  setText(text: string) {
+    this.text = text;
+  }
+}
 import { pathToFileURL } from "node:url";
 
 const EXTENSION_PATH = resolve("agent/extensions/confirm-before-actions.ts");
 const STUB_PACKAGE_DIR = resolve("agent/extensions/node_modules/@mariozechner/pi-coding-agent");
+const STUB_TUI_PACKAGE_DIR = resolve("agent/extensions/node_modules/@mariozechner/pi-tui");
 
 function stripAnsi(text: string) {
   return text.replace(/\x1b\[[0-9;]*m/g, "");
@@ -14,14 +22,41 @@ function stripAnsi(text: string) {
 
 async function loadExtension() {
   mkdirSync(STUB_PACKAGE_DIR, { recursive: true });
+  mkdirSync(STUB_TUI_PACKAGE_DIR, { recursive: true });
   writeFileSync(resolve(STUB_PACKAGE_DIR, "package.json"), JSON.stringify({
     name: "@mariozechner/pi-coding-agent",
     type: "module",
     exports: "./index.js",
   }));
   writeFileSync(resolve(STUB_PACKAGE_DIR, "index.js"), [
+    "export class CustomEditor {}",
+    "export function highlightCode(code, _lang, _theme) {",
+    "  return `<<${code}>>`;",
+    "}",
+    "export function createBashTool(_cwd) {",
+    "  return {",
+    "    name: 'bash',",
+    "    label: 'bash',",
+    "    description: 'stub bash tool',",
+    "    parameters: { type: 'object' },",
+    "    async execute(_toolCallId, params) {",
+    "      return { content: [{ type: 'text', text: params.command }], details: { stub: true } };",
+    "    },",
+    "  };",
+    "}",
     "export function isToolCallEventType(name, event) {",
     "  return event?.toolName === name;",
+    "}",
+  ].join("\n"));
+  writeFileSync(resolve(STUB_TUI_PACKAGE_DIR, "package.json"), JSON.stringify({
+    name: "@mariozechner/pi-tui",
+    type: "module",
+    exports: "./index.js",
+  }));
+  writeFileSync(resolve(STUB_TUI_PACKAGE_DIR, "index.js"), [
+    "export class Text {",
+    "  constructor(text) { this.text = text; }",
+    "  setText(text) { this.text = text; }",
     "}",
   ].join("\n"));
 
@@ -39,16 +74,25 @@ async function loadExtension() {
 
 function createPiHarness() {
   const handlers = new Map<string, Function>();
+  const tools: Array<Record<string, unknown>> = [];
   return {
     pi: {
       on(event: string, handler: Function) {
         handlers.set(event, handler);
+      },
+      registerTool(tool: Record<string, unknown>) {
+        tools.push(tool);
       },
     },
     getHandler(event: string) {
       const handler = handlers.get(event);
       assert.ok(handler, `Expected handler for ${event}`);
       return handler as (event: any, ctx: any) => Promise<any>;
+    },
+    getTool(name: string) {
+      const tool = tools.find((candidate) => candidate.name === name);
+      assert.ok(tool, `Expected tool ${name}`);
+      return tool;
     },
   };
 }
@@ -229,9 +273,9 @@ test("rejected edit confirmation blocks the tool and restores previous editor te
   assert.equal(uiHarness.setEditorTextCalls.at(-1), "original editor text");
 });
 
-test("bash confirmation includes command preview, programs list, and warnings", async () => {
+test("bash confirmation leaves the editor unchanged and includes command summary", async () => {
   const extension = await loadExtension();
-  const { pi, getHandler } = createPiHarness();
+  const { pi, getHandler, getTool } = createPiHarness();
   extension(pi as any);
   const handler = getHandler("tool_call");
 
@@ -251,15 +295,81 @@ test("bash confirmation includes command preview, programs list, and warnings", 
 
   assert.equal(result, undefined);
   assert.equal(uiHarness.confirmCalls.length, 1);
+  assert.deepEqual(uiHarness.setEditorTextCalls, []);
+  assert.equal(uiHarness.editorText, "original editor text");
+  assert.deepEqual(uiHarness.setWidgetCalls, []);
+
+  const bashTool = getTool("bash") as { renderCall: (args: { command: string }, theme: { fg: (color: string, text: string) => string; bold: (text: string) => string; }, context: unknown) => StubText };
+  const renderCall = bashTool.renderCall(
+    { command: "FOO=bar echo \"$FOO\" && python3 script.py" },
+    {
+      fg: (color, text) => `<${color}>${text}</${color}>`,
+      bold: (text) => `<b>${text}</b>`,
+    },
+    {},
+  );
+  assert.equal(
+    renderCall.text,
+    [
+      "<muted>1</muted> <dim>│</dim> <mdLink>FOO</mdLink><dim>=</dim><text>bar</text> <bashMode><b>echo</b></bashMode> <syntaxString>\"$FOO\"</syntaxString> <dim>&&</dim> <bashMode><b>python3</b></bashMode> <text>script.py</text>",
+    ].join("\n"),
+  );
+
+  const pythonRenderCall = bashTool.renderCall(
+    { command: "python3 - <<'PY'\nfrom pathlib import Path\nprint(123)\nPY" },
+    {
+      fg: (color, text) => `<${color}>${text}</${color}>`,
+      bold: (text) => `<b>${text}</b>`,
+    },
+    {},
+  );
+  assert.equal(
+    pythonRenderCall.text,
+    [
+      "<muted>1</muted> <dim>│</dim> <bashMode><b>python3</b></bashMode> <text>-</text> <dim><<</dim><syntaxString>'PY'</syntaxString>",
+      "<muted>2</muted> <dim>│</dim> <thinkingHigh>from</thinkingHigh> <mdCode>pathlib</mdCode> <thinkingHigh>import</thinkingHigh> <mdCode>Path</mdCode>",
+      "<muted>3</muted> <dim>│</dim> <mdLink>print</mdLink><toolTitle>(</toolTitle><syntaxNumber>123</syntaxNumber><toolTitle>)</toolTitle>",
+      "<muted>4</muted> <dim>│</dim> <accent>PY</accent>",
+    ].join("\n"),
+  );
+
   const title = stripAnsi(uiHarness.confirmCalls[0]!.title);
   const body = stripAnsi(uiHarness.confirmCalls[0]!.body);
   assert.match(title, /Allow bash command\?/);
-  assert.match(body, /Command:/);
-  assert.match(body, /sudo rm -rf tmp && echo done/);
+  assert.doesNotMatch(body, /Command:/);
+  assert.doesNotMatch(body, /sudo rm -rf tmp && echo done/);
   assert.match(body, /Programs to run:/);
   assert.match(body, /1\) rm, 2\) echo/);
   assert.match(body, /Warning: sudo runs with elevated privileges/);
   assert.match(body, /Warning: rm -rf can recursively and forcibly delete files/);
+});
+
+test("bash programs list excludes heredoc script fragments", async () => {
+  const extension = await loadExtension();
+  const { pi, getHandler } = createPiHarness();
+  extension(pi as any);
+  const handler = getHandler("tool_call");
+
+  const uiHarness = createUiHarness(true);
+  const result = await handler(
+    {
+      toolName: "bash",
+      input: {
+        command: "printf 'prepare\\n' >/dev/null && python3 - <<'PY'\nfrom pathlib import Path\nprint('hello')\nPY\nprintf 'cleanup\\n' >/dev/null",
+      },
+    },
+    {
+      hasUI: true,
+      ui: uiHarness.ui,
+    },
+  );
+
+  assert.equal(result, undefined);
+  const body = stripAnsi(uiHarness.confirmCalls[0]!.body);
+  assert.match(body, /Programs to run:/);
+  assert.match(body, /1\) printf, 2\) python3, 3\) printf/);
+  assert.doesNotMatch(body, /pathlib/);
+  assert.doesNotMatch(body, /print\('/);
 });
 
 test("empty file write shows empty file preview in editor and confirms with path only summary", async () => {

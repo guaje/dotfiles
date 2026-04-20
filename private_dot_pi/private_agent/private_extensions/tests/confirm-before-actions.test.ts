@@ -311,7 +311,7 @@ test("bash confirmation leaves the editor unchanged and includes command summary
   assert.equal(
     renderCall.text,
     [
-      "<muted>1</muted> <dim>│</dim> <mdLink>FOO</mdLink><dim>=</dim><text>bar</text> <bashMode><b>echo</b></bashMode> <syntaxString>\"$FOO\"</syntaxString> <dim>&&</dim> <bashMode><b>python3</b></bashMode> <text>script.py</text>",
+      "<muted>1</muted> <dim>│</dim> <mdLink>FOO</mdLink><accent>=</accent><text>bar</text> <warning><b>echo</b></warning> <syntaxString>\"$FOO\"</syntaxString> <accent>&&</accent> <warning><b>python3</b></warning> <text>script.py</text>",
     ].join("\n"),
   );
 
@@ -326,10 +326,10 @@ test("bash confirmation leaves the editor unchanged and includes command summary
   assert.equal(
     pythonRenderCall.text,
     [
-      "<muted>1</muted> <dim>│</dim> <bashMode><b>python3</b></bashMode> <text>-</text> <dim><<</dim><syntaxString>'PY'</syntaxString>",
+      "<muted>1</muted> <dim>│</dim> <warning><b>python3</b></warning> <text>-</text> <accent><<</accent><syntaxString>'PY'</syntaxString>",
       "<muted>2</muted> <dim>│</dim> <thinkingHigh>from</thinkingHigh> <mdCode>pathlib</mdCode> <thinkingHigh>import</thinkingHigh> <mdCode>Path</mdCode>",
       "<muted>3</muted> <dim>│</dim> <mdLink>print</mdLink><toolTitle>(</toolTitle><syntaxNumber>123</syntaxNumber><toolTitle>)</toolTitle>",
-      "<muted>4</muted> <dim>│</dim> <accent>PY</accent>",
+      "<muted>4</muted> <dim>│</dim> <bashMode>PY</bashMode>",
     ].join("\n"),
   );
 

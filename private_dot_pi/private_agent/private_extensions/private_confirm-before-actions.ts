@@ -743,11 +743,11 @@ type RenderTheme = {
 };
 
 function styleRenderCommandToken(theme: RenderTheme, text: string) {
-  return theme.fg("bashMode", theme.bold(text));
+  return theme.fg("warning", theme.bold(text));
 }
 
 function styleRenderFlagToken(theme: RenderTheme, text: string) {
-  return theme.fg("warning", text);
+  return theme.fg("toolTitle", text);
 }
 
 function styleRenderStringToken(theme: RenderTheme, text: string) {
@@ -781,11 +781,11 @@ function styleRenderCommentToken(theme: RenderTheme, text: string) {
 }
 
 function styleRenderOperatorToken(theme: RenderTheme, text: string) {
-  return theme.fg("dim", text);
+  return theme.fg("accent", text);
 }
 
 function styleRenderKeywordToken(theme: RenderTheme, text: string) {
-  return theme.fg("accent", text);
+  return theme.fg("bashMode", text);
 }
 
 function styleRenderScriptKeywordToken(theme: RenderTheme, text: string) {

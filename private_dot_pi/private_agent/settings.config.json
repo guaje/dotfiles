@@ -1,0 +1,20 @@
+{
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.4",
+  "defaultThinkingLevel": "medium",
+  "theme": "catppuccin-mocha",
+  "enabledModels": [
+    "openai-codex/gpt-5.4",
+    "reallms/gpt-oss-120b",
+    "reallms/gemma-4-31B-it",
+    "reallms/Qwen3-Coder-Next",
+    "reallms-dev/Qwen3-Coder-Next",
+    "google-antigravity/claude-opus-4-6-thinking",
+    "google-antigravity/claude-sonnet-4-6",
+    "google-antigravity/gemini-3.1-pro-high",
+    "google-antigravity/gemini-3-flash"
+  ],
+  "extensions": [
+    "-extensions/google-search.ts"
+  ]
+}

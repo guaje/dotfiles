@@ -15,6 +15,7 @@
     "google-antigravity/gemini-3-flash"
   ],
   "extensions": [
-    "-extensions/google-search.ts"
+    "-extensions/google-search.ts",
+    "-extensions/scoped-limits.ts"
   ]
 }

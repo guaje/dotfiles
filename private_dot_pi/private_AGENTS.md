@@ -13,6 +13,8 @@ These instructions apply to work in `~/.pi/`.
 ### Do
 
 - Make changes in `~/.pi/`.
+- Apply pi settings changes in `agent/settings.config.json`, not `agent/settings.json`.
+- Treat `agent/settings.json` as generated output from the merge workflow; do not make manual source-of-truth edits there.
 - Run targeted tests for the files you change.
 - Review diffs before proposing completion or commits.
 - Keep output styling aligned with the existing Catppuccin Mocha theme.
@@ -21,6 +23,7 @@ These instructions apply to work in `~/.pi/`.
 ### Do not
 
 - Edit `~/.local/share/chezmoi/` directly unless explicitly requested.
+- Edit `agent/settings.json` directly for persistent settings changes; update `agent/settings.config.json` instead.
 - Commit or stage unrelated files.
 - Modify secret-related chezmoi files or workflows unless explicitly requested.
 - Claim a change works unless you ran the relevant validation.
@@ -56,6 +59,11 @@ Current targeted tests:
 ## Chezmoi sync notes
 
 This directory is the editable working copy. Chezmoi is the source-of-truth repo for tracked dotfiles.
+
+Settings note:
+
+- `~/.pi/agent/settings.config.json` is the editable source of truth for pi settings in this repo.
+- `~/.pi/agent/settings.json` is automatically generated/merged and may be untracked; agents should update `settings.config.json` and let the merge workflow regenerate `settings.json`.
 
 Common mappings:
 

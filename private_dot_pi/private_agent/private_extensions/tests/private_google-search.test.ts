@@ -151,7 +151,11 @@ test("google_web_search streams search results, adds citations, and lists source
     assert.equal(fetchCalls[0]!.url, "https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:streamGenerateContent?alt=sse");
     assert.equal(fetchCalls[0]!.init?.method, "POST");
     assert.match(String(fetchCalls[0]!.init?.headers && (fetchCalls[0]!.init!.headers as Record<string, string>).Authorization), /^Bearer access-token$/);
-    assert.equal((fetchCalls[0]!.init!.headers as Record<string, string>)["X-Goog-Api-Client"], "gl-node/22.17.0");
+    assert.equal((fetchCalls[0]!.init!.headers as Record<string, string>)["X-Goog-Api-Client"], `gl-node/${process.versions.node}`);
+    assert.equal(
+      (fetchCalls[0]!.init!.headers as Record<string, string>)["User-Agent"],
+      `antigravity/1.21.9 ${process.platform}/${process.arch}`,
+    );
 
     const requestBody = JSON.parse(String(fetchCalls[0]!.init?.body));
     assert.equal(requestBody.project, "project-123");

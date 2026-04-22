@@ -1,7 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
-import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { resolvePiBundledDependencyPath } from "./packages/pi-package.ts";
 
 type OAuthAuthEntry = {
   type?: string;
@@ -53,7 +53,6 @@ type ExtensionOptions = {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const require = createRequire(import.meta.url);
 const DEFAULT_SETTINGS_PATH = path.resolve(__dirname, "../settings.json");
 const DEFAULT_AUTH_PATH = path.resolve(__dirname, "../auth.json");
 const DEFAULT_WIDGET_ID = "scoped-limits";
@@ -93,16 +92,23 @@ function hasAntigravityModelEnabled(settings: SettingsFile): boolean {
   return (settings.enabledModels ?? []).some((entry) => entry.startsWith("google-antigravity/"));
 }
 
-async function loadOpenAICodexRefreshFromPiInternals() {
-  const piPackageJson = require.resolve("@mariozechner/pi-coding-agent/package.json");
-  const piPackageDir = path.dirname(piPackageJson);
-  const openaiCodexModulePath = path.resolve(
-    piPackageDir,
-    "node_modules/@mariozechner/pi-ai/dist/utils/oauth/openai-codex.js",
-  );
-  const mod = await import(pathToFileURL(openaiCodexModulePath).href);
+let piAiOAuthModulePromise: Promise<Record<string, unknown>> | undefined;
+
+async function loadPiAiOAuthModule() {
+  if (!piAiOAuthModulePromise) {
+    piAiOAuthModulePromise = (async () => {
+      const piAiOAuthModulePath = await resolvePiBundledDependencyPath("@mariozechner/pi-ai", "dist/oauth.js");
+      return import(pathToFileURL(piAiOAuthModulePath).href) as Promise<Record<string, unknown>>;
+    })();
+  }
+
+  return piAiOAuthModulePromise;
+}
+
+async function loadOpenAICodexRefreshFromPiOAuth() {
+  const mod = await loadPiAiOAuthModule();
   if (typeof mod.refreshOpenAICodexToken !== "function") {
-    throw new Error("pi internals do not expose refreshOpenAICodexToken");
+    throw new Error("pi-ai oauth entrypoint does not expose refreshOpenAICodexToken");
   }
   return mod.refreshOpenAICodexToken as (refreshToken: string) => Promise<OAuthAuthEntry>;
 }
@@ -122,7 +128,7 @@ export async function refreshScopedOpenAIAuth(
     return creds;
   }
 
-  const refreshOpenAICodexToken = refreshImpl ?? (await loadOpenAICodexRefreshFromPiInternals());
+  const refreshOpenAICodexToken = refreshImpl ?? (await loadOpenAICodexRefreshFromPiOAuth());
   const refreshed = {
     ...creds,
     ...(await refreshOpenAICodexToken(creds.refresh)),
@@ -131,16 +137,10 @@ export async function refreshScopedOpenAIAuth(
   return refreshed;
 }
 
-async function loadAntigravityRefreshFromPiInternals() {
-  const piPackageJson = require.resolve("@mariozechner/pi-coding-agent/package.json");
-  const piPackageDir = path.dirname(piPackageJson);
-  const antigravityModulePath = path.resolve(
-    piPackageDir,
-    "node_modules/@mariozechner/pi-ai/dist/utils/oauth/google-antigravity.js",
-  );
-  const mod = await import(pathToFileURL(antigravityModulePath).href);
+async function loadAntigravityRefreshFromPiOAuth() {
+  const mod = await loadPiAiOAuthModule();
   if (typeof mod.refreshAntigravityToken !== "function") {
-    throw new Error("pi internals do not expose refreshAntigravityToken");
+    throw new Error("pi-ai oauth entrypoint does not expose refreshAntigravityToken");
   }
   return mod.refreshAntigravityToken as (refreshToken: string, projectId: string) => Promise<OAuthAuthEntry>;
 }
@@ -159,7 +159,7 @@ async function refreshAntigravityAuth(
     return creds;
   }
 
-  const refreshAntigravityToken = refreshImpl ?? (await loadAntigravityRefreshFromPiInternals());
+  const refreshAntigravityToken = refreshImpl ?? (await loadAntigravityRefreshFromPiOAuth());
   const refreshed = {
     ...creds,
     ...(await refreshAntigravityToken(creds.refresh, creds.projectId)),

@@ -8,14 +8,11 @@
     "reallms/gpt-oss-120b",
     "reallms/gemma-4-31B-it",
     "reallms/Qwen3-Coder-Next",
-    "reallms-dev/Qwen3-Coder-Next-Dev",
-    "google-antigravity/claude-opus-4-6-thinking",
-    "google-antigravity/claude-sonnet-4-6",
-    "google-antigravity/gemini-3.1-pro-high",
-    "google-antigravity/gemini-3-flash"
+    "reallms-dev/Qwen3-Coder-Next-Dev"
   ],
   "extensions": [
     "-extensions/google-search.ts",
     "-extensions/scoped-limits.ts"
-  ]
+  ],
+  "autoModelSelectionEnabled": false
 }

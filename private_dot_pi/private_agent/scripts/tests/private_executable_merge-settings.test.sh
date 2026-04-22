@@ -71,6 +71,55 @@ CREATED_EXTENSION=$(jq -r '.extensions[0]' "$FIXTURE_AGENT/settings.json")
 [ "$CREATED_EXTENSION" = "-extensions/google-search.ts" ] || fail "created settings.json should include extensions"
 pass "merge-settings.sh creates settings.json from settings.config.json"
 
+# falls back to node when jq is unavailable
+NODE_BIN=$(command -v node || true)
+DIRNAME_BIN=$(command -v dirname || true)
+RM_BIN=$(command -v rm || true)
+MV_BIN=$(command -v mv || true)
+[ -n "$NODE_BIN" ] || fail "node is required for fallback test"
+[ -n "$DIRNAME_BIN" ] || fail "dirname is required for fallback test"
+[ -n "$RM_BIN" ] || fail "rm is required for fallback test"
+[ -n "$MV_BIN" ] || fail "mv is required for fallback test"
+mkdir -p "$TMP_ROOT/bin"
+cat > "$TMP_ROOT/bin/node" <<SH
+#!/bin/sh
+exec "$NODE_BIN" "\$@"
+SH
+cat > "$TMP_ROOT/bin/dirname" <<SH
+#!/bin/sh
+exec "$DIRNAME_BIN" "\$@"
+SH
+cat > "$TMP_ROOT/bin/rm" <<SH
+#!/bin/sh
+exec "$RM_BIN" "\$@"
+SH
+cat > "$TMP_ROOT/bin/mv" <<SH
+#!/bin/sh
+exec "$MV_BIN" "\$@"
+SH
+chmod +x "$TMP_ROOT/bin/node" "$TMP_ROOT/bin/dirname" "$TMP_ROOT/bin/rm" "$TMP_ROOT/bin/mv"
+cat > "$FIXTURE_AGENT/settings.config.json" <<'JSON'
+{
+  "theme": "catppuccin-mocha",
+  "autoModelSelectionEnabled": false
+}
+JSON
+cat > "$FIXTURE_AGENT/settings.json" <<'JSON'
+{
+  "lastChangelogVersion": "0.67.68",
+  "theme": "old"
+}
+JSON
+OUTPUT=$(cd "$TMP_ROOT" && PATH="$TMP_ROOT/bin" "$FIXTURE_SCRIPTS/merge-settings.sh") || fail "merge-settings.sh should fall back to node when jq is unavailable"
+[ "$OUTPUT" = "Wrote settings.json" ] || fail "node fallback should still print the output path"
+FALLBACK_THEME=$(jq -r '.theme' "$FIXTURE_AGENT/settings.json")
+FALLBACK_AUTO_MODEL=$(jq -r '.autoModelSelectionEnabled' "$FIXTURE_AGENT/settings.json")
+FALLBACK_CHANGELOG=$(jq -r '.lastChangelogVersion' "$FIXTURE_AGENT/settings.json")
+[ "$FALLBACK_THEME" = "catppuccin-mocha" ] || fail "node fallback should merge config"
+[ "$FALLBACK_AUTO_MODEL" = "false" ] || fail "node fallback should preserve boolean values"
+[ "$FALLBACK_CHANGELOG" = "0.67.68" ] || fail "node fallback should preserve lastChangelogVersion"
+pass "merge-settings.sh falls back to node when jq is unavailable"
+
 # fails clearly when config is missing
 rm -f "$FIXTURE_AGENT/settings.config.json"
 set +e

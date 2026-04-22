@@ -13,10 +13,21 @@ const ANTIGRAVITY_ENDPOINTS = [
 ] as const;
 const DEFAULT_ANTIGRAVITY_VERSION = "1.21.9";
 
+function getRuntimePlatformDescriptor(): string {
+  const platform = typeof process !== "undefined" ? process.platform : undefined;
+  const arch = typeof process !== "undefined" ? process.arch : undefined;
+  return `${platform || "unknown"}/${arch || "unknown"}`;
+}
+
+function getRuntimeNodeClientDescriptor(): string {
+  const nodeVersion = typeof process !== "undefined" ? process.versions?.node : undefined;
+  return `gl-node/${nodeVersion || "unknown"}`;
+}
+
 function getAntigravityHeaders() {
   return {
-    "User-Agent": `antigravity/${process.env.PI_AI_ANTIGRAVITY_VERSION || DEFAULT_ANTIGRAVITY_VERSION} darwin/arm64`,
-    "X-Goog-Api-Client": "gl-node/22.17.0",
+    "User-Agent": `antigravity/${process.env.PI_AI_ANTIGRAVITY_VERSION || DEFAULT_ANTIGRAVITY_VERSION} ${getRuntimePlatformDescriptor()}`,
+    "X-Goog-Api-Client": getRuntimeNodeClientDescriptor(),
     "Client-Metadata": JSON.stringify({
       ideType: "IDE_UNSPECIFIED",
       platform: "PLATFORM_UNSPECIFIED",

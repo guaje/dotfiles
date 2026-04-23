@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { type ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { getHealthyEnabledModels } from "./model-health-check.ts";
 import { importPiModule } from "./packages/pi-package.ts";
@@ -78,6 +79,7 @@ export function isAutoModelSelectionEnabled(settings: SettingsFile): boolean {
 }
 
 let autoModelSelectionEnabledCache: boolean | undefined;
+let sessionAutoModelSelectionEnabled: boolean | undefined;
 let autoModelSettingsWatcher: FSWatcher | undefined;
 let autoModelSettingsWatchTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -86,6 +88,179 @@ async function refreshAutoModelSelectionEnabledCache(): Promise<boolean> {
   const enabled = isAutoModelSelectionEnabled(settings);
   autoModelSelectionEnabledCache = enabled;
   return enabled;
+}
+
+async function getCurrentSessionAutoModelSelectionEnabled(): Promise<boolean> {
+  if (sessionAutoModelSelectionEnabled !== undefined) return sessionAutoModelSelectionEnabled;
+  if (autoModelSelectionEnabledCache !== undefined) return autoModelSelectionEnabledCache;
+  return refreshAutoModelSelectionEnabledCache();
+}
+
+function setCurrentSessionAutoModelSelectionEnabled(enabled: boolean): void {
+  sessionAutoModelSelectionEnabled = enabled;
+}
+
+function renderAutoModelSessionStatus(theme: { fg: (color: string, text: string) => string }, enabled: boolean): string {
+  const dot = theme.fg(enabled ? "success" : "warning", enabled ? "●" : "○");
+  const label = theme.fg("dim", " Auto");
+  return dot + label;
+}
+
+let requestAutoModelFooterRender: (() => void) | undefined;
+
+function installAutoModelFooter(
+  ui: {
+    setFooter?: (factory?: ((tui: { requestRender: () => void }, theme: {
+      fg: (color: string, text: string) => string;
+    }, footerData: {
+      getGitBranch: () => string | null;
+      getExtensionStatuses: () => ReadonlyMap<string, string>;
+      getAvailableProviderCount: () => number;
+      onBranchChange: (listener: () => void) => (() => void) | void;
+    }) => {
+      render: (width: number) => string[];
+      invalidate: () => void;
+      dispose?: () => void;
+    })) => void;
+    setStatus?: (id: string, status?: string) => void;
+  } | undefined,
+  ctx: {
+    sessionManager: {
+      getEntries: () => Array<any>;
+      getCwd: () => string;
+      getSessionName: () => string | undefined;
+    };
+    getContextUsage?: () => { contextWindow?: number; percent?: number | null } | undefined;
+    model?: { id: string; provider: string; contextWindow?: number; reasoning?: boolean };
+  },
+  pi: ExtensionAPI,
+): void {
+  ui?.setStatus?.("auto-model-selection", undefined);
+  ui?.setFooter?.((tui, theme, footerData) => {
+    const requestRender = () => tui.requestRender();
+    requestAutoModelFooterRender = requestRender;
+    const unsubscribe = footerData.onBranchChange(() => tui.requestRender());
+
+    const formatTokens = (count: number): string => {
+      if (count < 1000) return count.toString();
+      if (count < 10000) return `${(count / 1000).toFixed(1)}k`;
+      if (count < 1000000) return `${Math.round(count / 1000)}k`;
+      if (count < 10000000) return `${(count / 1000000).toFixed(1)}M`;
+      return `${Math.round(count / 1000000)}M`;
+    };
+
+    return {
+      dispose: () => {
+        if (requestAutoModelFooterRender === requestRender) {
+          requestAutoModelFooterRender = undefined;
+        }
+        unsubscribe?.();
+      },
+      invalidate() {},
+      render(width: number): string[] {
+        let totalInput = 0;
+        let totalOutput = 0;
+        let totalCacheRead = 0;
+        let totalCacheWrite = 0;
+        let totalCost = 0;
+
+        for (const entry of ctx.sessionManager.getEntries()) {
+          if (entry.type === "message" && entry.message.role === "assistant") {
+            totalInput += entry.message.usage.input;
+            totalOutput += entry.message.usage.output;
+            totalCacheRead += entry.message.usage.cacheRead;
+            totalCacheWrite += entry.message.usage.cacheWrite;
+            totalCost += entry.message.usage.cost.total;
+          }
+        }
+
+        const contextUsage = ctx.getContextUsage?.();
+        const contextWindow = contextUsage?.contextWindow ?? ctx.model?.contextWindow ?? 0;
+        const contextPercentValue = contextUsage?.percent ?? 0;
+        const contextPercent = contextUsage?.percent !== null ? contextPercentValue.toFixed(1) : "?";
+
+        let pwd = ctx.sessionManager.getCwd();
+        const home = process.env.HOME || process.env.USERPROFILE;
+        if (home && pwd.startsWith(home)) {
+          pwd = `~${pwd.slice(home.length)}`;
+        }
+
+        const branch = footerData.getGitBranch();
+        if (branch) {
+          pwd = `${pwd} (${branch})`;
+        }
+
+        const sessionName = ctx.sessionManager.getSessionName();
+        if (sessionName) {
+          pwd = `${pwd} • ${sessionName}`;
+        }
+
+        const statsParts = [];
+        if (totalInput) statsParts.push(`↑${formatTokens(totalInput)}`);
+        if (totalOutput) statsParts.push(`↓${formatTokens(totalOutput)}`);
+        if (totalCacheRead) statsParts.push(`R${formatTokens(totalCacheRead)}`);
+        if (totalCacheWrite) statsParts.push(`W${formatTokens(totalCacheWrite)}`);
+        if (totalCost) statsParts.push(`$${totalCost.toFixed(3)}`);
+
+        const contextPercentDisplay =
+          contextPercent === "?"
+            ? `?/${formatTokens(contextWindow)}`
+            : `${contextPercent}%/${formatTokens(contextWindow)}`;
+        const contextPercentStr = contextPercentValue > 90
+          ? theme.fg("error", contextPercentDisplay)
+          : contextPercentValue > 70
+            ? theme.fg("warning", contextPercentDisplay)
+            : contextPercentDisplay;
+        statsParts.push(contextPercentStr);
+
+        const statsLeft = statsParts.join(" ");
+        const autoEnabled = sessionAutoModelSelectionEnabled ?? autoModelSelectionEnabledCache ?? true;
+        const autoStatus = renderAutoModelSessionStatus(theme, autoEnabled);
+        const modelName = ctx.model?.id || "no-model";
+        const thinkingText = pi.getThinkingLevel() === "off" ? "off" : pi.getThinkingLevel();
+        const providerText = ctx.model ? `(${ctx.model.provider}) ` : "";
+        const modelText = ctx.model?.reasoning
+          ? `${providerText}${modelName} • ${thinkingText}`
+          : `${providerText}${modelName}`;
+        const rightSide = `${autoStatus}${theme.fg("dim", ` • ${modelText}`)}`;
+
+        const statsLeftWidth = visibleWidth(statsLeft);
+        const rightSideWidth = visibleWidth(rightSide);
+        const minPadding = 2;
+        const paddingWidth = Math.max(minPadding, width - statsLeftWidth - rightSideWidth);
+        const statsLine = truncateToWidth(
+          theme.fg("dim", statsLeft) + " ".repeat(paddingWidth) + rightSide,
+          width,
+          theme.fg("dim", "..."),
+        );
+
+        const lines = [
+          truncateToWidth(theme.fg("dim", pwd), width, theme.fg("dim", "...")),
+          statsLine,
+        ];
+
+        const extensionStatuses = Array.from(footerData.getExtensionStatuses().entries())
+          .filter(([id]) => id !== "auto-model-selection")
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([, text]) => text.replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim())
+          .filter(Boolean);
+        if (extensionStatuses.length > 0) {
+          lines.push(truncateToWidth(extensionStatuses.join(" "), width, theme.fg("dim", "...")));
+        }
+
+        return lines;
+      },
+    };
+  });
+}
+
+function clearAutoModelFooter(ui: {
+  setFooter?: (factory?: undefined) => void;
+  setStatus?: (id: string, status?: string) => void;
+} | undefined): void {
+  requestAutoModelFooterRender = undefined;
+  ui?.setStatus?.("auto-model-selection", undefined);
+  ui?.setFooter?.(undefined);
 }
 
 function startAutoModelSettingsWatcher(): void {
@@ -485,18 +660,25 @@ export function selectModel(task: string, models: ModelMetadata[]): string {
 export default function autoModelSelectionExtension(pi: ExtensionAPI) {
   void patchBuiltInSettingsMenu();
 
-  pi.on("session_start", async () => {
+  pi.on("session_start", async (_event, ctx) => {
+    sessionAutoModelSelectionEnabled = undefined;
     await refreshAutoModelSelectionEnabledCache();
+    installAutoModelFooter(ctx.ui, ctx, pi);
     startAutoModelSettingsWatcher();
   });
 
-  pi.on("session_shutdown", () => {
+  pi.on("session_shutdown", (_event, ctx) => {
+    clearAutoModelFooter(ctx.ui);
+    sessionAutoModelSelectionEnabled = undefined;
     stopAutoModelSettingsWatcher();
   });
 
+  pi.on("model_select", () => {
+    requestAutoModelFooterRender?.();
+  });
+
   pi.on("before_agent_start", async (event, ctx) => {
-    const settings = await getSettings();
-    if (!isAutoModelSelectionEnabled(settings)) return;
+    if (!await getCurrentSessionAutoModelSelectionEnabled()) return;
 
     const models = await getHealthyEnabledModels(await getEnabledModelsMetadata());
     if (models.length === 0) return;
@@ -552,11 +734,14 @@ export default function autoModelSelectionExtension(pi: ExtensionAPI) {
     description: "Toggle automatic model selection on or off",
     handler: async (args, ctx) => {
       const action = (args || "toggle").trim().toLowerCase();
-      const settings = await getSettings();
-      const currentEnabled = isAutoModelSelectionEnabled(settings);
+      const defaultEnabled = await refreshAutoModelSelectionEnabledCache();
+      const currentEnabled = sessionAutoModelSelectionEnabled ?? defaultEnabled;
 
       if (action === "status") {
-        ctx.ui.notify(`Auto model selection is ${currentEnabled ? "ON" : "OFF"}`, "info");
+        ctx.ui.notify(
+          `Auto model selection is ${currentEnabled ? "ON" : "OFF"} for this session (default for new sessions: ${defaultEnabled ? "ON" : "OFF"})`,
+          "info",
+        );
         return;
       }
 
@@ -572,9 +757,10 @@ export default function autoModelSelectionExtension(pi: ExtensionAPI) {
         return;
       }
 
-      await setAutoModelSelectionEnabled(nextEnabled);
+      setCurrentSessionAutoModelSelectionEnabled(nextEnabled);
+      requestAutoModelFooterRender?.();
       ctx.ui.notify(
-        `Auto model selection ${nextEnabled ? "enabled" : "disabled"} (saved in settings.config.json and merged into settings.json)`,
+        `Auto model selection ${nextEnabled ? "enabled" : "disabled"} for this session only`,
         "info",
       );
     }

@@ -11,6 +11,8 @@ const STUB_PACKAGE_DIR = resolve("agent/extensions/node_modules");
 const PI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@mariozechner/pi-coding-agent");
 const PI_AI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@mariozechner/pi-ai");
 const TYPEBOX_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@sinclair/typebox");
+const PI_TUI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@mariozechner/pi-tui");
+const TEST_CWD = resolve(".");
 
 async function loadExtension() {
   mkdirSync(PI_PACKAGE_DIR, { recursive: true });
@@ -45,6 +47,21 @@ async function loadExtension() {
     "  Object(properties) { return { type: 'object', properties }; },",
     "  String(options = {}) { return { type: 'string', ...options }; },",
     "};",
+  ].join("\n"));
+
+  mkdirSync(PI_TUI_PACKAGE_DIR, { recursive: true });
+  writeFileSync(resolve(PI_TUI_PACKAGE_DIR, "package.json"), JSON.stringify({
+    name: "@mariozechner/pi-tui",
+    type: "module",
+    exports: "./index.js",
+  }));
+  writeFileSync(resolve(PI_TUI_PACKAGE_DIR, "index.js"), [
+    "function strip(value) { return String(value).replace(/\\x1b\\[[0-9;]*m/g, '').replace(/<[^>]+>/g, ''); }",
+    "export function visibleWidth(value) { return strip(value).length; }",
+    "export function truncateToWidth(value, width, ellipsis = '...') {",
+    "  const text = String(value);",
+    "  return strip(text).length <= width ? text : strip(text).slice(0, Math.max(0, width - String(ellipsis).length)) + ellipsis;",
+    "}",
   ].join("\n"));
 
   const moduleUrl = `${pathToFileURL(EXTENSION_PATH).href}?t=${Date.now()}`;
@@ -147,6 +164,85 @@ test("before_agent_start auto-selects reasoning effort for reasoning models", as
   assert.equal(thinkingLevel, "xhigh");
 });
 
+test("custom footer shows compact auto-model state immediately before the selected model", async () => {
+  const mod = await loadExtension();
+  const extension = mod.default;
+
+  const handlers = new Map<string, Function>();
+  let footerFactory: any;
+  const pi = {
+    on(eventName: string, handler: Function) {
+      handlers.set(eventName, handler);
+    },
+    registerTool() {},
+    registerCommand() {},
+    async setModel() {
+      return true;
+    },
+    getThinkingLevel() {
+      return "medium";
+    },
+  };
+
+  writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({ enabledModels: ["openai-codex/gpt-5.4"], autoModelSelectionEnabled: true }, null, 2)}\n`);
+  extension(pi as any);
+
+  const ctx = {
+    sessionManager: {
+      getEntries() {
+        return [];
+      },
+      getCwd() {
+        return TEST_CWD;
+      },
+      getSessionName() {
+        return undefined;
+      },
+    },
+    getContextUsage() {
+      return { contextWindow: 128000, percent: 12.5 };
+    },
+    model: { id: "gpt-5.4", provider: "openai-codex", contextWindow: 128000, reasoning: true },
+    ui: {
+      setStatus() {},
+      setFooter(factory: any) {
+        footerFactory = factory;
+      },
+    },
+  };
+
+  await handlers.get("session_start")?.({}, ctx as any);
+  assert.equal(typeof footerFactory, "function");
+
+  const footer = footerFactory(
+    { requestRender() {} },
+    {
+      fg(color: string, text: string) {
+        return `<${color}>${text}</${color}>`;
+      },
+    },
+    {
+      getGitBranch() {
+        return null;
+      },
+      getExtensionStatuses() {
+        return new Map();
+      },
+      getAvailableProviderCount() {
+        return 1;
+      },
+      onBranchChange() {
+        return () => {};
+      },
+    },
+  );
+
+  const footerLine = footer.render(1000)[1] ?? "";
+  assert.match(footerLine, /●/);
+  assert.match(footerLine, /Auto/);
+  assert.match(footerLine, /Auto.*\(openai-codex\) gpt-5\.4 • medium/);
+});
+
 test("registers tool, command, and auto-switch hook", async () => {
   const mod = await loadExtension();
   const extension = mod.default;
@@ -181,14 +277,17 @@ test("registers tool, command, and auto-switch hook", async () => {
   assert.equal(registeredCommand.description, "Toggle automatic model selection on or off");
 });
 
-test("/auto-model toggles persisted state in settings.config.json", async () => {
+test("/auto-model only toggles the current session", async () => {
   const mod = await loadExtension();
   const extension = mod.default;
 
   let registeredCommand: any;
+  const handlers = new Map<string, Function>();
   const notifications: Array<{ message: string; level: string }> = [];
   const pi = {
-    on() {},
+    on(eventName: string, handler: Function) {
+      handlers.set(eventName, handler);
+    },
     registerTool() {},
     registerCommand(_name: string, command: any) {
       registeredCommand = command;
@@ -200,6 +299,16 @@ test("/auto-model toggles persisted state in settings.config.json", async () => 
 
   writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({ enabledModels: ["openai-codex/gpt-5.4"], autoModelSelectionEnabled: true }, null, 2)}\n`);
   extension(pi as any);
+  await handlers.get("session_start")?.({}, {
+    sessionManager: {
+      getEntries() { return []; },
+      getCwd() { return TEST_CWD; },
+      getSessionName() { return undefined; },
+    },
+    getContextUsage() { return { contextWindow: 128000, percent: 0 }; },
+    model: { id: "gpt-5.4", provider: "openai-codex", contextWindow: 128000, reasoning: false },
+    ui: { setFooter() {}, setStatus() {} },
+  });
 
   await registeredCommand.handler("", {
     ui: {
@@ -210,10 +319,11 @@ test("/auto-model toggles persisted state in settings.config.json", async () => 
   });
 
   let settings = JSON.parse(readFileSync(SETTINGS_CONFIG_PATH, "utf8"));
-  assert.equal(settings.autoModelSelectionEnabled, false);
+  assert.equal(settings.autoModelSelectionEnabled, true);
   assert.match(notifications[0]!.message, /disabled/);
+  assert.match(notifications[0]!.message, /this session only/);
 
-  await registeredCommand.handler("on", {
+  await registeredCommand.handler("status", {
     ui: {
       notify(message: string, level: string) {
         notifications.push({ message, level });
@@ -221,9 +331,70 @@ test("/auto-model toggles persisted state in settings.config.json", async () => 
     },
   });
 
-  settings = JSON.parse(readFileSync(SETTINGS_CONFIG_PATH, "utf8"));
+  assert.match(notifications[1]!.message, /OFF for this session/);
+  assert.match(notifications[1]!.message, /default for new sessions: ON/);
+
+  handlers.get("session_shutdown")?.({}, {});
+});
+
+test("/auto-model session toggle affects auto-switching without changing defaults", async () => {
+  const mod = await loadExtension();
+  const extension = mod.default;
+
+  let registeredCommand: any;
+  const handlers = new Map<string, Function>();
+  let setModelCalls = 0;
+  const pi = {
+    on(eventName: string, handler: Function) {
+      handlers.set(eventName, handler);
+    },
+    registerTool() {},
+    registerCommand(_name: string, command: any) {
+      registeredCommand = command;
+    },
+    async setModel() {
+      setModelCalls += 1;
+      return true;
+    },
+    setThinkingLevel() {},
+  };
+
+  writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({
+    enabledModels: ["reallms/gpt-oss-120b"],
+    autoModelSelectionEnabled: true,
+  }, null, 2)}\n`);
+
+  extension(pi as any);
+  await handlers.get("session_start")?.({}, {
+    sessionManager: {
+      getEntries() { return []; },
+      getCwd() { return TEST_CWD; },
+      getSessionName() { return undefined; },
+    },
+    getContextUsage() { return { contextWindow: 128000, percent: 0 }; },
+    model: { id: "gpt-oss-120b", provider: "reallms", contextWindow: 128000, reasoning: true },
+    ui: { setFooter() {}, setStatus() {} },
+  });
+
+  await registeredCommand.handler("off", {
+    ui: { notify() {} },
+  });
+
+  await handlers.get("before_agent_start")?.({ prompt: "complex reasoning" }, {
+    modelRegistry: {
+      find(provider: string, modelId: string) {
+        return { provider, id: modelId };
+      },
+    },
+    model: undefined,
+    ui: { notify() {} },
+  });
+
+  assert.equal(setModelCalls, 0);
+  const settings = JSON.parse(readFileSync(SETTINGS_CONFIG_PATH, "utf8"));
   assert.equal(settings.autoModelSelectionEnabled, true);
-  assert.match(notifications[1]!.message, /enabled/);
+
+  handlers.get("session_shutdown")?.({}, {});
 });
 
 test("/auto-model status reflects manual settings.config.json edits", async () => {
@@ -263,8 +434,10 @@ test("/auto-model status reflects manual settings.config.json edits", async () =
     },
   });
 
-  assert.match(notifications[0]!.message, /OFF/);
-  assert.match(notifications[1]!.message, /ON/);
+  assert.match(notifications[0]!.message, /OFF for this session/);
+  assert.match(notifications[0]!.message, /default for new sessions: OFF/);
+  assert.match(notifications[1]!.message, /ON for this session/);
+  assert.match(notifications[1]!.message, /default for new sessions: ON/);
 });
 
 test.after(() => {
@@ -273,4 +446,5 @@ test.after(() => {
   rmSync(PI_PACKAGE_DIR, { recursive: true, force: true });
   rmSync(PI_AI_PACKAGE_DIR, { recursive: true, force: true });
   rmSync(TYPEBOX_PACKAGE_DIR, { recursive: true, force: true });
+  rmSync(PI_TUI_PACKAGE_DIR, { recursive: true, force: true });
 });

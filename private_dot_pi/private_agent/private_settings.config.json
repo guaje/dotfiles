@@ -14,5 +14,8 @@
     "-extensions/google-search.ts",
     "-extensions/scoped-limits.ts"
   ],
-  "autoModelSelectionEnabled": false
+  "autoModelSelectionEnabled": false,
+  "packages": [
+    "npm:@ollama/pi-web-search"
+  ]
 }

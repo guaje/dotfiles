@@ -44,6 +44,34 @@ function summarizeEdit(edits: Array<{ oldText: string; newText: string }> | unde
   return `\n\n${uiLabel("Changes:")} ${colorize(`${replacements} replacement${replacements === 1 ? "" : "s"}`, UI_PALETTE.hint)}`;
 }
 
+async function confirmFileMutation(
+  ctx: {
+    ui: {
+      getEditorText: () => string;
+      setEditorText: (text: string) => void;
+      confirm: (title: string, message: string) => Promise<boolean>;
+    };
+  },
+  options: {
+    title: string;
+    path: string;
+    previewText: string;
+    summary: string;
+  },
+) {
+  const previousEditorText = ctx.ui.getEditorText();
+  ctx.ui.setEditorText(options.previewText);
+  try {
+    return await ctx.ui.confirm(
+      formatConfirmTitle(options.title),
+      `${uiLabel("Path:")}\n\n${colorize(options.path, SYNTAX_PALETTE.text)}${options.summary}`,
+    );
+  }
+  finally {
+    ctx.ui.setEditorText(previousEditorText);
+  }
+}
+
 function formatPlainLineNumber(lineNumber: number, width: number) {
   return String(lineNumber).padStart(width, " ");
 }
@@ -534,6 +562,23 @@ function colorize(text: string, color: string) {
   return `${color}${text}${COLOR_RESET}`;
 }
 
+function findQuotedSpanEnd(text: string, start: number) {
+  const quote = text[start];
+  if (quote !== '"' && quote !== "'") return start + 1;
+
+  let end = start + 1;
+  while (end < text.length) {
+    const current = text[end]!;
+    if (current === quote && text[end - 1] !== "\\") {
+      end++;
+      break;
+    }
+    end++;
+  }
+
+  return end;
+}
+
 function bold(text: string) {
   return `\x1b[1m${text}${COLOR_RESET}`;
 }
@@ -581,18 +626,9 @@ function highlightWholeCommand(command: string, names: string[]) {
     }
 
     if (char === '"' || char === "'") {
-      const quote = char;
-      let j = i + 1;
-      while (j < command.length) {
-        const current = command[j]!;
-        if (current === quote && command[j - 1] !== "\\") {
-          j++;
-          break;
-        }
-        j++;
-      }
-      result += colorize(command.slice(i, j), SYNTAX_PALETTE.string);
-      i = j;
+      const end = findQuotedSpanEnd(command, i);
+      result += colorize(command.slice(i, end), SYNTAX_PALETTE.string);
+      i = end;
       continue;
     }
 
@@ -822,59 +858,61 @@ function getRenderWarningThemeColor(level: BashWarningLevel) {
   return "bashMode";
 }
 
-function inferHeredocLanguage(line: string) {
-  const lower = line.toLowerCase();
-  if (/\bpython(?:3)?\b/.test(lower)) return "python";
-  if (/\b(?:bash|sh|zsh|fish|ksh)\b/.test(lower)) return "shell";
-  return undefined;
-}
+type ShellHighlighterOptions = {
+  commandNameSet: Set<string>;
+  renderOperator: (theme: RenderTheme, text: string) => string;
+  renderPunctuation: (theme: RenderTheme, text: string) => string;
+  renderVariable: (theme: RenderTheme, text: string) => string;
+  renderString: (theme: RenderTheme, text: string) => string;
+  renderToken: (theme: RenderTheme, token: string, commandNameSet: Set<string>) => string;
+  renderFallback?: (theme: RenderTheme, text: string) => string;
+  renderBackslash?: (theme: RenderTheme, text: string) => string;
+  punctuationPattern?: RegExp;
+};
 
-function highlightShellScriptLineWithTheme(line: string, theme: RenderTheme) {
-  const commandNames = extractCommandNames(line);
-  const commandNameSet = new Set(commandNames);
+function highlightShellLikeTextWithTheme(source: string, theme: RenderTheme, options: ShellHighlighterOptions) {
   let result = "";
+  const punctuationPattern = options.punctuationPattern ?? /[(){}\[\]]/;
+  const renderFallback = options.renderFallback ?? ((currentTheme, text) => currentTheme.fg("text", text));
 
-  for (let i = 0; i < line.length;) {
-    const char = line[i]!;
+  for (let i = 0; i < source.length;) {
+    const char = source[i]!;
 
     if (char === "#") {
-      result += styleRenderCommentToken(theme, line.slice(i));
+      result += styleRenderCommentToken(theme, source.slice(i));
       break;
     }
 
     if (char === '"' || char === "'") {
-      const quote = char;
-      let j = i + 1;
-      while (j < line.length) {
-        const current = line[j]!;
-        if (current === quote && line[j - 1] !== "\\") {
-          j++;
-          break;
-        }
-        j++;
-      }
-      result += styleRenderStringToken(theme, line.slice(i, j));
-      i = j;
+      const end = findQuotedSpanEnd(source, i);
+      result += options.renderString(theme, source.slice(i, end));
+      i = end;
       continue;
     }
 
-    if (char === "$" && line[i + 1] === "(") {
-      result += styleRenderScriptOperatorToken(theme, "$(");
+    if (options.renderBackslash && char === "\\") {
+      result += options.renderBackslash(theme, char);
+      i++;
+      continue;
+    }
+
+    if (char === "$" && source[i + 1] === "(") {
+      result += options.renderOperator(theme, "$(");
       i += 2;
       continue;
     }
 
     if (char === "$") {
-      const match = line.slice(i).match(/^\$[A-Za-z_][A-Za-z0-9_]*/);
+      const match = source.slice(i).match(/^\$[A-Za-z_][A-Za-z0-9_]*/);
       if (match) {
-        result += styleRenderScriptVariableToken(theme, match[0]);
+        result += options.renderVariable(theme, match[0]);
         i += match[0].length;
         continue;
       }
     }
 
     if (/^[0-9]$/.test(char)) {
-      const match = line.slice(i).match(/^\d+(?:\.\d+)?/);
+      const match = source.slice(i).match(/^\d+(?:\.\d+)?/);
       if (match) {
         result += theme.fg("syntaxNumber", match[0]);
         i += match[0].length;
@@ -882,15 +920,15 @@ function highlightShellScriptLineWithTheme(line: string, theme: RenderTheme) {
       }
     }
 
-    const operatorMatch = line.slice(i).match(/^(?:&&|\|\||\|&|>>|<<|[|&;<>])/);
+    const operatorMatch = source.slice(i).match(/^(?:&&|\|\||\|&|>>|<<|[|&;<>])/);
     if (operatorMatch) {
-      result += styleRenderScriptOperatorToken(theme, operatorMatch[0]);
+      result += options.renderOperator(theme, operatorMatch[0]);
       i += operatorMatch[0].length;
       continue;
     }
 
-    if (/[(){}\[\]]/.test(char)) {
-      result += styleRenderScriptPunctuationToken(theme, char);
+    if (punctuationPattern.test(char)) {
+      result += options.renderPunctuation(theme, char);
       i++;
       continue;
     }
@@ -901,23 +939,43 @@ function highlightShellScriptLineWithTheme(line: string, theme: RenderTheme) {
       continue;
     }
 
-    const tokenMatch = line.slice(i).match(/^[^\s|&;<>()[\]{}]+/);
+    const tokenMatch = source.slice(i).match(/^[^\s|&;<>()[\]{}]+/);
     if (tokenMatch) {
       const token = tokenMatch[0];
-      if (isVariableAssignment(token)) result += renderStructuredToken(theme, token, styleRenderScriptVariableToken);
-      else if (commandNameSet.has(token)) result += styleRenderScriptFunctionToken(theme, token);
-      else if (token.startsWith("-") && token !== "-") result += styleRenderScriptKeywordToken(theme, token);
-      else if (/^[^=:]+[:=].+$/.test(token)) result += renderStructuredToken(theme, token, styleRenderScriptNameToken);
-      else result += styleRenderScriptNameToken(theme, token);
+      result += options.renderToken(theme, token, options.commandNameSet);
       i += token.length;
       continue;
     }
 
-    result += theme.fg("text", char);
+    result += renderFallback(theme, char);
     i++;
   }
 
   return result;
+}
+
+function inferHeredocLanguage(line: string) {
+  const lower = line.toLowerCase();
+  if (/\bpython(?:3)?\b/.test(lower)) return "python";
+  if (/\b(?:bash|sh|zsh|fish|ksh)\b/.test(lower)) return "shell";
+  return undefined;
+}
+
+function highlightShellScriptLineWithTheme(line: string, theme: RenderTheme) {
+  return highlightShellLikeTextWithTheme(line, theme, {
+    commandNameSet: new Set(extractCommandNames(line)),
+    renderOperator: styleRenderScriptOperatorToken,
+    renderPunctuation: styleRenderScriptPunctuationToken,
+    renderVariable: styleRenderScriptVariableToken,
+    renderString: styleRenderStringToken,
+    renderToken(currentTheme, token, commandNameSet) {
+      if (isVariableAssignment(token)) return renderStructuredToken(currentTheme, token, styleRenderScriptVariableToken);
+      if (commandNameSet.has(token)) return styleRenderScriptFunctionToken(currentTheme, token);
+      if (token.startsWith("-") && token !== "-") return styleRenderScriptKeywordToken(currentTheme, token);
+      if (/^[^=:]+[:=].+$/.test(token)) return renderStructuredToken(currentTheme, token, styleRenderScriptNameToken);
+      return styleRenderScriptNameToken(currentTheme, token);
+    },
+  });
 }
 
 function highlightPythonLineWithTheme(line: string, theme: RenderTheme) {
@@ -935,18 +993,9 @@ function highlightPythonLineWithTheme(line: string, theme: RenderTheme) {
     }
 
     if (char === '"' || char === "'") {
-      const quote = char;
-      let j = i + 1;
-      while (j < line.length) {
-        const current = line[j]!;
-        if (current === quote && line[j - 1] !== "\\") {
-          j++;
-          break;
-        }
-        j++;
-      }
-      result += styleRenderStringToken(theme, line.slice(i, j));
-      i = j;
+      const end = findQuotedSpanEnd(line, i);
+      result += styleRenderStringToken(theme, line.slice(i, end));
+      i = end;
       continue;
     }
 
@@ -997,99 +1046,24 @@ function highlightPythonLineWithTheme(line: string, theme: RenderTheme) {
 }
 
 function highlightWholeCommandWithTheme(command: string, names: string[], theme: RenderTheme) {
-  const commandNameSet = new Set(names);
-  let result = "";
+  let highlighted = highlightShellLikeTextWithTheme(command, theme, {
+    commandNameSet: new Set(names),
+    renderOperator: styleRenderOperatorToken,
+    renderPunctuation(currentTheme, text) {
+      return currentTheme.fg("syntaxPunctuation", text);
+    },
+    renderVariable: styleRenderVariableToken,
+    renderString: styleRenderStringToken,
+    renderBackslash: styleRenderOperatorToken,
+    renderToken(currentTheme, token, commandNameSet) {
+      if (isVariableAssignment(token)) return renderStructuredToken(currentTheme, token, styleRenderVariableToken);
+      if (commandNameSet.has(token)) return styleRenderCommandToken(currentTheme, token);
+      if (token.startsWith("-") && token !== "-") return renderStructuredToken(currentTheme, token, styleRenderFlagToken);
+      if (/^[^=:]+[:=].+$/.test(token)) return renderStructuredToken(currentTheme, token, (nestedTheme, text) => nestedTheme.fg("text", text));
+      return currentTheme.fg("text", token);
+    },
+  });
 
-  for (let i = 0; i < command.length;) {
-    const char = command[i]!;
-
-    if (char === "#") {
-      result += styleRenderCommentToken(theme, command.slice(i));
-      break;
-    }
-
-    if (char === '"' || char === "'") {
-      const quote = char;
-      let j = i + 1;
-      while (j < command.length) {
-        const current = command[j]!;
-        if (current === quote && command[j - 1] !== "\\") {
-          j++;
-          break;
-        }
-        j++;
-      }
-      result += styleRenderStringToken(theme, command.slice(i, j));
-      i = j;
-      continue;
-    }
-
-    if (char === "\\") {
-      result += styleRenderOperatorToken(theme, char);
-      i++;
-      continue;
-    }
-
-    if (char === "$" && command[i + 1] === "(") {
-      result += styleRenderOperatorToken(theme, "$(");
-      i += 2;
-      continue;
-    }
-
-    if (/[$]/.test(char)) {
-      const match = command.slice(i).match(/^\$[A-Za-z_][A-Za-z0-9_]*/);
-      if (match) {
-        result += styleRenderVariableToken(theme, match[0]);
-        i += match[0].length;
-        continue;
-      }
-    }
-
-    if (/^[0-9]$/.test(char)) {
-      const match = command.slice(i).match(/^\d+(?:\.\d+)?/);
-      if (match) {
-        result += theme.fg("syntaxNumber", match[0]);
-        i += match[0].length;
-        continue;
-      }
-    }
-
-    const operatorMatch = command.slice(i).match(/^(?:&&|\|\||\|&|>>|<<|[|&;<>])/);
-    if (operatorMatch) {
-      result += styleRenderOperatorToken(theme, operatorMatch[0]);
-      i += operatorMatch[0].length;
-      continue;
-    }
-
-    if (/[(){}\[\]]/.test(char)) {
-      result += theme.fg("syntaxPunctuation", char);
-      i++;
-      continue;
-    }
-
-    if (/\s/.test(char)) {
-      result += char;
-      i++;
-      continue;
-    }
-
-    const tokenMatch = command.slice(i).match(/^[^\s|&;<>()[\]{}]+/);
-    if (tokenMatch) {
-      const token = tokenMatch[0];
-      if (isVariableAssignment(token)) result += renderStructuredToken(theme, token, styleRenderVariableToken);
-      else if (commandNameSet.has(token)) result += styleRenderCommandToken(theme, token);
-      else if (token.startsWith("-") && token !== "-") result += renderStructuredToken(theme, token, styleRenderFlagToken);
-      else if (/^[^=:]+[:=].+$/.test(token)) result += renderStructuredToken(theme, token, (currentTheme, text) => currentTheme.fg("text", text));
-      else result += theme.fg("text", token);
-      i += token.length;
-      continue;
-    }
-
-    result += theme.fg("text", char);
-    i++;
-  }
-
-  let highlighted = result;
   for (const token of RISKY_TOKENS) {
     highlighted = highlighted.replace(token.pattern, (match) => theme.fg(getRenderWarningThemeColor(token.level), theme.bold(match)));
   }
@@ -1186,20 +1160,15 @@ export default function (pi: ExtensionAPI) {
         return { block: true, reason: "File write blocked (no UI available for confirmation)" };
       }
 
-      const previousEditorText = ctx.ui.getEditorText();
-      ctx.ui.setEditorText(buildWritePreviewText(event.input.content));
-      try {
-        const ok = await ctx.ui.confirm(
-          formatConfirmTitle("Allow file write?"),
-          `${uiLabel("Path:")}\n\n${colorize(event.input.path, SYNTAX_PALETTE.text)}${summarizeWrite(event.input.content)}`,
-        );
+      const ok = await confirmFileMutation(ctx, {
+        title: "Allow file write?",
+        path: event.input.path,
+        previewText: buildWritePreviewText(event.input.content),
+        summary: summarizeWrite(event.input.content),
+      });
 
-        if (!ok) return { block: true, reason: "File write blocked by user" };
-        return undefined;
-      }
-      finally {
-        ctx.ui.setEditorText(previousEditorText);
-      }
+      if (!ok) return { block: true, reason: "File write blocked by user" };
+      return undefined;
     }
 
     if (isToolCallEventType("edit", event)) {
@@ -1207,20 +1176,15 @@ export default function (pi: ExtensionAPI) {
         return { block: true, reason: "File edit blocked (no UI available for confirmation)" };
       }
 
-      const previousEditorText = ctx.ui.getEditorText();
-      ctx.ui.setEditorText(buildEditPreviewText(event.input.edits));
-      try {
-        const ok = await ctx.ui.confirm(
-          formatConfirmTitle("Allow file edit?"),
-          `${uiLabel("Path:")}\n\n${colorize(event.input.path, SYNTAX_PALETTE.text)}${summarizeEdit(event.input.edits)}`,
-        );
+      const ok = await confirmFileMutation(ctx, {
+        title: "Allow file edit?",
+        path: event.input.path,
+        previewText: buildEditPreviewText(event.input.edits),
+        summary: summarizeEdit(event.input.edits),
+      });
 
-        if (!ok) return { block: true, reason: "File edit blocked by user" };
-        return undefined;
-      }
-      finally {
-        ctx.ui.setEditorText(previousEditorText);
-      }
+      if (!ok) return { block: true, reason: "File edit blocked by user" };
+      return undefined;
     }
 
     return undefined;

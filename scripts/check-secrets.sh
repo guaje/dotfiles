@@ -5,10 +5,24 @@
 
 SENSITIVE_PATTERNS='API_KEY
 PASSWORD
+PASSWD
+PASSPHRASE
 SECRET
 TOKEN
-AUTH'
+AUTH
+CREDENTIAL
+ACCESS_KEY
+SECRET_KEY
+PRIVATE_KEY
+CLIENT_SECRET
+WEBHOOK
+DSN
+CONNECTION_STRING
+COOKIE
+SESSION'
 SOURCE_DIR=$(chezmoi source-path)
+SCRIPT_DIR=$(CDPATH= cd "$(dirname "$0")" && pwd)
+CHECK_SECRETS_AWK=$SCRIPT_DIR/check-secrets.awk
 AGE_KEY=$(awk -F: '/public key:/ {gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); print $2; exit}' "$HOME/.config/chezmoi/key.txt" 2>/dev/null)
 
 TTY_AVAILABLE=false
@@ -101,65 +115,68 @@ if [ ! -s "$FILES_TO_ADD_TMP" ] && [ -n "${CHEZMOI_ARGS:-}" ]; then
     collect_files $CHEZMOI_ARGS
 fi
 
+abspath_path() {
+    target=$1
+    case $target in
+        /*) ;;
+        *) target=$PWD/$target ;;
+    esac
+
+    target_dir=$(dirname "$target") || return 1
+    target_base=$(basename "$target") || return 1
+    (
+        cd "$target_dir" 2>/dev/null || exit 1
+        printf '%s/%s\n' "$(pwd -P)" "$target_base"
+    )
+}
+
+abspath_dir() {
+    target=$1
+    case $target in
+        /*) ;;
+        *) target=$PWD/$target ;;
+    esac
+    (
+        cd "$target" 2>/dev/null || exit 1
+        pwd -P
+    )
+}
+
 relpath() {
-    python3 - "$1" "$2" <<'PY'
-import os, sys
-path = os.path.abspath(sys.argv[1])
-base = os.path.abspath(sys.argv[2])
-print(os.path.relpath(path, base))
-PY
-}
-
-relpath_from_home() {
-    relpath "$1" "$HOME"
-}
-
-chezmoi_relpath() {
-    printf '%s' "$1" | sed -e 's@^\.@dot_@' -e 's@/\.@/dot_@g'
-}
-
-strip_quotes() {
-    printf '%s' "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//"
+    path_abs=$(abspath_path "$1") || return 1
+    base_abs=$(abspath_dir "$2") || return 1
+    awk -v path="$path_abs" -v base="$base_abs" '
+BEGIN {
+    path_count = split(path, path_parts, "/")
+    base_count = split(base, base_parts, "/")
+    common = 1
+    while (common <= path_count && common <= base_count && path_parts[common] == base_parts[common]) {
+        common++
+    }
+    result = ""
+    for (i = common; i < base_count; i++) {
+        result = result (result ? "/" : "") ".."
+    }
+    for (i = common; i <= path_count; i++) {
+        if (path_parts[i] == "") {
+            continue
+        }
+        result = result (result ? "/" : "") path_parts[i]
+    }
+    if (result == "") {
+        result = "."
+    }
+    print result
+}'
 }
 
 matches_sensitive_file() {
     input_file=$1
 
-    SENSITIVE_PATTERNS="$SENSITIVE_PATTERNS" python3 - "$input_file" <<'PY'
-import os
-import re
-import sys
-
-input_file = sys.argv[1]
-patterns = [p.strip() for p in os.environ.get("SENSITIVE_PATTERNS", "").splitlines() if p.strip()]
-
-with open(input_file, "r", encoding="utf-8") as f:
-    content = f.read()
-
-assignment_re = re.compile(r'["\']?(?P<key>[A-Za-z0-9_.-]+)["\']?\s*[:=]', re.MULTILINE)
-
-
-def normalize(value):
-    return re.sub(r'[^A-Za-z0-9]+', '', value).upper()
-
-normalized_patterns = [(pattern, normalize(pattern)) for pattern in patterns]
-
-for match in assignment_re.finditer(content):
-    key = match.group("key")
-    normalized_key = normalize(key)
-    for pattern, normalized_pattern in normalized_patterns:
-        if normalized_pattern and normalized_pattern in normalized_key:
-            print(pattern)
-            sys.exit(0)
-
-normalized_content = normalize(content)
-for pattern, normalized_pattern in normalized_patterns:
-    if normalized_pattern and normalized_pattern in normalized_content:
-        print(pattern)
-        sys.exit(0)
-
-sys.exit(1)
-PY
+    SENSITIVE_PATTERNS="$SENSITIVE_PATTERNS" awk \
+        -v mode=detect \
+        -f "$CHECK_SECRETS_AWK" \
+        "$input_file"
 }
 
 extract_sensitive_values() {
@@ -168,86 +185,13 @@ extract_sensitive_values() {
     secrets_file=$3
     sops_file_name=$4
 
-    SENSITIVE_PATTERNS="$SENSITIVE_PATTERNS" python3 - "$input_file" "$template_file" "$secrets_file" "$sops_file_name" <<'PY'
-import collections
-import os
-import re
-import sys
-
-input_file, template_file, secrets_file, sops_file_name = sys.argv[1:5]
-patterns = [p.strip() for p in os.environ.get("SENSITIVE_PATTERNS", "").splitlines() if p.strip()]
-
-with open(input_file, "r", encoding="utf-8") as f:
-    content = f.read()
-
-assignment_re = re.compile(
-    r'(?P<prefix>["\']?(?P<key>[A-Za-z0-9_.-]+)["\']?\s*[:=]\s*)(?P<value>"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|[^,\n\r}\]]+)',
-    re.MULTILINE,
-)
-
-
-def normalize(value):
-    return re.sub(r'[^A-Za-z0-9]+', '', value).upper()
-
-normalized_patterns = [normalize(pattern) for pattern in patterns if pattern.strip()]
-
-occurrences = []
-for match in assignment_re.finditer(content):
-    key = match.group("key").strip()
-    normalized_key = normalize(key)
-    if not any(pattern and pattern in normalized_key for pattern in normalized_patterns):
-        continue
-
-    raw_value = match.group("value")
-    trimmed_value = raw_value.strip()
-    if not trimmed_value:
-        continue
-
-    if len(trimmed_value) >= 2 and trimmed_value[0] == trimmed_value[-1] and trimmed_value[0] in ('"', "'"):
-        secret_value = trimmed_value[1:-1]
-        replace_start = match.start("value") + raw_value.find(trimmed_value) + 1
-        replace_end = replace_start + len(secret_value)
-    else:
-        secret_value = trimmed_value
-        replace_start = match.start("value") + raw_value.find(trimmed_value)
-        replace_end = replace_start + len(trimmed_value)
-
-    occurrences.append({
-        "key": key,
-        "value": secret_value,
-        "replace_start": replace_start,
-        "replace_end": replace_end,
-    })
-
-if not occurrences:
-    sys.exit(2)
-
-counts = collections.Counter(item["key"] for item in occurrences)
-seen = collections.Counter()
-secrets = []
-for item in occurrences:
-    seen[item["key"]] += 1
-    if counts[item["key"]] == 1:
-        secret_name = item["key"]
-    else:
-        secret_name = f'{item["key"]}__{seen[item["key"]]}'
-    item["secret_name"] = secret_name
-    secrets.append((secret_name, item["value"]))
-
-result = content
-for item in reversed(occurrences):
-    template_ref = '{{ (index ((secret "-d" (joinPath .chezmoi.sourceDir "secrets/' + sops_file_name + '") | fromYaml).data | fromYaml) "' + item["secret_name"] + '") }}'
-    result = result[:item["replace_start"]] + template_ref + result[item["replace_end"]:]
-
-with open(template_file, "w", encoding="utf-8") as f:
-    f.write('{{- /* chezmoi:template */ -}}\n')
-    f.write(result)
-
-with open(secrets_file, "w", encoding="utf-8") as f:
-    for key, value in secrets:
-        escaped = value.replace("'", "''")
-        f.write(f"{key}: '{escaped}'\n")
-PY
+    SENSITIVE_PATTERNS="$SENSITIVE_PATTERNS" awk \
+        -v mode=extract \
+        -v template_file="$template_file" \
+        -v secrets_file="$secrets_file" \
+        -v sops_file_name="$sops_file_name" \
+        -f "$CHECK_SECRETS_AWK" \
+        "$input_file"
 }
 
 while IFS= read -r file; do
@@ -294,12 +238,6 @@ while IFS= read -r file; do
             exit 1
             ;;
         2)
-            ABS_FILE=$(python3 - "$file" <<'PY'
-import os, sys
-print(os.path.abspath(sys.argv[1]))
-PY
-)
-
             log "Adding $file to chezmoi to determine source naming..."
             CHECK_SECRETS_BYPASS=1 chezmoi add "$file" || exit 1
 
@@ -322,49 +260,45 @@ PY
                 rm -f "$TMP_SECRETS_FILE"
                 exit 1
             }
-            TMP_KEYS_FILE=$(mktemp "${TMPDIR:-/tmp}/check-secrets.keys.XXXXXX") || {
-                rm -f "$TMP_SECRETS_FILE" "$TMP_TEMPLATE_FILE"
-                exit 1
-            }
 
             log 'Identifying and extracting secrets...'
 
             if ! extract_sensitive_values "$file" "$TMP_TEMPLATE_FILE" "$TMP_SECRETS_FILE" "$SOPS_FILE_NAME"; then
                 status=$?
                 if [ "$status" -ne 2 ]; then
-                    rm -f "$TMP_SECRETS_FILE" "$TMP_TEMPLATE_FILE" "$TMP_KEYS_FILE" "$SOURCE_FILE"
+                    rm -f "$TMP_SECRETS_FILE" "$TMP_TEMPLATE_FILE" "$SOURCE_FILE"
                     exit 1
                 fi
             fi
 
             if [ ! -s "$TMP_SECRETS_FILE" ]; then
                 log 'No extractable secrets found; aborting.'
-                rm -f "$TMP_SECRETS_FILE" "$TMP_TEMPLATE_FILE" "$TMP_KEYS_FILE" "$SOURCE_FILE"
+                rm -f "$TMP_SECRETS_FILE" "$TMP_TEMPLATE_FILE" "$SOURCE_FILE"
                 exit 1
             fi
 
             log "Creating sops-encrypted file at $SOPS_SOURCE_PATH..."
             if ! sops --encrypt --age "$AGE_KEY" "$TMP_SECRETS_FILE" > "$SOPS_SOURCE_PATH"; then
-                rm -f "$TMP_SECRETS_FILE" "$TMP_TEMPLATE_FILE" "$TMP_KEYS_FILE" "$SOURCE_FILE"
+                rm -f "$TMP_SECRETS_FILE" "$TMP_TEMPLATE_FILE" "$SOURCE_FILE"
                 exit 1
             fi
 
             log "Replacing $SOURCE_FILE with template content..."
             cp "$TMP_TEMPLATE_FILE" "$SOURCE_FILE" || {
-                rm -f "$TMP_SECRETS_FILE" "$TMP_TEMPLATE_FILE" "$TMP_KEYS_FILE" "$SOURCE_FILE"
+                rm -f "$TMP_SECRETS_FILE" "$TMP_TEMPLATE_FILE" "$SOURCE_FILE"
                 exit 1
             }
 
             FINAL_SOURCE_FILE=${SOURCE_FILE_BASE}.tmpl
             if [ "$SOURCE_FILE" != "$FINAL_SOURCE_FILE" ]; then
                 mv "$SOURCE_FILE" "$FINAL_SOURCE_FILE" || {
-                    rm -f "$TMP_SECRETS_FILE" "$TMP_TEMPLATE_FILE" "$TMP_KEYS_FILE" "$SOURCE_FILE"
+                    rm -f "$TMP_SECRETS_FILE" "$TMP_TEMPLATE_FILE" "$SOURCE_FILE"
                     exit 1
                 }
             fi
 
             log 'Cleaning up...'
-            rm -f "$TMP_TEMPLATE_FILE" "$TMP_SECRETS_FILE" "$TMP_KEYS_FILE"
+            rm -f "$TMP_TEMPLATE_FILE" "$TMP_SECRETS_FILE"
 
             log '✅ SOPS strategy complete.'
             exit 1

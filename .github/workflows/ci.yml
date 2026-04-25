@@ -86,5 +86,6 @@ jobs:
           cd "$HOME"
           sh "$GITHUB_WORKSPACE/scripts/test_check-secrets.sh"
           sh "$GITHUB_WORKSPACE/scripts/test_apply-secrets.sh"
+          sh "$GITHUB_WORKSPACE/scripts/test_scan-secrets.sh"
         env:
           matrix_shell: ${{ matrix.shell_name }}

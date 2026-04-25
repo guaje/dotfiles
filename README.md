@@ -4,7 +4,9 @@ This repository uses `chezmoi` to manage dotfiles, with a focus on securely hand
 
 ## 🛠️ Secrets Management: `check-secrets.sh`
 
-A custom pre-add hook, `scripts/check-secrets.sh`, expands the standard `chezmoi add` functionality. It automatically scans files for sensitive patterns (e.g., `API_KEY`, `PASSWORD`) before they are added to the source directory.
+A custom pre-add hook, `scripts/check-secrets.sh`, expands the standard `chezmoi add` functionality. It automatically scans files for sensitive patterns (e.g., `API_KEY`, `PASSWORD`) and provider-specific tokens before they are added to the source directory.
+
+The shared detector logic lives in `scripts/check-secrets.awk`, and can also be reused outside `chezmoi add` via `scripts/scan-secrets.sh` for CI and pre-commit checks.
 
 ### ⚙️ How it Works
 
@@ -34,11 +36,55 @@ If you modify `scripts/check-secrets.sh` or the `.chezmoi.toml.tmpl` configurati
 
 ### 🏃 Running Tests
 
-Run the following scripts to verify that adding secrets and rendering templates works correctly across different file formats and directory structures:
+Run the following scripts to verify that adding secrets, reusable scanning, and rendering templates works correctly across different file formats and directory structures:
 
 ```bash
 ./scripts/test_check-secrets.sh
 ./scripts/test_apply-secrets.sh
+```
+
+### 🔎 Reusable scanning for CI / pre-commit
+
+Scan explicit files:
+
+```bash
+./scripts/scan-secrets.sh path/to/file1 path/to/file2
+```
+
+Emit JSON for CI tooling / annotations:
+
+```bash
+./scripts/scan-secrets.sh --format json path/to/file1
+```
+
+Emit SARIF for code scanning uploads:
+
+```bash
+./scripts/scan-secrets.sh --format sarif path/to/file1 > secrets.sarif
+```
+
+Emit GitHub Actions workflow annotations:
+
+```bash
+./scripts/scan-secrets.sh --format gha path/to/file1
+```
+
+Scan staged git files in a pre-commit hook:
+
+```bash
+./scripts/scan-secrets.sh --git-staged
+```
+
+Use it in CI with tracked files:
+
+```bash
+git ls-files | xargs ./scripts/scan-secrets.sh
+```
+
+Run the dedicated scanner tests:
+
+```bash
+./scripts/test_scan-secrets.sh
 ```
 
 These tests are also automatically executed via GitHub Actions on every push to the `scripts/` directory or the main configuration template, ensuring compatibility across `bash`, `zsh`, and `fish` shells.

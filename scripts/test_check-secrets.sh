@@ -15,10 +15,10 @@ cleanup() {
     echo "Cleaning up test files..."
 
     rm -f "$TEST_ROOT/test_data.yaml" "$TEST_ROOT/test_data.json" "$TEST_ROOT/test_data.toml" "$TEST_ROOT/test_multi.json" 2>/dev/null || true
-    rm -f "$TEST_ROOT/test_abort.yaml" "$TEST_ROOT/test_plain.yaml" "$TEST_ROOT/test_full.yaml" 2>/dev/null || true
+    rm -f "$TEST_ROOT/test_abort.yaml" "$TEST_ROOT/test_plain.yaml" "$TEST_ROOT/test_full.yaml" "$TEST_ROOT/test_token.json" "$TEST_ROOT/test_openai.json" "$TEST_ROOT/test_postman.json" "$TEST_ROOT/test_clean.txt" "$TEST_ROOT/test_placeholder.yaml" 2>/dev/null || true
     rm -rf "$CONFIG_TEST_ROOT" "$SOURCE_NAMING_TEST_ROOT" "$HOME/.test_dir" 2>/dev/null || true
 
-    for prefix in test_abort test_plain test_full test_data test_multi test_sub test_chezmoi_naming; do
+    for prefix in test_abort test_plain test_full test_data test_multi test_sub test_chezmoi_naming test_token test_openai test_postman test_clean test_placeholder; do
         find "$SOURCE_DIR" -maxdepth 1 \( -name "*${prefix}*" -o -name "private_*${prefix}*" -o -name "encrypted_*${prefix}*" \) -exec rm -rf {} + 2>/dev/null || true
         if [ -d "$SOURCE_DIR/secrets" ]; then
             find "$SOURCE_DIR/secrets" -name "*${prefix}*" -exec rm -rf {} + 2>/dev/null || true
@@ -209,6 +209,95 @@ else
     echo "Expected template at: $THEME_TMPL"
     echo "Expected secret at: $THEME_SOPS"
     fail "Option 2 (chezmoi source naming) failed"
+fi
+
+# 10. Test strong token detection independent of key names
+echo "Testing strong token detection..."
+prepare_test_dirs
+cat <<'EOF' > "$TEST_ROOT/test_token.json"
+{
+  "service": "github",
+  "value": "ghp_abcdefghijklmnopqrstuvwxyz1234567890"
+}
+EOF
+run_chezmoi_add 2 "$TEST_ROOT/test_token.json" >/dev/null 2>&1 || true
+TOKEN_TMPL=$(template_source_path "$TEST_ROOT/test_token.json")
+TOKEN_SOPS=$(sops_source_path "$TEST_ROOT/test_token.json")
+if [ -f "$TOKEN_TMPL" ] \
+   && sops --decrypt "$TOKEN_SOPS" | grep -q "ghp_abcdefghijklmnopqrstuvwxyz1234567890"; then
+    pass "Strong token detection passed"
+else
+    fail "Strong token detection failed"
+fi
+
+# 11. Test additional provider token detection
+
+echo "Testing additional provider token detection..."
+prepare_test_dirs
+cat <<'EOF' > "$TEST_ROOT/test_openai.json"
+{
+  "service": "openai",
+  "value": "sk-proj-abcdefghijklmnopqrstuvwxyz1234567890"
+}
+EOF
+run_chezmoi_add 2 "$TEST_ROOT/test_openai.json" >/dev/null 2>&1 || true
+OPENAI_TMPL=$(template_source_path "$TEST_ROOT/test_openai.json")
+OPENAI_SOPS=$(sops_source_path "$TEST_ROOT/test_openai.json")
+if [ -f "$OPENAI_TMPL" ] \
+   && sops --decrypt "$OPENAI_SOPS" | grep -q "sk-proj-abcdefghijklmnopqrstuvwxyz1234567890"; then
+    pass "Additional provider token detection passed"
+else
+    fail "Additional provider token detection failed"
+fi
+
+# 12. Test placeholder values do not trigger detection
+echo "Testing placeholder filtering..."
+prepare_test_dirs
+cat <<'EOF' > "$TEST_ROOT/test_placeholder.yaml"
+api_key: YOUR_API_KEY
+password: changeme
+EOF
+PLACEHOLDER_OUTPUT=$(TEST_CHOICE=4 chezmoi add "$TEST_ROOT/test_placeholder.yaml" 2>&1 || true)
+PLACEHOLDER_SOURCE=$(template_source_path "$TEST_ROOT/test_placeholder.yaml")
+if printf '%s' "$PLACEHOLDER_OUTPUT" | grep -q 'Sensitive information detected'; then
+    fail "Placeholder filtering failed: warning was emitted"
+elif [ -f "$PLACEHOLDER_SOURCE" ]; then
+    pass "Placeholder filtering passed"
+else
+    fail "Placeholder filtering failed: file was not added"
+fi
+
+# 13. Test reusable scan script with provider-specific detector
+echo "Testing reusable scan script..."
+prepare_test_dirs
+cat <<'EOF' > "$TEST_ROOT/test_postman.json"
+{
+  "service": "postman",
+  "token": "PMAK-v1-abcdefghijklmnopqrstuvwxyz123456"
+}
+EOF
+if "$SOURCE_DIR/scripts/scan-secrets.sh" --quiet "$TEST_ROOT/test_postman.json" >/dev/null 2>&1; then
+    fail "Reusable scan script failed to detect provider-specific token"
+else
+    pass "Reusable scan script detection passed"
+fi
+
+# 14. Test reusable scan script on a clean file
+echo "Testing reusable scan script on clean input..."
+prepare_test_dirs
+printf '%s\n' 'hello world' > "$TEST_ROOT/test_clean.txt"
+if "$SOURCE_DIR/scripts/scan-secrets.sh" --quiet "$TEST_ROOT/test_clean.txt" >/dev/null 2>&1; then
+    pass "Reusable scan script clean input passed"
+else
+    fail "Reusable scan script clean input failed"
+fi
+
+# 15. Assert check-secrets.sh no longer depends on python
+echo "Testing python-free implementation..."
+if rg -n 'python3|python -' "$SOURCE_DIR/scripts/check-secrets.sh" "$SOURCE_DIR/scripts/check-secrets.awk" "$SOURCE_DIR/scripts/scan-secrets.sh" >/dev/null 2>&1; then
+    fail "Python-free implementation failed"
+else
+    pass "Python-free implementation passed"
 fi
 
 echo "All tests passed successfully!"

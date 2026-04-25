@@ -320,7 +320,15 @@ function scan_line(line, line_no,    rest, base, segment, key, value_part, first
                 }
                 return 1
             }
-            add_occurrence(line_no, key, secret_value, replace_start, replace_len)
+            if (mode == "preview") {
+                preview_found = 1
+                if (!preview_printed[line_no]) {
+                    preview_printed[line_no] = 1
+                    print line_no "\t" lines[line_no]
+                }
+            } else {
+                add_occurrence(line_no, key, secret_value, replace_start, replace_len)
+            }
         }
 
         rest = substr(value_part, consumed + 1)
@@ -360,13 +368,22 @@ BEGIN {
 
 {
     lines[++line_count] = $0
-    if (mode == "detect" && has_strong_pattern($0)) {
-        detect_found = 1
-        detect_label = strong_label
-        detect_line = line_count
-        next
+    if (has_strong_pattern($0)) {
+        if (mode == "detect") {
+            detect_found = 1
+            detect_label = strong_label
+            detect_line = line_count
+            next
+        }
+        if (mode == "preview") {
+            preview_found = 1
+            if (!preview_printed[line_count]) {
+                preview_printed[line_count] = 1
+                print line_count "\t" $0
+            }
+        }
     }
-    if (!detect_found) {
+    if (!(mode == "detect" && detect_found)) {
         scan_line($0, line_count)
     }
 }
@@ -379,6 +396,13 @@ END {
             } else {
                 print detect_label
             }
+            exit 0
+        }
+        exit 1
+    }
+
+    if (mode == "preview") {
+        if (preview_found) {
             exit 0
         }
         exit 1

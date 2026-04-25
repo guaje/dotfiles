@@ -179,6 +179,15 @@ matches_sensitive_file() {
         "$input_file"
 }
 
+preview_sensitive_lines() {
+    input_file=$1
+
+    SENSITIVE_PATTERNS="$SENSITIVE_PATTERNS" awk \
+        -v mode=preview \
+        -f "$CHECK_SECRETS_AWK" \
+        "$input_file"
+}
+
 extract_sensitive_values() {
     input_file=$1
     template_file=$2
@@ -209,6 +218,13 @@ while IFS= read -r file; do
     fi
 
     log "⚠️  WARNING: Sensitive information detected in $file (pattern: $MATCHED_PATTERN)"
+    log 'Sensitive lines:'
+    if PREVIEW_LINES=$(preview_sensitive_lines "$file" 2>/dev/null || true) && [ -n "$PREVIEW_LINES" ]; then
+        printf '%s\n' "$PREVIEW_LINES" | while IFS= read -r preview_line; do
+            [ -n "$preview_line" ] || continue
+            log "  $preview_line"
+        done
+    fi
     log 'How would you like to proceed?'
     log "1) Full Encryption: chezmoi add --encrypt $file"
     log '2) SOPS Strategy: Partial encryption using sops and templates'

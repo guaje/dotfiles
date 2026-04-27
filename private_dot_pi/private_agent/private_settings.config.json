@@ -1,10 +1,10 @@
 {
   "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.4",
+  "defaultModel": "gpt-5.5",
   "defaultThinkingLevel": "medium",
   "theme": "catppuccin-mocha",
   "enabledModels": [
-    "openai-codex/gpt-5.4",
+    "openai-codex/gpt-5.5",
     "reallms/gpt-oss-120b",
     "reallms/gemma-4-31B-it",
     "reallms/Qwen3-Coder-Next",

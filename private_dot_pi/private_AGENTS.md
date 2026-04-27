@@ -49,6 +49,30 @@ Current targeted tests:
 - `agent/extensions/tests/confirm-before-actions.test.ts`
 - `agent/extensions/tests/google-search.test.ts`
 
+Skill testing guidelines:
+
+- Validate every new or changed skill's frontmatter and location:
+  - `SKILL.md` exists in `agent/skills/<skill-name>/`.
+  - `name` matches the parent directory.
+  - `name` uses lowercase letters, numbers, and hyphens only.
+  - `description` is present and under the Agent Skills limit.
+- Add focused skill tests next to the skill when practical, e.g. `agent/skills/<skill-name>/*.test.sh`.
+- Prefer POSIX shell assertions for shell-based skill tests. Use `#!/bin/sh`, `set -eu`, and portable tools such as `grep`, `sed`, `cut`, and `tr`.
+- For live pi skill invocation tests, run `pi -p` with the target skill explicitly loaded and unrelated subsystems disabled:
+  - `--no-tools`
+  - `--no-extensions`
+  - `--no-prompt-templates`
+  - `--no-themes`
+  - `--skill agent/skills/<skill-name>`
+- Ask the model for constrained, machine-checkable output such as strict JSON, then assert the response content with POSIX shell or TypeScript assertions.
+- Test behavior from the skill instructions, not just discovery: verify recommended workflows, parameters, endpoint choices, output types, and error-prone decision rules.
+- Keep live model tests deterministic enough for repeated runs: avoid requiring web access, tool calls, or API calls unless the test is specifically for those integrations.
+- Allow an optional model override for live tests, e.g. `PI_<SKILL_NAME>_MODEL`, without requiring it for normal runs.
+
+Current targeted skill tests:
+
+- `agent/skills/linkup-search/pi-invocation.test.sh`
+
 ## Theming
 
 - Preferred theme: `agent/themes/catppuccin-mocha.json`

@@ -1,6 +1,6 @@
 ---
 name: linkup-search
-description: "Use this skill whenever the agent has access to Linkup web search or fetch tools. Teaches the agent how to reason about query construction, choose search depth, write effective queries, select the right output type, use the fetch endpoint, and apply advanced techniques like sequential search and multi-query coverage. Applicable to any task involving web search, content extraction, company research, news retrieval, data enrichment, or real-time information gathering via Linkup."
+description: 'Web search, web scouting, and URL content fetching with Linkup tools. Use when the user asks to "search the web", "scout the web", look something up online, find current or recent information, research companies, news, docs, or facts, gather sources, scrape a page, or "fetch the content from" a URL. Covers linkup-search and linkup-fetch: choosing fast/standard/deep depth, building queries, selecting output type, using /fetch for exact URLs, and extracting/synthesizing web content.'
 ---
 
 This skill teaches you how to use Linkup's search and fetch tools effectively. Linkup is an agentic web search API — it interprets natural language instructions and executes retrieval steps to return accurate, real-time web data. Read this skill before making any Linkup search or fetch call.

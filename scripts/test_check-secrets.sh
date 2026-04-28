@@ -15,10 +15,10 @@ cleanup() {
     echo "Cleaning up test files..."
 
     rm -f "$TEST_ROOT/test_data.yaml" "$TEST_ROOT/test_data.json" "$TEST_ROOT/test_data.toml" "$TEST_ROOT/test_multi.json" 2>/dev/null || true
-    rm -f "$TEST_ROOT/test_abort.yaml" "$TEST_ROOT/test_plain.yaml" "$TEST_ROOT/test_full.yaml" "$TEST_ROOT/test_token.json" "$TEST_ROOT/test_openai.json" "$TEST_ROOT/test_postman.json" "$TEST_ROOT/test_clean.txt" "$TEST_ROOT/test_placeholder.yaml" 2>/dev/null || true
+    rm -f "$TEST_ROOT/test_abort.yaml" "$TEST_ROOT/test_plain.yaml" "$TEST_ROOT/test_full.yaml" "$TEST_ROOT/test_token.json" "$TEST_ROOT/test_openai.json" "$TEST_ROOT/test_postman.json" "$TEST_ROOT/test_clean.txt" "$TEST_ROOT/test_placeholder.yaml" "$TEST_ROOT/test_limits.json" 2>/dev/null || true
     rm -rf "$CONFIG_TEST_ROOT" "$SOURCE_NAMING_TEST_ROOT" "$HOME/.test_dir" 2>/dev/null || true
 
-    for prefix in test_abort test_plain test_full test_data test_multi test_sub test_chezmoi_naming test_token test_openai test_postman test_clean test_placeholder; do
+    for prefix in test_abort test_plain test_full test_data test_multi test_sub test_chezmoi_naming test_token test_openai test_postman test_clean test_placeholder test_limits; do
         find "$SOURCE_DIR" -maxdepth 1 \( -name "*${prefix}*" -o -name "private_*${prefix}*" -o -name "encrypted_*${prefix}*" \) -exec rm -rf {} + 2>/dev/null || true
         if [ -d "$SOURCE_DIR/secrets" ]; then
             find "$SOURCE_DIR/secrets" -name "*${prefix}*" -exec rm -rf {} + 2>/dev/null || true
@@ -292,7 +292,27 @@ else
     fail "Reusable scan script clean input failed"
 fi
 
-# 15. Assert check-secrets.sh no longer depends on python
+# 15. Test numeric token limit settings do not trigger detection
+echo "Testing numeric token limit filtering..."
+prepare_test_dirs
+cat <<'EOF' > "$TEST_ROOT/test_limits.json"
+{
+  "maxTokens": 16384,
+  "maxOutputTokens": 4096,
+  "tokenLimit": 200000
+}
+EOF
+LIMITS_OUTPUT=$(TEST_CHOICE=4 chezmoi add "$TEST_ROOT/test_limits.json" 2>&1 || true)
+LIMITS_SOURCE=$(template_source_path "$TEST_ROOT/test_limits.json")
+if printf '%s' "$LIMITS_OUTPUT" | grep -q 'Sensitive information detected'; then
+    fail "Numeric token limit filtering failed: warning was emitted"
+elif [ -f "$LIMITS_SOURCE" ]; then
+    pass "Numeric token limit filtering passed"
+else
+    fail "Numeric token limit filtering failed: file was not added"
+fi
+
+# 16. Assert check-secrets.sh no longer depends on python
 echo "Testing python-free implementation..."
 if rg -n 'python3|python -' "$SOURCE_DIR/scripts/check-secrets.sh" "$SOURCE_DIR/scripts/check-secrets.awk" "$SOURCE_DIR/scripts/scan-secrets.sh" >/dev/null 2>&1; then
     fail "Python-free implementation failed"

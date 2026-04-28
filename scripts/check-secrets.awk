@@ -41,6 +41,7 @@ function is_placeholder(value, upper) {
 }
 
 function has_strong_pattern(value) {
+    strong_label = ""
     if (value ~ /-----BEGIN ([A-Z0-9 ]+ )?PRIVATE KEY-----/) {
         strong_label = "PRIVATE_KEY_BLOCK"
         return 1
@@ -237,6 +238,28 @@ function looks_like_secret_value(value, compact) {
     return 0
 }
 
+function is_nonsecret_config_value(key, value, lower, compact) {
+    value = trim(value)
+    lower = tolower(key)
+    compact = lower
+    gsub(/[^a-z0-9]/, "", compact)
+
+    if (value !~ /^[-+]?[0-9]+([.][0-9]+)?$/ && value !~ /^(true|false|null)$/) {
+        return 0
+    }
+
+    if (compact ~ /(maxtokens|mintokens|tokencount|tokenlimit|maxinputtokens|maxoutputtokens|contexttokens)/) {
+        return 1
+    }
+    if (lower ~ /(^|[_.-])(max|min|default|limit|num|number|count|total|size|length|timeout|ttl|retries?)[_.-]?[a-z0-9_.-]*tokens?($|[_.-])/) {
+        return 1
+    }
+    if (lower ~ /(^|[_.-])tokens?[_.-]?(max|min|limit|count|total|used|remaining|budget)($|[_.-])/) {
+        return 1
+    }
+    return 0
+}
+
 function unquote(value, quote) {
     value = trim(value)
     quote = substr(value, 1, 1)
@@ -304,7 +327,9 @@ function scan_line(line, line_no,    rest, base, segment, key, value_part, first
 
         matched = 0
         if (replace_len > 0 && !is_placeholder(secret_value)) {
-            if (looks_like_sensitive_key(key) || looks_like_secret_value(secret_value)) {
+            value_is_secret = looks_like_secret_value(secret_value)
+            key_is_sensitive = looks_like_sensitive_key(key)
+            if (value_is_secret || (key_is_sensitive && !is_nonsecret_config_value(key, secret_value))) {
                 matched = 1
             }
         }

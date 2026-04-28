@@ -6,11 +6,53 @@ import { pathToFileURL } from "node:url";
 
 const EXTENSION_PATH = resolve("agent/extensions/model-health-check.ts");
 const SETTINGS_CONFIG_PATH = resolve("agent/settings.config.json");
+const MODELS_PATH = resolve("agent/models.json");
 const ORIGINAL_SETTINGS_CONFIG = readFileSync(SETTINGS_CONFIG_PATH, "utf8");
 const CACHE_PATH = resolve("agent/model-health-cache.json");
+const ORIGINAL_CACHE = (() => {
+  try {
+    return readFileSync(CACHE_PATH, "utf8");
+  } catch {
+    return undefined;
+  }
+})();
 const STUB_PACKAGE_DIR = resolve("agent/extensions/node_modules");
 const PI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@mariozechner/pi-coding-agent");
 const PI_AI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@mariozechner/pi-ai");
+
+interface AvailableTestModel {
+  id: string;
+  name: string;
+  reasoning?: boolean;
+}
+
+function splitTestModelId(fullId: string): { provider: string; modelId: string } {
+  const [provider, ...rest] = fullId.split("/");
+  assert.ok(provider && rest.length > 0, `Expected provider/model id, got ${fullId}`);
+  return { provider, modelId: rest.join("/") };
+}
+
+function readAvailableTestModels(minCount: number): AvailableTestModel[] {
+  const modelsFile = JSON.parse(readFileSync(MODELS_PATH, "utf8"));
+  const settingsFile = JSON.parse(readFileSync(SETTINGS_CONFIG_PATH, "utf8"));
+  const enabledIds: string[] = settingsFile.enabledModels || [];
+  const metadata = new Map<string, AvailableTestModel>();
+
+  for (const [providerId, provider] of Object.entries<any>(modelsFile.providers || {})) {
+    for (const model of provider.models || []) {
+      metadata.set(`${providerId}/${model.id}`, { ...model, id: `${providerId}/${model.id}` });
+    }
+  }
+
+  const enabledModels = enabledIds.map((id) => metadata.get(id) || { id, name: splitTestModelId(id).modelId });
+  assert.ok(enabledModels.length >= minCount, `Expected at least ${minCount} enabled models for model-health-check tests`);
+  return enabledModels;
+}
+
+function runtimeModelFromId(fullId: string): { provider: string; id: string } {
+  const { provider, modelId } = splitTestModelId(fullId);
+  return { provider, id: modelId };
+}
 
 async function loadExtension() {
   mkdirSync(PI_PACKAGE_DIR, { recursive: true });
@@ -42,24 +84,24 @@ test("checks model health with a concurrency limit and caches results", async ()
   const mod = await loadExtension();
   const checkModelHealth = mod.checkModelHealth;
 
+  const selectedModels = readAvailableTestModels(3).slice(0, 3);
+  const selectedIds = selectedModels.map((model) => model.id);
+  const failingId = selectedIds[1]!;
   writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({
-    enabledModels: [
-      "openai-codex/gpt-5.4",
-      "reallms/Qwen3-Coder-Next",
-      "reallms/gpt-oss-120b",
-    ],
+    enabledModels: selectedIds,
   }, null, 2)}\n`);
 
   let active = 0;
   let maxActive = 0;
   const called: string[] = [];
   (globalThis as any).__completeSimpleMock = async (model: any) => {
-    called.push(`${model.provider}/${model.id}`);
+    const fullId = `${model.provider}/${model.id}`;
+    called.push(fullId);
     active += 1;
     maxActive = Math.max(maxActive, active);
     await new Promise((resolve) => setTimeout(resolve, 20));
     active -= 1;
-    if (model.id === "Qwen3-Coder-Next") throw new Error("offline");
+    if (fullId === failingId) throw new Error("offline");
     return { stopReason: "stop", content: [{ type: "text", text: "OK" }] };
   };
 
@@ -67,7 +109,8 @@ test("checks model health with a concurrency limit and caches results", async ()
   const ctx = {
     modelRegistry: {
       find(provider: string, modelId: string) {
-        return { provider, id: modelId };
+        const fullId = `${provider}/${modelId}`;
+        return selectedIds.includes(fullId) ? runtimeModelFromId(fullId) : undefined;
       },
       async getApiKeyAndHeaders(model: any) {
         return { ok: true, apiKey: `key-${model.id}` };
@@ -83,18 +126,13 @@ test("checks model health with a concurrency limit and caches results", async ()
   const results = await checkModelHealth(ctx, { notify: true, concurrencyLimit: 2, forceRefresh: true, cacheTtlMs: 60_000 });
 
   assert.equal(maxActive, 2);
-  assert.deepEqual([...called].sort(), [
-    "openai-codex/gpt-5.4",
-    "reallms/Qwen3-Coder-Next",
-    "reallms/gpt-oss-120b",
-  ]);
+  assert.deepEqual([...called].sort(), [...selectedIds].sort());
+  const expectedStatuses = selectedIds
+    .map((id) => [id, id === failingId ? "error" : "ok"])
+    .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
   assert.deepEqual(
     [...results].map((result: any) => [result.id, result.status]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
-    [
-      ["openai-codex/gpt-5.4", "ok"],
-      ["reallms/gpt-oss-120b", "ok"],
-      ["reallms/Qwen3-Coder-Next", "error"],
-    ],
+    expectedStatuses,
   );
   assert.match(notifications[0]!.message, /checked model availability/);
 
@@ -109,21 +147,22 @@ test("filters models to healthy cached entries when available", async () => {
   const mod = await loadExtension();
   const getHealthyEnabledModels = mod.getHealthyEnabledModels;
 
+  const [healthyModel, unhealthyModel] = readAvailableTestModels(2);
   writeFileSync(CACHE_PATH, `${JSON.stringify({
     checkedAt: Date.now(),
     results: [
-      { id: "openai-codex/gpt-5.4", status: "ok" },
-      { id: "reallms/Qwen3-Coder-Next", status: "error", error: "offline" },
+      { id: healthyModel.id, status: "ok" },
+      { id: unhealthyModel.id, status: "error", error: "offline" },
     ],
   }, null, 2)}\n`);
 
   const models = [
-    { id: "openai-codex/gpt-5.4", name: "gpt" },
-    { id: "reallms/Qwen3-Coder-Next", name: "coder" },
+    { id: healthyModel.id, name: healthyModel.name },
+    { id: unhealthyModel.id, name: unhealthyModel.name },
   ];
 
   const filtered = await getHealthyEnabledModels(models, { cacheTtlMs: 60_000 });
-  assert.deepEqual(filtered, [{ id: "openai-codex/gpt-5.4", name: "gpt" }]);
+  assert.deepEqual(filtered, [{ id: healthyModel.id, name: healthyModel.name }]);
 });
 
 test("registers a model-health command", async () => {
@@ -149,7 +188,11 @@ test("registers a model-health command", async () => {
 test.after(() => {
   delete (globalThis as any).__completeSimpleMock;
   writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
-  rmSync(CACHE_PATH, { force: true });
+  if (ORIGINAL_CACHE === undefined) {
+    rmSync(CACHE_PATH, { force: true });
+  } else {
+    writeFileSync(CACHE_PATH, ORIGINAL_CACHE);
+  }
   rmSync(PI_PACKAGE_DIR, { recursive: true, force: true });
   rmSync(PI_AI_PACKAGE_DIR, { recursive: true, force: true });
 });

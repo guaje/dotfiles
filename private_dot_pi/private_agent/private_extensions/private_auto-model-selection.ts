@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { type ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { completeSimple, type Model } from "@mariozechner/pi-ai";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { getHealthyEnabledModels } from "./model-health-check.ts";
@@ -532,12 +533,12 @@ async function switchToModel(
     ui?: { notify: (message: string, level: "info" | "warning" | "error" | "success") => void };
   },
   selectedId: string,
-  options?: { notifyOnSwitch?: boolean; notifyOnFailure?: boolean },
+  options?: { notifyOnSwitch?: boolean; notifyOnFailure?: boolean; force?: boolean },
 ): Promise<{ switched: boolean; success: boolean }> {
   const parts = splitModelId(selectedId);
   if (!parts) return { switched: false, success: false };
 
-  if (ctx.model?.provider === parts.provider && ctx.model?.id === parts.modelId) {
+  if (!options?.force && ctx.model?.provider === parts.provider && ctx.model?.id === parts.modelId) {
     return { switched: false, success: true };
   }
 
@@ -621,6 +622,20 @@ export function estimateReasoningEffort(task: string): ThinkingLevel {
   return "medium";
 }
 
+export function selectMostPowerfulThinkingModel(models: ModelMetadata[]): string {
+  const scoreModel = (model: ModelMetadata): number => {
+    const id = model.id.toLowerCase();
+    let score = model.reasoning ? 10_000 : 0;
+    if (/opus|gpt-5|o3|o4|120b|pro-high|ultra|max/.test(id)) score += 1_000;
+    if (/sonnet|pro|70b|72b/.test(id)) score += 500;
+    if (/coder/.test(id)) score += 150;
+    if (/flash|haiku|gemma|mini|small|lite/.test(id)) score -= 250;
+    return score;
+  };
+
+  return [...models].sort((a, b) => scoreModel(b) - scoreModel(a))[0]?.id || "unknown";
+}
+
 export function selectModel(task: string, models: ModelMetadata[]): string {
   const taskLower = task.toLowerCase();
 
@@ -657,6 +672,85 @@ export function selectModel(task: string, models: ModelMetadata[]): string {
   return balancedModel?.id || models[0]?.id || "unknown";
 }
 
+interface ModelSelectionDecision {
+  modelId: string;
+  reasoningEffort?: ThinkingLevel;
+  reason?: string;
+}
+
+function extractTextContent(response: { content?: Array<{ type: string; text?: string }> }): string {
+  return response.content
+    ?.filter((content): content is { type: "text"; text: string } => content.type === "text" && typeof content.text === "string")
+    .map((content) => content.text)
+    .join("\n")
+    .trim() || "";
+}
+
+function parseSelectionDecision(text: string): Partial<ModelSelectionDecision> | undefined {
+  const jsonText = text.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]?.trim() ||
+                   text.match(/\{[\s\S]*\}/)?.[0]?.trim();
+  if (!jsonText) return undefined;
+
+  try {
+    return JSON.parse(jsonText) as Partial<ModelSelectionDecision>;
+  } catch {
+    return undefined;
+  }
+}
+
+function sanitizeSelectionDecision(
+  decision: Partial<ModelSelectionDecision> | undefined,
+  task: string,
+  models: ModelMetadata[],
+): ModelSelectionDecision {
+  const fallbackModelId = selectModel(task, models);
+  const candidateId = typeof decision?.modelId === "string" ? decision.modelId : fallbackModelId;
+  const modelId = models.some((model) => model.id === candidateId) ? candidateId : fallbackModelId;
+  const selectedModel = models.find((model) => model.id === modelId);
+  const candidateEffort = decision?.reasoningEffort;
+  const validEffort = candidateEffort === "off" || candidateEffort === "minimal" || candidateEffort === "low" ||
+                      candidateEffort === "medium" || candidateEffort === "high" || candidateEffort === "xhigh";
+
+  return {
+    modelId,
+    reasoningEffort: selectedModel?.reasoning
+      ? validEffort ? candidateEffort : estimateReasoningEffort(task)
+      : undefined,
+    reason: typeof decision?.reason === "string" ? decision.reason : undefined,
+  };
+}
+
+async function selectModelWithThinkingSelector(
+  task: string,
+  models: ModelMetadata[],
+  selectorModel: unknown,
+  auth?: { apiKey?: string; headers?: Record<string, string> },
+): Promise<ModelSelectionDecision> {
+  const modelList = models.map((model) => `- ${model.id}${model.reasoning ? " (thinking/reasoning capable)" : ""}`).join("\n");
+  const prompt = `User task:\n${task}\n\nAvailable models:\n${modelList}\n\nChoose the model that should perform the task. You may choose yourself if the task needs the strongest thinking model, and may set reasoningEffort to minimal, low, medium, high, or xhigh for reasoning-capable models. Respond with strict JSON only: {"modelId":"provider/model","reasoningEffort":"medium","reason":"short rationale"}`;
+
+  try {
+    const response = await completeSimple(selectorModel as Model<any>, {
+      systemPrompt: "You are Pi's auto model selection router. Pick the most appropriate execution model and reasoning effort. Prefer cheaper/faster models for simple tasks, coder models for implementation, and the strongest thinking model for complex reasoning.",
+      messages: [{ role: "user", content: [{ type: "text", text: prompt }], timestamp: Date.now() }],
+    }, {
+      apiKey: auth?.apiKey,
+      headers: auth?.headers,
+      reasoning: "medium",
+      maxTokens: 800,
+    });
+
+    if (response.stopReason === "error" || response.stopReason === "aborted") {
+      throw new Error(response.errorMessage || `selector stopped: ${response.stopReason}`);
+    }
+
+    return sanitizeSelectionDecision(parseSelectionDecision(extractTextContent(response)), task, models);
+  } catch (error) {
+    console.error("Auto model selector failed; falling back to heuristic selection:", error);
+    return sanitizeSelectionDecision(undefined, task, models);
+  }
+}
+
 export default function autoModelSelectionExtension(pi: ExtensionAPI) {
   void patchBuiltInSettingsMenu();
 
@@ -684,15 +778,45 @@ export default function autoModelSelectionExtension(pi: ExtensionAPI) {
     if (models.length === 0) return;
 
     const task = event.prompt || "general task";
-    const selectedId = selectModel(task, models);
-    const selectedModel = models.find((model) => model.id === selectedId);
-    await switchToModel(pi, ctx, selectedId, {
+    const selectorId = selectMostPowerfulThinkingModel(models);
+    const selectorParts = splitModelId(selectorId);
+    const selectorRuntimeModel = selectorParts
+      ? ctx.modelRegistry.find(selectorParts.provider, selectorParts.modelId)
+      : undefined;
+    const authCapableRegistry = ctx.modelRegistry as typeof ctx.modelRegistry & {
+      getApiKeyAndHeaders?: (model: unknown) => Promise<{ ok: boolean; apiKey?: string; headers?: Record<string, string> }>;
+    };
+    const selectorAuth = selectorRuntimeModel && authCapableRegistry.getApiKeyAndHeaders
+      ? await authCapableRegistry.getApiKeyAndHeaders(selectorRuntimeModel)
+      : undefined;
+
+    await switchToModel(pi, ctx, selectorId, {
       notifyOnSwitch: true,
       notifyOnFailure: true,
     });
+    const selectorMetadata = models.find((model) => model.id === selectorId);
+    if (selectorMetadata?.reasoning) {
+      pi.setThinkingLevel("medium");
+    }
 
-    if (selectedModel?.reasoning) {
-      pi.setThinkingLevel(estimateReasoningEffort(task));
+    const decision = selectorRuntimeModel
+      ? await selectModelWithThinkingSelector(
+          task,
+          models,
+          selectorRuntimeModel,
+          selectorAuth && selectorAuth.ok ? { apiKey: selectorAuth.apiKey, headers: selectorAuth.headers } : undefined,
+        )
+      : sanitizeSelectionDecision(undefined, task, models);
+    const selectedModel = models.find((model) => model.id === decision.modelId);
+
+    await switchToModel(pi, ctx, decision.modelId, {
+      notifyOnSwitch: true,
+      notifyOnFailure: true,
+      force: true,
+    });
+
+    if (selectedModel?.reasoning && decision.reasoningEffort) {
+      pi.setThinkingLevel(decision.reasoningEffort);
     }
   });
 

@@ -16,6 +16,7 @@ These instructions apply to work in `~/.pi/`.
 - Apply pi settings changes in `agent/settings.config.json`, not `agent/settings.json`.
 - Treat `agent/settings.json` as generated output from the merge workflow; do not make manual source-of-truth edits there.
 - Run targeted tests for the files you change.
+- Avoid hardcoding absolute paths, package/versioned install paths, version numbers, model IDs, provider IDs, or other environment-specific identifiers in any script, test, extension, or generated file you write. Discover them from config files, the runtime environment, command output, package metadata, or test fixtures instead.
 - Review diffs before proposing completion or commits.
 - Keep output styling aligned with the existing Catppuccin Mocha theme.
 - Suggest the correct chezmoi path when a changed file should be tracked there.
@@ -27,6 +28,14 @@ These instructions apply to work in `~/.pi/`.
 - Commit or stage unrelated files.
 - Modify secret-related chezmoi files or workflows unless explicitly requested.
 - Claim a change works unless you ran the relevant validation.
+
+## Portability and dynamic discovery
+
+- Treat hardcoded paths, version numbers, and model/provider IDs as brittle defaults to avoid.
+- Prefer deriving paths relative to the current file, repository root, `$HOME`, or documented config locations.
+- Prefer reading available models/providers from `agent/settings.config.json`, `agent/models.json`, health-cache output, or the model registry instead of embedding specific model IDs in scripts or tests.
+- Prefer discovering tool/package versions from installed package metadata or command output instead of embedding versioned paths such as package-manager cellar paths.
+- If a literal identifier is unavoidable for a focused unit fixture, use synthetic fixture names (for example `test-provider/test-model`) and keep them clearly separate from real local model IDs or machine-specific paths.
 
 ## Testing
 

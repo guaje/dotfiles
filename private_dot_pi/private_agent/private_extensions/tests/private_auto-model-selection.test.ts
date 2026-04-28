@@ -6,6 +6,8 @@ import { pathToFileURL } from "node:url";
 
 const EXTENSION_PATH = resolve("agent/extensions/auto-model-selection.ts");
 const SETTINGS_CONFIG_PATH = resolve("agent/settings.config.json");
+const MODELS_PATH = resolve("agent/models.json");
+const MODEL_HEALTH_CACHE_PATH = resolve("agent/model-health-cache.json");
 const ORIGINAL_SETTINGS_CONFIG = readFileSync(SETTINGS_CONFIG_PATH, "utf8");
 const STUB_PACKAGE_DIR = resolve("agent/extensions/node_modules");
 const PI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@mariozechner/pi-coding-agent");
@@ -13,6 +15,61 @@ const PI_AI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@mariozechner/pi-ai");
 const TYPEBOX_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@sinclair/typebox");
 const PI_TUI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@mariozechner/pi-tui");
 const TEST_CWD = resolve(".");
+
+interface AvailableTestModel {
+  id: string;
+  name: string;
+  reasoning?: boolean;
+}
+
+function splitTestModelId(fullId: string): { provider: string; modelId: string } {
+  const [provider, ...rest] = fullId.split("/");
+  assert.ok(provider && rest.length > 0, `Expected provider/model id, got ${fullId}`);
+  return { provider, modelId: rest.join("/") };
+}
+
+function runtimeModelFromMetadata(model: AvailableTestModel) {
+  const { provider, modelId } = splitTestModelId(model.id);
+  return { provider, id: modelId, reasoning: model.reasoning === true };
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function readAvailableTestModels(): AvailableTestModel[] {
+  const modelsFile = JSON.parse(readFileSync(MODELS_PATH, "utf8"));
+  const settingsFile = JSON.parse(readFileSync(SETTINGS_CONFIG_PATH, "utf8"));
+  const enabledIds: string[] = settingsFile.enabledModels || [];
+  const metadata = new Map<string, AvailableTestModel>();
+
+  for (const [providerId, provider] of Object.entries<any>(modelsFile.providers || {})) {
+    for (const model of provider.models || []) {
+      metadata.set(`${providerId}/${model.id}`, { ...model, id: `${providerId}/${model.id}` });
+    }
+  }
+
+  const enabledModels = enabledIds.map((id) => metadata.get(id) || { id, name: splitTestModelId(id).modelId });
+  let healthyIds: Set<string> | undefined;
+  try {
+    const cache = JSON.parse(readFileSync(MODEL_HEALTH_CACHE_PATH, "utf8"));
+    healthyIds = new Set((cache.results || []).filter((result: any) => result.status === "ok").map((result: any) => result.id));
+  } catch {
+    healthyIds = undefined;
+  }
+
+  const healthyModels = healthyIds ? enabledModels.filter((model) => healthyIds!.has(model.id)) : enabledModels;
+  const models = healthyModels.length > 0 ? healthyModels : enabledModels;
+  assert.ok(models.length > 0, "Expected at least one enabled model for auto-model-selection tests");
+  return models;
+}
+
+function chooseDelegateModel(models: AvailableTestModel[], selectorId: string): AvailableTestModel {
+  const delegate = models.find((model) => model.id !== selectorId && !model.reasoning) ||
+                   models.find((model) => model.id !== selectorId);
+  assert.ok(delegate, "Expected at least two available models to test delegation");
+  return delegate;
+}
 
 async function loadExtension() {
   mkdirSync(PI_PACKAGE_DIR, { recursive: true });
@@ -75,16 +132,16 @@ test("selectModel logic", async () => {
   const estimateReasoningEffort = mod.estimateReasoningEffort;
 
   const models = [
-    { id: "google-antigravity/gemini-3-flash", name: "flash" },
-    { id: "google-antigravity/gemini-3.1-pro-high", name: "pro-high" },
-    { id: "google-antigravity/claude-opus-4-6-thinking", name: "opus", reasoning: true },
-    { id: "reallms/Qwen3-Coder-Next", name: "coder" },
+    { id: "test-provider/test-flash", name: "flash" },
+    { id: "test-provider/test-pro-high", name: "pro-high" },
+    { id: "test-provider/test-opus-thinking", name: "opus", reasoning: true },
+    { id: "test-provider/test-coder", name: "coder" },
   ];
 
-  assert.equal(selectModel("summarize this file", models), "google-antigravity/gemini-3-flash");
-  assert.equal(selectModel("complex architectural reasoning", models), "google-antigravity/claude-opus-4-6-thinking");
-  assert.equal(selectModel("refactor this typescript function", models), "reallms/Qwen3-Coder-Next");
-  assert.equal(selectModel("general question", models), "google-antigravity/gemini-3.1-pro-high");
+  assert.equal(selectModel("summarize this file", models), "test-provider/test-flash");
+  assert.equal(selectModel("complex architectural reasoning", models), "test-provider/test-opus-thinking");
+  assert.equal(selectModel("refactor this typescript function", models), "test-provider/test-coder");
+  assert.equal(selectModel("general question", models), "test-provider/test-pro-high");
 
   assert.equal(estimateReasoningEffort("complex architectural reasoning"), "xhigh");
   assert.equal(estimateReasoningEffort("debug this difficult issue"), "high");
@@ -124,9 +181,10 @@ test("adds auto model setting to a settings list", async () => {
 test("before_agent_start auto-selects reasoning effort for reasoning models", async () => {
   const mod = await loadExtension();
   const extension = mod.default;
+  const availableModels = readAvailableTestModels();
 
   writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({
-    enabledModels: ["reallms/gpt-oss-120b", "reallms/Qwen3-Coder-Next"],
+    enabledModels: availableModels.map((model) => model.id),
     autoModelSelectionEnabled: true,
   }, null, 2)}\n`);
 
@@ -153,15 +211,147 @@ test("before_agent_start auto-selects reasoning effort for reasoning models", as
   await handlers.get("before_agent_start")?.({ prompt: "complex architectural reasoning" }, {
     modelRegistry: {
       find(provider: string, modelId: string) {
-        return { provider, id: modelId };
+        const metadata = availableModels.find((candidate) => candidate.id === `${provider}/${modelId}`);
+        return metadata ? runtimeModelFromMetadata(metadata) : { provider, id: modelId };
       },
     },
     model: undefined,
     ui: { notify() {} },
   });
 
-  assert.deepEqual(setModelArg, { provider: "reallms", id: "gpt-oss-120b" });
+  assert.equal(setModelArg?.reasoning, true);
   assert.equal(thinkingLevel, "xhigh");
+});
+
+test("before_agent_start starts with strongest thinking model at medium before delegating", async () => {
+  const mod = await loadExtension();
+  const extension = mod.default;
+  const availableModels = readAvailableTestModels();
+  const selectorId = mod.selectMostPowerfulThinkingModel(availableModels);
+  const selectorMetadata = availableModels.find((model) => model.id === selectorId)!;
+  const delegateMetadata = chooseDelegateModel(availableModels, selectorId);
+  const selectorRuntimeModel = runtimeModelFromMetadata(selectorMetadata);
+  const delegateRuntimeModel = runtimeModelFromMetadata(delegateMetadata);
+
+  writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({
+    enabledModels: availableModels.map((model) => model.id),
+    autoModelSelectionEnabled: true,
+  }, null, 2)}\n`);
+
+  const setModelCalls: any[] = [];
+  const thinkingLevels: string[] = [];
+  const selectorCalls: any[] = [];
+  (globalThis as any).__completeSimpleMock = async (model: any, context: any, options: any) => {
+    selectorCalls.push({ model, context, options });
+    return {
+      stopReason: "stop",
+      content: [{ type: "text", text: JSON.stringify({
+        modelId: delegateMetadata.id,
+        reason: "Delegate this task to another available model",
+      }) }],
+    };
+  };
+
+  const handlers = new Map<string, Function>();
+  const pi = {
+    on(eventName: string, handler: Function) {
+      handlers.set(eventName, handler);
+    },
+    registerTool() {},
+    registerCommand() {},
+    async setModel(model: any) {
+      setModelCalls.push(model);
+      return true;
+    },
+    setThinkingLevel(level: string) {
+      thinkingLevels.push(level);
+    },
+  };
+
+  extension(pi as any);
+
+  await handlers.get("before_agent_start")?.({ prompt: "implement a TypeScript feature" }, {
+    modelRegistry: {
+      find(provider: string, modelId: string) {
+        const fullId = `${provider}/${modelId}`;
+        const metadata = availableModels.find((candidate) => candidate.id === fullId);
+        return metadata ? runtimeModelFromMetadata(metadata) : undefined;
+      },
+      async getApiKeyAndHeaders(model: any) {
+        return { ok: true, apiKey: `key-for-${model.id}`, headers: { "x-model": model.id } };
+      },
+    },
+    model: undefined,
+    ui: { notify() {} },
+  });
+
+  assert.deepEqual(setModelCalls, [selectorRuntimeModel, delegateRuntimeModel]);
+  assert.deepEqual(thinkingLevels, selectorMetadata.reasoning ? ["medium"] : []);
+  assert.equal(selectorCalls.length, 1);
+  assert.deepEqual(selectorCalls[0]!.model, selectorRuntimeModel);
+  assert.equal(selectorCalls[0]!.options.reasoning, "medium");
+  assert.equal(selectorCalls[0]!.options.apiKey, `key-for-${selectorRuntimeModel.id}`);
+  assert.deepEqual(selectorCalls[0]!.options.headers, { "x-model": selectorRuntimeModel.id });
+  assert.match(selectorCalls[0]!.context.messages[0].content[0].text, /implement a TypeScript feature/);
+  assert.match(selectorCalls[0]!.context.messages[0].content[0].text, new RegExp(escapeRegExp(delegateMetadata.id)));
+});
+
+test("before_agent_start can delegate back to selector model with a different reasoning effort", async () => {
+  const mod = await loadExtension();
+  const extension = mod.default;
+  const availableModels = readAvailableTestModels();
+  const selectorId = mod.selectMostPowerfulThinkingModel(availableModels);
+  const selectorMetadata = availableModels.find((model) => model.id === selectorId)!;
+  const selectorRuntimeModel = runtimeModelFromMetadata(selectorMetadata);
+
+  writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({
+    enabledModels: availableModels.map((model) => model.id),
+    autoModelSelectionEnabled: true,
+  }, null, 2)}\n`);
+
+  const setModelCalls: any[] = [];
+  const thinkingLevels: string[] = [];
+  (globalThis as any).__completeSimpleMock = async () => ({
+    stopReason: "stop",
+    content: [{ type: "text", text: "```json\n" + JSON.stringify({
+      modelId: selectorId,
+      reasoningEffort: "xhigh",
+      reason: "Keep the strongest model and raise reasoning for architecture work",
+    }) + "\n```" }],
+  });
+
+  const handlers = new Map<string, Function>();
+  const pi = {
+    on(eventName: string, handler: Function) {
+      handlers.set(eventName, handler);
+    },
+    registerTool() {},
+    registerCommand() {},
+    async setModel(model: any) {
+      setModelCalls.push(model);
+      return true;
+    },
+    setThinkingLevel(level: string) {
+      thinkingLevels.push(level);
+    },
+  };
+
+  extension(pi as any);
+
+  await handlers.get("before_agent_start")?.({ prompt: "write a complex migration architecture plan" }, {
+    modelRegistry: {
+      find(provider: string, modelId: string) {
+        const fullId = `${provider}/${modelId}`;
+        const metadata = availableModels.find((candidate) => candidate.id === fullId);
+        return metadata ? runtimeModelFromMetadata(metadata) : undefined;
+      },
+    },
+    model: undefined,
+    ui: { notify() {} },
+  });
+
+  assert.deepEqual(setModelCalls, [selectorRuntimeModel, selectorRuntimeModel]);
+  assert.deepEqual(thinkingLevels, selectorMetadata.reasoning ? ["medium", "xhigh"] : []);
 });
 
 test("custom footer shows compact auto-model state immediately before the selected model", async () => {
@@ -184,7 +374,9 @@ test("custom footer shows compact auto-model state immediately before the select
     },
   };
 
-  writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({ enabledModels: ["openai-codex/gpt-5.4"], autoModelSelectionEnabled: true }, null, 2)}\n`);
+  const availableModels = readAvailableTestModels();
+  const footerModel = runtimeModelFromMetadata(availableModels[0]!);
+  writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({ enabledModels: availableModels.map((model) => model.id), autoModelSelectionEnabled: true }, null, 2)}\n`);
   extension(pi as any);
 
   const ctx = {
@@ -202,7 +394,7 @@ test("custom footer shows compact auto-model state immediately before the select
     getContextUsage() {
       return { contextWindow: 128000, percent: 12.5 };
     },
-    model: { id: "gpt-5.4", provider: "openai-codex", contextWindow: 128000, reasoning: true },
+    model: { ...footerModel, contextWindow: 128000, reasoning: true },
     ui: {
       setStatus() {},
       setFooter(factory: any) {
@@ -240,7 +432,7 @@ test("custom footer shows compact auto-model state immediately before the select
   const footerLine = footer.render(1000)[1] ?? "";
   assert.match(footerLine, /●/);
   assert.match(footerLine, /Auto/);
-  assert.match(footerLine, /Auto.*\(openai-codex\) gpt-5\.4 • medium/);
+  assert.match(footerLine, new RegExp(`Auto.*\\(${escapeRegExp(footerModel.provider)}\\) ${escapeRegExp(footerModel.id)} • medium`));
 });
 
 test("registers tool, command, and auto-switch hook", async () => {
@@ -297,7 +489,9 @@ test("/auto-model only toggles the current session", async () => {
     },
   };
 
-  writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({ enabledModels: ["openai-codex/gpt-5.4"], autoModelSelectionEnabled: true }, null, 2)}\n`);
+  const availableModels = readAvailableTestModels();
+  const currentModel = runtimeModelFromMetadata(availableModels[0]!);
+  writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({ enabledModels: availableModels.map((model) => model.id), autoModelSelectionEnabled: true }, null, 2)}\n`);
   extension(pi as any);
   await handlers.get("session_start")?.({}, {
     sessionManager: {
@@ -306,7 +500,7 @@ test("/auto-model only toggles the current session", async () => {
       getSessionName() { return undefined; },
     },
     getContextUsage() { return { contextWindow: 128000, percent: 0 }; },
-    model: { id: "gpt-5.4", provider: "openai-codex", contextWindow: 128000, reasoning: false },
+    model: { ...currentModel, contextWindow: 128000, reasoning: false },
     ui: { setFooter() {}, setStatus() {} },
   });
 
@@ -359,8 +553,10 @@ test("/auto-model session toggle affects auto-switching without changing default
     setThinkingLevel() {},
   };
 
+  const availableModels = readAvailableTestModels();
+  const currentModel = runtimeModelFromMetadata(availableModels[0]!);
   writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({
-    enabledModels: ["reallms/gpt-oss-120b"],
+    enabledModels: availableModels.map((model) => model.id),
     autoModelSelectionEnabled: true,
   }, null, 2)}\n`);
 
@@ -372,7 +568,7 @@ test("/auto-model session toggle affects auto-switching without changing default
       getSessionName() { return undefined; },
     },
     getContextUsage() { return { contextWindow: 128000, percent: 0 }; },
-    model: { id: "gpt-oss-120b", provider: "reallms", contextWindow: 128000, reasoning: true },
+    model: { ...currentModel, contextWindow: 128000, reasoning: currentModel.reasoning },
     ui: { setFooter() {}, setStatus() {} },
   });
 
@@ -416,7 +612,9 @@ test("/auto-model status reflects manual settings.config.json edits", async () =
 
   extension(pi as any);
 
-  writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({ enabledModels: ["openai-codex/gpt-5.4"], autoModelSelectionEnabled: false }, null, 2)}\n`);
+  const availableModels = readAvailableTestModels();
+  const enabledModels = availableModels.map((model) => model.id);
+  writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({ enabledModels, autoModelSelectionEnabled: false }, null, 2)}\n`);
   await registeredCommand.handler("status", {
     ui: {
       notify(message: string, level: string) {
@@ -425,7 +623,7 @@ test("/auto-model status reflects manual settings.config.json edits", async () =
     },
   });
 
-  writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({ enabledModels: ["openai-codex/gpt-5.4"], autoModelSelectionEnabled: true }, null, 2)}\n`);
+  writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({ enabledModels, autoModelSelectionEnabled: true }, null, 2)}\n`);
   await registeredCommand.handler("status", {
     ui: {
       notify(message: string, level: string) {

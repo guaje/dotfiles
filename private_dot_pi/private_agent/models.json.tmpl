@@ -5,20 +5,58 @@
       "baseUrl": "https://reallms.rescloud.iu.edu/direct/v1",
       "api": "openai-completions",
       "apiKey": "{{ (index ((secret "-d" (joinPath .chezmoi.sourceDir "secrets/private_dot_pi/private_agent/models.json.sops.yaml") | fromYaml).data | fromYaml) "apiKey__1") }}",
+      "compat": {
+        "supportsDeveloperRole": false,
+        "supportsReasoningEffort": false
+      },
       "models": [
+        {
+          "id": "Qwen3-Coder-Next",
+          "name": "Qwen3-Coder-Next",
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
         {
           "id": "gemma-4-31B-it",
           "name": "gemma-4-31B-it",
-          "reasoning": true
+          "reasoning": false,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
         },
         {
           "id": "gpt-oss-120b",
           "name": "gpt-oss-120b",
-          "reasoning": true
-        },
-        {
-          "id": "Qwen3-Coder-Next",
-          "name": "Qwen3-coder-next"
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
         }
       ]
     },
@@ -26,10 +64,42 @@
       "baseUrl": "https://reallms-dev.rescloud.iu.edu/direct/v1",
       "api": "openai-completions",
       "apiKey": "{{ (index ((secret "-d" (joinPath .chezmoi.sourceDir "secrets/private_dot_pi/private_agent/models.json.sops.yaml") | fromYaml).data | fromYaml) "apiKey__2") }}",
+      "compat": {
+        "supportsDeveloperRole": false,
+        "supportsReasoningEffort": false
+      },
       "models": [
         {
           "id": "Qwen3-Coder-Next-Dev",
-          "name": "Qwen3-coder-next-dev"
+          "name": "Qwen3-Coder-Next-Dev",
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "claude-sonnet-4-6",
+          "name": "claude-sonnet-4-6",
+          "reasoning": false,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
         }
       ]
     }

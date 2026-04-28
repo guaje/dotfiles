@@ -66,10 +66,10 @@ test("renders a compact widget with Antigravity tier info and Codex model resets
 
   writeFileSync(settingsPath, JSON.stringify({
     enabledModels: [
-      "openai-codex/gpt-5.4",
-      "reallms/gpt-oss-120b",
-      "google-antigravity/gemini-3-flash",
-      "openai-codex/gpt-5.2",
+      "openai-codex/test-metered-model",
+      "test-provider/non-scoped-model",
+      "google-antigravity/test-antigravity-model",
+      "openai-codex/test-unlimited-model",
     ],
   }, null, 2));
   writeFileSync(authPath, JSON.stringify({
@@ -103,8 +103,8 @@ test("renders a compact widget with Antigravity tier info and Codex model resets
     const model = body.model;
     const headers = new Headers({
       "x-codex-active-limit": "codex",
-      "x-codex-credits-unlimited": model === "gpt-5.4" ? "False" : "True",
-      "x-codex-primary-reset-after-seconds": model === "gpt-5.4" ? "120" : "7200",
+      "x-codex-credits-unlimited": model === "test-metered-model" ? "False" : "True",
+      "x-codex-primary-reset-after-seconds": model === "test-metered-model" ? "120" : "7200",
       "x-codex-primary-reset-at": "1776732663",
       "x-codex-secondary-reset-after-seconds": "86400",
       "x-codex-secondary-reset-at": "1776959568",
@@ -124,9 +124,9 @@ test("renders a compact widget with Antigravity tier info and Codex model resets
   assert.equal(harness.widgets[0]?.id, "scoped-limits");
   assert.equal(lines[0], "Model access");
   assert.match(lines[1] ?? "", /^AG  Gemini Code Assist \(standard-tier\) · allowed standard-tier · blocked free-tier$/);
-  assert.match(lines[2] ?? "", /^OX  gpt-5\.4 · codex · metered · P /);
-  assert.match(lines[3] ?? "", /^OX  gpt-5\.2 · codex · unlimited · P /);
-  assert.doesNotMatch(lines.join("\n"), /reallms/);
+  assert.match(lines[2] ?? "", /^OX  test-metered-model · codex · metered · P /);
+  assert.match(lines[3] ?? "", /^OX  test-unlimited-model · codex · unlimited · P /);
+  assert.doesNotMatch(lines.join("\n"), /test-provider/);
 
   assert.equal(fetchCalls.filter((url) => url.includes("codex/responses")).length, 2);
   assert.equal(fetchCalls.filter((url) => url.includes("loadCodeAssist")).length, 1);
@@ -140,7 +140,7 @@ test("refreshes expired tokens and persists updated auth file", async () => {
   const { dir, settingsPath, authPath } = createTempFiles();
 
   writeFileSync(settingsPath, JSON.stringify({
-    enabledModels: ["openai-codex/gpt-5.4", "google-antigravity/gemini-3-flash"],
+    enabledModels: ["openai-codex/test-model", "google-antigravity/test-antigravity-model"],
   }, null, 2));
   writeFileSync(authPath, JSON.stringify({
     "openai-codex": {

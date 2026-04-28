@@ -30,6 +30,7 @@ interface ModelMetadata {
   id: string;
   name: string;
   reasoning?: boolean;
+  contextWindow?: number;
 }
 
 interface Provider {
@@ -622,14 +623,29 @@ export function estimateReasoningEffort(task: string): ThinkingLevel {
   return "medium";
 }
 
+function modelSearchText(model: ModelMetadata): string {
+  return `${model.id} ${model.name || ""}`.toLowerCase();
+}
+
+function estimateParameterScale(text: string): number {
+  const matches = [...text.matchAll(/(\d+(?:\.\d+)?)\s*([bm])\b/gi)];
+  return matches.reduce((max, match) => {
+    const value = Number.parseFloat(match[1] || "0");
+    const unit = (match[2] || "").toLowerCase();
+    const scaled = unit === "b" ? value : value / 1_000;
+    return Math.max(max, Number.isFinite(scaled) ? scaled : 0);
+  }, 0);
+}
+
 export function selectMostPowerfulThinkingModel(models: ModelMetadata[]): string {
   const scoreModel = (model: ModelMetadata): number => {
-    const id = model.id.toLowerCase();
+    const text = modelSearchText(model);
     let score = model.reasoning ? 10_000 : 0;
-    if (/opus|gpt-5|o3|o4|120b|pro-high|ultra|max/.test(id)) score += 1_000;
-    if (/sonnet|pro|70b|72b/.test(id)) score += 500;
-    if (/coder/.test(id)) score += 150;
-    if (/flash|haiku|gemma|mini|small|lite/.test(id)) score -= 250;
+    score += estimateParameterScale(text);
+    score += Math.min(model.contextWindow ?? 0, 1_000_000) / 1_000;
+    if (/\b(pro|ultra|max|large|high)\b/.test(text)) score += 1_000;
+    if (/\b(coder|code)\b/.test(text)) score += 150;
+    if (/\b(flash|mini|small|lite|fast)\b/.test(text)) score -= 250;
     return score;
   };
 
@@ -643,30 +659,27 @@ export function selectModel(task: string, models: ModelMetadata[]): string {
   const isCoding = /code|refactor|implement|fix|test|script|function|class|method/i.test(taskLower);
   const isLightweight = /summarize|list|read|check|status|short|quick|simple|hello|ping/i.test(taskLower);
 
-  // 1. If complex/reasoning, look for models with reasoning: true or known high-end models
+  // 1. If complex/reasoning, prefer models explicitly marked as reasoning-capable.
   if (isComplex) {
-    const reasoningModel = models.find((m) => m.reasoning) ||
-                           models.find((m) => m.id.includes("opus") || m.id.includes("gpt-5") || m.id.includes("120b"));
+    const reasoningModel = models.find((m) => m.reasoning);
     if (reasoningModel) return reasoningModel.id;
   }
 
-  // 2. If coding, look for coder-specific models
+  // 2. If coding, look for generic code-oriented model names.
   if (isCoding) {
-    const coderModel = models.find((m) => m.id.toLowerCase().includes("coder")) ||
-                       models.find((m) => m.id.includes("sonnet") || m.id.includes("gpt-5"));
+    const coderModel = models.find((m) => /\b(coder|code)\b/.test(modelSearchText(m)));
     if (coderModel) return coderModel.id;
   }
 
-  // 3. If lightweight, look for flash or small models
+  // 3. If lightweight, look for generic fast or small model names.
   if (isLightweight) {
-    const flashModel = models.find((m) => m.id.includes("flash")) ||
-                       models.find((m) => m.id.includes("gemma") || m.id.includes("haiku"));
+    const flashModel = models.find((m) => /\b(flash|mini|small|lite|fast)\b/.test(modelSearchText(m)));
     if (flashModel) return flashModel.id;
   }
 
-  // 4. Default/Balanced: Prefer Pro or high-tier general models
-  const balancedModel = models.find((m) => m.id.includes("pro-high")) ||
-                        models.find((m) => m.id.includes("sonnet")) ||
+  // 4. Default/Balanced: prefer generic high-tier names or larger context windows.
+  const balancedModel = models.find((m) => /\b(pro|large|high)\b/.test(modelSearchText(m))) ||
+                        [...models].sort((a, b) => (b.contextWindow ?? 0) - (a.contextWindow ?? 0))[0] ||
                         models[0];
 
   return balancedModel?.id || models[0]?.id || "unknown";

@@ -102,6 +102,10 @@ test("google_web_search streams search results, adds citations, and lists source
   const updates: any[] = [];
   const fetchCalls: Array<{ url: string; init: RequestInit | undefined }> = [];
   const originalFetch = globalThis.fetch;
+  const originalAntigravityVersion = process.env.PI_AI_ANTIGRAVITY_VERSION;
+  const originalPackageVersion = process.env.npm_package_version;
+  delete process.env.PI_AI_ANTIGRAVITY_VERSION;
+  delete process.env.npm_package_version;
 
   globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
     fetchCalls.push({ url: String(url), init });
@@ -154,7 +158,7 @@ test("google_web_search streams search results, adds citations, and lists source
     assert.equal((fetchCalls[0]!.init!.headers as Record<string, string>)["X-Goog-Api-Client"], `gl-node/${process.versions.node}`);
     assert.equal(
       (fetchCalls[0]!.init!.headers as Record<string, string>)["User-Agent"],
-      `antigravity/1.21.9 ${process.platform}/${process.arch}`,
+      `antigravity/unknown ${process.platform}/${process.arch}`,
     );
 
     const requestBody = JSON.parse(String(fetchCalls[0]!.init?.body));
@@ -176,6 +180,10 @@ test("google_web_search streams search results, adds citations, and lists source
       details: { query: "test query", sourcesCount: 2, backend: "google-antigravity" },
     });
   } finally {
+    if (originalAntigravityVersion === undefined) delete process.env.PI_AI_ANTIGRAVITY_VERSION;
+    else process.env.PI_AI_ANTIGRAVITY_VERSION = originalAntigravityVersion;
+    if (originalPackageVersion === undefined) delete process.env.npm_package_version;
+    else process.env.npm_package_version = originalPackageVersion;
     globalThis.fetch = originalFetch;
   }
 });
@@ -191,7 +199,7 @@ test("google_web_search uses Google GenAI when standard Google credentials are c
   (globalThis as any).__googleGenAIConstructorCalls = constructorCalls;
   (globalThis as any).__googleGenAICreate = async (request: any, options: any) => {
     assert.equal(options.apiKey, "google-api-key");
-    assert.equal(request.model, "gemini-2.5-flash");
+    assert.equal(request.model, "test-google-model");
     assert.equal(request.input, "test query");
     assert.deepEqual(request.tools, [{ type: "google_search" }]);
     return {
@@ -219,6 +227,7 @@ test("google_web_search uses Google GenAI when standard Google credentials are c
       undefined,
       (update: any) => updates.push(update),
       {
+        model: { provider: "google", id: "test-google-model" },
         modelRegistry: {
           async getApiKeyForProvider(provider: string) {
             if (provider === "google") return "google-api-key";

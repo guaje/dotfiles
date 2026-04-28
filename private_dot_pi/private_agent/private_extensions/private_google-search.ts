@@ -4,14 +4,13 @@ import { Type } from "@sinclair/typebox";
 
 const PROVIDER = "google-antigravity";
 const GOOGLE_PROVIDER = "google";
-const DEFAULT_GOOGLE_GENAI_MODEL = "gemini-2.5-flash";
 const DEFAULT_ENDPOINT = "https://cloudcode-pa.googleapis.com";
 const ANTIGRAVITY_ENDPOINTS = [
   "https://daily-cloudcode-pa.sandbox.googleapis.com",
   "https://autopush-cloudcode-pa.sandbox.googleapis.com",
   DEFAULT_ENDPOINT,
 ] as const;
-const DEFAULT_ANTIGRAVITY_VERSION = "1.21.9";
+const UNKNOWN_CLIENT_VERSION = "unknown";
 
 function getRuntimePlatformDescriptor(): string {
   const platform = typeof process !== "undefined" ? process.platform : undefined;
@@ -26,7 +25,7 @@ function getRuntimeNodeClientDescriptor(): string {
 
 function getAntigravityHeaders() {
   return {
-    "User-Agent": `antigravity/${process.env.PI_AI_ANTIGRAVITY_VERSION || DEFAULT_ANTIGRAVITY_VERSION} ${getRuntimePlatformDescriptor()}`,
+    "User-Agent": `antigravity/${process.env.PI_AI_ANTIGRAVITY_VERSION || process.env.npm_package_version || UNKNOWN_CLIENT_VERSION} ${getRuntimePlatformDescriptor()}`,
     "X-Goog-Api-Client": getRuntimeNodeClientDescriptor(),
     "Client-Metadata": JSON.stringify({
       ideType: "IDE_UNSPECIFIED",
@@ -212,7 +211,7 @@ function appendUrlCitations(text: string, annotations: any[] | undefined) {
   return { text: nextText, sources };
 }
 
-async function searchWithGoogleGenAI(config: GoogleGenAIConfig, query: string, onUpdate?: Function) {
+async function searchWithGoogleGenAI(config: GoogleGenAIConfig, model: string, query: string, onUpdate?: Function) {
   onUpdate?.({
     content: [{ type: "text", text: `Searching the web with Google GenAI for: "${query}"...` }],
     details: { query, backend: "google-genai" }
@@ -220,7 +219,7 @@ async function searchWithGoogleGenAI(config: GoogleGenAIConfig, query: string, o
 
   const ai = new GoogleGenAI(config);
   const interaction = await ai.interactions.create({
-    model: process.env.PI_GOOGLE_WEB_SEARCH_MODEL || DEFAULT_GOOGLE_GENAI_MODEL,
+    model,
     input: query,
     tools: [{ type: "google_search" }],
   } as any);
@@ -331,9 +330,10 @@ export default function googleSearchExtension(pi: ExtensionAPI) {
     }),
     async execute(_toolCallId, params: { query: string }, signal, onUpdate, ctx) {
       const googleGenAIConfig = await getGoogleGenAIConfig(ctx);
-      if (googleGenAIConfig) {
+      const googleGenAIModel = process.env.PI_GOOGLE_WEB_SEARCH_MODEL || (ctx.model?.provider === GOOGLE_PROVIDER ? ctx.model.id : undefined);
+      if (googleGenAIConfig && googleGenAIModel) {
         try {
-          return await searchWithGoogleGenAI(googleGenAIConfig, params.query, onUpdate);
+          return await searchWithGoogleGenAI(googleGenAIConfig, googleGenAIModel, params.query, onUpdate);
         } catch {
           // Fall back to antigravity below.
         }

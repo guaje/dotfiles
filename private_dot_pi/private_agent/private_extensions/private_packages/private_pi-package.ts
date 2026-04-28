@@ -1,5 +1,5 @@
 import { execFile as execFileCallback } from "node:child_process";
-import { access, readdir, realpath } from "node:fs/promises";
+import { access, realpath } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -24,27 +24,27 @@ export function getNpmGlobalPiPackageRoot(globalNodeModulesPath: string): string
   return path.resolve(globalNodeModulesPath, PI_PACKAGE_NAME);
 }
 
-export function getHomebrewPiPackageRootFromExecutable(piExecutablePath: string): string {
-  return path.resolve(path.dirname(piExecutablePath), "../libexec/lib/node_modules", PI_PACKAGE_NAME);
+export function getPiPackageRootCandidatesFromExecutable(piExecutablePath: string): string[] {
+  const installRoot = path.resolve(path.dirname(piExecutablePath), "..");
+  return [
+    path.resolve(installRoot, "libexec/lib/node_modules", PI_PACKAGE_NAME),
+    path.resolve(installRoot, "lib/node_modules", PI_PACKAGE_NAME),
+    path.resolve(installRoot, "node_modules", PI_PACKAGE_NAME),
+    path.resolve(installRoot, PI_PACKAGE_NAME),
+  ];
 }
 
-async function getLatestHomebrewPiPackageRoot(): Promise<string | undefined> {
-  const cellarRoot = process.env.HOMEBREW_CELLAR ?? path.resolve(process.env.HOMEBREW_PREFIX ?? "/opt/homebrew", "Cellar");
-  const packageCellarDir = path.resolve(cellarRoot, "pi-coding-agent");
+export function getHomebrewPiPackageRootFromExecutable(piExecutablePath: string): string {
+  return getPiPackageRootCandidatesFromExecutable(piExecutablePath)[0]!;
+}
 
-  try {
-    const versions = (await readdir(packageCellarDir)).sort().reverse();
-    for (const version of versions) {
-      const candidate = path.resolve(packageCellarDir, version, "libexec/lib/node_modules", PI_PACKAGE_NAME);
-      if (await pathExists(path.resolve(candidate, "package.json"))) {
-        return candidate;
-      }
-    }
-  } catch {
-    // Ignore and continue through other candidates.
-  }
-
-  return undefined;
+function addPiPackageRootCandidatesFromInstallRoot(candidates: string[], installRoot: string): void {
+  candidates.push(
+    path.resolve(installRoot, "libexec/lib/node_modules", PI_PACKAGE_NAME),
+    path.resolve(installRoot, "lib/node_modules", PI_PACKAGE_NAME),
+    path.resolve(installRoot, "node_modules", PI_PACKAGE_NAME),
+    path.resolve(installRoot, PI_PACKAGE_NAME),
+  );
 }
 
 export async function getPiPackageRoot(): Promise<string> {
@@ -80,15 +80,20 @@ export async function getPiPackageRoot(): Promise<string> {
         const { stdout } = await execFile("which", ["pi"]);
         const piExecutablePath = stdout.trim();
         if (piExecutablePath) {
-          candidates.push(getHomebrewPiPackageRootFromExecutable(await realpath(piExecutablePath)));
+          candidates.push(...getPiPackageRootCandidatesFromExecutable(await realpath(piExecutablePath)));
         }
       } catch {
         // Ignore and continue through other candidates.
       }
 
-      const latestHomebrewPackageRoot = await getLatestHomebrewPiPackageRoot();
-      if (latestHomebrewPackageRoot) {
-        candidates.push(latestHomebrewPackageRoot);
+      try {
+        const { stdout } = await execFile("brew", ["--prefix", "pi-coding-agent"]);
+        const brewPackagePrefix = stdout.trim();
+        if (brewPackagePrefix) {
+          addPiPackageRootCandidatesFromInstallRoot(candidates, brewPackagePrefix);
+        }
+      } catch {
+        // Ignore and continue through other candidates.
       }
 
       for (const candidate of candidates) {

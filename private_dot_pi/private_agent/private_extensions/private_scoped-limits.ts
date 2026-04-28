@@ -58,6 +58,11 @@ const DEFAULT_AUTH_PATH = path.resolve(__dirname, "../auth.json");
 const DEFAULT_WIDGET_ID = "scoped-limits";
 const OPENAI_CODEX_RESPONSES_URL = "https://chatgpt.com/backend-api/codex/responses";
 const ANTIGRAVITY_LOAD_CODE_ASSIST_URL = "https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:loadCodeAssist";
+const UNKNOWN_CLIENT_VERSION = "unknown";
+
+function getClientVersion(): string {
+  return process.env.PI_AI_CLIENT_VERSION || process.env.npm_package_version || UNKNOWN_CLIENT_VERSION;
+}
 
 function decodeJwtPayload(token: string): Record<string, any> | null {
   try {
@@ -238,8 +243,8 @@ async function probeAntigravityTierInfo(creds: OAuthAuthEntry, fetchImpl: typeof
     headers: {
       Authorization: `Bearer ${creds.access}`,
       "Content-Type": "application/json",
-      "User-Agent": "google-cloud-sdk vscode_cloudshelleditor/0.1",
-      "X-Goog-Api-Client": "google-cloud-sdk vscode_cloudshelleditor/0.1",
+      "User-Agent": `google-cloud-sdk vscode_cloudshelleditor/${getClientVersion()}`,
+      "X-Goog-Api-Client": `google-cloud-sdk vscode_cloudshelleditor/${getClientVersion()}`,
       "Client-Metadata": JSON.stringify({
         ideType: "IDE_UNSPECIFIED",
         platform: "PLATFORM_UNSPECIFIED",

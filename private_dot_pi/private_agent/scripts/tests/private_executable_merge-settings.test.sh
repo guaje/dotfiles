@@ -29,14 +29,14 @@ chmod +x "$FIXTURE_SCRIPTS/merge-settings.sh"
 # preserves lastChangelogVersion and replaces the rest
 cat > "$FIXTURE_AGENT/settings.config.json" <<'JSON'
 {
-  "defaultProvider": "openai-codex",
+  "defaultProvider": "test-provider",
   "theme": "catppuccin-mocha",
-  "enabledModels": ["openai-codex/gpt-5.4"]
+  "enabledModels": ["test-provider/test-model"]
 }
 JSON
 cat > "$FIXTURE_AGENT/settings.json" <<'JSON'
 {
-  "lastChangelogVersion": "0.67.68",
+  "lastChangelogVersion": "test-changelog-version",
   "defaultProvider": "old-provider",
   "extra": true
 }
@@ -48,10 +48,10 @@ DEFAULT_PROVIDER=$(jq -r '.defaultProvider' "$FIXTURE_AGENT/settings.json")
 THEME=$(jq -r '.theme' "$FIXTURE_AGENT/settings.json")
 ENABLED_MODEL=$(jq -r '.enabledModels[0]' "$FIXTURE_AGENT/settings.json")
 HAS_EXTRA=$(jq 'has("extra")' "$FIXTURE_AGENT/settings.json")
-[ "$LAST_CHANGELOG" = "0.67.68" ] || fail "should preserve lastChangelogVersion"
-[ "$DEFAULT_PROVIDER" = "openai-codex" ] || fail "should replace defaultProvider from config"
+[ "$LAST_CHANGELOG" = "test-changelog-version" ] || fail "should preserve lastChangelogVersion"
+[ "$DEFAULT_PROVIDER" = "test-provider" ] || fail "should replace defaultProvider from config"
 [ "$THEME" = "catppuccin-mocha" ] || fail "should merge theme from config"
-[ "$ENABLED_MODEL" = "openai-codex/gpt-5.4" ] || fail "should merge enabledModels from config"
+[ "$ENABLED_MODEL" = "test-provider/test-model" ] || fail "should merge enabledModels from config"
 [ "$HAS_EXTRA" = "false" ] || fail "should drop keys not present in settings.config.json"
 pass "merge-settings.sh preserves lastChangelogVersion and rewrites the rest"
 
@@ -106,7 +106,7 @@ cat > "$FIXTURE_AGENT/settings.config.json" <<'JSON'
 JSON
 cat > "$FIXTURE_AGENT/settings.json" <<'JSON'
 {
-  "lastChangelogVersion": "0.67.68",
+  "lastChangelogVersion": "test-changelog-version",
   "theme": "old"
 }
 JSON
@@ -117,7 +117,7 @@ FALLBACK_AUTO_MODEL=$(jq -r '.autoModelSelectionEnabled' "$FIXTURE_AGENT/setting
 FALLBACK_CHANGELOG=$(jq -r '.lastChangelogVersion' "$FIXTURE_AGENT/settings.json")
 [ "$FALLBACK_THEME" = "catppuccin-mocha" ] || fail "node fallback should merge config"
 [ "$FALLBACK_AUTO_MODEL" = "false" ] || fail "node fallback should preserve boolean values"
-[ "$FALLBACK_CHANGELOG" = "0.67.68" ] || fail "node fallback should preserve lastChangelogVersion"
+[ "$FALLBACK_CHANGELOG" = "test-changelog-version" ] || fail "node fallback should preserve lastChangelogVersion"
 pass "merge-settings.sh falls back to node when jq is unavailable"
 
 # fails clearly when config is missing

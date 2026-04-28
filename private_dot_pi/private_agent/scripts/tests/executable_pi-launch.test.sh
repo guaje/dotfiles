@@ -40,7 +40,7 @@ cat > "$FIXTURE_AGENT/settings.config.json" <<'JSON'
 JSON
 cat > "$FIXTURE_AGENT/settings.json" <<'JSON'
 {
-  "lastChangelogVersion": "0.67.68",
+  "lastChangelogVersion": "test-changelog-version",
   "theme": "old"
 }
 JSON
@@ -54,7 +54,7 @@ OUTPUT=$(cd "$FIXTURE_ROOT" && PI_REAL_BIN="$FIXTURE_ROOT/fake-pi.sh" "$FIXTURE_
 MERGED_THEME=$(jq -r '.theme' "$FIXTURE_AGENT/settings.json")
 MERGED_VERSION=$(jq -r '.lastChangelogVersion' "$FIXTURE_AGENT/settings.json")
 [ "$MERGED_THEME" = "catppuccin-mocha" ] || fail "pi-launch.sh should merge settings before launching"
-[ "$MERGED_VERSION" = "0.67.68" ] || fail "pi-launch.sh should preserve lastChangelogVersion"
+[ "$MERGED_VERSION" = "test-changelog-version" ] || fail "pi-launch.sh should preserve lastChangelogVersion"
 pass "pi-launch.sh merges settings and execs PI_REAL_BIN"
 cleanup_fixture
 

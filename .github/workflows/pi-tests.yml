@@ -88,21 +88,60 @@ jobs:
           done < <(find "$src" -mindepth 1 -print | sort | sed "s#^$src/##")
 
           # models.json.tmpl contains encrypted-secret template expressions that are
-          # intentionally unavailable in CI. Use a deterministic model registry that
-          # covers every enabled model in settings.config.json.
+          # intentionally unavailable in CI. Use a deterministic placeholder model
+          # registry so tests do not expose or depend on real provider/model IDs.
           cat > "$dst/agent/models.json" <<'JSON'
           {
             "providers": {
-              "openai-codex": {"models": [{"id": "gpt-5.5", "name": "GPT 5.5"}]},
-              "reallms": {"models": [
-                {"id": "gpt-oss-120b", "name": "gpt-oss-120b", "reasoning": true},
-                {"id": "gemma-4-31B-it", "name": "gemma-4-31B-it", "reasoning": false},
-                {"id": "Qwen3-Coder-Next", "name": "Qwen3-Coder-Next", "reasoning": true}
-              ]},
-              "reallms-dev": {"models": [{"id": "Qwen3-Coder-Next-Dev", "name": "Qwen3-Coder-Next-Dev", "reasoning": true}]}
+              "test-chat-provider": {
+                "baseUrl": "http://test-chat-provider.invalid/v1",
+                "apiKey": "TEST_PLACEHOLDER_API_KEY",
+                "models": [
+                  {"id": "test-reasoning-large", "name": "Test Reasoning Large", "reasoning": true},
+                  {"id": "test-balanced", "name": "Test Balanced", "reasoning": false},
+                  {"id": "test-reasoning-small", "name": "Test Reasoning Small", "reasoning": true}
+                ]
+              },
+              "test-image-provider": {
+                "baseUrl": "http://test-image-provider.invalid/v1",
+                "apiKey": "TEST_PLACEHOLDER_IMAGE_API_KEY",
+                "models": [
+                  {"id": "test-image-chat", "name": "Test Image Provider Chat", "reasoning": false}
+                ]
+              }
             }
           }
           JSON
+
+          # The checked-in source can include real enabled model IDs. Replace them
+          # with placeholders for CI, and create the runtime settings.json that pi
+          # normally writes locally.
+          jq '.enabledModels = [
+                "test-chat-provider/test-reasoning-large",
+                "test-chat-provider/test-balanced",
+                "test-chat-provider/test-reasoning-small"
+              ]
+              | .imageGenerationProviders = {}' \
+            "$dst/agent/settings.config.json" > "$dst/agent/settings.config.json.tmp"
+          mv "$dst/agent/settings.config.json.tmp" "$dst/agent/settings.config.json"
+          cp -p "$dst/agent/settings.config.json" "$dst/agent/settings.json"
+
+          # Keep CI-only test inputs generic even if a source test contains
+          # provider names from a local/private configuration.
+          model_health_test="$dst/agent/extensions/tests/model-health-check.test.ts"
+          if [ -f "$model_health_test" ]; then
+            perl -0pi -e '
+              my $chat = "test-chat-provider";
+              my $image = "test-image-provider";
+              my $builtin = "test-built-in-provider";
+              s/\.startsWith\("[^"]+\/"\)/.startsWith("$chat\/")/g;
+              s/"[^"]+\/not-in-current-scope"/"$chat\/not-in-current-scope"/g;
+              s/"[^"]+\/generated-only-model"/"$builtin\/generated-only-model"/g;
+              s/"[^"]+\/test-built-in"/"$builtin\/test-built-in"/g;
+              s/"[^"]+"\s*:\s*\{\s*models:\s*\[\{\s*id:\s*"(z-image-turbo|generated-only-image-model|settings-image-model)"/"$image": {\n        models: [{ id: "$1"/g;
+              s/"[^"]+\/(z-image-turbo|settings-image-model)"/"$image\/$1"/g;
+            ' "$model_health_test"
+          fi
 
       - name: Add deterministic pi stub for live invocation test
         shell: bash

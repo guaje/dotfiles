@@ -11,6 +11,7 @@ const MODELS_PATH = resolve("agent/models.json");
 const ORIGINAL_SETTINGS_CONFIG = readFileSync(SETTINGS_CONFIG_PATH, "utf8");
 const ORIGINAL_SETTINGS = readFileSync(SETTINGS_PATH, "utf8");
 const CACHE_PATH = resolve("agent/model-health-cache.json");
+const ORIGINAL_FETCH = globalThis.fetch;
 const ORIGINAL_CACHE = (() => {
   try {
     return readFileSync(CACHE_PATH, "utf8");
@@ -91,6 +92,7 @@ test("checks model health with a concurrency limit and caches results", async ()
   const failingId = selectedIds[1]!;
   writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({
     enabledModels: selectedIds,
+    imageGenerationProviders: {},
   }, null, 2)}\n`);
 
   let active = 0;
@@ -183,13 +185,155 @@ test("uses settings.config enabled models and skips stale scoped-provider models
   assert.deepEqual([...called].sort(), [builtInModel, scopedModel.id].sort());
 });
 
+test("checks image generation models from settings.config before settings", async () => {
+  const mod = await loadExtension();
+  const checkModelHealth = mod.checkModelHealth;
+
+  writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({
+    enabledModels: [],
+    imageGenerationProviders: {
+      "reallms-dev": {
+        models: [{ id: "z-image-turbo", name: "z-image-turbo" }],
+      },
+    },
+  }, null, 2)}\n`);
+  writeFileSync(SETTINGS_PATH, `${JSON.stringify({
+    enabledModels: [],
+    imageGenerationProviders: {
+      "reallms-dev": {
+        models: [{ id: "generated-only-image-model", name: "generated-only-image-model" }],
+      },
+    },
+  }, null, 2)}\n`);
+
+  const fetchCalls: Array<{ url: string; body?: string }> = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    fetchCalls.push({ url: String(input), body: String(init?.body || "") });
+    return new Response(JSON.stringify({ data: [{ b64_json: "iVBORw0KGgo=" }] }), { status: 200 });
+  }) as typeof fetch;
+
+  const results = await checkModelHealth({
+    modelRegistry: {
+      find() {
+        throw new Error("image generation checks should not use the chat model registry");
+      },
+      async getApiKeyAndHeaders() {
+        throw new Error("image generation checks should not use chat auth");
+      },
+    },
+  }, { forceRefresh: true });
+
+  assert.deepEqual(results, [{
+    id: "reallms-dev/z-image-turbo",
+    status: "ok",
+    name: "z-image-turbo",
+    service: "imageGeneration",
+  }]);
+  assert.equal(fetchCalls.length, 1);
+  assert.match(fetchCalls[0]!.url, /\/images\/generations$/);
+  const imageRequest = JSON.parse(fetchCalls[0]!.body || "{}");
+  assert.equal(imageRequest.model, "z-image-turbo");
+  assert.equal(imageRequest.size, "16x16");
+});
+
+test("falls back to settings image generation models when settings.config has none", async () => {
+  const mod = await loadExtension();
+  const checkModelHealth = mod.checkModelHealth;
+
+  writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({
+    enabledModels: [],
+  }, null, 2)}\n`);
+  writeFileSync(SETTINGS_PATH, `${JSON.stringify({
+    enabledModels: [],
+    imageGenerationProviders: {
+      "reallms-dev": {
+        models: [{ id: "settings-image-model", name: "settings-image-model" }],
+      },
+    },
+  }, null, 2)}\n`);
+
+  globalThis.fetch = (async () => {
+    return new Response(JSON.stringify({ error: "model not found" }), { status: 404 });
+  }) as typeof fetch;
+
+  const results = await checkModelHealth({
+    modelRegistry: {
+      find() {
+        throw new Error("image generation checks should not use the chat model registry");
+      },
+      async getApiKeyAndHeaders() {
+        throw new Error("image generation checks should not use chat auth");
+      },
+    },
+  }, { forceRefresh: true });
+
+  assert.deepEqual(results, [{
+    id: "reallms-dev/settings-image-model",
+    status: "not-found",
+    error: "Image generation request failed (404): {\"error\":\"model not found\"}",
+    name: "settings-image-model",
+    service: "imageGeneration",
+  }]);
+});
+
+test("notify summary groups healthy chat and image generation models", async () => {
+  writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
+
+  const mod = await loadExtension();
+  const checkModelHealth = mod.checkModelHealth;
+  const [chatModel] = readAvailableTestModels(1);
+
+  writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({
+    enabledModels: [chatModel.id],
+    imageGenerationProviders: {
+      "reallms-dev": {
+        models: [{ id: "z-image-turbo", name: "z-image-turbo" }],
+      },
+    },
+  }, null, 2)}\n`);
+  writeFileSync(CACHE_PATH, `${JSON.stringify({
+    checkedAt: Date.now(),
+    results: [
+      { id: chatModel.id, status: "ok", name: chatModel.name, service: "chat" },
+      { id: "reallms-dev/z-image-turbo", status: "ok", name: "z-image-turbo", service: "imageGeneration" },
+    ],
+  }, null, 2)}\n`);
+
+  const notifications: Array<{ message: string; level: string }> = [];
+  await checkModelHealth({
+    modelRegistry: {
+      find() {
+        throw new Error("cache should be used without registry lookup");
+      },
+      async getApiKeyAndHeaders() {
+        throw new Error("cache should be used without auth lookup");
+      },
+    },
+    ui: {
+      notify(message: string, level: string) {
+        notifications.push({ message, level });
+      },
+    },
+  }, { notify: true, cacheTtlMs: 60_000 });
+
+  assert.equal(notifications[0]?.level, "info");
+  assert.equal(
+    notifications[0]?.message,
+    `Model health check used cached results: 2 enabled models queryable. 1 chat model (${chatModel.name}), 1 image generation model (z-image-turbo)`,
+  );
+});
+
 test("filters stale entries out of cached health check results", async () => {
+  writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
   const mod = await loadExtension();
   const checkModelHealth = mod.checkModelHealth;
 
   const [currentModel] = readAvailableTestModels(1);
   writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({
     enabledModels: [currentModel.id, "reallms/not-in-current-scope"],
+    imageGenerationProviders: {},
   }, null, 2)}\n`);
   writeFileSync(CACHE_PATH, `${JSON.stringify({
     checkedAt: Date.now(),
@@ -218,6 +362,8 @@ test("filters stale entries out of cached health check results", async () => {
 });
 
 test("filters models to healthy cached entries when available", async () => {
+  writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
   const mod = await loadExtension();
   const getHealthyEnabledModels = mod.getHealthyEnabledModels;
 
@@ -263,6 +409,7 @@ test.after(() => {
   delete (globalThis as any).__completeSimpleMock;
   writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
   writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
+  globalThis.fetch = ORIGINAL_FETCH;
   if (ORIGINAL_CACHE === undefined) {
     rmSync(CACHE_PATH, { force: true });
   } else {

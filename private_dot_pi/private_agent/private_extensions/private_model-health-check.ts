@@ -1,8 +1,12 @@
+import { exec } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
+import { promisify } from "node:util";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { completeSimple } from "@mariozechner/pi-ai";
+
+const execAsync = promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,10 +22,17 @@ interface ModelMetadata {
   id: string;
   name: string;
   reasoning?: boolean;
+  service?: "chat" | "imageGeneration";
+  providerConfig?: Provider;
 }
 
 interface Provider {
+  baseUrl?: string;
+  apiKey?: string;
   models: ModelMetadata[];
+  services?: {
+    imageGeneration?: ModelMetadata[];
+  };
 }
 
 interface ModelsFile {
@@ -30,6 +41,7 @@ interface ModelsFile {
 
 interface SettingsFile {
   enabledModels?: string[];
+  imageGenerationProviders?: Record<string, { models?: ModelMetadata[] }>;
 }
 
 interface CacheFile {
@@ -41,6 +53,8 @@ export interface ModelHealthResult {
   id: string;
   status: "ok" | "not-found" | "auth-missing" | "error";
   error?: string;
+  name?: string;
+  service?: "chat" | "imageGeneration";
 }
 
 interface ProbeContext {
@@ -72,9 +86,17 @@ async function readSettingsFile(filePath: string): Promise<SettingsFile | null> 
 }
 
 async function getSettings(): Promise<SettingsFile> {
-  return (await readSettingsFile(SETTINGS_CONFIG_PATH)) ||
-         (await readSettingsFile(SETTINGS_PATH)) ||
-         {};
+  const [settingsFile, settingsConfigFile] = await Promise.all([
+    readSettingsFile(SETTINGS_PATH),
+    readSettingsFile(SETTINGS_CONFIG_PATH),
+  ]);
+
+  return {
+    ...(settingsFile || {}),
+    ...(settingsConfigFile || {}),
+    enabledModels: settingsConfigFile?.enabledModels ?? settingsFile?.enabledModels,
+    imageGenerationProviders: settingsConfigFile?.imageGenerationProviders ?? settingsFile?.imageGenerationProviders,
+  };
 }
 
 function splitModelId(fullId: string): { provider: string; modelId: string } | null {
@@ -82,6 +104,26 @@ function splitModelId(fullId: string): { provider: string; modelId: string } | n
   const modelId = rest.join("/");
   if (!provider || !modelId) return null;
   return { provider, modelId };
+}
+
+function getConfiguredImageGenerationModels(settingsFile: SettingsFile, modelsFile: ModelsFile): ModelMetadata[] {
+  const configuredProviders = settingsFile.imageGenerationProviders || {};
+  const models: ModelMetadata[] = [];
+
+  for (const [providerId, provider] of Object.entries(configuredProviders)) {
+    for (const model of provider.models || []) {
+      const fullId = `${providerId}/${model.id}`;
+      models.push({
+        ...model,
+        id: fullId,
+        name: model.name || model.id,
+        service: "imageGeneration",
+        providerConfig: modelsFile.providers[providerId],
+      });
+    }
+  }
+
+  return models;
 }
 
 async function getEnabledModelsMetadata(): Promise<ModelMetadata[]> {
@@ -99,7 +141,7 @@ async function getEnabledModelsMetadata(): Promise<ModelMetadata[]> {
       for (const model of provider.models) {
         const fullId = `${providerId}/${model.id}`;
         if (enabledModelIds.includes(fullId)) {
-          allMetadata.push({ ...model, id: fullId });
+          allMetadata.push({ ...model, id: fullId, service: "chat" });
         }
       }
     }
@@ -116,8 +158,10 @@ async function getEnabledModelsMetadata(): Promise<ModelMetadata[]> {
       // are no longer available to this account.
       if (Object.hasOwn(modelsFile.providers, parts.provider)) continue;
 
-      allMetadata.push({ id: enabledId, name: parts.modelId });
+      allMetadata.push({ id: enabledId, name: parts.modelId, service: "chat" });
     }
+
+    allMetadata.push(...getConfiguredImageGenerationModels(settingsFile, modelsFile));
 
     return allMetadata;
   } catch (error) {
@@ -129,6 +173,16 @@ async function getEnabledModelsMetadata(): Promise<ModelMetadata[]> {
 function formatProbeError(error: unknown): string {
   if (error instanceof Error) return error.message;
   return String(error);
+}
+
+async function resolveApiKey(value: string | undefined): Promise<string> {
+  if (!value) return "";
+  if (value.startsWith("$")) return process.env[value.slice(1)] || "";
+  if (value.startsWith("!")) {
+    const { stdout } = await execAsync(value.slice(1));
+    return stdout.trim();
+  }
+  return value;
 }
 
 async function readCacheFile(): Promise<CacheFile | null> {
@@ -174,25 +228,96 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-async function probeModel(metadata: ModelMetadata, ctx: ProbeContext): Promise<ModelHealthResult> {
+function modelHealthResult(
+  metadata: ModelMetadata,
+  status: ModelHealthResult["status"],
+  error?: string,
+): ModelHealthResult {
+  return {
+    id: metadata.id,
+    status,
+    ...(error ? { error } : {}),
+    name: metadata.name,
+    service: metadata.service || "chat",
+  };
+}
+
+async function probeImageGenerationModel(metadata: ModelMetadata): Promise<ModelHealthResult> {
   const parts = splitModelId(metadata.id);
   if (!parts) {
-    return { id: metadata.id, status: "error", error: "Invalid model id" };
+    return modelHealthResult(metadata, "error", "Invalid model id");
+  }
+
+  const provider = metadata.providerConfig;
+  if (!provider) {
+    return modelHealthResult(metadata, "not-found", "Image generation provider not found in models.json");
+  }
+
+  if (!provider.baseUrl) {
+    return modelHealthResult(metadata, "error", "Image generation provider is missing baseUrl");
+  }
+
+  try {
+    const apiKey = await resolveApiKey(provider.apiKey);
+    if (!apiKey) {
+      return modelHealthResult(metadata, "auth-missing", "No API key available");
+    }
+
+    const response = await fetch(`${provider.baseUrl.replace(/\/$/, "")}/images/generations`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: parts.modelId,
+        prompt: "Health check image: a simple solid color square. No text.",
+        n: 1,
+        size: "16x16",
+        response_format: "b64_json",
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    const text = await response.text();
+    if (!response.ok) {
+      return modelHealthResult(
+        metadata,
+        response.status === 404 ? "not-found" : "error",
+        `Image generation request failed (${response.status}): ${text}`,
+      );
+    }
+
+    const item = (JSON.parse(text) as { data?: Array<{ b64_json?: unknown; url?: unknown }> }).data?.[0];
+    if (typeof item?.b64_json !== "string" && typeof item?.url !== "string") {
+      return modelHealthResult(metadata, "error", "Image generation response did not include b64_json or url");
+    }
+
+    return modelHealthResult(metadata, "ok");
+  } catch (error) {
+    return modelHealthResult(metadata, "error", formatProbeError(error));
+  }
+}
+
+async function probeModel(metadata: ModelMetadata, ctx: ProbeContext): Promise<ModelHealthResult> {
+  if (metadata.service === "imageGeneration") {
+    return probeImageGenerationModel(metadata);
+  }
+
+  const parts = splitModelId(metadata.id);
+  if (!parts) {
+    return modelHealthResult(metadata, "error", "Invalid model id");
   }
 
   const model = ctx.modelRegistry.find(parts.provider, parts.modelId);
   if (!model) {
-    return { id: metadata.id, status: "not-found", error: "Model not found in registry" };
+    return modelHealthResult(metadata, "not-found", "Model not found in registry");
   }
 
   try {
     const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
     if (!auth.ok || (!auth.apiKey && !auth.headers)) {
-      return {
-        id: metadata.id,
-        status: "auth-missing",
-        error: auth.ok ? "No API key or request headers available" : (auth.error || "Authentication unavailable"),
-      };
+      return modelHealthResult(metadata, "auth-missing", auth.ok ? "No API key or request headers available" : (auth.error || "Authentication unavailable"));
     }
 
     await completeSimple(
@@ -208,10 +333,38 @@ async function probeModel(metadata: ModelMetadata, ctx: ProbeContext): Promise<M
       },
     );
 
-    return { id: metadata.id, status: "ok" };
+    return modelHealthResult(metadata, "ok");
   } catch (error) {
-    return { id: metadata.id, status: "error", error: formatProbeError(error) };
+    return modelHealthResult(metadata, "error", formatProbeError(error));
   }
+}
+
+function resultDisplayName(result: ModelHealthResult): string {
+  return result.name || result.id.split("/")[1] || result.id;
+}
+
+function serviceLabel(service: ModelHealthResult["service"], count: number): string {
+  if (service === "imageGeneration") {
+    return `image generation model${count === 1 ? "" : "s"}`;
+  }
+  return `chat model${count === 1 ? "" : "s"}`;
+}
+
+function formatHealthySummary(healthy: ModelHealthResult[]): string {
+  const byService = new Map<ModelHealthResult["service"], ModelHealthResult[]>();
+  for (const result of healthy) {
+    const service = result.service || "chat";
+    byService.set(service, [...(byService.get(service) || []), result]);
+  }
+
+  const groups: string[] = [];
+  for (const service of ["chat", "imageGeneration"] as const) {
+    const group = byService.get(service) || [];
+    if (group.length === 0) continue;
+    groups.push(`${group.length} ${serviceLabel(service, group.length)} (${group.map(resultDisplayName).join(", ")})`);
+  }
+
+  return groups.join(", ");
 }
 
 function notifyProbeSummary(results: ModelHealthResult[], ctx: ProbeContext, usedCache: boolean): void {
@@ -226,8 +379,8 @@ function notifyProbeSummary(results: ModelHealthResult[], ctx: ProbeContext, use
     return;
   }
 
-  const healthyNames = healthy.map((r) => r.id.split("/")[1] || r.id).join(", ");
-  ctx.ui.notify(`${prefix}: ${healthy.length} enabled model${healthy.length === 1 ? "" : "s"} queryable (${healthyNames})`, "info");
+  const details = formatHealthySummary(healthy);
+  ctx.ui.notify(`${prefix}: ${healthy.length} enabled model${healthy.length === 1 ? "" : "s"} queryable. ${details}`, "info");
 
   if (failing.length > 0) {
     const summary = failing.map((result) => `${result.id} (${result.error || result.status})`).join(", ");

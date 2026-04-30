@@ -1,0 +1,173 @@
+name: Pi tests
+
+on:
+  push:
+    paths:
+      - 'private_dot_pi/**'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Materialize private_dot_pi for tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          src="private_dot_pi"
+          dst="$HOME/.pi"
+          rm -rf "$dst"
+
+          materialize_component() {
+            local name="$1"
+            while :; do
+              case "$name" in
+                private_*) name="${name#private_}" ;;
+                executable_*) name="${name#executable_}" ;;
+                *) break ;;
+              esac
+            done
+            name="${name%.tmpl}"
+            printf '%s' "$name"
+          }
+
+          is_executable_source_path() {
+            local rel="$1"
+            local component
+            IFS=/ read -ra components <<< "$rel"
+            for component in "${components[@]}"; do
+              while :; do
+                case "$component" in
+                  private_*) component="${component#private_}" ;;
+                  executable_*) return 0 ;;
+                  *) break ;;
+                esac
+              done
+            done
+            return 1
+          }
+
+          materialize_path() {
+            local rel="$1"
+            local target="$dst"
+            local component
+            IFS=/ read -ra components <<< "$rel"
+            for component in "${components[@]}"; do
+              target="$target/$(materialize_component "$component")"
+            done
+            printf '%s' "$target"
+          }
+
+          while IFS= read -r rel; do
+            target="$(materialize_path "$rel")"
+            if [ -d "$src/$rel" ]; then
+              mkdir -p "$target"
+            else
+              mkdir -p "$(dirname "$target")"
+              cp -p "$src/$rel" "$target"
+              if is_executable_source_path "$rel"; then
+                chmod +x "$target"
+              fi
+            fi
+          done < <(find "$src" -mindepth 1 -print | sort | sed "s#^$src/##")
+
+          # models.json.tmpl contains encrypted-secret template expressions that are
+          # intentionally unavailable in CI. Use a deterministic model registry that
+          # covers every enabled model in settings.config.json.
+          cat > "$dst/agent/models.json" <<'JSON'
+          {
+            "providers": {
+              "openai-codex": {"models": [{"id": "gpt-5.5", "name": "GPT 5.5"}]},
+              "reallms": {"models": [
+                {"id": "gpt-oss-120b", "name": "gpt-oss-120b", "reasoning": true},
+                {"id": "gemma-4-31B-it", "name": "gemma-4-31B-it", "reasoning": false},
+                {"id": "Qwen3-Coder-Next", "name": "Qwen3-Coder-Next", "reasoning": true}
+              ]},
+              "reallms-dev": {"models": [{"id": "Qwen3-Coder-Next-Dev", "name": "Qwen3-Coder-Next-Dev", "reasoning": true}]}
+            }
+          }
+          JSON
+
+      - name: Add deterministic pi stub for live invocation test
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bin"
+          cat > "$RUNNER_TEMP/bin/pi" <<'SH'
+          #!/bin/sh
+          cat <<'JSON'
+          {
+            "depths": {
+              "fast": {"recommendedDepth": "fast", "scenario": "single focused low-latency lookup", "reason": "use for one specific fact"},
+              "standard": {"recommendedDepth": "standard", "scenario": "parallel snippets or one URL", "reason": "use for balanced source gathering"},
+              "deep": {"recommendedDepth": "deep", "scenario": "sequential chain to find then scrape multiple URLs", "reason": "use for iterative research"}
+            },
+            "outputTypes": {
+              "searchResults": {"outputType": "searchResults", "useWhen": "raw sources need agent-side processing"},
+              "sourcedAnswer": {"outputType": "sourcedAnswer", "useWhen": "user-facing answer with citations"},
+              "structured": {"outputType": "structured", "useWhen": "JSON schema parsing for a pipeline or CRM"}
+            },
+            "fetch": {"endpoint": "/fetch", "renderJs": true, "useWhen": "known exact single specific URL"},
+            "dateFiltering": {"fromDate": "2025-01-01", "toDate": "2025-03-31", "useWhen": "date time window range"},
+            "domainFiltering": {"includeDomains": ["sec.gov"], "excludeDomains": ["example.com"], "useWhen": "domain source focus and noise removal"}
+          }
+          JSON
+          SH
+          chmod +x "$RUNNER_TEMP/bin/pi"
+
+      - name: Run shell tests
+        shell: bash
+        env:
+          # This workflow does not consume repository secrets. Keep common token
+          # variables empty so tests cannot accidentally print or exfiltrate them.
+          GITHUB_TOKEN: ''
+          GH_TOKEN: ''
+          OPENAI_API_KEY: ''
+          ANTHROPIC_API_KEY: ''
+          GOOGLE_API_KEY: ''
+          GEMINI_API_KEY: ''
+          LINKUP_API_KEY: ''
+        run: |
+          set -euo pipefail
+          export PATH="$RUNNER_TEMP/bin:$PATH"
+          find "$HOME/.pi" -name '*.test.sh' -type f -print0 | sort -z | xargs -0 -n1 sh
+
+      - name: Run TypeScript tests
+        shell: bash
+        env:
+          # This workflow does not consume repository secrets. Keep common token
+          # variables empty so tests cannot accidentally print or exfiltrate them.
+          GITHUB_TOKEN: ''
+          GH_TOKEN: ''
+          OPENAI_API_KEY: ''
+          ANTHROPIC_API_KEY: ''
+          GOOGLE_API_KEY: ''
+          GEMINI_API_KEY: ''
+          LINKUP_API_KEY: ''
+        run: |
+          set -euo pipefail
+          fake_pi_package="$RUNNER_TEMP/pi-package/node_modules/@mariozechner/pi-coding-agent"
+          mkdir -p "$fake_pi_package"
+          printf '{"name":"@mariozechner/pi-coding-agent"}\n' > "$fake_pi_package/package.json"
+          export PI_CODING_AGENT_PACKAGE_ROOT="$fake_pi_package"
+
+          cd "$HOME/.pi"
+          while IFS= read -r -d '' test_file; do
+            npx -y tsx --test "$test_file"
+          done < <(find agent -name '*.test.ts' -type f -print0 | sort -z)

@@ -105,9 +105,18 @@ async function getEnabledModelsMetadata(): Promise<ModelMetadata[]> {
     }
 
     for (const enabledId of enabledModelIds) {
-      if (!allMetadata.find((model) => model.id === enabledId)) {
-        allMetadata.push({ id: enabledId, name: enabledId.split("/")[1] || enabledId });
-      }
+      if (allMetadata.find((model) => model.id === enabledId)) continue;
+
+      const parts = splitModelId(enabledId);
+      if (!parts) continue;
+
+      // Built-in providers may not be listed in models.json, but if a provider is
+      // listed there, treat its model list as the scoped set for that provider.
+      // This avoids probing stale enabled entries for provider-scoped models that
+      // are no longer available to this account.
+      if (Object.hasOwn(modelsFile.providers, parts.provider)) continue;
+
+      allMetadata.push({ id: enabledId, name: parts.modelId });
     }
 
     return allMetadata;
@@ -230,15 +239,22 @@ export async function checkModelHealth(ctx: ProbeContext, options: ModelHealthOp
   const cacheTtlMs = options.cacheTtlMs ?? MODEL_HEALTH_CACHE_TTL_MS;
   const concurrencyLimit = options.concurrencyLimit ?? MODEL_PROBE_CONCURRENCY_LIMIT;
 
+  const models = await getEnabledModelsMetadata();
+
   if (!options.forceRefresh) {
     const cached = await getFreshCachedResults(cacheTtlMs);
     if (cached) {
-      if (options.notify) notifyProbeSummary(cached, ctx, true);
-      return cached;
+      const currentIds = new Set(models.map((model) => model.id));
+      const cachedIds = new Set(cached.map((result) => result.id));
+      const hasAllCurrentModels = models.every((model) => cachedIds.has(model.id));
+      if (hasAllCurrentModels) {
+        const currentCached = cached.filter((result) => currentIds.has(result.id));
+        if (options.notify) notifyProbeSummary(currentCached, ctx, true);
+        return currentCached;
+      }
     }
   }
 
-  const models = await getEnabledModelsMetadata();
   const results = await mapWithConcurrency(models, concurrencyLimit, (model) => probeModel(model, ctx));
   await writeCacheFile(results);
 

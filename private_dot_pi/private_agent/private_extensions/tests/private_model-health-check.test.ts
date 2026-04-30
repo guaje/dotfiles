@@ -6,8 +6,10 @@ import { pathToFileURL } from "node:url";
 
 const EXTENSION_PATH = resolve("agent/extensions/model-health-check.ts");
 const SETTINGS_CONFIG_PATH = resolve("agent/settings.config.json");
+const SETTINGS_PATH = resolve("agent/settings.json");
 const MODELS_PATH = resolve("agent/models.json");
 const ORIGINAL_SETTINGS_CONFIG = readFileSync(SETTINGS_CONFIG_PATH, "utf8");
+const ORIGINAL_SETTINGS = readFileSync(SETTINGS_PATH, "utf8");
 const CACHE_PATH = resolve("agent/model-health-cache.json");
 const ORIGINAL_CACHE = (() => {
   try {
@@ -143,6 +145,78 @@ test("checks model health with a concurrency limit and caches results", async ()
   assert.match(notifications[0]!.message, /Model health check used cached results/);
 });
 
+test("uses settings.config enabled models and skips stale scoped-provider models", async () => {
+  const mod = await loadExtension();
+  const checkModelHealth = mod.checkModelHealth;
+
+  const scopedModel = readAvailableTestModels(1).find((model) => model.id.startsWith("reallms/"))!;
+  const staleScopedModel = "reallms/not-in-current-scope";
+  const generatedOnlyModel = "openai-codex/generated-only-model";
+  const builtInModel = "openai-codex/test-built-in";
+
+  writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({
+    enabledModels: [scopedModel.id, staleScopedModel, builtInModel],
+  }, null, 2)}\n`);
+  writeFileSync(SETTINGS_PATH, `${JSON.stringify({
+    enabledModels: [generatedOnlyModel],
+  }, null, 2)}\n`);
+
+  const called: string[] = [];
+  (globalThis as any).__completeSimpleMock = async (model: any) => {
+    called.push(`${model.provider}/${model.id}`);
+    return { stopReason: "stop", content: [{ type: "text", text: "OK" }] };
+  };
+
+  const ctx = {
+    modelRegistry: {
+      find(provider: string, modelId: string) {
+        return { provider, id: modelId };
+      },
+      async getApiKeyAndHeaders(model: any) {
+        return { ok: true, apiKey: `key-${model.id}` };
+      },
+    },
+  };
+
+  await checkModelHealth(ctx, { forceRefresh: true, cacheTtlMs: 60_000 });
+
+  assert.deepEqual([...called].sort(), [builtInModel, scopedModel.id].sort());
+});
+
+test("filters stale entries out of cached health check results", async () => {
+  const mod = await loadExtension();
+  const checkModelHealth = mod.checkModelHealth;
+
+  const [currentModel] = readAvailableTestModels(1);
+  writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({
+    enabledModels: [currentModel.id, "reallms/not-in-current-scope"],
+  }, null, 2)}\n`);
+  writeFileSync(CACHE_PATH, `${JSON.stringify({
+    checkedAt: Date.now(),
+    results: [
+      { id: currentModel.id, status: "ok" },
+      { id: "reallms/not-in-current-scope", status: "error", error: "stale" },
+    ],
+  }, null, 2)}\n`);
+
+  (globalThis as any).__completeSimpleMock = async () => {
+    throw new Error("cache should be used without probing");
+  };
+
+  const results = await checkModelHealth({
+    modelRegistry: {
+      find() {
+        throw new Error("cache should be used without registry lookup");
+      },
+      async getApiKeyAndHeaders() {
+        throw new Error("cache should be used without auth lookup");
+      },
+    },
+  }, { cacheTtlMs: 60_000 });
+
+  assert.deepEqual(results, [{ id: currentModel.id, status: "ok" }]);
+});
+
 test("filters models to healthy cached entries when available", async () => {
   const mod = await loadExtension();
   const getHealthyEnabledModels = mod.getHealthyEnabledModels;
@@ -188,6 +262,7 @@ test("registers a model-health command", async () => {
 test.after(() => {
   delete (globalThis as any).__completeSimpleMock;
   writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
   if (ORIGINAL_CACHE === undefined) {
     rmSync(CACHE_PATH, { force: true });
   } else {

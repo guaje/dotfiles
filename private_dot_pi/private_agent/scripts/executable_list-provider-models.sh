@@ -107,10 +107,14 @@ while IFS='	' read -r provider_name base_url api api_key_expr compat_json; do
         else false
         end;
 
-      def is_chat_model:
-        if (env.PI_INCLUDE_NON_CHAT_MODELS // "") == "1" then true
-        elif (.id | test("(?i)(embed|embedding|rerank|reranker|whisper|image|tts|stt|moderation)")) then false
-        else true
+      def service_type:
+        if (.id | test("(?i)(embed|embedding)")) then "embeddings"
+        elif (.id | test("(?i)(dall[-_ ]?e|gpt[-_ ]?image|image|imagen|flux|stable[-_ ]?diffusion|sdxl|midjourney)")) then "imageGeneration"
+        elif (.id | test("(?i)(rerank|reranker)")) then "reranking"
+        elif (.id | test("(?i)(whisper|transcrib|speech[-_ ]?to[-_ ]?text|stt)")) then "speechToText"
+        elif (.id | test("(?i)(tts|text[-_ ]?to[-_ ]?speech|voice|audio)")) then "textToSpeech"
+        elif (.id | test("(?i)(moderation|safety)")) then "moderation"
+        else "chat"
         end;
 
       def provider_compat:
@@ -122,10 +126,8 @@ while IFS='	' read -r provider_name base_url api api_key_expr compat_json; do
         else null
         end;
 
-      models_array
-      | map(select(type == "object" and .id and is_chat_model))
-      | sort_by(.id)
-      | map({
+      def normalized_model:
+        {
           id,
           name: (.name // .display_name // .label // .id),
           reasoning: supports_reasoning,
@@ -157,7 +159,17 @@ while IFS='	' read -r provider_name base_url api api_key_expr compat_json; do
             cacheRead: 0,
             cacheWrite: 0
           }
-        }) as $models
+        };
+
+      models_array
+      | map(select(type == "object" and .id))
+      | sort_by(.id)
+      | map(. + {service: service_type, model: normalized_model}) as $discovered
+      | ($discovered | map(select(.service == "chat" or (env.PI_INCLUDE_NON_CHAT_MODELS // "") == "1") | .model)) as $models
+      | ($discovered
+          | group_by(.service)
+          | map({key: .[0].service, value: map(.model)})
+          | from_entries) as $services
       | {
           ($provider): (
             {
@@ -166,7 +178,7 @@ while IFS='	' read -r provider_name base_url api api_key_expr compat_json; do
               apiKey: $apiKey
             }
             + (if provider_compat == null then {} else {compat: provider_compat} end)
-            + {models: $models}
+            + {models: $models, services: $services}
           )
         }
     ' "$response_file" >> "$entries_file"

@@ -83,6 +83,11 @@ case "$url" in
       "id": "embedding-model",
       "name": "Embedding Model",
       "context_window": 8192
+    },
+    {
+      "id": "gpt-image-1",
+      "name": "GPT Image",
+      "context_window": 0
     }
   ]
 }
@@ -123,6 +128,11 @@ LOCAL_INPUT=$(printf '%s\n' "$OUTPUT" | jq -r '.providers["local-openai"].models
 LOCAL_CONTEXT=$(printf '%s\n' "$OUTPUT" | jq -r '.providers["local-openai"].models[0].contextWindow')
 LOCAL_MAX=$(printf '%s\n' "$OUTPUT" | jq -r '.providers["local-openai"].models[0].maxTokens')
 LOCAL_COST=$(printf '%s\n' "$OUTPUT" | jq -r '.providers["local-openai"].models[0].cost | [.input, .output, .cacheRead, .cacheWrite] | join(",")')
+LOCAL_SERVICE_CHAT=$(printf '%s\n' "$OUTPUT" | jq '.providers["local-openai"].services.chat | length')
+LOCAL_SERVICE_EMBEDDINGS=$(printf '%s\n' "$OUTPUT" | jq '.providers["local-openai"].services.embeddings | length')
+LOCAL_SERVICE_EMBEDDING_ID=$(printf '%s\n' "$OUTPUT" | jq -r '.providers["local-openai"].services.embeddings[0].id')
+LOCAL_SERVICE_IMAGE=$(printf '%s\n' "$OUTPUT" | jq '.providers["local-openai"].services.imageGeneration | length')
+LOCAL_SERVICE_IMAGE_ID=$(printf '%s\n' "$OUTPUT" | jq -r '.providers["local-openai"].services.imageGeneration[0].id')
 [ "$LOCAL_API" = "TEST_LOCAL_API_KEY" ] || fail "output should preserve the apiKey expression for models.json"
 [ "$LOCAL_COMPAT_DEV" = "false" ] || fail "OpenAI-compatible providers should default supportsDeveloperRole to false"
 [ "$LOCAL_COMPAT_REASONING" = "false" ] || fail "OpenAI-compatible providers should default supportsReasoningEffort to false"
@@ -134,7 +144,12 @@ LOCAL_COST=$(printf '%s\n' "$OUTPUT" | jq -r '.providers["local-openai"].models[
 [ "$LOCAL_CONTEXT" = "262144" ] || fail "should map context_window to contextWindow"
 [ "$LOCAL_MAX" = "32768" ] || fail "should map max_output_tokens to maxTokens"
 [ "$LOCAL_COST" = "0,0,0,0" ] || fail "self-hosted models should get zero cost entries"
-pass "list-provider-models.sh prints complete models.json entries for discovered chat models"
+[ "$LOCAL_SERVICE_CHAT" = "1" ] || fail "services should list discovered chat models"
+[ "$LOCAL_SERVICE_EMBEDDINGS" = "1" ] || fail "services should list discovered embedding models"
+[ "$LOCAL_SERVICE_EMBEDDING_ID" = "embedding-model" ] || fail "embedding service should include embedding model id"
+[ "$LOCAL_SERVICE_IMAGE" = "1" ] || fail "services should list discovered image generation models"
+[ "$LOCAL_SERVICE_IMAGE_ID" = "gpt-image-1" ] || fail "imageGeneration service should include image model id"
+pass "list-provider-models.sh prints complete models.json entries and all discovered services"
 
 CUSTOM_COMPAT=$(printf '%s\n' "$OUTPUT" | jq -c '.providers["custom-compat"].compat')
 CUSTOM_MODEL=$(printf '%s\n' "$OUTPUT" | jq -r '.providers["custom-compat"].models[0].name')
@@ -148,5 +163,5 @@ pass "list-provider-models.sh preserves configured compat and maps alternate lim
 
 INCLUDE_OUTPUT=$(cd "$TMP_ROOT" && PI_INCLUDE_NON_CHAT_MODELS=1 TEST_LOCAL_API_KEY=env-token PATH="$TMP_ROOT/bin:$PATH" "$FIXTURE_SCRIPTS/list-provider-models.sh") || fail "list-provider-models.sh should include all models when requested"
 INCLUDE_COUNT=$(printf '%s\n' "$INCLUDE_OUTPUT" | jq '.providers["local-openai"].models | length')
-[ "$INCLUDE_COUNT" = "2" ] || fail "PI_INCLUDE_NON_CHAT_MODELS=1 should include filtered models"
+[ "$INCLUDE_COUNT" = "3" ] || fail "PI_INCLUDE_NON_CHAT_MODELS=1 should include filtered models"
 pass "list-provider-models.sh can include non-chat models on request"

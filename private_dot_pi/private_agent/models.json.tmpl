@@ -1,10 +1,26 @@
 {{- /* chezmoi:template */ -}}
 {
   "providers": {
+    "kelley": {
+      "baseUrl": "https://hub.kelley.iu.edu/llmapi",
+      "api": "openai-completions",
+      "apiKey": "{{ (index ((secret "-d" (joinPath .chezmoi.sourceDir "secrets/private_dot_pi/private_agent/models.json.sops.yaml") | fromYaml).data | fromYaml) "apiKey__1") }}",
+      "compat": {
+        "supportsDeveloperRole": false,
+        "supportsReasoningEffort": false
+      },
+      "models": [
+        {
+          "id": "Kimi-K2.6",
+          "name": "Kimi-K2.6",
+          "reasoning": true
+        }
+      ]
+    },
     "reallms": {
       "baseUrl": "https://reallms.rescloud.iu.edu/direct/v1",
       "api": "openai-completions",
-      "apiKey": "{{ (index ((secret "-d" (joinPath .chezmoi.sourceDir "secrets/private_dot_pi/private_agent/models.json.sops.yaml") | fromYaml).data | fromYaml) "apiKey__1") }}",
+      "apiKey": "{{ (index ((secret "-d" (joinPath .chezmoi.sourceDir "secrets/private_dot_pi/private_agent/models.json.sops.yaml") | fromYaml).data | fromYaml) "apiKey__2") }}",
       "compat": {
         "supportsDeveloperRole": false,
         "supportsReasoningEffort": false
@@ -30,7 +46,7 @@
     "reallms-dev": {
       "baseUrl": "https://reallms-dev.rescloud.iu.edu/direct/v1",
       "api": "openai-completions",
-      "apiKey": "{{ (index ((secret "-d" (joinPath .chezmoi.sourceDir "secrets/private_dot_pi/private_agent/models.json.sops.yaml") | fromYaml).data | fromYaml) "apiKey__2") }}",
+      "apiKey": "{{ (index ((secret "-d" (joinPath .chezmoi.sourceDir "secrets/private_dot_pi/private_agent/models.json.sops.yaml") | fromYaml).data | fromYaml) "apiKey__3") }}",
       "compat": {
         "supportsDeveloperRole": false,
         "supportsReasoningEffort": false

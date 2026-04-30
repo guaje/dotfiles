@@ -14,5 +14,15 @@
     "-extensions/google-search.ts",
     "-extensions/scoped-limits.ts"
   ],
-  "autoModelSelectionEnabled": false
+  "autoModelSelectionEnabled": false,
+  "imageGenerationProviders": {
+    "reallms-dev": {
+      "models": [
+        {
+          "id": "z-image-turbo",
+          "name": "z-image-turbo"
+        }
+      ]
+    }
+  }
 }

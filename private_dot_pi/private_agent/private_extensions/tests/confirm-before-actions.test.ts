@@ -372,6 +372,34 @@ test("bash programs list excludes heredoc script fragments", async () => {
   assert.doesNotMatch(body, /print\('/);
 });
 
+test("bash programs list includes commands after quoted command substitution", async () => {
+  const extension = await loadExtension();
+  const { pi, getHandler } = createPiHarness();
+  extension(pi as any);
+  const handler = getHandler("tool_call");
+
+  const uiHarness = createUiHarness(true);
+  const result = await handler(
+    {
+      toolName: "bash",
+      input: {
+        command: "cd \"$(chezmoi source-path)\" && git status --short && git add private_dot_pi/private_agent/scripts/executable_list-provider-models.sh private_dot_pi/private_agent/scripts/tests/executable_list-provider-models.test.sh && git status --short && git commit -m \"List provider service models\"",
+      },
+    },
+    {
+      hasUI: true,
+      ui: uiHarness.ui,
+    },
+  );
+
+  assert.equal(result, undefined);
+  const body = stripAnsi(uiHarness.confirmCalls[0]!.body);
+  assert.match(body, /Programs to run:/);
+  assert.match(body, /1\) cd, 2\) chezmoi, 3\) git, 4\) git, 5\) git, 6\) git/);
+  assert.doesNotMatch(body, /executable_list-provider-models/);
+  assert.doesNotMatch(body, /List provider service models/);
+});
+
 test("bash programs list ignores line-continuation paths and only includes actual commands", async () => {
   const extension = await loadExtension();
   const { pi, getHandler } = createPiHarness();

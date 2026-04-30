@@ -354,9 +354,14 @@ function splitShellSegments(command: string) {
         continue;
       }
 
+      if (char === ")" && commandSubDepth > 0) {
+        commandSubDepth--;
+        current += char;
+        continue;
+      }
+
       if (!doubleQuote && char === ")") {
-        if (commandSubDepth > 0) commandSubDepth--;
-        else if (subshellDepth > 0) subshellDepth--;
+        if (subshellDepth > 0) subshellDepth--;
         current += char;
         continue;
       }
@@ -418,7 +423,7 @@ function tokenizeShell(segment: string) {
       continue;
     }
 
-    if (!singleQuote && !doubleQuote && commandSubDepth > 0 && char === ")") {
+    if (!singleQuote && commandSubDepth > 0 && char === ")") {
       commandSubDepth--;
       current += char;
       continue;

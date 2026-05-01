@@ -100,13 +100,18 @@ async function loadExtension() {
 function createPiHarness() {
   const handlers = new Map<string, Function>();
   const tools: Array<Record<string, unknown>> = [];
+  const shortcuts = new Map<string, any>();
   return {
+    shortcuts,
     pi: {
       on(event: string, handler: Function) {
         handlers.set(event, handler);
       },
       registerTool(tool: Record<string, unknown>) {
         tools.push(tool);
+      },
+      registerShortcut(shortcut: string, spec: any) {
+        shortcuts.set(shortcut, spec);
       },
     },
     getHandler(event: string) {
@@ -772,6 +777,56 @@ test("management style status shows styled icon and selected style as continuous
 
     await getHandler("session_shutdown")({}, { ui });
     assert.deepEqual(uiHarness.setStatusCalls.at(-1), { id: "management-style", status: undefined });
+  }
+  finally {
+    writeFileSync(SETTINGS_CONFIG_PATH, originalSettings);
+  }
+});
+
+test("management style shortcut cycles session style without changing settings", async () => {
+  const originalSettings = readFileSync(SETTINGS_CONFIG_PATH, "utf8");
+  try {
+    const settings = JSON.parse(originalSettings);
+    settings.managingStyle = "Micromanagement";
+    writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify(settings, null, 2)}\n`);
+
+    const mod = await loadExtensionModule();
+    const extension = mod.default as (pi: { on: (event: string, handler: Function) => void; registerTool: Function; registerShortcut: Function }) => void;
+    const { pi, getHandler, shortcuts } = createPiHarness();
+    extension(pi as any);
+
+    const uiHarness = createUiHarness(true);
+    const notifications: Array<{ message: string; level?: string }> = [];
+    const ui = {
+      ...uiHarness.ui,
+      notify(message: string, level?: string) {
+        notifications.push({ message, level });
+      },
+    };
+    await getHandler("session_start")({}, { ui });
+
+    const shortcut = shortcuts.get(mod.MANAGEMENT_STYLE_CYCLE_SHORTCUT);
+    assert.ok(shortcut, "Expected management style cycle shortcut to be registered");
+    assert.equal(mod.MANAGEMENT_STYLE_CYCLE_SHORTCUT, "alt+m");
+    assert.equal(shortcut.description, "Cycle management style for this session");
+
+    await shortcut.handler({ ui });
+    assert.equal(stripAnsi(uiHarness.setStatusCalls.at(-1)!.status!), "◆ Guiding");
+    await shortcut.handler({ ui });
+    assert.equal(stripAnsi(uiHarness.setStatusCalls.at(-1)!.status!), "▲ Empowering");
+    assert.deepEqual(notifications.map((entry) => entry.message), [
+      "Management style: Guiding (session only)",
+      "Management style: Empowering (session only)",
+    ]);
+    assert.equal(JSON.parse(readFileSync(SETTINGS_CONFIG_PATH, "utf8")).managingStyle, "Micromanagement");
+
+    assert.equal(
+      await getHandler("tool_call")(
+        { toolName: "write", input: { path: "notes.txt", content: "hello" } },
+        { cwd: resolve("agent"), hasUI: false, ui },
+      ),
+      undefined,
+    );
   }
   finally {
     writeFileSync(SETTINGS_CONFIG_PATH, originalSettings);

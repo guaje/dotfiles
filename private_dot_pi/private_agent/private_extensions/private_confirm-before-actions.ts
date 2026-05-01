@@ -86,6 +86,7 @@ async function getSettings(): Promise<SettingsFile> {
 }
 
 let managingStyleCache: ManagingStyle | undefined;
+let sessionManagingStyle: ManagingStyle | undefined;
 
 export async function refreshManagingStyleCache(): Promise<ManagingStyle> {
   const settings = await getSettings();
@@ -95,7 +96,18 @@ export async function refreshManagingStyleCache(): Promise<ManagingStyle> {
 }
 
 async function getCurrentManagingStyle(): Promise<ManagingStyle> {
+  if (sessionManagingStyle !== undefined) return sessionManagingStyle;
   return refreshManagingStyleCache();
+}
+
+function getNextManagingStyle(style: ManagingStyle): ManagingStyle {
+  const currentIndex = MANAGING_STYLE_VALUES.indexOf(style);
+  return MANAGING_STYLE_VALUES[(currentIndex + 1) % MANAGING_STYLE_VALUES.length] ?? DEFAULT_MANAGING_STYLE;
+}
+
+function setSessionManagingStyle(style: ManagingStyle) {
+  sessionManagingStyle = style;
+  updateManagingStyleStatus(activeManagingStyleUi, style);
 }
 
 function getManagingStyleStatusColor(style: ManagingStyle) {
@@ -321,6 +333,8 @@ class ManagingStyleSubmenu extends Container {
     this.selectList.handleInput(data);
   }
 }
+
+export const MANAGEMENT_STYLE_CYCLE_SHORTCUT = "alt+m";
 
 export function createManagingStyleSubmenuFactory(
   themeModule: SettingsThemeModule,
@@ -1661,6 +1675,7 @@ export default function (pi: ExtensionAPI) {
   void patchBuiltInSettingsMenu();
 
   pi.on("session_start", async (_event, ctx) => {
+    sessionManagingStyle = undefined;
     activeManagingStyleUi = ctx.ui;
     await patchBuiltInSettingsMenu();
     patchUiFooter(ctx.ui);
@@ -1671,7 +1686,18 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("session_shutdown", (_event, ctx) => {
     clearManagingStyleStatus(ctx.ui);
+    sessionManagingStyle = undefined;
     if (activeManagingStyleUi === ctx.ui) activeManagingStyleUi = undefined;
+  });
+
+  pi.registerShortcut?.(MANAGEMENT_STYLE_CYCLE_SHORTCUT, {
+    description: "Cycle management style for this session",
+    handler: async (ctx: { ui?: { notify?: (message: string, level?: "info" | "warning" | "error" | "success") => void; setStatus?: (id: string, status?: string) => void } }) => {
+      activeManagingStyleUi = ctx.ui;
+      const nextStyle = getNextManagingStyle(await getCurrentManagingStyle());
+      setSessionManagingStyle(nextStyle);
+      ctx.ui?.notify?.(`Management style: ${MANAGING_STYLE_STATUS_LABELS[nextStyle]} (session only)`, "info");
+    },
   });
 
   const originalBash = createBashTool(process.cwd());

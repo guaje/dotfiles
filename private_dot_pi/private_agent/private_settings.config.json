@@ -16,6 +16,7 @@
     "-extensions/scoped-limits.ts"
   ],
   "autoModelSelectionEnabled": false,
+  "managingStyle": "Empowerment",
   "imageGenerationProviders": {
     "reallms-dev": {
       "models": [

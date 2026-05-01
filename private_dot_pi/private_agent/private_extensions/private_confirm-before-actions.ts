@@ -1,12 +1,493 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { createBashTool, isToolCallEventType } from "@mariozechner/pi-coding-agent";
-import { Text } from "@mariozechner/pi-tui";
+import { Container, SelectList, Spacer, Text, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
+import { execFile as execFileCallback } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { promisify } from "node:util";
+import { importPiModule } from "./packages/pi-package.ts";
 
 const MAX_CONFIRM_COMMAND_LINES = 24;
 const MAX_CONFIRM_COMMAND_CHARS = 3000;
 const MAX_PROGRAMS_TO_SHOW = 12;
+const SETTINGS_CONFIG_PATH = resolve(import.meta.dirname, "../settings.config.json");
+const SETTINGS_PATH = resolve(import.meta.dirname, "../settings.json");
+const MERGE_SETTINGS_SCRIPT_PATH = resolve(import.meta.dirname, "../scripts/merge-settings.sh");
+const PI_INTERACTIVE_MODE_RELATIVE_PATH = "dist/modes/interactive/interactive-mode.js";
+const PI_FOOTER_COMPONENT_RELATIVE_PATH = "dist/modes/interactive/components/footer.js";
+const PI_SETTINGS_SELECTOR_RELATIVE_PATH = "dist/modes/interactive/components/settings-selector.js";
+const PI_THEME_RELATIVE_PATH = "dist/modes/interactive/theme/theme.js";
+const execFile = promisify(execFileCallback);
+
+type ManagingStyle = "Micromanagement" | "Guidance" | "Empowerment";
+
+interface SettingsFile {
+  managingStyle?: ManagingStyle;
+  [key: string]: unknown;
+}
+
+interface SettingsListItem {
+  id: string;
+  label: string;
+  description?: string;
+  currentValue: string;
+  values?: string[];
+  submenu?: (currentValue: string, done: (newValue?: string) => void) => unknown;
+}
+
+interface SettingsListLike {
+  items: SettingsListItem[];
+  filteredItems: SettingsListItem[];
+  onChange: (id: string, newValue: string) => void;
+  updateValue?: (id: string, newValue: string) => void;
+}
+
+const MANAGING_STYLE_VALUES: ManagingStyle[] = ["Micromanagement", "Guidance", "Empowerment"];
+const DEFAULT_MANAGING_STYLE: ManagingStyle = "Micromanagement";
+const MANAGING_STYLE_DESCRIPTIONS: Record<ManagingStyle, string> = {
+  Micromanagement: "Ask before every bash command, write, and edit",
+  Guidance: "Allow local read-only checks; ask before file changes and risky commands",
+  Empowerment: "Allow in-folder writes/edits and checks; ask before risky commands",
+};
+const MANAGING_STYLE_STATUS_LABELS: Record<ManagingStyle, string> = {
+  Micromanagement: "Micromanaging",
+  Guidance: "Guiding",
+  Empowerment: "Empowering",
+};
+const MANAGING_STYLE_STATUS_ICONS: Record<ManagingStyle, string> = {
+  Micromanagement: "●",
+  Guidance: "◆",
+  Empowerment: "▲",
+};
+const MANAGING_STYLE_STATUS_ID = "management-style";
+
+function isManagingStyle(value: unknown): value is ManagingStyle {
+  return typeof value === "string" && MANAGING_STYLE_VALUES.includes(value as ManagingStyle);
+}
+
+function normalizeManagingStyle(value: unknown): ManagingStyle {
+  return isManagingStyle(value) ? value : DEFAULT_MANAGING_STYLE;
+}
+
+async function readSettingsFile(filePath: string): Promise<SettingsFile | null> {
+  try {
+    return JSON.parse(await readFile(filePath, "utf8")) as SettingsFile;
+  }
+  catch {
+    return null;
+  }
+}
+
+async function getSettings(): Promise<SettingsFile> {
+  return (await readSettingsFile(SETTINGS_CONFIG_PATH))
+    || (await readSettingsFile(SETTINGS_PATH))
+    || {};
+}
+
+let managingStyleCache: ManagingStyle | undefined;
+
+export async function refreshManagingStyleCache(): Promise<ManagingStyle> {
+  const settings = await getSettings();
+  const style = normalizeManagingStyle(settings.managingStyle);
+  managingStyleCache = style;
+  return style;
+}
+
+async function getCurrentManagingStyle(): Promise<ManagingStyle> {
+  return refreshManagingStyleCache();
+}
+
+function getManagingStyleStatusColor(style: ManagingStyle) {
+  if (style === "Micromanagement") return UI_PALETTE.danger;
+  if (style === "Guidance") return UI_PALETTE.warning;
+  return UI_PALETTE.primaryAction;
+}
+
+function formatManagingStyleStatus(style: ManagingStyle) {
+  return `${colorize(MANAGING_STYLE_STATUS_ICONS[style], getManagingStyleStatusColor(style))}${colorize(` ${MANAGING_STYLE_STATUS_LABELS[style]}`, UI_PALETTE.hint)}`;
+}
+
+function stripAnsi(text: string) {
+  return text.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
+function rightAlignManagingStyleStatus(line: string, width: number, fallback: string) {
+  if (!activeManagingStyleDisplay) return line;
+
+  const gap = 2;
+  const statusWidth = visibleWidth(activeManagingStyleDisplay);
+  const availableLineWidth = Math.max(0, width - statusWidth - gap);
+  const left = truncateToWidth(line, availableLineWidth, fallback);
+  const padding = Math.max(gap, width - visibleWidth(left) - statusWidth);
+  return `${left}${" ".repeat(padding)}${activeManagingStyleDisplay}`;
+}
+
+function removeManagingStyleStatusLine(lines: string[]) {
+  if (!activeManagingStyleDisplay) return lines;
+
+  const activePlain = stripAnsi(activeManagingStyleDisplay).trim();
+  return lines.flatMap((line, index) => {
+    if (index < 2) return [line];
+
+    const plainLine = stripAnsi(line);
+    if (!plainLine.includes(activePlain)) return [line];
+
+    const cleaned = plainLine.replace(activePlain, "").replace(/\s+/g, " ").trim();
+    return cleaned ? [cleaned] : [];
+  });
+}
+
+function updateManagingStyleStatus(ui: { setStatus?: (id: string, status?: string) => void } | undefined, style: ManagingStyle) {
+  activeManagingStyleDisplay = formatManagingStyleStatus(style);
+  ui?.setStatus?.(MANAGING_STYLE_STATUS_ID, activeManagingStyleDisplay);
+  requestManagingStyleFooterRender?.();
+}
+
+function clearManagingStyleStatus(ui: { setStatus?: (id: string, status?: string) => void } | undefined) {
+  activeManagingStyleDisplay = "";
+  ui?.setStatus?.(MANAGING_STYLE_STATUS_ID, undefined);
+  requestManagingStyleFooterRender?.();
+}
+
+function wrapManagingStyleFooterComponent(footer: { render?: (width: number) => string[]; [PATCHED_FOOTER_COMPONENT]?: boolean } | undefined) {
+  if (!footer?.render || footer[PATCHED_FOOTER_COMPONENT]) return;
+
+  const originalRender = footer.render.bind(footer);
+  footer[PATCHED_FOOTER_COMPONENT] = true;
+  footer.render = (width: number) => {
+    const lines = removeManagingStyleStatusLine(originalRender(width));
+    if (lines[0] !== undefined) {
+      lines[0] = rightAlignManagingStyleStatus(lines[0], width, colorize("...", UI_PALETTE.hint));
+    }
+    return lines;
+  };
+}
+
+function wrapExistingUiFooter(ui: ({ children?: unknown[] } & Record<string, unknown>) | undefined) {
+  const children = ui?.children;
+  if (!Array.isArray(children)) return;
+
+  for (let index = children.length - 1; index >= 0; index--) {
+    const child = children[index] as { render?: (width: number) => string[]; [PATCHED_FOOTER_COMPONENT]?: boolean } | undefined;
+    if (typeof child?.render === "function") {
+      wrapManagingStyleFooterComponent(child);
+      return;
+    }
+  }
+}
+
+function wrapInteractiveModeFooter(instance: unknown) {
+  const candidate = instance as {
+    customFooter?: { render?: (width: number) => string[]; [PATCHED_FOOTER_COMPONENT]?: boolean };
+    footer?: { render?: (width: number) => string[]; [PATCHED_FOOTER_COMPONENT]?: boolean };
+    ui?: { children?: unknown[] } & Record<string, unknown>;
+  };
+
+  wrapManagingStyleFooterComponent(candidate.customFooter ?? candidate.footer);
+  wrapExistingUiFooter(candidate.ui);
+}
+
+function wrapManagingStyleFooterFactory(factory: unknown) {
+  if (typeof factory !== "function") return factory;
+
+  return (tui: { requestRender: () => void }, theme: { fg: (color: string, text: string) => string }, footerData: unknown) => {
+    const requestRender = () => tui.requestRender();
+    requestManagingStyleFooterRender = requestRender;
+    const wrappedFooterData = typeof footerData === "object" && footerData !== null && "getExtensionStatuses" in footerData
+      ? new Proxy(footerData as object, {
+          get(target, property, receiver) {
+            if (property === "getExtensionStatuses") {
+              return () => {
+                const statuses = (target as { getExtensionStatuses: () => ReadonlyMap<string, string> }).getExtensionStatuses();
+                const filtered = new Map(statuses);
+                filtered.delete(MANAGING_STYLE_STATUS_ID);
+                return filtered;
+              };
+            }
+
+            const value = Reflect.get(target, property, receiver);
+            return typeof value === "function" ? value.bind(target) : value;
+          },
+        })
+      : footerData;
+    const footer = (factory as (tui: unknown, theme: unknown, footerData: unknown) => { render: (width: number) => string[]; dispose?: () => void; [key: string]: unknown })(tui, theme, wrappedFooterData);
+    return {
+      ...footer,
+      dispose() {
+        if (requestManagingStyleFooterRender === requestRender) requestManagingStyleFooterRender = undefined;
+        footer.dispose?.();
+      },
+      render(width: number) {
+        const lines = removeManagingStyleStatusLine(footer.render(width));
+        if (lines[0] !== undefined) {
+          lines[0] = rightAlignManagingStyleStatus(lines[0], width, theme.fg("dim", "..."));
+        }
+        return lines;
+      },
+    };
+  };
+}
+
+function patchUiFooter(ui: ({ setFooter?: (factory?: unknown) => void; [PATCHED_UI_FOOTER]?: boolean } & Record<string, unknown>) | undefined) {
+  if (!ui?.setFooter || ui[PATCHED_UI_FOOTER]) return;
+
+  const originalSetFooter = ui.setFooter.bind(ui);
+  ui[PATCHED_UI_FOOTER] = true;
+  ui.setFooter = (factory?: unknown) => {
+    if (typeof factory !== "function") requestManagingStyleFooterRender = undefined;
+    originalSetFooter(wrapManagingStyleFooterFactory(factory));
+    wrapExistingUiFooter(ui);
+  };
+
+  wrapExistingUiFooter(ui);
+}
+
+async function setManagingStyle(style: ManagingStyle): Promise<void> {
+  managingStyleCache = style;
+  const settings = await getSettings();
+  settings.managingStyle = style;
+  await writeFile(SETTINGS_CONFIG_PATH, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
+  try {
+    await execFile(MERGE_SETTINGS_SCRIPT_PATH);
+  }
+  catch (error) {
+    console.error("Failed to merge settings after managing style update:", error);
+  }
+}
+
+type SettingsThemeModule = {
+  theme: {
+    fg: (color: string, text: string) => string;
+    bold: (text: string) => string;
+  };
+  getSelectListTheme: () => unknown;
+};
+
+const MANAGEMENT_STYLE_SUBMENU_SELECT_LIST_LAYOUT = {
+  minPrimaryColumnWidth: 16,
+  maxPrimaryColumnWidth: 24,
+};
+
+let activeManagingStyleUi: { setStatus?: (id: string, status?: string) => void } | undefined;
+let activeManagingStyleDisplay = "";
+let requestManagingStyleFooterRender: (() => void) | undefined;
+const PATCHED_UI_FOOTER = Symbol("managementStyleUiFooterPatched");
+const PATCHED_FOOTER_COMPONENT = Symbol("managementStyleFooterComponentPatched");
+
+class ManagingStyleSubmenu extends Container {
+  private selectList: { handleInput: (data: Buffer) => void; onSelect?: (item: { value: ManagingStyle }) => void; onCancel?: () => void; setSelectedIndex?: (index: number) => void };
+
+  constructor(
+    themeModule: SettingsThemeModule,
+    currentValue: string,
+    onSelect: (style: ManagingStyle) => void | Promise<void>,
+    onCancel: () => void,
+  ) {
+    super();
+
+    const { theme } = themeModule;
+    this.addChild(new Text(theme.bold(theme.fg("accent", "Management style")), 0, 0));
+    this.addChild(new Spacer(1));
+    this.addChild(new Text(theme.fg("muted", "Select how much approval Pi needs before acting"), 0, 0));
+    this.addChild(new Spacer(1));
+
+    const options = MANAGING_STYLE_VALUES.map((style) => ({
+      value: style,
+      label: style,
+      description: MANAGING_STYLE_DESCRIPTIONS[style],
+    }));
+    this.selectList = new SelectList(
+      options,
+      Math.min(options.length, 10),
+      themeModule.getSelectListTheme(),
+      MANAGEMENT_STYLE_SUBMENU_SELECT_LIST_LAYOUT,
+    ) as typeof this.selectList;
+
+    const currentIndex = options.findIndex((option) => option.value === normalizeManagingStyle(currentValue));
+    if (currentIndex !== -1) this.selectList.setSelectedIndex?.(currentIndex);
+
+    this.selectList.onSelect = (item) => {
+      void onSelect(item.value);
+    };
+    this.selectList.onCancel = onCancel;
+
+    this.addChild(this.selectList as unknown as Container);
+    this.addChild(new Spacer(1));
+    this.addChild(new Text(theme.fg("dim", "  Enter to select · Esc to go back"), 0, 0));
+  }
+
+  handleInput(data: Buffer) {
+    this.selectList.handleInput(data);
+  }
+}
+
+export function createManagingStyleSubmenuFactory(
+  themeModule: SettingsThemeModule,
+  onChange: (style: ManagingStyle) => void | Promise<void>,
+) {
+  return (currentValue: string, done: (newValue?: string) => void) => new ManagingStyleSubmenu(
+    themeModule,
+    currentValue,
+    (style) => {
+      void onChange(style);
+      done(style);
+    },
+    () => done(),
+  );
+}
+
+export function addManagingStyleSettingToSettingsList(
+  settingsList: SettingsListLike,
+  style: ManagingStyle,
+  onChange: (style: ManagingStyle) => void | Promise<void>,
+  submenuFactory?: (currentValue: string, done: (newValue?: string) => void) => unknown,
+): void {
+  const item: SettingsListItem = {
+    id: "managing-style",
+    label: "Management style",
+    description: "Choose how much approval Pi needs before acting",
+    currentValue: style,
+    submenu: submenuFactory,
+  };
+
+  const existingIndex = settingsList.items.findIndex((entry) => entry.id === item.id);
+  if (existingIndex !== -1) {
+    const existingItem = settingsList.items[existingIndex]!;
+    existingItem.label = item.label;
+    existingItem.description = item.description;
+    existingItem.currentValue = item.currentValue;
+    existingItem.values = item.values;
+    existingItem.submenu = item.submenu;
+    settingsList.updateValue?.(item.id, item.currentValue);
+    settingsList.filteredItems = settingsList.items;
+    return;
+  }
+
+  const insertAt = (() => {
+    const autoModelIndex = settingsList.items.findIndex((entry) => entry.id === "auto-model-selection");
+    if (autoModelIndex !== -1) return autoModelIndex + 1;
+    const thinkingIndex = settingsList.items.findIndex((entry) => entry.id === "thinking");
+    if (thinkingIndex !== -1) return thinkingIndex + 1;
+    return settingsList.items.length;
+  })();
+
+  settingsList.items.splice(insertAt, 0, item);
+  settingsList.filteredItems = settingsList.items;
+
+  const originalOnChange = settingsList.onChange;
+  settingsList.onChange = (id, newValue) => {
+    if (id === item.id) {
+      const nextStyle = normalizeManagingStyle(newValue);
+      updateManagingStyleStatus(activeManagingStyleUi, nextStyle);
+      void onChange(nextStyle);
+      return;
+    }
+    originalOnChange(id, newValue);
+  };
+}
+
+let settingsSelectorPatchPromise: Promise<void> | undefined;
+
+function patchBuiltInSettingsMenu(): Promise<void> {
+  if (!settingsSelectorPatchPromise) {
+    settingsSelectorPatchPromise = (async () => {
+      const [interactiveModeModule, footerModule, settingsSelectorModule, themeModule] = await Promise.all([
+        importPiModule(PI_INTERACTIVE_MODE_RELATIVE_PATH),
+        importPiModule(PI_FOOTER_COMPONENT_RELATIVE_PATH),
+        importPiModule(PI_SETTINGS_SELECTOR_RELATIVE_PATH),
+        importPiModule(PI_THEME_RELATIVE_PATH),
+      ]);
+      const InteractiveMode = interactiveModeModule.InteractiveMode as {
+        prototype: {
+          showSettingsSelector?: (...args: unknown[]) => unknown;
+          setExtensionFooter?: (factory?: unknown) => unknown;
+          setExtensionStatus?: (key: string, text?: string) => unknown;
+          __managingStyleUiPatched?: boolean;
+          __managingStyleFooterPatched?: boolean;
+          __managingStyleStatusPatched?: boolean;
+        };
+      };
+      const FooterComponent = footerModule.FooterComponent as {
+        prototype: { render?: (width: number) => string[]; __managingStyleRenderPatched?: boolean };
+      };
+      const SettingsSelectorComponent = settingsSelectorModule.SettingsSelectorComponent as {
+        prototype: { getSettingsList?: () => SettingsListLike; __managingStyleSettingsPatched?: boolean };
+      };
+
+      if (!InteractiveMode.prototype.__managingStyleUiPatched && InteractiveMode.prototype.showSettingsSelector) {
+        const originalShowSettingsSelector = InteractiveMode.prototype.showSettingsSelector;
+        InteractiveMode.prototype.__managingStyleUiPatched = true;
+        InteractiveMode.prototype.showSettingsSelector = function showSettingsSelector(this: { ui?: { setStatus?: (id: string, status?: string) => void } }, ...args: unknown[]) {
+          activeManagingStyleUi = this.ui;
+          return originalShowSettingsSelector.apply(this, args);
+        };
+      }
+
+      if (!InteractiveMode.prototype.__managingStyleFooterPatched && InteractiveMode.prototype.setExtensionFooter) {
+        const originalSetExtensionFooter = InteractiveMode.prototype.setExtensionFooter;
+        InteractiveMode.prototype.__managingStyleFooterPatched = true;
+        InteractiveMode.prototype.setExtensionFooter = function setExtensionFooter(this: unknown, factory?: unknown) {
+          const result = originalSetExtensionFooter.call(this, wrapManagingStyleFooterFactory(factory));
+          wrapInteractiveModeFooter(this);
+          return result;
+        };
+      }
+
+      if (!InteractiveMode.prototype.__managingStyleStatusPatched && InteractiveMode.prototype.setExtensionStatus) {
+        const originalSetExtensionStatus = InteractiveMode.prototype.setExtensionStatus;
+        InteractiveMode.prototype.__managingStyleStatusPatched = true;
+        InteractiveMode.prototype.setExtensionStatus = function setExtensionStatus(this: { ui?: { requestRender?: () => void } }, key: string, text?: string) {
+          if (key === MANAGING_STYLE_STATUS_ID) {
+            activeManagingStyleDisplay = text ?? "";
+            wrapInteractiveModeFooter(this);
+            this.ui?.requestRender?.();
+            return;
+          }
+          return originalSetExtensionStatus.call(this, key, text);
+        };
+      }
+
+      if (!FooterComponent.prototype.__managingStyleRenderPatched && FooterComponent.prototype.render) {
+        const originalRender = FooterComponent.prototype.render;
+        FooterComponent.prototype.__managingStyleRenderPatched = true;
+        FooterComponent.prototype.render = function render(this: unknown, width: number) {
+          const lines = removeManagingStyleStatusLine(originalRender.call(this, width));
+          if (lines[0] !== undefined) {
+            lines[0] = rightAlignManagingStyleStatus(lines[0], width, colorize("...", UI_PALETTE.hint));
+          }
+          return lines;
+        };
+      }
+
+      if (SettingsSelectorComponent.prototype.__managingStyleSettingsPatched) return;
+      const originalGetSettingsList = SettingsSelectorComponent.prototype.getSettingsList;
+      if (!originalGetSettingsList) return;
+
+      SettingsSelectorComponent.prototype.__managingStyleSettingsPatched = true;
+      SettingsSelectorComponent.prototype.getSettingsList = function getSettingsList(this: unknown) {
+        const settingsList = originalGetSettingsList.call(this);
+        addManagingStyleSettingToSettingsList(
+          settingsList,
+          managingStyleCache ?? DEFAULT_MANAGING_STYLE,
+          async (style) => {
+            await setManagingStyle(style);
+          },
+          createManagingStyleSubmenuFactory(themeModule as SettingsThemeModule, (style) => {
+            updateManagingStyleStatus(activeManagingStyleUi, style);
+            void setManagingStyle(style);
+          }),
+        );
+        return settingsList;
+      };
+    })().catch((error) => {
+      settingsSelectorPatchPromise = undefined;
+      console.error("Failed to patch pi settings menu for managing style:", error);
+    });
+  }
+
+  return settingsSelectorPatchPromise;
+}
 
 function summarizeWrite(content: string | undefined) {
   if (!content) return "";
@@ -1114,6 +1595,49 @@ function buildBashRenderCallText(command: string | undefined, theme: RenderTheme
   }).join("\n");
 }
 
+function isPathInCurrentDirectory(targetPath: string | undefined, cwd: string | undefined) {
+  if (!targetPath || !cwd) return false;
+  const resolvedCwd = resolve(cwd);
+  const resolvedTarget = resolve(resolvedCwd, targetPath);
+  return resolvedTarget === resolvedCwd || resolvedTarget.startsWith(`${resolvedCwd}/`);
+}
+
+function commandRequiresConfirmationInEmpowerment(command: string | undefined) {
+  if (!command) return false;
+
+  const normalizedCommand = normalizeShellContinuations(stripHeredocBodies(command));
+  const commandNames = extractCommandNames(command).map((name) => name.replace(/^.*\//, "").toLowerCase());
+
+  if (/\b(?:sudo|doas|su)\b/.test(normalizedCommand)) return true;
+  if (/(^|[^A-Za-z])rm(\s|$)/.test(normalizedCommand)) return true;
+  if (/\b(?:chmod|chown|chgrp)\b/.test(normalizedCommand)) return true;
+  if (/\bgit\s+(?:add|commit|push)\b/.test(normalizedCommand)) return true;
+  if (/\bgit\s+(?:clone|fetch|pull|ls-remote|remote\s+(?:add|set-url))\b/.test(normalizedCommand)) return true;
+  if (/\b(?:gh|glab)\s+(?:pr|mr)\s+create\b/.test(normalizedCommand)) return true;
+  if (/\b(?:gh|glab)\s+api\b/.test(normalizedCommand)) return true;
+
+  const localMutationCommands = new Set([
+    "mv", "cp", "mkdir", "rmdir", "touch", "ln", "truncate", "tee", "install", "rsync", "dd", "patch",
+  ]);
+
+  if (commandNames.some((name) => localMutationCommands.has(name))) return true;
+
+  if (/\b(?:npm|pnpm|yarn|bun)\s+(?:install|i|add|remove|rm|update|upgrade|publish|login|logout|link|unlink)\b/.test(normalizedCommand)) return true;
+  if (/\bnpx\s+(?!tsc\b)[^\n;|&]*\b(?:create-|degit|yo|npm-check-updates|npm\b)/.test(normalizedCommand)) return true;
+  if (/\b(?:pip|pip3|uv)\s+(?:install|uninstall|sync|add|remove|publish)\b/.test(normalizedCommand)) return true;
+  if (/\bcargo\s+(?:install|publish|add|remove|update)\b/.test(normalizedCommand)) return true;
+  if (/\bgo\s+(?:get|install|mod\s+(?:download|tidy|vendor))\b/.test(normalizedCommand)) return true;
+
+  const networkCommands = new Set([
+    "curl", "wget", "http", "https", "ssh", "scp", "sftp", "ftp", "telnet", "nc", "ncat", "netcat",
+    "git-remote-https", "git-remote-http", "git-remote-ssh", "docker", "podman", "kubectl", "helm", "aws", "gcloud", "az", "gh", "glab",
+  ]);
+
+  if (commandNames.some((name) => networkCommands.has(name))) return true;
+
+  return false;
+}
+
 function summarizeBash(command: string | undefined) {
   if (!command) return "No command provided.";
 
@@ -1133,6 +1657,23 @@ function summarizeBash(command: string | undefined) {
 
 
 export default function (pi: ExtensionAPI) {
+  void refreshManagingStyleCache();
+  void patchBuiltInSettingsMenu();
+
+  pi.on("session_start", async (_event, ctx) => {
+    activeManagingStyleUi = ctx.ui;
+    await patchBuiltInSettingsMenu();
+    patchUiFooter(ctx.ui);
+    wrapExistingUiFooter(ctx.ui);
+    updateManagingStyleStatus(activeManagingStyleUi, await refreshManagingStyleCache());
+    wrapExistingUiFooter(ctx.ui);
+  });
+
+  pi.on("session_shutdown", (_event, ctx) => {
+    clearManagingStyleStatus(ctx.ui);
+    if (activeManagingStyleUi === ctx.ui) activeManagingStyleUi = undefined;
+  });
+
   const originalBash = createBashTool(process.cwd());
 
   pi.registerTool({
@@ -1147,6 +1688,13 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("tool_call", async (event, ctx) => {
     if (isToolCallEventType("bash", event)) {
+      const managingStyle = await getCurrentManagingStyle();
+      updateManagingStyleStatus(ctx.ui, managingStyle);
+      const requiresConfirmation = managingStyle === "Micromanagement"
+        || commandRequiresConfirmationInEmpowerment(event.input.command);
+
+      if (!requiresConfirmation) return undefined;
+
       if (!ctx.hasUI) {
         return { block: true, reason: "Bash command blocked (no UI available for confirmation)" };
       }
@@ -1161,6 +1709,13 @@ export default function (pi: ExtensionAPI) {
     }
 
     if (isToolCallEventType("write", event)) {
+      const managingStyle = await getCurrentManagingStyle();
+      updateManagingStyleStatus(ctx.ui, managingStyle);
+      const requiresConfirmation = managingStyle !== "Empowerment"
+        || !isPathInCurrentDirectory(event.input.path, ctx.cwd);
+
+      if (!requiresConfirmation) return undefined;
+
       if (!ctx.hasUI) {
         return { block: true, reason: "File write blocked (no UI available for confirmation)" };
       }
@@ -1177,6 +1732,13 @@ export default function (pi: ExtensionAPI) {
     }
 
     if (isToolCallEventType("edit", event)) {
+      const managingStyle = await getCurrentManagingStyle();
+      updateManagingStyleStatus(ctx.ui, managingStyle);
+      const requiresConfirmation = managingStyle !== "Empowerment"
+        || !isPathInCurrentDirectory(event.input.path, ctx.cwd);
+
+      if (!requiresConfirmation) return undefined;
+
       if (!ctx.hasUI) {
         return { block: true, reason: "File edit blocked (no UI available for confirmation)" };
       }

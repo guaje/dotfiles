@@ -317,9 +317,10 @@ export function getMacOsTerminalNotificationWarning(): string | undefined {
       stdio: ["ignore", "pipe", "ignore"],
     });
     const terminalEntry = output.match(/\{[^{}]*"bundle-id" => "com\.apple\.Terminal"[^{}]*\}/s);
-    if (terminalEntry && !/"auth" => 0\b/.test(terminalEntry[0])) return undefined;
+    if (!terminalEntry) return undefined;
+    if (!/"auth" => 0\b/.test(terminalEntry[0])) return undefined;
   } catch {
-    // If settings cannot be read, fall through to a best-effort warning.
+    return undefined;
   }
 
   return "macOS notifications for Terminal are not enabled. Enable Settings > Notifications > Terminal for alerter notifications.";

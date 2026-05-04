@@ -37,7 +37,8 @@ The health extension gets configured image models from `imageGenerationProviders
    - Text to include or avoid
    - Negative constraints, if supported
 6. Call the selected provider's OpenAI-compatible image generation endpoint and save the result to a file.
-7. Return the saved path, model, provider, and a short note about any assumptions.
+7. Trigger a generated-image notification by calling `notifyGeneratedImage(savedImagePath, ctx)` from `agent/extensions/native-notify.ts` when you are operating from extension code that has a Pi extension context. If you generated the image from a script or shell workflow without an extension context, ask Pi/the user to call that function with the saved path rather than reimplementing notification logic.
+8. Return the saved path, model, provider, and a short note about any assumptions.
 
 ## Listing Healthy Image Models
 
@@ -229,6 +230,7 @@ console.log(JSON.stringify({
   provider: selected.providerName,
   model: selected.model.id,
   size,
+  notification: 'Call notifyGeneratedImage(outPath, ctx) from agent/extensions/native-notify.ts when an extension context is available.',
 }, null, 2));
 NODE
 ```

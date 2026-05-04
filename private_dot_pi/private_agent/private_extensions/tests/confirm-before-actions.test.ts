@@ -22,6 +22,12 @@ function stripAnsi(text: string) {
 }
 
 let extensionImportCounter = 0;
+const nativeNotifyCalls: string[] = [];
+let nativeApprovalResult: boolean | undefined;
+(globalThis as any).__nativeNotifyMock = (body: string) => {
+  nativeNotifyCalls.push(body);
+};
+(globalThis as any).__nativeApprovalMock = () => nativeApprovalResult;
 
 async function loadExtensionModule() {
   mkdirSync(STUB_PACKAGE_DIR, { recursive: true });
@@ -82,10 +88,12 @@ async function loadExtensionModule() {
   ].join("\n"));
 
   const patchedExtensionPath = resolve("agent/extensions/.confirm-before-actions.testable.ts");
-  const source = readFileSync(EXTENSION_PATH, "utf8").replaceAll(
-    "import.meta.dirname",
-    JSON.stringify(dirname(EXTENSION_PATH)),
-  );
+  const source = readFileSync(EXTENSION_PATH, "utf8")
+    .replace('import { notifyPiWaitingForUser, raceBashApprovalWithConfirm } from "./native-notify.ts";', 'const notifyPiWaitingForUser = (globalThis as any).__nativeNotifyMock; const raceBashApprovalWithConfirm = (_command: string, _ctx: any, confirm: (signal?: AbortSignal) => Promise<boolean>) => confirm();')
+    .replaceAll(
+      "import.meta.dirname",
+      JSON.stringify(dirname(EXTENSION_PATH)),
+    );
   writeFileSync(patchedExtensionPath, source);
 
   const moduleUrl = `${pathToFileURL(patchedExtensionPath).href}?t=${Date.now()}-${extensionImportCounter++}`;
@@ -136,7 +144,7 @@ function createUiHarness(confirmResult = true) {
 
   return {
     ui: {
-      async confirm(title: string, body: string) {
+      async confirm(title: string, body: string, _opts?: { signal?: AbortSignal }) {
         confirmCalls.push({ title, body });
         return confirmResult;
       },
@@ -165,6 +173,7 @@ function createUiHarness(confirmResult = true) {
 }
 
 test("write confirmation loads the full file preview into the editor and restores previous editor text", async () => {
+  nativeNotifyCalls.length = 0;
   const extension = await loadExtension();
   const { pi, getHandler } = createPiHarness();
   extension(pi as any);
@@ -195,6 +204,7 @@ test("write confirmation loads the full file preview into the editor and restore
   assert.equal(uiHarness.editorText, "original editor text");
   assert.equal(uiHarness.setEditorTextCalls.at(-1), "original editor text");
   assert.equal(uiHarness.confirmCalls.length, 1);
+  assert.deepEqual(nativeNotifyCalls, ["Approval needed: Allow file write"]);
   assert.match(stripAnsi(uiHarness.confirmCalls[0]!.title), /Allow file write\?/);
   assert.match(stripAnsi(uiHarness.confirmCalls[0]!.body), /Path:/);
   assert.match(stripAnsi(uiHarness.confirmCalls[0]!.body), /notes\.txt/);
@@ -309,6 +319,8 @@ test("rejected edit confirmation blocks the tool and restores previous editor te
 });
 
 test("bash confirmation leaves the editor unchanged and includes command summary", async () => {
+  nativeNotifyCalls.length = 0;
+  nativeApprovalResult = undefined;
   const extension = await loadExtension();
   const { pi, getHandler, getTool } = createPiHarness();
   extension(pi as any);
@@ -330,6 +342,7 @@ test("bash confirmation leaves the editor unchanged and includes command summary
 
   assert.equal(result, undefined);
   assert.equal(uiHarness.confirmCalls.length, 1);
+  assert.deepEqual(nativeNotifyCalls, []);
   assert.deepEqual(uiHarness.setEditorTextCalls, []);
   assert.equal(uiHarness.editorText, "original editor text");
   assert.deepEqual(uiHarness.setWidgetCalls, []);
@@ -964,6 +977,8 @@ test("write tool blocks immediately when no UI is available", async () => {
 });
 
 test.after(() => {
+  delete (globalThis as any).__nativeNotifyMock;
+  delete (globalThis as any).__nativeApprovalMock;
   rmSync(resolve("agent/extensions/node_modules"), { recursive: true, force: true });
   rmSync(resolve("agent/extensions/.confirm-before-actions.testable.ts"), { force: true });
 });

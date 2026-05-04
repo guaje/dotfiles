@@ -7,6 +7,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
 import { importPiModule } from "./packages/pi-package.ts";
+import { notifyPiWaitingForUser, raceBashApprovalWithConfirm } from "./native-notify.ts";
 
 const MAX_CONFIRM_COMMAND_LINES = 24;
 const MAX_CONFIRM_COMMAND_CHARS = 3000;
@@ -555,6 +556,7 @@ async function confirmFileMutation(
   },
 ) {
   const previousEditorText = ctx.ui.getEditorText();
+  await notifyPiWaitingForUser(`Approval needed: ${options.title.replace(/\?$/, "")}`, ctx);
   ctx.ui.setEditorText(options.previewText);
   try {
     return await ctx.ui.confirm(
@@ -1725,10 +1727,11 @@ export default function (pi: ExtensionAPI) {
         return { block: true, reason: "Bash command blocked (no UI available for confirmation)" };
       }
 
-      const ok = await ctx.ui.confirm(
+      const ok = await raceBashApprovalWithConfirm(event.input.command, ctx, (signal) => ctx.ui.confirm(
         formatConfirmTitle("Allow bash command?"),
         summarizeBash(event.input.command),
-      );
+        { signal },
+      ));
 
       if (!ok) return { block: true, reason: "Bash command blocked by user" };
       return undefined;

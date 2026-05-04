@@ -23,11 +23,9 @@ function stripAnsi(text: string) {
 
 let extensionImportCounter = 0;
 const nativeNotifyCalls: string[] = [];
-let nativeApprovalResult: boolean | undefined;
 (globalThis as any).__nativeNotifyMock = (body: string) => {
   nativeNotifyCalls.push(body);
 };
-(globalThis as any).__nativeApprovalMock = () => nativeApprovalResult;
 
 async function loadExtensionModule() {
   mkdirSync(STUB_PACKAGE_DIR, { recursive: true });
@@ -94,7 +92,7 @@ async function loadExtensionModule() {
 
   const patchedExtensionPath = resolve("agent/extensions/.confirm-before-actions.testable.ts");
   const source = readFileSync(EXTENSION_PATH, "utf8")
-    .replace('import { notifyPiWaitingForUser, raceBashApprovalWithConfirm } from "./native-notify.ts";', 'const notifyPiWaitingForUser = (globalThis as any).__nativeNotifyMock; const raceBashApprovalWithConfirm = (_command: string, _ctx: any, confirm: () => Promise<boolean>) => confirm();')
+    .replace('import { notifyPiWaitingForUser } from "./native-notify.ts";', 'const notifyPiWaitingForUser = (globalThis as any).__nativeNotifyMock;')
     .replaceAll(
       "import.meta.dirname",
       JSON.stringify(dirname(EXTENSION_PATH)),
@@ -325,7 +323,6 @@ test("rejected edit confirmation blocks the tool and restores previous editor te
 
 test("bash confirmation leaves the editor unchanged and includes command summary", async () => {
   nativeNotifyCalls.length = 0;
-  nativeApprovalResult = undefined;
   const extension = await loadExtension();
   const { pi, getHandler, getTool } = createPiHarness();
   extension(pi as any);
@@ -347,7 +344,7 @@ test("bash confirmation leaves the editor unchanged and includes command summary
 
   assert.equal(result, undefined);
   assert.equal(uiHarness.confirmCalls.length, 1);
-  assert.deepEqual(nativeNotifyCalls, []);
+  assert.deepEqual(nativeNotifyCalls, ["Approval needed: bash command"]);
   assert.deepEqual(uiHarness.setEditorTextCalls, []);
   assert.equal(uiHarness.editorText, "original editor text");
   assert.deepEqual(uiHarness.setWidgetCalls, []);
@@ -1003,7 +1000,6 @@ test("write tool blocks immediately when no UI is available", async () => {
 
 test.after(() => {
   delete (globalThis as any).__nativeNotifyMock;
-  delete (globalThis as any).__nativeApprovalMock;
   rmSync(resolve("agent/extensions/node_modules"), { recursive: true, force: true });
   rmSync(resolve("agent/extensions/.confirm-before-actions.testable.ts"), { force: true });
 });

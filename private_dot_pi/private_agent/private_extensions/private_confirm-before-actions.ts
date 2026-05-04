@@ -7,10 +7,8 @@ import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
 import { importPiModule } from "./packages/pi-package.ts";
-import { notifyPiWaitingForUser, raceBashApprovalWithConfirm } from "./native-notify.ts";
+import { notifyPiWaitingForUser } from "./native-notify.ts";
 
-const MAX_CONFIRM_COMMAND_LINES = 24;
-const MAX_CONFIRM_COMMAND_CHARS = 3000;
 const MAX_PROGRAMS_TO_SHOW = 12;
 const SETTINGS_CONFIG_PATH = resolve(import.meta.dirname, "../settings.config.json");
 const SETTINGS_PATH = resolve(import.meta.dirname, "../settings.json");
@@ -593,29 +591,6 @@ function summarizeWrite(content: string | undefined) {
   return `\n\n${uiLabel("New content:")} ${colorize(`${lines} line${lines === 1 ? "" : "s"}, ${chars} char${chars === 1 ? "" : "s"}`, UI_PALETTE.hint)}`;
 }
 
-function truncatePreview(text: string, maxLines: number, maxChars: number) {
-  const fullLines = text.split("\n").length;
-  const fullChars = text.length;
-
-  let preview = text;
-  const lines = preview.split("\n");
-  if (lines.length > maxLines) preview = lines.slice(0, maxLines).join("\n");
-  if (preview.length > maxChars) preview = `${preview.slice(0, maxChars)}\n…`;
-  else if (preview.length < text.length) preview = `${preview}\n…`;
-
-  const previewLines = preview.split("\n").length;
-  const previewChars = preview.replace(/\n…$/, "").length;
-  const truncated = previewChars < fullChars || previewLines < fullLines;
-
-  return {
-    preview,
-    truncated,
-    summary: truncated
-      ? `${uiHint("Preview truncated:")} ${colorize(`showing ${previewLines}/${fullLines} lines, ${previewChars}/${fullChars} chars`, UI_PALETTE.hint)}`
-      : "",
-  };
-}
-
 function summarizeEdit(edits: Array<{ oldText: string; newText: string }> | undefined) {
   if (!edits || edits.length === 0) return "";
   const replacements = edits.length;
@@ -786,11 +761,6 @@ function hexToAnsiColor(hex: string) {
   return rgb ? `\x1b[38;2;${rgb.r};${rgb.g};${rgb.b}m` : undefined;
 }
 
-function hexToAnsiBgColor(hex: string) {
-  const rgb = parseHexColor(hex);
-  return rgb ? `\x1b[48;2;${rgb.r};${rgb.g};${rgb.b}m` : undefined;
-}
-
 function resolveThemeRawColor(theme: ThemeFile, colorName: string | undefined) {
   if (!colorName) return undefined;
   return colorName.startsWith("#") ? colorName : theme.vars?.[colorName];
@@ -799,11 +769,6 @@ function resolveThemeRawColor(theme: ThemeFile, colorName: string | undefined) {
 function resolveThemeColor(theme: ThemeFile, colorName: string | undefined) {
   const resolvedColor = resolveThemeRawColor(theme, colorName);
   return resolvedColor ? hexToAnsiColor(resolvedColor) : undefined;
-}
-
-function resolveThemeBgColor(theme: ThemeFile, colorName: string | undefined) {
-  const resolvedColor = resolveThemeRawColor(theme, colorName);
-  return resolvedColor ? hexToAnsiBgColor(resolvedColor) : undefined;
 }
 
 function getThemeFile() {
@@ -890,10 +855,6 @@ const RISKY_TOKENS: RiskyToken[] = [
 
 function colorCommand(commandName: string) {
   return `${COMMAND_COLOR}${commandName}${COLOR_RESET}`;
-}
-
-function escapeRegex(text: string) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function normalizeShellContinuations(command: string) {
@@ -1206,10 +1167,6 @@ function uiHint(text: string) {
   return colorize(text, UI_PALETTE.hint);
 }
 
-function uiHintKey(text: string) {
-  return colorize(text, UI_PALETTE.hintKey);
-}
-
 function formatConfirmTitle(text: string) {
   return colorize(bold(text), UI_PALETTE.title);
 }
@@ -1222,85 +1179,6 @@ function highlightRiskyTokens(command: string) {
   }
 
   return highlighted;
-}
-
-function highlightWholeCommand(command: string, names: string[]) {
-  const commandNameSet = new Set(names);
-  let result = "";
-
-  for (let i = 0; i < command.length;) {
-    const char = command[i]!;
-
-    if (char === "#") {
-      result += colorize(command.slice(i), SYNTAX_PALETTE.comment);
-      break;
-    }
-
-    if (char === '"' || char === "'") {
-      const end = findQuotedSpanEnd(command, i);
-      result += colorize(command.slice(i, end), SYNTAX_PALETTE.string);
-      i = end;
-      continue;
-    }
-
-    if (char === "$" && command[i + 1] === "(") {
-      result += colorize("$(", SYNTAX_PALETTE.operator);
-      i += 2;
-      continue;
-    }
-
-    if (/[$]/.test(char)) {
-      const match = command.slice(i).match(/^\$[A-Za-z_][A-Za-z0-9_]*/);
-      if (match) {
-        result += colorize(match[0], SYNTAX_PALETTE.variable);
-        i += match[0].length;
-        continue;
-      }
-    }
-
-    if (/^[0-9]$/.test(char)) {
-      const match = command.slice(i).match(/^\d+(?:\.\d+)?/);
-      if (match) {
-        result += colorize(match[0], SYNTAX_PALETTE.number);
-        i += match[0].length;
-        continue;
-      }
-    }
-
-    const operatorMatch = command.slice(i).match(/^(?:&&|\|\||\|&|>>|<<|[|&;<>])/);
-    if (operatorMatch) {
-      result += colorize(operatorMatch[0], SYNTAX_PALETTE.operator);
-      i += operatorMatch[0].length;
-      continue;
-    }
-
-    if (/[(){}\[\]]/.test(char)) {
-      result += colorize(char, SYNTAX_PALETTE.punctuation);
-      i++;
-      continue;
-    }
-
-    if (/\s/.test(char)) {
-      result += char;
-      i++;
-      continue;
-    }
-
-    const tokenMatch = command.slice(i).match(/^[^\s|&;<>()[\]{}]+/);
-    if (tokenMatch) {
-      const token = tokenMatch[0];
-      if (isVariableAssignment(token)) result += colorize(token, SYNTAX_PALETTE.variable);
-      else if (commandNameSet.has(token)) result += colorCommand(token);
-      else result += colorize(token, SYNTAX_PALETTE.text);
-      i += token.length;
-      continue;
-    }
-
-    result += colorize(char, SYNTAX_PALETTE.text);
-    i++;
-  }
-
-  return highlightRiskyTokens(result);
 }
 
 function detectWarnings(command: string): BashWarning[] {
@@ -1840,11 +1718,12 @@ export default function (pi: ExtensionAPI) {
         return { block: true, reason: "Bash command blocked (no UI available for confirmation)" };
       }
 
-      const ok = await raceBashApprovalWithConfirm(event.input.command, ctx, () => confirmWithWorkingHidden(
+      await notifyPiWaitingForUser("Approval needed: bash command", ctx);
+      const ok = await confirmWithWorkingHidden(
         ctx.ui,
         formatConfirmTitle("Allow bash command?"),
         summarizeBash(event.input.command),
-      ));
+      );
 
       if (!ok) return { block: true, reason: "Bash command blocked by user" };
       return undefined;

@@ -102,7 +102,7 @@ test("getNotificationCommand uses alerter with osascript fallback on macOS", asy
     "--app-icon", "/tmp/pi-icon.png",
     "--group", command?.args[12],
   ]);
-  assert.match(command?.args[12] ?? "", /^pi-native-notify-\d+$/);
+  assert.equal(command?.args[12], "pi-native-notify");
   assert.equal(command?.args[13], "--ignore-dnd");
   assert.deepEqual(command?.fallback, {
     command: "osascript",
@@ -111,71 +111,6 @@ test("getNotificationCommand uses alerter with osascript fallback on macOS", asy
 });
 
 
-
-test("requestNativeApproval uses alerter Yes/No actions for short messages", async () => {
-  const { requestNativeApproval } = await loadExtension();
-  const calls: Array<{ command: string; args: string[] }> = [];
-  const execFile = ((command: string, args: string[], _options: unknown, callback: (error?: Error | null, stdout?: string) => void) => {
-    calls.push({ command, args });
-    callback(null, JSON.stringify({ activationValue: "Yes", activationType: "actionClicked" }));
-  }) as any;
-
-  const approved = await requestNativeApproval("echo hello", undefined, {
-    execFile,
-    target: "macos",
-    env: {},
-    iconPath: "/tmp/pi-icon.png",
-  });
-
-  assert.equal(approved, true);
-  assert.equal(calls[0]?.command, "alerter");
-  assert.deepEqual(calls[0]?.args.slice(0, 14), [
-    "--title", "Pi Coding Agent",
-    "--subtitle", "Pi",
-    "--message", "echo hello",
-    "--actions", "Yes",
-    "--close-label", "No",
-    "--app-icon", "/tmp/pi-icon.png",
-    "--group", calls[0]!.args[13],
-  ]);
-});
-
-test("raceBashApprovalWithConfirm notifies and uses only the Pi confirm dialog", async () => {
-  const { raceBashApprovalWithConfirm } = await loadExtension();
-  const calls: Array<{ command: string; args: string[] }> = [];
-  let confirmShown = false;
-  const execFile = ((command: string, args: string[], _options: unknown, callback: () => void) => {
-    calls.push({ command, args });
-    callback();
-  }) as any;
-
-  const approved = await raceBashApprovalWithConfirm("echo hello", {
-    cwd: "/tmp/test-project",
-  }, async () => {
-    confirmShown = true;
-    return true;
-  }, { execFile, target: "termux", env: {}, iconPath: "" });
-
-  assert.equal(approved, true);
-  assert.equal(confirmShown, true);
-  assert.deepEqual(calls, [
-    { command: "termux-notification", args: ["-t", "Pi Coding Agent", "-c", "Approval needed: bash command"] },
-  ]);
-});
-
-test("requestNativeApproval ignores messages over the alerter message limit", async () => {
-  const { MAX_ALERTER_ACTION_MESSAGE_CHARS, requestNativeApproval } = await loadExtension();
-  const calls: any[] = [];
-
-  const result = await requestNativeApproval("x".repeat(MAX_ALERTER_ACTION_MESSAGE_CHARS + 1), undefined, {
-    execFile: ((...args: any[]) => calls.push(args)) as any,
-    target: "macos",
-    iconPath: "/tmp/pi-icon.png",
-  });
-
-  assert.equal(result, undefined);
-  assert.deepEqual(calls, []);
-});
 
 test("sendNativeNotification stops after alerter succeeds", async () => {
   const { sendNativeNotification } = await loadExtension();
@@ -245,6 +180,7 @@ test("notifyGeneratedImage uses alerter content-image for generated images", asy
     "--group", calls[0]!.args[9],
     "--ignore-dnd",
   ]);
+  assert.equal(calls[0]?.args[9], "pi-native-notify");
   assert.deepEqual(calls[0]?.args.slice(11), ["--app-icon", "/tmp/pi-logo.svg"]);
 });
 
@@ -288,7 +224,7 @@ test("notifyPiWaitingForUser sends the standard waiting notification", async () 
     "--json",
     "--group", calls[0]?.args[10],
   ]);
-  assert.match(calls[0]?.args[10] ?? "", /^pi-native-notify-\d+$/);
+  assert.equal(calls[0]?.args[10], "pi-native-notify");
   assert.equal(calls[0]?.args[11], "--ignore-dnd");
 });
 

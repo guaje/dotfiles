@@ -12,7 +12,7 @@ type NotificationCommand = { command: string; args: string[]; fallback?: { comma
 const EXTENSION_DIR = dirname(fileURLToPath(import.meta.url));
 const PI_ICON_PATH = resolve(EXTENSION_DIR, "assets/pi-logo.svg");
 const PI_NOTIFICATION_TITLE = "Pi Coding Agent";
-export const MAX_ALERTER_ACTION_MESSAGE_CHARS = 240;
+const PI_NOTIFICATION_GROUP = "pi-native-notify";
 
 export interface EnvironmentLike {
   ANDROID_DATA?: string;
@@ -289,7 +289,7 @@ export function getNotificationCommand(
       ];
       if (iconPath) args.push("--app-icon", iconPath);
       args.push(
-        "--group", `pi-native-notify-${Date.now()}`,
+        "--group", PI_NOTIFICATION_GROUP,
         "--ignore-dnd",
       );
 
@@ -333,25 +333,6 @@ function execFileQuiet(execFile: ExecFileLike, command: string, args: string[], 
   });
 }
 
-function parseAlerterApproval(stdout: string): boolean | undefined {
-  const value = stdout.trim();
-  if (!value) return undefined;
-
-  try {
-    const parsed = JSON.parse(value) as { activationValue?: unknown; activationType?: unknown };
-    if (String(parsed.activationValue).toLowerCase() === "yes") return true;
-    if (String(parsed.activationValue).toLowerCase() === "no") return false;
-    if (String(parsed.activationType).toLowerCase().includes("closed")) return false;
-    return undefined;
-  } catch {
-    // Plain text mode fallback.
-  }
-
-  if (/^yes$/i.test(value)) return true;
-  if (/^no$|^@closed$/i.test(value)) return false;
-  return undefined;
-}
-
 function parseAlerterReply(stdout: string): string | undefined {
   const value = stdout.trim();
   if (!value) return undefined;
@@ -366,50 +347,6 @@ function parseAlerterReply(stdout: string): string | undefined {
   }
 
   return value === "@closed" ? undefined : value;
-}
-
-export async function requestNativeApproval(
-  message: string,
-  ctx?: NotificationContextLike,
-  options: {
-    execFile?: ExecFileLike;
-    target?: NotificationTarget;
-    env?: EnvironmentLike;
-    iconPath?: string;
-    timeoutMs?: number;
-  } = {},
-): Promise<boolean | undefined> {
-  if (message.length > MAX_ALERTER_ACTION_MESSAGE_CHARS) return undefined;
-
-  const target = options.target ?? detectNotificationTarget(options.env);
-  if (target !== "macos") return undefined;
-
-  const iconPath = options.iconPath ?? getPiIconPath();
-  if (!iconPath) return undefined;
-
-  const execFile = options.execFile ?? execFileCallback;
-  const subtitle = await getNotificationTitle({
-    ctx,
-    env: options.env,
-    execFile,
-    fallbackTitle: "Pi",
-  });
-  if (execFile === execFileCallback && getMacOsAlerterInstallWarning()) return undefined;
-
-  const result = await execFileQuiet(execFile, "alerter", [
-    "--title", PI_NOTIFICATION_TITLE,
-    "--subtitle", subtitle,
-    "--message", message,
-    "--actions", "Yes",
-    "--close-label", "No",
-    "--app-icon", iconPath,
-    "--group", `pi-native-approval-${Date.now()}`,
-    "--json",
-    "--ignore-dnd",
-  ], options.timeoutMs ?? 120000);
-
-  if (result.error) return undefined;
-  return parseAlerterApproval(result.stdout);
 }
 
 export async function sendNativeNotification(
@@ -487,42 +424,6 @@ export async function sendNativeNotification(
   // Ignore notification failures. Pi should never fail a turn because the OS notification API is unavailable.
 }
 
-function unresolvedApproval(): Promise<boolean> {
-  return new Promise(() => {});
-}
-
-export async function raceBashApprovalWithConfirm(
-  command: string,
-  ctx: NotificationContextLike | undefined,
-  confirm: () => Promise<boolean>,
-  options: Parameters<typeof notifyPiWaitingForUser>[2] = {},
-): Promise<boolean> {
-  await notifyPiWaitingForUser(
-    command.length <= MAX_ALERTER_ACTION_MESSAGE_CHARS
-      ? "Approval needed: bash command"
-      : "Approval needed: bash command (see Pi for full command)",
-    ctx,
-    options,
-  );
-  return confirm();
-}
-
-export async function requestBashApprovalOrNotify(
-  command: string,
-  ctx?: NotificationContextLike,
-): Promise<boolean | undefined> {
-  const approval = await requestNativeApproval(command, ctx);
-  if (approval !== undefined) return approval;
-
-  await notifyPiWaitingForUser(
-    command.length <= MAX_ALERTER_ACTION_MESSAGE_CHARS
-      ? "Approval needed: bash command"
-      : "Approval needed: bash command (see Pi for full command)",
-    ctx,
-  );
-  return undefined;
-}
-
 export async function notifyGeneratedImage(
   imagePath: string,
   ctx?: NotificationContextLike,
@@ -554,7 +455,7 @@ export async function notifyGeneratedImage(
     "--subtitle", subtitle,
     "--message", options.body ?? "Image generated",
     "--content-image", imagePath,
-    "--group", `pi-native-image-${Date.now()}`,
+    "--group", PI_NOTIFICATION_GROUP,
     "--ignore-dnd",
   ];
   if (iconPath) args.push("--app-icon", iconPath);

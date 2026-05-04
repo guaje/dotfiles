@@ -13,12 +13,16 @@ async function loadExtension() {
 
 function createPiHarness() {
   const handlers = new Map<string, Array<(...args: any[]) => unknown>>();
-  return {
+  const harness = {
+    sentUserMessages: [] as Array<{ content: string; options?: { deliverAs?: "steer" | "followUp" } }>,
     pi: {
       on(eventName: string, handler: (...args: any[]) => unknown) {
         const eventHandlers = handlers.get(eventName) ?? [];
         eventHandlers.push(handler);
         handlers.set(eventName, eventHandlers);
+      },
+      sendUserMessage(content: string, options?: { deliverAs?: "steer" | "followUp" }) {
+        harness.sentUserMessages.push({ content, options });
       },
     },
     async emit(eventName: string, ...args: any[]) {
@@ -30,6 +34,7 @@ function createPiHarness() {
       return handlers.get(eventName)?.length ?? 0;
     },
   };
+  return harness;
 }
 
 test("detectNotificationTarget detects Termux from Termux-specific environment", async () => {
@@ -85,18 +90,20 @@ test("getNotificationCommand builds the macOS osascript notification command wit
 test("getNotificationCommand uses alerter with osascript fallback on macOS", async () => {
   const { getNotificationCommand } = await loadExtension();
 
-  const command = getNotificationCommand("Pi", "Ready for input", "macos", "/tmp/pi-icon.png");
+  const command = getNotificationCommand("Pi", "Ready for input", "macos", "/tmp/pi-icon.png", "Pi", "Type a follow-up…");
 
   assert.equal(command?.command, "alerter");
-  assert.deepEqual(command?.args.slice(0, 10), [
+  assert.deepEqual(command?.args.slice(0, 13), [
     "--title", "Pi",
     "--subtitle", "Pi",
     "--message", "Ready for input",
+    "--reply", "Type a follow-up…",
+    "--json",
     "--app-icon", "/tmp/pi-icon.png",
-    "--group", command?.args[9],
+    "--group", command?.args[12],
   ]);
-  assert.match(command?.args[9] ?? "", /^pi-native-notify-\d+$/);
-  assert.equal(command?.args[10], "--ignore-dnd");
+  assert.match(command?.args[12] ?? "", /^pi-native-notify-\d+$/);
+  assert.equal(command?.args[13], "--ignore-dnd");
   assert.deepEqual(command?.fallback, {
     command: "osascript",
     args: ["-e", 'display notification "Ready for input" with title "Pi" subtitle "Pi"'],
@@ -231,6 +238,27 @@ test("notifyGeneratedImage uses alerter content-image for generated images", asy
   assert.deepEqual(calls[0]?.args.slice(11), ["--app-icon", "/tmp/pi-logo.svg"]);
 });
 
+test("notifyPiWaitingForUser forwards alerter replies as follow-up prompts", async () => {
+  const { notifyPiWaitingForUser } = await loadExtension();
+  const replies: string[] = [];
+  const execFile = ((command: string, args: string[], _options: unknown, callback: (error?: Error | null, stdout?: string) => void) => {
+    assert.equal(command, "alerter");
+    assert.ok(args.includes("--reply"));
+    assert.ok(args.includes("--json"));
+    callback(null, JSON.stringify({ activationType: "replied", activationValue: "Continue from notification" }));
+  }) as any;
+
+  await notifyPiWaitingForUser(undefined, undefined, {
+    execFile,
+    target: "macos",
+    env: {},
+    iconPath: "",
+    onReply: (reply) => replies.push(reply),
+  });
+
+  assert.deepEqual(replies, ["Continue from notification"]);
+});
+
 test("notifyPiWaitingForUser sends the standard waiting notification", async () => {
   const { notifyPiWaitingForUser } = await loadExtension();
   const calls: Array<{ command: string; args: string[] }> = [];
@@ -241,10 +269,17 @@ test("notifyPiWaitingForUser sends the standard waiting notification", async () 
 
   await notifyPiWaitingForUser(undefined, undefined, { execFile, target: "macos", env: {}, iconPath: "" });
 
-  assert.deepEqual(calls, [{
-    command: "osascript",
-    args: ["-e", 'display notification "Ready for input" with title "Pi Coding Agent" subtitle "Pi"'],
-  }]);
+  assert.equal(calls[0]?.command, "alerter");
+  assert.deepEqual(calls[0]?.args.slice(0, 11), [
+    "--title", "Pi Coding Agent",
+    "--subtitle", "Pi",
+    "--message", "Ready for input",
+    "--reply", "Type a follow-up…",
+    "--json",
+    "--group", calls[0]?.args[10],
+  ]);
+  assert.match(calls[0]?.args[10] ?? "", /^pi-native-notify-\d+$/);
+  assert.equal(calls[0]?.args[11], "--ignore-dnd");
 });
 
 test("getNotificationTitle uses the tmux session name when inside tmux", async () => {

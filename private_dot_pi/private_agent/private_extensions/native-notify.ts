@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 export type NotificationTarget = "macos" | "termux" | "unsupported";
 
 type ExecFileLike = typeof execFileCallback;
-type NotificationCommand = { command: string; args: string[]; fallback?: { command: string; args: string[] } };
+type NotificationCommand = { command: string; args: string[]; fallback?: { command: string; args: string[] }; expectsReply?: boolean };
 
 const EXTENSION_DIR = dirname(fileURLToPath(import.meta.url));
 const PI_ICON_PATH = resolve(EXTENSION_DIR, "assets/pi-logo.svg");
@@ -25,6 +25,7 @@ export interface EnvironmentLike {
 
 export interface NotificationContextLike {
   cwd?: string;
+  sendUserMessage?: (content: string, options?: { deliverAs?: "steer" | "followUp" }) => void;
   sessionManager?: {
     getCwd?: () => string;
     getSessionName?: () => string | undefined;
@@ -223,10 +224,15 @@ function commandExists(command: string): boolean {
   }
 }
 
-function getMacOsAlerterWarning(): string | undefined {
+function getMacOsAlerterInstallWarning(): string | undefined {
   if (process.platform !== "darwin") return undefined;
   if (!commandExists("alerter")) return "alerter is not installed. Install it with: brew install vjeantet/tap/alerter";
-  return getMacOsTerminalNotificationWarning();
+  return undefined;
+}
+
+function warnMacOsTerminalNotificationsIfNeeded(): void {
+  const warning = getMacOsTerminalNotificationWarning();
+  if (warning) console.warn(`native-notify: ${warning}`);
 }
 
 function getTermuxNotificationWarning(): string | undefined {
@@ -249,6 +255,7 @@ export function getNotificationCommand(
   target = detectNotificationTarget(),
   iconPath = getPiIconPath(),
   subtitle = "Pi",
+  replyPlaceholder?: string,
 ): NotificationCommand | null {
   if (target === "termux") {
     const args = ["-t", title, "-c", body];
@@ -259,18 +266,24 @@ export function getNotificationCommand(
   if (target === "macos") {
     const osascriptCommand = getMacOsOsaScriptCommand(title, body, subtitle);
 
-    if (iconPath) {
+    if (iconPath || replyPlaceholder) {
+      const args = [
+        "--title", title,
+        "--subtitle", subtitle,
+        "--message", body,
+        ...(replyPlaceholder ? ["--reply", replyPlaceholder, "--json"] : []),
+      ];
+      if (iconPath) args.push("--app-icon", iconPath);
+      args.push(
+        "--group", `pi-native-notify-${Date.now()}`,
+        "--ignore-dnd",
+      );
+
       return {
         command: "alerter",
-        args: [
-          "--title", title,
-          "--subtitle", subtitle,
-          "--message", body,
-          "--app-icon", iconPath,
-          "--group", `pi-native-notify-${Date.now()}`,
-          "--ignore-dnd",
-        ],
+        args,
         fallback: osascriptCommand,
+        expectsReply: Boolean(replyPlaceholder),
       };
     }
 
@@ -325,6 +338,22 @@ function parseAlerterApproval(stdout: string): boolean | undefined {
   return undefined;
 }
 
+function parseAlerterReply(stdout: string): string | undefined {
+  const value = stdout.trim();
+  if (!value) return undefined;
+
+  try {
+    const parsed = JSON.parse(value) as { activationValue?: unknown; activationType?: unknown };
+    if (!String(parsed.activationType ?? "").toLowerCase().includes("repl")) return undefined;
+    const reply = String(parsed.activationValue ?? "").trim();
+    return reply || undefined;
+  } catch {
+    // Plain text mode fallback.
+  }
+
+  return value === "@closed" ? undefined : value;
+}
+
 export async function requestNativeApproval(
   message: string,
   ctx?: NotificationContextLike,
@@ -351,7 +380,12 @@ export async function requestNativeApproval(
     execFile,
     fallbackTitle: "Pi",
   });
-  if (execFile === execFileCallback && getMacOsAlerterWarning()) return undefined;
+  const installWarning = execFile === execFileCallback ? getMacOsAlerterInstallWarning() : undefined;
+  if (installWarning) {
+    console.warn(`native-notify: ${installWarning}`);
+    return undefined;
+  }
+  if (execFile === execFileCallback) warnMacOsTerminalNotificationsIfNeeded();
 
   const result = await execFileQuiet(execFile, "alerter", [
     "--title", PI_NOTIFICATION_TITLE,
@@ -376,8 +410,10 @@ export async function sendNativeNotification(
   target = detectNotificationTarget(),
   iconPath = getPiIconPath(),
   subtitle = "Pi",
+  replyPlaceholder?: string,
+  onReply?: (reply: string) => void,
 ): Promise<void> {
-  const notificationCommand = getNotificationCommand(title, body, target, iconPath, subtitle);
+  const notificationCommand = getNotificationCommand(title, body, target, iconPath, subtitle, replyPlaceholder);
   if (!notificationCommand) return;
 
   if (notificationCommand.command === "termux-notification" && execFile === execFileCallback) {
@@ -386,12 +422,35 @@ export async function sendNativeNotification(
   }
 
   if (notificationCommand.command === "alerter" && execFile === execFileCallback) {
-    const warning = getMacOsAlerterWarning();
-    if (warning) {
-      console.warn(`native-notify: ${warning}`);
+    const installWarning = getMacOsAlerterInstallWarning();
+    if (installWarning) {
+      console.warn(`native-notify: ${installWarning}`);
       if (notificationCommand.fallback) {
         await execFileQuiet(execFile, notificationCommand.fallback.command, notificationCommand.fallback.args);
       }
+      return;
+    }
+    warnMacOsTerminalNotificationsIfNeeded();
+
+    if (notificationCommand.expectsReply && onReply) {
+      const child = spawn(notificationCommand.command, notificationCommand.args, {
+        stdio: ["ignore", "pipe", "ignore"],
+        windowsHide: true,
+      });
+      let stdout = "";
+      child.stdout?.setEncoding("utf8");
+      child.stdout?.on("data", (chunk) => {
+        stdout += String(chunk);
+      });
+      child.once("error", () => {
+        if (notificationCommand.fallback) {
+          execFileCallback(notificationCommand.fallback.command, notificationCommand.fallback.args, { windowsHide: true }, () => {});
+        }
+      });
+      child.once("close", () => {
+        const reply = parseAlerterReply(stdout);
+        if (reply) onReply(reply);
+      });
       return;
     }
 
@@ -410,7 +469,13 @@ export async function sendNativeNotification(
   }
 
   const result = await execFileQuiet(execFile, notificationCommand.command, notificationCommand.args);
-  if (!result.error) return;
+  if (!result.error) {
+    if (notificationCommand.expectsReply && onReply) {
+      const reply = parseAlerterReply(result.stdout);
+      if (reply) onReply(reply);
+    }
+    return;
+  }
 
   if (notificationCommand.fallback) {
     await execFileQuiet(execFile, notificationCommand.fallback.command, notificationCommand.fallback.args);
@@ -498,12 +563,13 @@ export async function notifyGeneratedImage(
   if (iconPath) args.push("--app-icon", iconPath);
 
   if (execFile === execFileCallback) {
-    const warning = getMacOsAlerterWarning();
-    if (warning) {
-      console.warn(`native-notify: ${warning}`);
+    const installWarning = getMacOsAlerterInstallWarning();
+    if (installWarning) {
+      console.warn(`native-notify: ${installWarning}`);
       await execFileQuiet(execFile, osascriptCommand.command, osascriptCommand.args);
       return;
     }
+    warnMacOsTerminalNotificationsIfNeeded();
 
     const child = spawn("alerter", args, { detached: true, stdio: "ignore", windowsHide: true });
     child.once("error", () => {
@@ -526,6 +592,7 @@ export async function notifyPiWaitingForUser(
     target?: NotificationTarget;
     env?: EnvironmentLike;
     iconPath?: string;
+    onReply?: (reply: string) => void;
   } = {},
 ): Promise<void> {
   const execFile = options.execFile ?? execFileCallback;
@@ -543,6 +610,8 @@ export async function notifyPiWaitingForUser(
     options.target ?? detectNotificationTarget(options.env),
     iconPath,
     subtitle,
+    body === "Ready for input" ? "Type a follow-up…" : undefined,
+    options.onReply,
   );
 }
 
@@ -556,7 +625,10 @@ export function createNativeNotifyExtension(options: {
 } = {}) {
   return function nativeNotifyExtension(pi: ExtensionAPI) {
     pi.on("agent_end", async (_event, ctx) => {
-      await notifyPiWaitingForUser(options.body ?? "Ready for input", ctx, options);
+      await notifyPiWaitingForUser(options.body ?? "Ready for input", ctx, {
+        ...options,
+        onReply: (reply) => pi.sendUserMessage(reply, { deliverAs: "followUp" }),
+      });
     });
   };
 }

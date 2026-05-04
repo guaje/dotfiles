@@ -75,6 +75,11 @@ async function loadExtensionModule() {
     "export class Spacer {",
     "  constructor(size) { this.size = size; }",
     "}",
+    "export function matchesKey(data, keyId) {",
+    "  if (keyId === 'ctrl+:') return data === '\\x1b[58;5u';",
+    "  if (keyId === 'shift+ctrl+:') return data === '\\x1b[58;6u';",
+    "  return false;",
+    "}",
     "export class Text {",
     "  constructor(text) { this.text = text; }",
     "  setText(text) { this.text = text; }",
@@ -819,15 +824,26 @@ test("management style shortcut cycles session style without changing settings",
     await getHandler("session_start")({}, { ui });
 
     const shortcut = shortcuts.get(mod.MANAGEMENT_STYLE_CYCLE_SHORTCUT);
+    const backwardShortcut = shortcuts.get(mod.MANAGEMENT_STYLE_CYCLE_BACKWARD_SHORTCUT);
     assert.ok(shortcut, "Expected management style cycle shortcut to be registered");
-    assert.equal(mod.MANAGEMENT_STYLE_CYCLE_SHORTCUT, "alt+m");
+    assert.ok(backwardShortcut, "Expected management style backward cycle shortcut to be registered");
+    assert.equal(mod.MANAGEMENT_STYLE_CYCLE_SHORTCUT, "ctrl+;");
+    assert.equal(mod.MANAGEMENT_STYLE_CYCLE_BACKWARD_SHORTCUT, "shift+ctrl+;");
+    assert.equal(mod.MANAGEMENT_STYLE_CYCLE_HOTKEY_DISPLAY, "ctrl+; / shift+ctrl+;");
     assert.equal(shortcut.description, "Cycle management style for this session");
+    assert.equal(backwardShortcut.description, "Cycle management style backward for this session");
 
     await shortcut.handler({ ui });
     assert.equal(stripAnsi(uiHarness.setStatusCalls.at(-1)!.status!), "◆ Guiding");
     await shortcut.handler({ ui });
     assert.equal(stripAnsi(uiHarness.setStatusCalls.at(-1)!.status!), "▲ Empowering");
+    await backwardShortcut.handler({ ui });
+    assert.equal(stripAnsi(uiHarness.setStatusCalls.at(-1)!.status!), "◆ Guiding");
+    await shortcut.handler({ ui });
+    assert.equal(stripAnsi(uiHarness.setStatusCalls.at(-1)!.status!), "▲ Empowering");
     assert.deepEqual(notifications.map((entry) => entry.message), [
+      "Management style: Guiding (session only)",
+      "Management style: Empowering (session only)",
       "Management style: Guiding (session only)",
       "Management style: Empowering (session only)",
     ]);
@@ -844,6 +860,15 @@ test("management style shortcut cycles session style without changing settings",
   finally {
     writeFileSync(SETTINGS_CONFIG_PATH, originalSettings);
   }
+});
+
+test("management style backward shortcut handles terminal ctrl-colon fallback", async () => {
+  const mod = await loadExtensionModule();
+
+  assert.equal(mod.MANAGEMENT_STYLE_CYCLE_BACKWARD_SHORTCUT, "shift+ctrl+;");
+  assert.equal(mod.isShiftCtrlSemicolonFallbackInput("\x1b[58;5u"), true);
+  assert.equal(mod.isShiftCtrlSemicolonFallbackInput("\x1b[58;6u"), true);
+  assert.equal(mod.isShiftCtrlSemicolonFallbackInput("\x1b[59;6u"), false);
 });
 
 test("management style settings submenu immediately updates active status", async () => {

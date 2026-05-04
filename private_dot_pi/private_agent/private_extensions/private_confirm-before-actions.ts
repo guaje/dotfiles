@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { createBashTool, isToolCallEventType } from "@mariozechner/pi-coding-agent";
-import { Container, SelectList, Spacer, Text, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
+import { Container, matchesKey, SelectList, Spacer, Text, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 import { execFile as execFileCallback } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
@@ -106,9 +106,30 @@ function getNextManagingStyle(style: ManagingStyle): ManagingStyle {
   return MANAGING_STYLE_VALUES[(currentIndex + 1) % MANAGING_STYLE_VALUES.length] ?? DEFAULT_MANAGING_STYLE;
 }
 
+function getPreviousManagingStyle(style: ManagingStyle): ManagingStyle {
+  const currentIndex = MANAGING_STYLE_VALUES.indexOf(style);
+  return MANAGING_STYLE_VALUES[(currentIndex - 1 + MANAGING_STYLE_VALUES.length) % MANAGING_STYLE_VALUES.length] ?? DEFAULT_MANAGING_STYLE;
+}
+
 function setSessionManagingStyle(style: ManagingStyle) {
   sessionManagingStyle = style;
   updateManagingStyleStatus(activeManagingStyleUi, style);
+}
+
+export function isShiftCtrlSemicolonFallbackInput(data: string) {
+  // Some terminals report physical Shift+Ctrl+; as Ctrl+: because Shift+; is ':'.
+  return matchesKey(data, "ctrl+:") || matchesKey(data, "shift+ctrl+:");
+}
+
+async function cycleSessionManagingStyle(
+  direction: "forward" | "backward",
+  ctx: { ui?: { notify?: (message: string, level?: "info" | "warning" | "error" | "success") => void; setStatus?: (id: string, status?: string) => void } },
+) {
+  activeManagingStyleUi = ctx.ui;
+  const currentStyle = await getCurrentManagingStyle();
+  const nextStyle = direction === "forward" ? getNextManagingStyle(currentStyle) : getPreviousManagingStyle(currentStyle);
+  setSessionManagingStyle(nextStyle);
+  ctx.ui?.notify?.(`Management style: ${MANAGING_STYLE_STATUS_LABELS[nextStyle]} (session only)`, "info");
 }
 
 function getManagingStyleStatusColor(style: ManagingStyle) {
@@ -335,7 +356,9 @@ class ManagingStyleSubmenu extends Container {
   }
 }
 
-export const MANAGEMENT_STYLE_CYCLE_SHORTCUT = "alt+m";
+export const MANAGEMENT_STYLE_CYCLE_SHORTCUT = "ctrl+;";
+export const MANAGEMENT_STYLE_CYCLE_BACKWARD_SHORTCUT = "shift+ctrl+;";
+export const MANAGEMENT_STYLE_CYCLE_HOTKEY_DISPLAY = `${MANAGEMENT_STYLE_CYCLE_SHORTCUT} / ${MANAGEMENT_STYLE_CYCLE_BACKWARD_SHORTCUT}`;
 
 export function createManagingStyleSubmenuFactory(
   themeModule: SettingsThemeModule,
@@ -418,9 +441,13 @@ function patchBuiltInSettingsMenu(): Promise<void> {
           showSettingsSelector?: (...args: unknown[]) => unknown;
           setExtensionFooter?: (factory?: unknown) => unknown;
           setExtensionStatus?: (key: string, text?: string) => unknown;
+          setupExtensionShortcuts?: (...args: unknown[]) => unknown;
+          handleHotkeysCommand?: (...args: unknown[]) => unknown;
           __managingStyleUiPatched?: boolean;
           __managingStyleFooterPatched?: boolean;
           __managingStyleStatusPatched?: boolean;
+          __managingStyleShortcutPatched?: boolean;
+          __managingStyleHotkeysPatched?: boolean;
         };
       };
       const FooterComponent = footerModule.FooterComponent as {
@@ -460,6 +487,61 @@ function patchBuiltInSettingsMenu(): Promise<void> {
             return;
           }
           return originalSetExtensionStatus.call(this, key, text);
+        };
+      }
+
+      if (!InteractiveMode.prototype.__managingStyleShortcutPatched && InteractiveMode.prototype.setupExtensionShortcuts) {
+        const originalSetupExtensionShortcuts = InteractiveMode.prototype.setupExtensionShortcuts;
+        InteractiveMode.prototype.__managingStyleShortcutPatched = true;
+        InteractiveMode.prototype.setupExtensionShortcuts = function setupExtensionShortcuts(this: { defaultEditor?: { onExtensionShortcut?: (data: string) => boolean }; createExtensionUIContext?: () => { notify?: (message: string, level?: "info" | "warning" | "error" | "success") => void; setStatus?: (id: string, status?: string) => void } }, ...args: unknown[]) {
+          const result = originalSetupExtensionShortcuts.apply(this, args);
+          const originalOnExtensionShortcut = this.defaultEditor?.onExtensionShortcut;
+          if (this.defaultEditor && !((this.defaultEditor as { __managingStyleShortcutPatched?: boolean }).__managingStyleShortcutPatched)) {
+            (this.defaultEditor as { __managingStyleShortcutPatched?: boolean }).__managingStyleShortcutPatched = true;
+            this.defaultEditor.onExtensionShortcut = (data: string) => {
+              if (isShiftCtrlSemicolonFallbackInput(data)) {
+                const ui = this.createExtensionUIContext?.() ?? activeManagingStyleUi;
+                void cycleSessionManagingStyle("backward", { ui });
+                return true;
+              }
+              return originalOnExtensionShortcut?.(data) ?? false;
+            };
+          }
+          return result;
+        };
+      }
+
+      if (!InteractiveMode.prototype.__managingStyleHotkeysPatched && InteractiveMode.prototype.handleHotkeysCommand) {
+        const originalHandleHotkeysCommand = InteractiveMode.prototype.handleHotkeysCommand;
+        InteractiveMode.prototype.__managingStyleHotkeysPatched = true;
+        InteractiveMode.prototype.handleHotkeysCommand = function handleHotkeysCommand(this: { session?: { extensionRunner?: { getShortcuts?: (config: unknown) => Map<string, unknown> } } }, ...args: unknown[]) {
+          const extensionRunner = this.session?.extensionRunner;
+          const originalGetShortcuts = extensionRunner?.getShortcuts;
+          if (!extensionRunner || !originalGetShortcuts) {
+            return originalHandleHotkeysCommand.apply(this, args);
+          }
+
+          extensionRunner.getShortcuts = function getShortcutsWithCombinedManagementStyle(config: unknown) {
+            const shortcuts = new Map(originalGetShortcuts.call(this, config));
+            const forwardShortcut = shortcuts.get(MANAGEMENT_STYLE_CYCLE_SHORTCUT);
+            const backwardShortcut = shortcuts.get(MANAGEMENT_STYLE_CYCLE_BACKWARD_SHORTCUT);
+            if (forwardShortcut && backwardShortcut) {
+              shortcuts.delete(MANAGEMENT_STYLE_CYCLE_SHORTCUT);
+              shortcuts.delete(MANAGEMENT_STYLE_CYCLE_BACKWARD_SHORTCUT);
+              shortcuts.set(MANAGEMENT_STYLE_CYCLE_HOTKEY_DISPLAY, {
+                ...(forwardShortcut as Record<string, unknown>),
+                description: "Cycle management style",
+              });
+            }
+            return shortcuts;
+          };
+
+          try {
+            return originalHandleHotkeysCommand.apply(this, args);
+          }
+          finally {
+            extensionRunner.getShortcuts = originalGetShortcuts;
+          }
         };
       }
 
@@ -1722,10 +1804,14 @@ export default function (pi: ExtensionAPI) {
   pi.registerShortcut?.(MANAGEMENT_STYLE_CYCLE_SHORTCUT, {
     description: "Cycle management style for this session",
     handler: async (ctx: { ui?: { notify?: (message: string, level?: "info" | "warning" | "error" | "success") => void; setStatus?: (id: string, status?: string) => void } }) => {
-      activeManagingStyleUi = ctx.ui;
-      const nextStyle = getNextManagingStyle(await getCurrentManagingStyle());
-      setSessionManagingStyle(nextStyle);
-      ctx.ui?.notify?.(`Management style: ${MANAGING_STYLE_STATUS_LABELS[nextStyle]} (session only)`, "info");
+      await cycleSessionManagingStyle("forward", ctx);
+    },
+  });
+
+  pi.registerShortcut?.(MANAGEMENT_STYLE_CYCLE_BACKWARD_SHORTCUT, {
+    description: "Cycle management style backward for this session",
+    handler: async (ctx: { ui?: { notify?: (message: string, level?: "info" | "warning" | "error" | "success") => void; setStatus?: (id: string, status?: string) => void } }) => {
+      await cycleSessionManagingStyle("backward", ctx);
     },
   });
 

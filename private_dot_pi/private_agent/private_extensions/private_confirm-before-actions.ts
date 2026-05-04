@@ -540,12 +540,38 @@ function summarizeEdit(edits: Array<{ oldText: string; newText: string }> | unde
   return `\n\n${uiLabel("Changes:")} ${colorize(`${replacements} replacement${replacements === 1 ? "" : "s"}`, UI_PALETTE.hint)}`;
 }
 
+async function confirmWithWorkingHidden(
+  ui: {
+    confirm: (title: string, message: string, opts?: { signal?: AbortSignal }) => Promise<boolean>;
+    setWorkingVisible?: (visible: boolean) => void;
+    setWorkingMessage?: (message?: string) => void;
+    setWorkingIndicator?: (options?: { frames?: string[]; intervalMs?: number }) => void;
+  },
+  title: string,
+  message: string,
+  opts?: { signal?: AbortSignal },
+): Promise<boolean> {
+  ui.setWorkingVisible?.(false);
+  ui.setWorkingMessage?.("");
+  ui.setWorkingIndicator?.({ frames: [] });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  try {
+    return await ui.confirm(title, message, opts);
+  }
+  finally {
+    ui.setWorkingMessage?.();
+    ui.setWorkingIndicator?.();
+    ui.setWorkingVisible?.(true);
+  }
+}
+
 async function confirmFileMutation(
   ctx: {
     ui: {
       getEditorText: () => string;
       setEditorText: (text: string) => void;
       confirm: (title: string, message: string) => Promise<boolean>;
+      setWorkingVisible?: (visible: boolean) => void;
     };
   },
   options: {
@@ -559,7 +585,8 @@ async function confirmFileMutation(
   await notifyPiWaitingForUser(`Approval needed: ${options.title.replace(/\?$/, "")}`, ctx);
   ctx.ui.setEditorText(options.previewText);
   try {
-    return await ctx.ui.confirm(
+    return await confirmWithWorkingHidden(
+      ctx.ui,
       formatConfirmTitle(options.title),
       `${uiLabel("Path:")}\n\n${colorize(options.path, SYNTAX_PALETTE.text)}${options.summary}`,
     );
@@ -1727,10 +1754,10 @@ export default function (pi: ExtensionAPI) {
         return { block: true, reason: "Bash command blocked (no UI available for confirmation)" };
       }
 
-      const ok = await raceBashApprovalWithConfirm(event.input.command, ctx, (signal) => ctx.ui.confirm(
+      const ok = await raceBashApprovalWithConfirm(event.input.command, ctx, () => confirmWithWorkingHidden(
+        ctx.ui,
         formatConfirmTitle("Allow bash command?"),
         summarizeBash(event.input.command),
-        { signal },
       ));
 
       if (!ok) return { block: true, reason: "Bash command blocked by user" };

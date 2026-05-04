@@ -26,6 +26,7 @@ export interface EnvironmentLike {
 export interface NotificationContextLike {
   cwd?: string;
   sendUserMessage?: (content: string, options?: { deliverAs?: "steer" | "followUp" }) => void;
+  ui?: { notify?: (message: string, type?: "info" | "warning" | "error" | "success") => void };
   sessionManager?: {
     getCwd?: () => string;
     getSessionName?: () => string | undefined;
@@ -230,9 +231,22 @@ function getMacOsAlerterInstallWarning(): string | undefined {
   return undefined;
 }
 
-function warnMacOsTerminalNotificationsIfNeeded(): void {
-  const warning = getMacOsTerminalNotificationWarning();
-  if (warning) console.warn(`native-notify: ${warning}`);
+let didCheckNotificationReadiness = false;
+
+export function checkNativeNotificationReadiness(
+  target = detectNotificationTarget(),
+): string | undefined {
+  if (didCheckNotificationReadiness) return undefined;
+  didCheckNotificationReadiness = true;
+
+  if (target === "macos") {
+    const installWarning = getMacOsAlerterInstallWarning();
+    if (installWarning) return installWarning;
+    return getMacOsTerminalNotificationWarning();
+  }
+
+  if (target === "termux") return getTermuxNotificationWarning();
+  return undefined;
 }
 
 function getTermuxNotificationWarning(): string | undefined {
@@ -380,12 +394,7 @@ export async function requestNativeApproval(
     execFile,
     fallbackTitle: "Pi",
   });
-  const installWarning = execFile === execFileCallback ? getMacOsAlerterInstallWarning() : undefined;
-  if (installWarning) {
-    console.warn(`native-notify: ${installWarning}`);
-    return undefined;
-  }
-  if (execFile === execFileCallback) warnMacOsTerminalNotificationsIfNeeded();
+  if (execFile === execFileCallback && getMacOsAlerterInstallWarning()) return undefined;
 
   const result = await execFileQuiet(execFile, "alerter", [
     "--title", PI_NOTIFICATION_TITLE,
@@ -416,27 +425,22 @@ export async function sendNativeNotification(
   const notificationCommand = getNotificationCommand(title, body, target, iconPath, subtitle, replyPlaceholder);
   if (!notificationCommand) return;
 
-  if (notificationCommand.command === "termux-notification" && execFile === execFileCallback) {
-    const warning = getTermuxNotificationWarning();
-    if (warning) console.warn(`native-notify: ${warning}`);
-  }
-
   if (notificationCommand.command === "alerter" && execFile === execFileCallback) {
     const installWarning = getMacOsAlerterInstallWarning();
     if (installWarning) {
-      console.warn(`native-notify: ${installWarning}`);
       if (notificationCommand.fallback) {
         await execFileQuiet(execFile, notificationCommand.fallback.command, notificationCommand.fallback.args);
       }
       return;
     }
-    warnMacOsTerminalNotificationsIfNeeded();
 
     if (notificationCommand.expectsReply && onReply) {
       const child = spawn(notificationCommand.command, notificationCommand.args, {
         stdio: ["ignore", "pipe", "ignore"],
         windowsHide: true,
       });
+      child.unref();
+      child.stdout?.unref?.();
       let stdout = "";
       child.stdout?.setEncoding("utf8");
       child.stdout?.on("data", (chunk) => {
@@ -490,24 +494,17 @@ function unresolvedApproval(): Promise<boolean> {
 export async function raceBashApprovalWithConfirm(
   command: string,
   ctx: NotificationContextLike | undefined,
-  confirm: (signal?: AbortSignal) => Promise<boolean>,
+  confirm: () => Promise<boolean>,
+  options: Parameters<typeof notifyPiWaitingForUser>[2] = {},
 ): Promise<boolean> {
-  const controller = new AbortController();
-  const confirmPromise = confirm(controller.signal).then((value) => ({ source: "confirm" as const, value }));
-
-  if (command.length > MAX_ALERTER_ACTION_MESSAGE_CHARS) {
-    await notifyPiWaitingForUser("Approval needed: bash command (see Pi for full command)", ctx);
-    return (await confirmPromise).value;
-  }
-
-  const nativeApprovalPromise = requestNativeApproval(command, ctx)
-    .then((approval) => approval === undefined
-      ? unresolvedApproval()
-      : { source: "native" as const, value: approval });
-
-  const winner = await Promise.race([confirmPromise, nativeApprovalPromise]);
-  if (winner.source === "native") controller.abort();
-  return winner.value;
+  await notifyPiWaitingForUser(
+    command.length <= MAX_ALERTER_ACTION_MESSAGE_CHARS
+      ? "Approval needed: bash command"
+      : "Approval needed: bash command (see Pi for full command)",
+    ctx,
+    options,
+  );
+  return confirm();
 }
 
 export async function requestBashApprovalOrNotify(
@@ -565,11 +562,9 @@ export async function notifyGeneratedImage(
   if (execFile === execFileCallback) {
     const installWarning = getMacOsAlerterInstallWarning();
     if (installWarning) {
-      console.warn(`native-notify: ${installWarning}`);
       await execFileQuiet(execFile, osascriptCommand.command, osascriptCommand.args);
       return;
     }
-    warnMacOsTerminalNotificationsIfNeeded();
 
     const child = spawn("alerter", args, { detached: true, stdio: "ignore", windowsHide: true });
     child.once("error", () => {
@@ -624,10 +619,17 @@ export function createNativeNotifyExtension(options: {
   iconPath?: string;
 } = {}) {
   return function nativeNotifyExtension(pi: ExtensionAPI) {
-    pi.on("agent_end", async (_event, ctx) => {
-      await notifyPiWaitingForUser(options.body ?? "Ready for input", ctx, {
+    pi.on("session_start", (_event, ctx) => {
+      const warning = checkNativeNotificationReadiness(options.target ?? detectNotificationTarget(options.env));
+      if (warning) ctx.ui?.notify?.(`Native notifications: ${warning}`, "warning");
+    });
+
+    pi.on("agent_end", (_event, ctx) => {
+      void notifyPiWaitingForUser(options.body ?? "Ready for input", ctx, {
         ...options,
         onReply: (reply) => pi.sendUserMessage(reply, { deliverAs: "followUp" }),
+      }).catch((error) => {
+        console.warn(`native-notify: failed to send ready notification: ${error instanceof Error ? error.message : String(error)}`);
       });
     });
   };

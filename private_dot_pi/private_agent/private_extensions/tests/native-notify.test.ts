@@ -140,17 +140,27 @@ test("requestNativeApproval uses alerter Yes/No actions for short messages", asy
   ]);
 });
 
-test("raceBashApprovalWithConfirm resolves with the first selected approval path", async () => {
+test("raceBashApprovalWithConfirm notifies and uses only the Pi confirm dialog", async () => {
   const { raceBashApprovalWithConfirm } = await loadExtension();
-  let confirmResolved = false;
+  const calls: Array<{ command: string; args: string[] }> = [];
+  let confirmShown = false;
+  const execFile = ((command: string, args: string[], _options: unknown, callback: () => void) => {
+    calls.push({ command, args });
+    callback();
+  }) as any;
 
-  const approved = await raceBashApprovalWithConfirm("echo hello", undefined, async () => {
-    confirmResolved = true;
+  const approved = await raceBashApprovalWithConfirm("echo hello", {
+    cwd: "/tmp/test-project",
+  }, async () => {
+    confirmShown = true;
     return true;
-  });
+  }, { execFile, target: "termux", env: {}, iconPath: "" });
 
   assert.equal(approved, true);
-  assert.equal(confirmResolved, true);
+  assert.equal(confirmShown, true);
+  assert.deepEqual(calls, [
+    { command: "termux-notification", args: ["-t", "Pi Coding Agent", "-c", "Approval needed: bash command"] },
+  ]);
 });
 
 test("requestNativeApproval ignores messages over the alerter message limit", async () => {
@@ -350,7 +360,7 @@ test("getNotificationTitle uses a short session description outside tmux", async
   assert.equal(await getNotificationTitle({ ctx, env: {} }), "Native Notifications Approval");
 });
 
-test("native-notify sends a notification every time agent_end fires", async () => {
+test("native-notify checks readiness at session start and sends a notification every time agent_end fires", async () => {
   const { createNativeNotifyExtension } = await loadExtension();
   const calls: Array<{ command: string; args: string[] }> = [];
   const execFile = ((command: string, args: string[], _options: unknown, callback: () => void) => {
@@ -361,9 +371,12 @@ test("native-notify sends a notification every time agent_end fires", async () =
 
   createNativeNotifyExtension({ execFile, target: "termux", env: {}, iconPath: "" })(harness.pi as any);
 
+  assert.equal(harness.handlerCount("session_start"), 1);
   assert.equal(harness.handlerCount("agent_end"), 1);
+  await harness.emit("session_start", {}, { cwd: "/tmp/test-project" });
   await harness.emit("agent_end", {}, { cwd: "/tmp/test-project" });
   await harness.emit("agent_end", {}, { cwd: "/tmp/test-project" });
+  await new Promise((resolve) => setTimeout(resolve, 0));
 
   assert.deepEqual(calls, [
     { command: "termux-notification", args: ["-t", "Pi Coding Agent", "-c", "Ready for input"] },

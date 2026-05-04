@@ -89,7 +89,7 @@ async function loadExtensionModule() {
 
   const patchedExtensionPath = resolve("agent/extensions/.confirm-before-actions.testable.ts");
   const source = readFileSync(EXTENSION_PATH, "utf8")
-    .replace('import { notifyPiWaitingForUser, raceBashApprovalWithConfirm } from "./native-notify.ts";', 'const notifyPiWaitingForUser = (globalThis as any).__nativeNotifyMock; const raceBashApprovalWithConfirm = (_command: string, _ctx: any, confirm: (signal?: AbortSignal) => Promise<boolean>) => confirm();')
+    .replace('import { notifyPiWaitingForUser, raceBashApprovalWithConfirm } from "./native-notify.ts";', 'const notifyPiWaitingForUser = (globalThis as any).__nativeNotifyMock; const raceBashApprovalWithConfirm = (_command: string, _ctx: any, confirm: () => Promise<boolean>) => confirm();')
     .replaceAll(
       "import.meta.dirname",
       JSON.stringify(dirname(EXTENSION_PATH)),

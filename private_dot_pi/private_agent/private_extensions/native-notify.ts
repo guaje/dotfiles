@@ -211,6 +211,30 @@ export function getPiIconPath(): string | undefined {
   return existsSync(PI_ICON_PATH) ? PI_ICON_PATH : undefined;
 }
 
+function commandExists(command: string): boolean {
+  try {
+    execFileSync("sh", ["-c", `command -v ${command} >/dev/null 2>&1`], {
+      stdio: "ignore",
+      timeout: 1000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function getMacOsAlerterWarning(): string | undefined {
+  if (process.platform !== "darwin") return undefined;
+  if (!commandExists("alerter")) return "alerter is not installed. Install it with: brew install vjeantet/tap/alerter";
+  return getMacOsTerminalNotificationWarning();
+}
+
+function getTermuxNotificationWarning(): string | undefined {
+  if (detectNotificationTarget() !== "termux") return undefined;
+  if (commandExists("termux-notification")) return undefined;
+  return "Termux notifications require the Termux:API app and CLI tools. Install the app, then run: pkg install termux-api";
+}
+
 function getMacOsOsaScriptCommand(title: string, body: string, subtitle?: string) {
   const subtitleClause = subtitle ? ` subtitle ${appleScriptString(subtitle)}` : "";
   return {
@@ -265,8 +289,7 @@ export function getMacOsTerminalNotificationWarning(): string | undefined {
       timeout: 1500,
       stdio: ["ignore", "pipe", "ignore"],
     });
-    const terminalEntry = output.match(/\{[^{}]*"bundle-id" => "com\.apple\.Terminal"[^{}]*\}/s)
-      ?? output.match(/\{[^{}]*"bundle-id" => "com\.apple\.ScriptEditor"[^{}]*\}/s);
+    const terminalEntry = output.match(/\{[^{}]*"bundle-id" => "com\.apple\.Terminal"[^{}]*\}/s);
     if (terminalEntry && !/"auth" => 0\b/.test(terminalEntry[0])) return undefined;
   } catch {
     // If settings cannot be read, fall through to a best-effort warning.
@@ -328,6 +351,8 @@ export async function requestNativeApproval(
     execFile,
     fallbackTitle: "Pi",
   });
+  if (execFile === execFileCallback && getMacOsAlerterWarning()) return undefined;
+
   const result = await execFileQuiet(execFile, "alerter", [
     "--title", PI_NOTIFICATION_TITLE,
     "--subtitle", subtitle,
@@ -355,9 +380,20 @@ export async function sendNativeNotification(
   const notificationCommand = getNotificationCommand(title, body, target, iconPath, subtitle);
   if (!notificationCommand) return;
 
-  if (notificationCommand.command === "alerter" && execFile === execFileCallback) {
-    const warning = getMacOsTerminalNotificationWarning();
+  if (notificationCommand.command === "termux-notification" && execFile === execFileCallback) {
+    const warning = getTermuxNotificationWarning();
     if (warning) console.warn(`native-notify: ${warning}`);
+  }
+
+  if (notificationCommand.command === "alerter" && execFile === execFileCallback) {
+    const warning = getMacOsAlerterWarning();
+    if (warning) {
+      console.warn(`native-notify: ${warning}`);
+      if (notificationCommand.fallback) {
+        await execFileQuiet(execFile, notificationCommand.fallback.command, notificationCommand.fallback.args);
+      }
+      return;
+    }
 
     const child = spawn(notificationCommand.command, notificationCommand.args, {
       detached: true,
@@ -462,6 +498,13 @@ export async function notifyGeneratedImage(
   if (iconPath) args.push("--app-icon", iconPath);
 
   if (execFile === execFileCallback) {
+    const warning = getMacOsAlerterWarning();
+    if (warning) {
+      console.warn(`native-notify: ${warning}`);
+      await execFileQuiet(execFile, osascriptCommand.command, osascriptCommand.args);
+      return;
+    }
+
     const child = spawn("alerter", args, { detached: true, stdio: "ignore", windowsHide: true });
     child.once("error", () => {
       execFileCallback(osascriptCommand.command, osascriptCommand.args, { windowsHide: true }, () => {});

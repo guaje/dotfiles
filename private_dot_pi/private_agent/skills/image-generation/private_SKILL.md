@@ -37,8 +37,11 @@ The health extension gets configured image models from `imageGenerationProviders
    - Text to include or avoid
    - Negative constraints, if supported
 6. Call the selected provider's OpenAI-compatible image generation endpoint and save the result to a file.
-7. Trigger a generated-image notification by calling `notifyGeneratedImage(savedImagePath, ctx)` from `agent/extensions/native-notify.ts` when you are operating from extension code that has a Pi extension context. If you generated the image from a script or shell workflow without an extension context, ask Pi/the user to call that function with the saved path rather than reimplementing notification logic.
-8. Return the saved path, model, provider, and a short note about any assumptions.
+7. Display the saved image for the user:
+   - In supported non-Termux terminals, use pi's inline terminal image rendering. From extension/tool rendering code, return an `Image` component from `@mariozechner/pi-tui` when `context.showImages` is true, using the saved file's base64 data and MIME type.
+   - In Termux, do not rely on inline terminal image rendering. Schedule a delayed, background image opener so pi can finish rendering its response before Android switches apps: first `am start -a android.intent.action.VIEW -d file://<realSavedImagePath> -t image/png`; if that fails, try `termux-open --chooser --content-type image/png <savedImagePath>`; if image opening still fails, open the generated image directory with `termux-open --chooser <generatedImageDirectory>`.
+8. Trigger a generated-image notification by calling `notifyGeneratedImage(savedImagePath, ctx)` from `agent/extensions/native-notify.ts` when you are operating from extension code that has a Pi extension context. If you generated the image from a script or shell workflow without an extension context, ask Pi/the user to call that function with the saved path rather than reimplementing notification logic.
+9. Return the saved path, model, provider, display method, and a short note about any assumptions.
 
 ## Listing Healthy Image Models
 
@@ -94,6 +97,34 @@ Typical body:
 
 Only include optional fields such as `quality`, `style`, `background`, `moderation`, `negative_prompt`, `image`, or `mask` when the selected model/provider metadata or API docs indicate support, or when the user explicitly requests them and the provider accepts them.
 
+## Displaying Generated Images
+
+After a file is written, show it immediately when practical:
+
+- **Pi inline rendering:** In extension code or a custom image generation tool, render the most recently generated image with pi's TUI `Image` component from `@mariozechner/pi-tui` when `context.showImages` is true. Read the saved file, convert it to base64, pass the MIME type such as `image/png`, and cap the preview with the current terminal image settings (for example `terminal.imageWidthCells`). This works only in terminals with inline image support such as Kitty, iTerm2, Ghostty, or WezTerm.
+- **Termux:** Detect Termux with environment/runtime signals such as `TERMUX_VERSION`, a Termux `PREFIX`, or the availability of `termux-open`. In Termux, schedule image opening in a delayed background shell so pi can finish writing its final response before Android foregrounds another app. Use Android's activity manager first, `am start -a android.intent.action.VIEW -d file://<realSavedImagePath> -t image/png`, because some gallery apps display shared-storage files correctly through this path when `termux-open` does not. If `am start` fails, try `termux-open --chooser --content-type image/png <savedImagePath>`; if that also fails, fall back to `termux-open --chooser <generatedImageDirectory>` so the user can select the image from a file/gallery picker. Avoid unsupported short options; use the long Termux:API CLI flags shown here. Allow `IMAGE_OPEN_DELAY_SECONDS` to tune the delay, with a safe default.
+- **Fallback:** If inline rendering is unavailable and this is not Termux, return the path and tell the user how to open it locally.
+
+Minimal extension renderer pattern:
+
+```typescript
+import { readFileSync } from 'node:fs';
+import { Image, Text } from '@mariozechner/pi-tui';
+
+renderResult(result, options, theme, context) {
+  const imagePath = result.details?.path;
+  if (!imagePath || !context.showImages) {
+    return new Text(`Generated image: ${imagePath || 'unknown path'}`, 0, 0);
+  }
+
+  const base64Data = readFileSync(imagePath).toString('base64');
+  return new Image(base64Data, 'image/png', theme, {
+    maxWidthCells: 80,
+    maxHeightCells: 24,
+  });
+}
+```
+
 ## Safe API Key Handling
 
 Resolve `apiKey` without printing it:
@@ -104,16 +135,26 @@ Resolve `apiKey` without printing it:
 
 Never include the key in final answers, logs, filenames, or generated artifacts.
 
+## Output Directory
+
+By default, save generated images under the OS Pictures directory in a `generated` subdirectory:
+
+- Termux with storage set up: `$HOME/storage/pictures/generated`
+- XDG desktops: `$(xdg-user-dir PICTURES)/generated`
+- Fallback: `$HOME/Pictures/generated`
+
+Allow users to override this with `IMAGE_OUT_DIR`.
+
 ## Reference Node Script
 
 Use an inline Node script for robust JSON handling and base64/URL outputs. It reads the health cache first, refuses to generate when no healthy image models are available, then reads pi configuration, selects a healthy model, calls the endpoint, and writes a PNG. Adjust prompt, size, and output path for the user's request.
 
 ```bash
 node <<'NODE'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 
 const agentDir = resolve('agent');
 const modelsPath = join(agentDir, 'models.json');
@@ -125,7 +166,8 @@ const prompt = process.env.IMAGE_PROMPT || 'A concise image prompt goes here';
 const requestedModel = process.env.IMAGE_MODEL || '';
 const requestedProvider = process.env.IMAGE_PROVIDER || '';
 const size = process.env.IMAGE_SIZE || '1024x1024';
-const outDir = process.env.IMAGE_OUT_DIR || 'generated-images';
+const outDir = process.env.IMAGE_OUT_DIR || getDefaultGeneratedImagesDir();
+const openDelaySeconds = Number(process.env.IMAGE_OPEN_DELAY_SECONDS || 5);
 
 function readJson(filePath) {
   return JSON.parse(readFileSync(filePath, 'utf8'));
@@ -143,6 +185,45 @@ function getCacheTtlMs() {
   const match = source.match(/MODEL_HEALTH_CACHE_TTL_MS\s*=\s*(\d+)\s*\*\s*(\d+)\s*\*\s*(\d+)/);
   if (match) return Number(match[1]) * Number(match[2]) * Number(match[3]);
   return 15 * 60 * 1000;
+}
+
+function getDefaultGeneratedImagesDir() {
+  const home = process.env.HOME || '.';
+  const termuxPicturesDir = join(home, 'storage', 'pictures');
+  if ((process.env.TERMUX_VERSION || process.env.PREFIX?.includes('/com.termux/')) && existsSync(termuxPicturesDir)) {
+    return join(termuxPicturesDir, 'generated');
+  }
+  try {
+    const picturesDir = execFileSync('xdg-user-dir', ['PICTURES'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    if (picturesDir) return join(picturesDir, 'generated');
+  } catch (error) {
+    // Fall back below when xdg-user-dir is unavailable.
+  }
+  return join(home, 'Pictures', 'generated');
+}
+
+function isTermux() {
+  return Boolean(process.env.TERMUX_VERSION || process.env.PREFIX?.includes('/com.termux/'));
+}
+
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
+}
+
+function openInTermux(imagePath) {
+  if (!isTermux()) return 'Use pi inline terminal image rendering when supported; otherwise open the saved path locally.';
+  const delay = Number.isFinite(openDelaySeconds) && openDelaySeconds >= 0 ? openDelaySeconds : 5;
+  const realImagePath = realpathSync(imagePath);
+  const imageCommand = `am start -a android.intent.action.VIEW -d ${shellQuote(`file://${realImagePath}`)} -t image/png`;
+  const termuxOpenCommand = `termux-open --chooser --content-type image/png ${shellQuote(imagePath)}`;
+  const folderCommand = `termux-open --chooser ${shellQuote(dirname(imagePath))}`;
+  const opener = `(sleep ${delay}; ${imageCommand} || ${termuxOpenCommand} || ${folderCommand}) >/dev/null 2>&1 &`;
+  try {
+    execFileSync('sh', ['-c', opener], { stdio: 'ignore' });
+    return `Termux detected. Scheduled image open in ${delay}s with Android activity manager; fallbacks: ${termuxOpenCommand}; ${folderCommand}.`;
+  } catch (error) {
+    return `Termux detected, but scheduling image open failed. Run: ${imageCommand}. If that fails, run: ${termuxOpenCommand}. Folder fallback: ${folderCommand}.`;
+  }
 }
 
 if (!existsSync(cachePath)) {
@@ -225,11 +306,14 @@ if (item.b64_json) {
   throw new Error('Image response included neither b64_json nor url');
 }
 
+const display = openInTermux(outPath);
+
 console.log(JSON.stringify({
   path: outPath,
   provider: selected.providerName,
   model: selected.model.id,
   size,
+  display,
   notification: 'Call notifyGeneratedImage(outPath, ctx) from agent/extensions/native-notify.ts when an extension context is available.',
 }, null, 2));
 NODE

@@ -2,7 +2,8 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-SKILL_FILE=$SCRIPT_DIR/SKILL.md
+SKILL_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+SKILL_FILE=$SKILL_DIR/SKILL.md
 
 fail() {
   printf 'FAIL %s\n' "$1" >&2
@@ -12,7 +13,7 @@ fail() {
 [ -f "$SKILL_FILE" ] || fail 'SKILL.md must exist'
 
 NAME=$(sed -n 's/^name: *//p' "$SKILL_FILE" | head -n 1 | tr -d '"' | tr -d "'")
-[ "$NAME" = "$(basename "$SCRIPT_DIR")" ] || fail 'name must match parent directory'
+[ "$NAME" = "$(basename "$SKILL_DIR")" ] || fail 'name must match parent directory'
 printf '%s' "$NAME" | grep -Eq '^[a-z0-9]+(-[a-z0-9]+)*$' || fail 'name must use lowercase letters, numbers, and hyphens only'
 
 DESCRIPTION_LINE=$(sed -n 's/^description: *//p' "$SKILL_FILE" | head -n 1)

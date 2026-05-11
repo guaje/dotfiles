@@ -2,7 +2,8 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-SKILL_FILE=$SCRIPT_DIR/SKILL.md
+SKILL_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+SKILL_FILE=$SKILL_DIR/SKILL.md
 
 fail() {
   printf 'FAIL %s\n' "$1" >&2

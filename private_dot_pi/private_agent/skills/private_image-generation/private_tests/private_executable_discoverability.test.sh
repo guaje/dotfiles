@@ -5,6 +5,7 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+SKILL_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 OUTPUT_FILE=$(mktemp)
 trap 'rm -f "$OUTPUT_FILE"' EXIT HUP INT TERM
 
@@ -58,7 +59,7 @@ if [ -n "${PI_IMAGE_GENERATION_MODEL:-}" ]; then
     --no-extensions \
     --no-prompt-templates \
     --no-themes \
-    --skill "$SCRIPT_DIR" \
+    --skill "$SKILL_DIR" \
     --model "$PI_IMAGE_GENERATION_MODEL" \
     "$PROMPT" > "$OUTPUT_FILE"
 else
@@ -67,7 +68,7 @@ else
     --no-extensions \
     --no-prompt-templates \
     --no-themes \
-    --skill "$SCRIPT_DIR" \
+    --skill "$SKILL_DIR" \
     "$PROMPT" > "$OUTPUT_FILE"
 fi
 

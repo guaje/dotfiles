@@ -8,7 +8,8 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-SKILL_FILE=$SCRIPT_DIR/SKILL.md
+SKILL_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+SKILL_FILE=$SKILL_DIR/SKILL.md
 
 fail() {
   printf 'FAIL %s\n' "$1" >&2
@@ -23,7 +24,8 @@ pass() {
 # 1. Extract the reference Node script from SKILL.md
 # ---------------------------------------------------------------------------
 # The script uses ESM imports and top-level await; .mjs extension is intentional.
-NODE_SCRIPT=$(mktemp /tmp/image-gen-skill-XXXXXX.mjs)
+TMP_BASE=${TMPDIR:-/tmp}
+NODE_SCRIPT=$(mktemp "$TMP_BASE/image-gen-skill-XXXXXX.mjs")
 trap 'rm -f "$NODE_SCRIPT"' EXIT HUP INT TERM
 
 # Extract the body of the node <<'NODE' ... NODE heredoc from SKILL.md.
@@ -40,7 +42,7 @@ STUB_PNG_B64="iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVQI12P4z8AAAA
 # ---------------------------------------------------------------------------
 # 3. Build fixture directory
 # ---------------------------------------------------------------------------
-TMP_ROOT=$(mktemp -d /tmp/image-gen-test-XXXXXX)
+TMP_ROOT=$(mktemp -d "$TMP_BASE/image-gen-test-XXXXXX")
 AGENT_DIR=$TMP_ROOT/agent
 EXTENSIONS_DIR=$AGENT_DIR/extensions
 OUT_DIR=$TMP_ROOT/generated-images
@@ -52,7 +54,7 @@ FAKE_API_KEY="test-api-key-fixture"
 # ---------------------------------------------------------------------------
 # 4. Start a stub HTTP server (Node) that handles /models and /images/generations
 # ---------------------------------------------------------------------------
-SERVER_SCRIPT=$(mktemp /tmp/image-gen-server-XXXXXX.mjs)
+SERVER_SCRIPT=$(mktemp "$TMP_BASE/image-gen-server-XXXXXX.mjs")
 # shellcheck disable=SC2064
 trap 'rm -f "$NODE_SCRIPT" "$SERVER_SCRIPT"; rm -rf "$TMP_ROOT"' EXIT HUP INT TERM
 

@@ -34,6 +34,8 @@ assert_contains '/model-health' 'skill should tell the user how to refresh healt
 assert_contains 'imageGenerationProviders' 'skill should use configured image generation provider settings'
 assert_contains 'agent/models\.json' 'skill should use models.json for provider connection details'
 assert_contains '/images/generations' 'skill should document the image generation endpoint'
+assert_contains 'scripts/generate-image\.mjs' 'skill should point to the reusable generation script'
+assert_contains 'IMAGE_AGENT_DIR' 'skill should document agent directory override for tests and unusual layouts'
 assert_contains 'response_format.*b64_json|b64_json.*response_format' 'skill should request base64 output by default'
 assert_contains 'Never include the key' 'skill should protect API keys'
 assert_contains 'inline terminal image rendering' 'skill should use pi inline image rendering in supported terminals'

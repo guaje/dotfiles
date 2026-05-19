@@ -1,15 +1,14 @@
 #!/bin/sh
-# End-to-end test for the image-generation skill's reference Node script.
+# End-to-end test for the image-generation skill's generate-image script.
 # Stubs the image generation HTTP endpoint with a minimal Node HTTP server,
 # builds temporary fixture files (models.json, settings.config.json,
-# model-health-cache.json, model-health-check.ts), runs the reference script
-# extracted from SKILL.md, then asserts a PNG was written and the JSON output
-# matches expectations.
+# model-health-cache.json, model-health-check.ts), runs the script, then asserts
+# a PNG was written and the JSON output matches expectations.
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 SKILL_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
-SKILL_FILE=$SKILL_DIR/SKILL.md
+SCRIPT_FILE=$SKILL_DIR/scripts/generate-image.mjs
 
 fail() {
   printf 'FAIL %s\n' "$1" >&2
@@ -21,18 +20,10 @@ pass() {
 }
 
 # ---------------------------------------------------------------------------
-# 1. Extract the reference Node script from SKILL.md
+# 1. Locate the generation script
 # ---------------------------------------------------------------------------
-# The script uses ESM imports and top-level await; .mjs extension is intentional.
 TMP_BASE=${TMPDIR:-/tmp}
-NODE_SCRIPT=$(mktemp "$TMP_BASE/image-gen-skill-XXXXXX.mjs")
-trap 'rm -f "$NODE_SCRIPT"' EXIT HUP INT TERM
-
-# Extract the body of the node <<'NODE' ... NODE heredoc from SKILL.md.
-awk "/^node <<'NODE'$/{found=1; next} /^NODE$/ && found{found=0; next} found{print}" \
-  "$SKILL_FILE" > "$NODE_SCRIPT"
-
-[ -s "$NODE_SCRIPT" ] || fail 'could not extract Node script from SKILL.md'
+[ -s "$SCRIPT_FILE" ] || fail 'generate-image.mjs must exist'
 
 # ---------------------------------------------------------------------------
 # 2. Minimal 1x1 PNG in base64
@@ -56,7 +47,7 @@ FAKE_API_KEY="test-api-key-fixture"
 # ---------------------------------------------------------------------------
 SERVER_SCRIPT=$(mktemp "$TMP_BASE/image-gen-server-XXXXXX.mjs")
 # shellcheck disable=SC2064
-trap 'rm -f "$NODE_SCRIPT" "$SERVER_SCRIPT"; rm -rf "$TMP_ROOT"' EXIT HUP INT TERM
+trap 'rm -f "$SERVER_SCRIPT"; rm -rf "$TMP_ROOT"' EXIT HUP INT TERM
 
 cat > "$SERVER_SCRIPT" <<SERVEREOF
 import http from 'node:http';
@@ -111,12 +102,12 @@ SERVEREOF
 # Start the server and capture its port.
 SERVER_OUT=$(mktemp)
 # shellcheck disable=SC2064
-trap 'rm -f "$NODE_SCRIPT" "$SERVER_SCRIPT" "$SERVER_OUT"; rm -rf "$TMP_ROOT"' EXIT HUP INT TERM
+trap 'rm -f "$SERVER_SCRIPT" "$SERVER_OUT"; rm -rf "$TMP_ROOT"' EXIT HUP INT TERM
 
 node "$SERVER_SCRIPT" > "$SERVER_OUT" &
 SERVER_PID=$!
 # shellcheck disable=SC2064
-trap 'kill "$SERVER_PID" 2>/dev/null || true; rm -f "$NODE_SCRIPT" "$SERVER_SCRIPT" "$SERVER_OUT"; rm -rf "$TMP_ROOT"' EXIT HUP INT TERM
+trap 'kill "$SERVER_PID" 2>/dev/null || true; rm -f "$SERVER_SCRIPT" "$SERVER_OUT"; rm -rf "$TMP_ROOT"' EXIT HUP INT TERM
 
 # Wait for PORT= line.
 PORT=""
@@ -188,7 +179,8 @@ SCRIPT_OUTPUT=$(
   IMAGE_PROMPT="a tiny red square" \
   IMAGE_SIZE="256x256" \
   IMAGE_OUT_DIR="$OUT_DIR" \
-  node "$NODE_SCRIPT" 2>&1
+  IMAGE_AGENT_DIR="$AGENT_DIR" \
+  node "$SCRIPT_FILE" 2>&1
 )
 
 # ---------------------------------------------------------------------------
@@ -240,7 +232,8 @@ rm "$AGENT_DIR/model-health-cache.json"
 MISSING_CACHE_OUTPUT=$(
   cd "$TMP_ROOT" && \
   IMAGE_PROMPT="test" IMAGE_OUT_DIR="$OUT_DIR" \
-  node "$NODE_SCRIPT" 2>&1 || true
+  IMAGE_AGENT_DIR="$AGENT_DIR" \
+  node "$SCRIPT_FILE" 2>&1 || true
 )
 printf '%s\n' "$MISSING_CACHE_OUTPUT" | grep -qi 'cache\|model-health' \
   || fail "missing cache should produce an error mentioning the cache or /model-health. Got: $MISSING_CACHE_OUTPUT"
@@ -262,7 +255,8 @@ STALEEOF
 STALE_OUTPUT=$(
   cd "$TMP_ROOT" && \
   IMAGE_PROMPT="test" IMAGE_OUT_DIR="$OUT_DIR" \
-  node "$NODE_SCRIPT" 2>&1 || true
+  IMAGE_AGENT_DIR="$AGENT_DIR" \
+  node "$SCRIPT_FILE" 2>&1 || true
 )
 printf '%s\n' "$STALE_OUTPUT" | grep -qi 'stale\|cache\|model-health' \
   || fail "stale cache should produce an error mentioning staleness or /model-health. Got: $STALE_OUTPUT"
@@ -283,7 +277,8 @@ NOMODEOF
 NO_HEALTHY_OUTPUT=$(
   cd "$TMP_ROOT" && \
   IMAGE_PROMPT="test" IMAGE_OUT_DIR="$OUT_DIR" \
-  node "$NODE_SCRIPT" 2>&1 || true
+  IMAGE_AGENT_DIR="$AGENT_DIR" \
+  node "$SCRIPT_FILE" 2>&1 || true
 )
 printf '%s\n' "$NO_HEALTHY_OUTPUT" | grep -qi 'available\|model-health' \
   || fail "no healthy models should produce an error mentioning availability or /model-health. Got: $NO_HEALTHY_OUTPUT"

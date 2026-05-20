@@ -5,11 +5,13 @@
   "theme": "catppuccin-mocha",
   "enabledModels": [
     "openai-codex/gpt-5.5",
+    "kelley/Kimi-K2.6",
     "reallms/gpt-oss-120b",
     "reallms/gemma-4-31B-it",
     "reallms/Qwen3-Coder-Next",
+    "reallms-dev/claude-opus-4-6",
     "reallms-dev/claude-sonnet-4-6",
-    "kelley/Kimi-K2.6"
+    "reallms-dev/claude-haiku-4-5"
   ],
   "extensions": [
     "-extensions/google-search.ts",

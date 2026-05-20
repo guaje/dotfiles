@@ -82,6 +82,19 @@ Current targeted skill tests:
 
 - `agent/skills/linkup-search/pi-invocation.test.sh`
 
+## GitHub workflow coverage
+
+Pi files tracked in chezmoi are validated by the `Pi tests` GitHub Actions workflow in the chezmoi repo:
+
+- Workflow path: `~/.local/share/chezmoi/.github/workflows/pi-tests.yml`.
+
+When a workflow fails, use GitHub CLI from the chezmoi repo context:
+
+- `gh run list --repo guaje/dotfiles --limit 10`
+- `gh run view <run-id> --repo guaje/dotfiles --log-failed`
+
+If changing package scopes, test fixtures, model/provider assumptions, or skill invocation behavior, update both the local tests and `pi-tests.yml` as needed.
+
 ## Theming
 
 - Preferred theme: `agent/themes/catppuccin-mocha.json`

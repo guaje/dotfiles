@@ -11,7 +11,7 @@ import {
   getPiPackageRootCandidatesFromExecutable,
 } from "../packages/pi-package.ts";
 
-const packagePathParts = ["@mariozechner", "pi-coding-agent"];
+const packagePathParts = ["@earendil-works", "pi-coding-agent"];
 
 test("getNpmGlobalPiPackageRoot maps an npm global node_modules path to the pi package root", () => {
   const globalNodeModules = join(tmpdir(), "test-prefix", "lib", "node_modules");
@@ -29,7 +29,14 @@ test("getPiPackageRootCandidatesFromExecutable maps a pi binary to portable pack
     join(installRoot, "lib", "node_modules", ...packagePathParts),
     join(installRoot, "node_modules", ...packagePathParts),
     join(installRoot, ...packagePathParts),
+    installRoot,
   ]);
+});
+
+test("getPiPackageRootCandidatesFromExecutable includes the package root for a resolved dist CLI path", () => {
+  const packageRoot = join(tmpdir(), "test-prefix", "libexec", "lib", "node_modules", ...packagePathParts);
+  const executablePath = join(packageRoot, "dist", "cli.js");
+  assert.ok(getPiPackageRootCandidatesFromExecutable(executablePath).includes(packageRoot));
 });
 
 test("getHomebrewPiPackageRootFromExecutable keeps backward-compatible Homebrew mapping", () => {
@@ -42,6 +49,6 @@ test("getHomebrewPiPackageRootFromExecutable keeps backward-compatible Homebrew 
 
 test("getPiPackageRoot resolves the installed pi package root in this environment", async () => {
   const packageRoot = await getPiPackageRoot();
-  assert.match(packageRoot, /@mariozechner\/pi-coding-agent$/);
+  assert.match(packageRoot, /@earendil-works\/pi-coding-agent$/);
   assert.match(packageRoot, /pi-coding-agent/);
 });

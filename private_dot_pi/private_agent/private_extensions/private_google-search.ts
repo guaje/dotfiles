@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { type ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 
 const PROVIDER = "google-antigravity";

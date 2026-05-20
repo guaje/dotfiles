@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 
 const execFile = promisify(execFileCallback);
 const require = createRequire(import.meta.url);
-const PI_PACKAGE_NAME = "@mariozechner/pi-coding-agent";
+const PI_PACKAGE_NAME = "@earendil-works/pi-coding-agent";
 
 let piPackageRootPromise: Promise<string> | undefined;
 
@@ -31,6 +31,7 @@ export function getPiPackageRootCandidatesFromExecutable(piExecutablePath: strin
     path.resolve(installRoot, "lib/node_modules", PI_PACKAGE_NAME),
     path.resolve(installRoot, "node_modules", PI_PACKAGE_NAME),
     path.resolve(installRoot, PI_PACKAGE_NAME),
+    installRoot,
   ];
 }
 
@@ -51,6 +52,10 @@ export async function getPiPackageRoot(): Promise<string> {
   if (!piPackageRootPromise) {
     piPackageRootPromise = (async () => {
       const candidates: string[] = [];
+
+      if (process.env.PI_PACKAGE_DIR) {
+        candidates.push(process.env.PI_PACKAGE_DIR);
+      }
 
       if (process.env.PI_CODING_AGENT_PACKAGE_ROOT) {
         candidates.push(process.env.PI_CODING_AGENT_PACKAGE_ROOT);

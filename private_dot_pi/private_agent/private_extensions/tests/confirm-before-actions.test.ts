@@ -14,8 +14,8 @@ import { pathToFileURL } from "node:url";
 
 const EXTENSION_PATH = resolve("agent/extensions/confirm-before-actions.ts");
 const SETTINGS_CONFIG_PATH = resolve("agent/settings.config.json");
-const STUB_PACKAGE_DIR = resolve("agent/extensions/node_modules/@mariozechner/pi-coding-agent");
-const STUB_TUI_PACKAGE_DIR = resolve("agent/extensions/node_modules/@mariozechner/pi-tui");
+const STUB_PACKAGE_DIR = resolve("agent/extensions/node_modules/@earendil-works/pi-coding-agent");
+const STUB_TUI_PACKAGE_DIR = resolve("agent/extensions/node_modules/@earendil-works/pi-tui");
 
 function stripAnsi(text: string) {
   return text.replace(/\x1b\[[0-9;]*m/g, "");
@@ -31,7 +31,7 @@ async function loadExtensionModule() {
   mkdirSync(STUB_PACKAGE_DIR, { recursive: true });
   mkdirSync(STUB_TUI_PACKAGE_DIR, { recursive: true });
   writeFileSync(resolve(STUB_PACKAGE_DIR, "package.json"), JSON.stringify({
-    name: "@mariozechner/pi-coding-agent",
+    name: "@earendil-works/pi-coding-agent",
     type: "module",
     exports: "./index.js",
   }));
@@ -56,7 +56,7 @@ async function loadExtensionModule() {
     "}",
   ].join("\n"));
   writeFileSync(resolve(STUB_TUI_PACKAGE_DIR, "package.json"), JSON.stringify({
-    name: "@mariozechner/pi-tui",
+    name: "@earendil-works/pi-tui",
     type: "module",
     exports: "./index.js",
   }));

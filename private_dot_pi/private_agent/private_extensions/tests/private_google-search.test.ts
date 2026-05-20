@@ -9,10 +9,10 @@ const EXTENSION_PATH = resolve("agent/extensions/google-search.ts");
 const STUB_PACKAGE_DIR = resolve("agent/extensions/node_modules");
 
 async function loadExtension() {
-  const piPackageDir = resolve(STUB_PACKAGE_DIR, "@mariozechner/pi-coding-agent");
+  const piPackageDir = resolve(STUB_PACKAGE_DIR, "@earendil-works/pi-coding-agent");
   mkdirSync(piPackageDir, { recursive: true });
   writeFileSync(resolve(piPackageDir, "package.json"), JSON.stringify({
-    name: "@mariozechner/pi-coding-agent",
+    name: "@earendil-works/pi-coding-agent",
     type: "module",
     exports: "./index.js",
   }));

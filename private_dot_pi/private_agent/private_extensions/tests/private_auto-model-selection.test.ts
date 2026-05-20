@@ -10,10 +10,10 @@ const MODELS_PATH = resolve("agent/models.json");
 const MODEL_HEALTH_CACHE_PATH = resolve("agent/model-health-cache.json");
 const ORIGINAL_SETTINGS_CONFIG = readFileSync(SETTINGS_CONFIG_PATH, "utf8");
 const STUB_PACKAGE_DIR = resolve("agent/extensions/node_modules");
-const PI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@mariozechner/pi-coding-agent");
-const PI_AI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@mariozechner/pi-ai");
+const PI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@earendil-works/pi-coding-agent");
+const PI_AI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@earendil-works/pi-ai");
 const TYPEBOX_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@sinclair/typebox");
-const PI_TUI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@mariozechner/pi-tui");
+const PI_TUI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@earendil-works/pi-tui");
 const TEST_CWD = resolve(".");
 
 interface AvailableTestModel {
@@ -74,7 +74,7 @@ function chooseDelegateModel(models: AvailableTestModel[], selectorId: string): 
 async function loadExtension() {
   mkdirSync(PI_PACKAGE_DIR, { recursive: true });
   writeFileSync(resolve(PI_PACKAGE_DIR, "package.json"), JSON.stringify({
-    name: "@mariozechner/pi-coding-agent",
+    name: "@earendil-works/pi-coding-agent",
     type: "module",
     exports: "./index.js",
   }));
@@ -82,7 +82,7 @@ async function loadExtension() {
 
   mkdirSync(PI_AI_PACKAGE_DIR, { recursive: true });
   writeFileSync(resolve(PI_AI_PACKAGE_DIR, "package.json"), JSON.stringify({
-    name: "@mariozechner/pi-ai",
+    name: "@earendil-works/pi-ai",
     type: "module",
     exports: "./index.js",
   }));
@@ -108,7 +108,7 @@ async function loadExtension() {
 
   mkdirSync(PI_TUI_PACKAGE_DIR, { recursive: true });
   writeFileSync(resolve(PI_TUI_PACKAGE_DIR, "package.json"), JSON.stringify({
-    name: "@mariozechner/pi-tui",
+    name: "@earendil-works/pi-tui",
     type: "module",
     exports: "./index.js",
   }));

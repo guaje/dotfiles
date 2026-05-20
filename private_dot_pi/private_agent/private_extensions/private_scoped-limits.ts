@@ -102,7 +102,7 @@ let piAiOAuthModulePromise: Promise<Record<string, unknown>> | undefined;
 async function loadPiAiOAuthModule() {
   if (!piAiOAuthModulePromise) {
     piAiOAuthModulePromise = (async () => {
-      const piAiOAuthModulePath = await resolvePiBundledDependencyPath("@mariozechner/pi-ai", "dist/oauth.js");
+      const piAiOAuthModulePath = await resolvePiBundledDependencyPath("@earendil-works/pi-ai", "dist/oauth.js");
       return import(pathToFileURL(piAiOAuthModulePath).href) as Promise<Record<string, unknown>>;
     })();
   }

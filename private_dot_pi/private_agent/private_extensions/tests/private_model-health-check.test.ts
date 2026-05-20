@@ -20,8 +20,8 @@ const ORIGINAL_CACHE = (() => {
   }
 })();
 const STUB_PACKAGE_DIR = resolve("agent/extensions/node_modules");
-const PI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@mariozechner/pi-coding-agent");
-const PI_AI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@mariozechner/pi-ai");
+const PI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@earendil-works/pi-coding-agent");
+const PI_AI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@earendil-works/pi-ai");
 
 interface AvailableTestModel {
   id: string;
@@ -60,7 +60,7 @@ function runtimeModelFromId(fullId: string): { provider: string; id: string } {
 async function loadExtension() {
   mkdirSync(PI_PACKAGE_DIR, { recursive: true });
   writeFileSync(resolve(PI_PACKAGE_DIR, "package.json"), JSON.stringify({
-    name: "@mariozechner/pi-coding-agent",
+    name: "@earendil-works/pi-coding-agent",
     type: "module",
     exports: "./index.js",
   }));
@@ -68,7 +68,7 @@ async function loadExtension() {
 
   mkdirSync(PI_AI_PACKAGE_DIR, { recursive: true });
   writeFileSync(resolve(PI_AI_PACKAGE_DIR, "package.json"), JSON.stringify({
-    name: "@mariozechner/pi-ai",
+    name: "@earendil-works/pi-ai",
     type: "module",
     exports: "./index.js",
   }));

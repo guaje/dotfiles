@@ -201,9 +201,9 @@ jobs:
           LINKUP_API_KEY: ''
         run: |
           set -euo pipefail
-          fake_pi_package="$RUNNER_TEMP/pi-package/node_modules/@mariozechner/pi-coding-agent"
+          fake_pi_package="$RUNNER_TEMP/pi-package/node_modules/@earendil-works/pi-coding-agent"
           mkdir -p "$fake_pi_package"
-          printf '{"name":"@mariozechner/pi-coding-agent"}\n' > "$fake_pi_package/package.json"
+          printf '{"name":"@earendil-works/pi-coding-agent"}\n' > "$fake_pi_package/package.json"
           export PI_CODING_AGENT_PACKAGE_ROOT="$fake_pi_package"
 
           cd "$HOME/.pi"

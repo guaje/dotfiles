@@ -61,8 +61,28 @@ function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
 
+function commandExists(command) {
+  try {
+    execFileSync('sh', ['-c', `command -v ${command} >/dev/null 2>&1`], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isAutoNotificationAvailable() {
+  if (!isTermux()) return false;
+  if (process.env.IMAGE_FORCE_OPEN === '1') return false;
+  if (process.env.IMAGE_DISABLE_AUTONOTIFICATION === '1') return false;
+  return commandExists('am');
+}
+
 function openInTermux(imagePath) {
   if (!isTermux()) return 'Use pi inline terminal image rendering when supported; otherwise open the saved path locally.';
+  if (isAutoNotificationAvailable()) {
+    return 'Termux detected. Skipped immediate image open because AutoNotification is available; open the image from the generated-image notification.';
+  }
+
   const delay = Number.isFinite(openDelaySeconds) && openDelaySeconds >= 0 ? openDelaySeconds : 5;
   const realImagePath = realpathSync(imagePath);
   const imageCommand = `am start -a android.intent.action.VIEW -d ${shellQuote(`file://${realImagePath}`)} -t image/png`;
@@ -71,7 +91,7 @@ function openInTermux(imagePath) {
   const opener = `(sleep ${delay}; ${imageCommand} || ${termuxOpenCommand} || ${folderCommand}) >/dev/null 2>&1 &`;
   try {
     execFileSync('sh', ['-c', opener], { stdio: 'ignore' });
-    return `Termux detected. Scheduled image open in ${delay}s with Android activity manager; fallbacks: ${termuxOpenCommand}; ${folderCommand}.`;
+    return `Termux detected. AutoNotification unavailable; scheduled image open in ${delay}s with Android activity manager; fallbacks: ${termuxOpenCommand}; ${folderCommand}.`;
   } catch (error) {
     return `Termux detected, but scheduling image open failed. Run: ${imageCommand}. If that fails, run: ${termuxOpenCommand}. Folder fallback: ${folderCommand}.`;
   }

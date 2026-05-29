@@ -14,7 +14,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const scriptFile = resolve(scriptDir, '../generate-image.mjs');
 const stubPngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVQI12P4z8AAAAACAAHiIbwzAAAAAElFTkSuQmCC';
 
-test('generate-image.mjs writes a PNG and returns expected metadata', async (t) => {
+async function createFixture(t) {
   assert.ok(existsSync(scriptFile), 'generate-image.mjs must exist');
 
   const tmpRoot = await mkdtemp(join(tmpdir(), 'generate-image-script-test-'));
@@ -80,6 +80,13 @@ test('generate-image.mjs writes a PNG and returns expected metadata', async (t) 
     },
   }));
 
+  return { agentDir, outDir, requests };
+}
+
+test('generate-image.mjs writes a PNG and returns expected metadata', async (t) => {
+  assert.ok(existsSync(scriptFile), 'generate-image.mjs must exist');
+  const { agentDir, outDir, requests } = await createFixture(t);
+
   const { stdout } = await execFileAsync('node', [scriptFile], {
     env: {
       ...process.env,
@@ -106,4 +113,23 @@ test('generate-image.mjs writes a PNG and returns expected metadata', async (t) 
   assert.equal(requests[0].prompt, 'script test prompt');
   assert.equal(requests[0].response_format, 'b64_json');
   assert.equal(requests[0].model, 'test-image-model');
+});
+
+test('generate-image.mjs skips immediate Termux image open when AutoNotification is available', async (t) => {
+  const { agentDir, outDir } = await createFixture(t);
+
+  const { stdout } = await execFileAsync('node', [scriptFile], {
+    env: {
+      ...process.env,
+      IMAGE_AGENT_DIR: agentDir,
+      IMAGE_PROMPT: 'termux autonotification prompt',
+      IMAGE_SIZE: '256x256',
+      IMAGE_OUT_DIR: outDir,
+      TERMUX_VERSION: 'test-termux',
+      PREFIX: '/data/data/com.termux/files/usr',
+    },
+  });
+
+  const result = JSON.parse(stdout);
+  assert.match(result.display, /Skipped immediate image open because AutoNotification is available/);
 });

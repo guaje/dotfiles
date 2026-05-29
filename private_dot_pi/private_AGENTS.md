@@ -15,6 +15,8 @@ These instructions apply to work in `~/.pi/`.
 - Make changes in `~/.pi/`.
 - Apply pi settings changes in `agent/settings.config.json`, not `agent/settings.json`.
 - Treat `agent/settings.json` as generated output from the merge workflow; do not make manual source-of-truth edits there.
+- Enable pi extensions in `agent/settings.config.json` with paths such as `"extensions/native-notify.ts"`; do not prefix enabled extension paths with `-`.
+- Disable an extension by removing/commenting it through the supported settings workflow or `pi config`; a leading `-` in this repo's merged settings convention means the resource is disabled/excluded, not enabled.
 - Run targeted tests for the files you change.
 - Avoid hardcoding absolute paths, package/versioned install paths, version numbers, model IDs, provider IDs, or other environment-specific identifiers in any script, test, extension, or generated file you write. Discover them from config files, the runtime environment, command output, package metadata, or test fixtures instead.
 - Review diffs before proposing completion or commits.
@@ -110,6 +112,9 @@ Settings note:
 
 - `~/.pi/agent/settings.config.json` is the editable source of truth for pi settings in this repo.
 - `~/.pi/agent/settings.json` is automatically generated/merged and may be untracked; agents should update `settings.config.json` and let the merge workflow regenerate `settings.json`.
+- Pi auto-discovers extensions from `~/.pi/agent/extensions/*.ts` and `~/.pi/agent/extensions/*/index.ts`; additional explicit extension paths in settings should be normal paths like `"extensions/native-notify.ts"` or absolute paths.
+- In this repo, an extension entry prefixed with `-` (for example `"-extensions/native-notify.ts"`) is a disable/exclude marker from the settings merge convention. Do not use a leading `-` when enabling extensions.
+- CLI equivalents: `pi -e <source>` loads an extension explicitly, `pi --no-extensions` disables extension discovery, and `pi --no-extensions -e ./path.ts` loads only the specified extension(s), ignoring settings discovery.
 
 Common mappings:
 

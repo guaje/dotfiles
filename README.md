@@ -1,26 +1,42 @@
-# 🔐 Dotfiles Management with Chezmoi & SOPS
+# 🏠 Dotfiles
+
+## 🚀 Installation
+
+### 📱 Termux
+
+After `chezmoi init --apply`, the Termux package bootstrap should complete automatically. A fresh Termux environment still requires these Android/Termux integration steps:
+
+- Install the **Termux:API** Android app if `termux-api` commands are needed.
+- Run `termux-setup-storage` to create `~/storage` symlinks and grant storage access.
+- Start required services with `sv-enable sshd` and `sv-enable ssh-agent`.
+
+These steps are required for the full Termux environment because Android app installation, storage permission grants, and service activation cannot be safely completed by a non-interactive package bootstrap script.
+
+For Pi native notifications on Termux, see [`~/.pi/docs/tasker-autonotification.md`](private_dot_pi/private_docs/private_tasker-autonotification.md). It documents the Tasker + AutoNotification bridge used by Pi to show native Android notifications with Pi icons, including storage icon setup, required Tasker profile/action configuration, generated-image preview handling, and test broadcasts.
+
+## 🔐 Dotfiles Management with Chezmoi & SOPS
 
 This repository uses `chezmoi` to manage dotfiles, with a focus on securely handling secrets using `sops` and `age`.
 
-## 🛠️ Secrets Management: `check-secrets.sh`
+### 🛠️ Secrets Management: `check-secrets.sh`
 
 A custom pre-add hook, `scripts/check-secrets.sh`, expands the standard `chezmoi add` functionality. It automatically scans files for sensitive patterns (e.g., `API_KEY`, `PASSWORD`) and provider-specific tokens before they are added to the source directory.
 
 The shared detector logic lives in `scripts/check-secrets.awk`, and can also be reused outside `chezmoi add` via `scripts/scan-secrets.sh` for CI and pre-commit checks.
 
-### ⚙️ How it Works
+#### ⚙️ How it Works
 
 When you run `chezmoi add <file>`, the script triggers and provides several options if sensitive data is detected:
 
-1.  **📦 Full Encryption:** Encrypts the entire file using `chezmoi`'s built-in `age` support.
-2.  **🛡️ SOPS Strategy (Recommended):** 
-    *   Extracts only the sensitive key-value pairs.
-    *   Saves them into a SOPS-encrypted YAML file in subdirectories within `secrets/` mirroring their relative `$HOME` path (e.g., `secrets/dot_config/app/settings.yaml.sops.yaml`).
-    *   Converts the original file into a `chezmoi` template that retrieves values from the encrypted secrets at `chezmoi apply` time.
-3.  **📄 Plain:** Adds the file as-is (not recommended for secrets).
-4.  **🛑 Abort:** Cancels the `add` operation.
+1. **📦 Full Encryption:** Encrypts the entire file using `chezmoi`'s built-in `age` support.
+2. **🛡️ SOPS Strategy (Recommended):**
+   - Extracts only the sensitive key-value pairs.
+   - Saves them into a SOPS-encrypted YAML file in subdirectories within `secrets/` mirroring their relative `$HOME` path (e.g., `secrets/dot_config/app/settings.yaml.sops.yaml`).
+   - Converts the original file into a `chezmoi` template that retrieves values from the encrypted secrets at `chezmoi apply` time.
+3. **📄 Plain:** Adds the file as-is (not recommended for secrets).
+4. **🛑 Abort:** Cancels the `add` operation.
 
-### 🚀 Usage
+#### 🚀 Usage
 
 Simply use the standard `chezmoi` command:
 
@@ -30,11 +46,11 @@ chezmoi add ~/.config/myapp/config.yaml
 
 If the script detects secrets, it will prompt you for action in the terminal.
 
-## 🧪 Development & Testing
+### 🧪 Development & Testing
 
 If you modify `scripts/check-secrets.sh` or the `.chezmoi.toml.tmpl` configuration, you **must** ensure that the test suite passes.
 
-### 🏃 Running Tests
+#### 🏃 Running Tests
 
 Run the following scripts to verify that adding secrets, reusable scanning, and rendering templates works correctly across different file formats and directory structures:
 
@@ -43,7 +59,7 @@ Run the following scripts to verify that adding secrets, reusable scanning, and 
 ./scripts/test_apply-secrets.sh
 ```
 
-### 🔎 Reusable scanning for CI / pre-commit
+#### 🔎 Reusable scanning for CI / pre-commit
 
 Scan explicit files:
 
@@ -89,6 +105,6 @@ Run the dedicated scanner tests:
 
 These tests are also automatically executed via GitHub Actions on every push to the `scripts/` directory or the main configuration template, ensuring compatibility across `bash`, `zsh`, and `fish` shells.
 
-## 🔧 Configuration
+### 🔧 Configuration
 
 The system is configured via `.chezmoi.toml.tmpl`, which sets up the `SOPS_AGE_KEY_FILE` environment variable and defines the `secret` command using a portable shell wrapper to ensure path expansion (e.g., `~` or `$HOME`) works correctly on all machines.

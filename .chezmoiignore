@@ -1,3 +1,9 @@
+# Manage .bashrc only on Termux/Android for now. Other Linux hosts keep
+# their host-specific .bashrc until branches are added to private_dot_bashrc.tmpl.
+{{ if ne .chezmoi.os "android" }}
+.bashrc
+{{ end }}
+
 # Ignore the age private key backup (if any)
 key.txt.age
 

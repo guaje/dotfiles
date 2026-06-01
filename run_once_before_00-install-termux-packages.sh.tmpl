@@ -1,0 +1,99 @@
+#!/bin/sh
+set -eu
+
+# Install the Termux packages used by this dotfiles environment before chezmoi
+# applies files that expect those tools to exist.
+case "${PREFIX:-}" in
+  */com.termux/files/usr) ;;
+  *)
+    echo "Skipping Termux package install: PREFIX is not a Termux prefix"
+    exit 0
+    ;;
+esac
+
+packages="
+age
+bat
+chezmoi
+clang
+dnsutils
+fd
+fzf
+git
+jq
+lsof
+magic-wormhole-rs
+neovim
+net-tools
+nodejs
+openssh
+ripgrep
+rust
+sops
+starship
+termux-api
+termux-services
+tmux
+traceroute
+tree
+unbound
+which
+yq
+"
+
+missing=""
+for package in $packages; do
+  if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'install ok installed'; then
+    missing="$missing $package"
+  fi
+done
+
+if [ -z "$missing" ]; then
+  echo "All Termux bootstrap packages are already installed"
+else
+  pkg update -y
+  # shellcheck disable=SC2086
+  pkg install -y $missing
+fi
+
+# These global npm CLIs are part of the current environment and are not managed
+# by apt/chezmoi. npm is provided by the nodejs Termux package.
+if command -v npm >/dev/null 2>&1; then
+  npm install -g @earendil-works/pi-coding-agent @google/gemini-cli
+fi
+
+echo "Termux package bootstrap complete."
+
+warn() {
+  printf 'Warning: %s\n' "$*" >&2
+}
+
+# Check whether the Termux:API Android companion app is installed. The apt
+# package only provides CLI wrappers; the Android app is still required.
+if command -v cmd >/dev/null 2>&1; then
+  if cmd package list packages com.termux.api 2>/dev/null | grep -q '^package:com\.termux\.api$'; then
+    echo "Termux:API Android app is installed."
+  else
+    warn "Termux:API Android app is not installed; termux-api commands will not work."
+  fi
+else
+  warn "Cannot check Termux:API Android app because Android 'cmd' is unavailable."
+fi
+
+# Check whether termux-setup-storage has been run and storage permission is
+# available. The existing after-install icon script also depends on this.
+if [ -d "$HOME/storage" ] && [ -e "$HOME/storage/shared" ]; then
+  echo "Termux storage links are present."
+else
+  warn "Termux storage links are missing; run termux-setup-storage."
+fi
+
+# Check service links created by sv-enable. Do not enable automatically because
+# users may not want sshd/ssh-agent running on every fresh install.
+for service in sshd ssh-agent; do
+  if [ -e "$PREFIX/var/service/$service" ]; then
+    echo "Termux service '$service' is enabled."
+  else
+    warn "Termux service '$service' is not enabled; run: sv-enable $service"
+  fi
+done

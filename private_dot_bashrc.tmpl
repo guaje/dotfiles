@@ -1,0 +1,26 @@
+{{- if eq .chezmoi.os "android" -}}
+# ~/.bashrc for Termux/Android
+# Managed by chezmoi from private_dot_bashrc.tmpl.
+
+# Prefer vi-compatible tools as the default editor.
+export EDITOR=vi
+
+# Pi coding agent launcher.
+# This wrapper loads the local ~/.pi/agent configuration, merged settings,
+# extensions, skills, and themes managed by this dotfiles repo.
+alias pi="$HOME/.pi/agent/scripts/pi-launch.sh"
+
+# Starship prompt initialization.
+# STARSHIP_CONFIG points at the Catppuccin Mocha config managed by chezmoi.
+export STARSHIP_CONFIG="$HOME/.config/starship/config.toml"
+if command -v starship >/dev/null 2>&1; then
+  eval "$(starship init bash)"
+fi
+{{- else -}}
+# ~/.bashrc
+# Managed by chezmoi, but no host-specific bashrc has been defined for:
+#   os={{ .chezmoi.os }} hostname={{ .chezmoi.hostname }}
+#
+# Add a branch for this host in private_dot_bashrc.tmpl, or ignore .bashrc for
+# this host in .chezmoiignore if it should remain unmanaged.
+{{- end }}

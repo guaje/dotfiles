@@ -237,8 +237,8 @@ When your agent already knows the exact URL, use `/fetch` instead of `/search`. 
 
 ### LinkedIn extraction (if you have the LinkedIn URL of the person/company/post -> standard)
 
-- return the linkedin profile details of {{linkedin_url}}
-- return the last 10 linkedin posts of {{linkedin_url}}
+- return the linkedin profile details of {{linkedin_url}} 
+- return the last 10 linkedin posts of {{linkedin_url}} 
 - return the last 10 linkedin comments of {{linkedin_url}}
 - extracts the comments from {{linkedin_post_url}}
 
@@ -269,17 +269,115 @@ includeDomains: ["tesla.com", "sec.gov"]
 
 Instructions: for both domain filtering and date filtering, only use if implicitly or explicitly instructed to do so.
 
-## 7. MCP Setup
+## 7. Pi Configuration and Execution
 
-Two tools: `linkup-search` (query, depth) and `linkup-fetch` (url, renderJs).
+Pi does not include built-in MCP support. In pi, use the scripts in `agent/skills/linkup-search/scripts/` to call Linkup's documented REST endpoints directly.
 
-| Client | Setup |
-|--------|-------|
-| **VS Code / Cursor** | Add to MCP config: `{"servers":{"linkup":{"url":"https://mcp.linkup.so/mcp?apiKey=YOUR_API_KEY","type":"http"}}}` |
-| **Claude Code** | `claude mcp add --transport http linkup https://mcp.linkup.so/mcp?apiKey=YOUR_API_KEY` |
-| **Claude Desktop** | Download [MCPB bundle](https://github.com/LinkupPlatform/linkup-mcp-server/releases/latest/download/linkup-mcp-server.mcpb), double-click to install |
+### API Key
 
-Auth format (v2.x): `apiKey=YOUR_API_KEY` in args. Old v1.x `env` format no longer works.
+Linkup requires an API key. The scripts read configuration from `agent/settings.config.json`, falling back to `agent/settings.json`.
+
+Configured key name:
+
+```json
+{
+  "linkupAPIKey": "YOUR_API_KEY"
+}
+```
+
+The scripts resolve secrets using the same pattern as the image-generation skill:
+
+- Literal values are used as-is.
+- Values like `$ENV_VAR` are resolved from the environment.
+- Values beginning with `!` are shell commands; run the command and capture stdout.
+- `LINKUP_API_KEY` in the environment overrides settings.
+
+Never print, log, or include the API key in final answers, filenames, generated artifacts, or error output.
+
+### Search Endpoint
+
+Use `/v1/search` for synchronous search and extraction. Run from `~/.pi` or a repository root where `agent/settings.config.json` exists:
+
+```bash
+LINKUP_QUERY='Who is the CEO of OpenAI?' \
+LINKUP_DEPTH='fast' \
+LINKUP_OUTPUT_TYPE='searchResults' \
+node agent/skills/linkup-search/scripts/linkup-search.mjs
+```
+
+Supported environment variables:
+
+- `LINKUP_QUERY` (required): maps to `q`.
+- `LINKUP_DEPTH`: `fast`, `standard`, or `deep`; defaults to `standard`.
+- `LINKUP_OUTPUT_TYPE`: `searchResults`, `sourcedAnswer`, or `structured`; defaults to `searchResults`.
+- `LINKUP_STRUCTURED_OUTPUT_SCHEMA`: JSON schema string for `structuredOutputSchema` when `LINKUP_OUTPUT_TYPE=structured`.
+- `LINKUP_FROM_DATE` and `LINKUP_TO_DATE`: ISO date filters.
+- `LINKUP_INCLUDE_DOMAINS` and `LINKUP_EXCLUDE_DOMAINS`: comma-separated domain filters.
+- `LINKUP_MAX_RESULTS`: positive integer result limit.
+- `LINKUP_INCLUDE_IMAGES`: `true` or `false`; include image results when supported by the endpoint.
+
+### Fetch Endpoint
+
+Use `/v1/fetch` when you already know the exact URL:
+
+```bash
+LINKUP_URL='https://example.com/pricing' \
+LINKUP_RENDER_JS='true' \
+node agent/skills/linkup-search/scripts/linkup-fetch.mjs
+```
+
+Supported environment variables:
+
+- `LINKUP_URL` (required): URL to fetch.
+- `LINKUP_RENDER_JS`: `true` or `false`; defaults to `true` for reliability.
+- `LINKUP_INCLUDE_RAW_HTML`: `true` or `false`; defaults to `false`.
+- `LINKUP_EXTRACT_IMAGES`: `true` or `false`; defaults to `false`.
+
+### Research Endpoint
+
+Use `/v1/research` for asynchronous, comprehensive research tasks that may take minutes and should be polled after creation:
+
+```bash
+LINKUP_QUERY='Research the current state of the semiconductor market with citations.' \
+LINKUP_OUTPUT_TYPE='sourcedAnswer' \
+LINKUP_RESEARCH_MODE='auto' \
+LINKUP_REASONING_DEPTH='L' \
+node agent/skills/linkup-search/scripts/linkup-research.mjs
+```
+
+Supported environment variables:
+
+- `LINKUP_QUERY` (required): maps to `q`.
+- `LINKUP_OUTPUT_TYPE`: `sourcedAnswer` or `structured`; defaults to `sourcedAnswer`.
+- `LINKUP_RESEARCH_MODE`: `answer`, `auto`, `investigate`, or `research`.
+- `LINKUP_REASONING_DEPTH`: `S`, `M`, `L`, or `XL`.
+- `LINKUP_STRUCTURED_OUTPUT_SCHEMA`, date filters, and domain filters as in search.
+
+The script returns the created research task JSON. Poll `GET /v1/research/:id` manually or add a polling helper before claiming the research is complete.
+
+### Tasks Endpoint
+
+Use `/v1/tasks` for asynchronous batches of up to 100 `search`, `fetch`, or `research` jobs:
+
+```bash
+LINKUP_TASKS_JSON='[
+  {"type":"search","input":{"q":"What is Microsoft 2024 revenue?","depth":"standard","outputType":"sourcedAnswer"}},
+  {"type":"fetch","input":{"url":"https://docs.linkup.so","renderJs":false}}
+]' \
+node agent/skills/linkup-search/scripts/linkup-tasks.mjs
+```
+
+Each item is `{ "type": "search" | "fetch" | "research", "input": { ... } }`, where `input` uses the same parameters as the corresponding synchronous endpoint. The script returns task identifiers and statuses; poll `GET /v1/tasks/:id` manually before treating results as completed.
+
+### Script Output and Errors
+
+All scripts print JSON to stdout on success and JSON errors to stderr on failure.
+
+Exit codes:
+
+- `0`: success
+- `1`: Linkup API or network failure
+- `2`: missing or invalid local configuration/input
 
 ---
 

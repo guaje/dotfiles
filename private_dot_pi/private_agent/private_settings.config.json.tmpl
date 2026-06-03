@@ -1,8 +1,9 @@
+{{- /* chezmoi:template */ -}}
 {
-  "defaultProvider": "openai-codex",
+  "autoModelSelectionEnabled": false,
   "defaultModel": "gpt-5.5",
+  "defaultProvider": "openai-codex",
   "defaultThinkingLevel": "medium",
-  "theme": "catppuccin-mocha",
   "enabledModels": [
     "openai-codex/gpt-5.5",
     "reallms-dev/Kimi-K2.6",
@@ -19,8 +20,6 @@
     "-extensions/google-search.ts",
     "-extensions/scoped-limits.ts"
   ],
-  "autoModelSelectionEnabled": false,
-  "managingStyle": "Empowerment",
   "imageGenerationProviders": {
     "reallms-dev": {
       "models": [
@@ -30,5 +29,8 @@
         }
       ]
     }
-  }
+  },
+  "linkupAPIKey": "{{ (index ((secret "-d" (joinPath .chezmoi.sourceDir "secrets/private_dot_pi/private_agent/private_settings.config.json.sops.yaml") | fromYaml).data | fromYaml) "linkupAPIKey") }}",
+  "managingStyle": "Empowerment",
+  "theme": "catppuccin-mocha"
 }

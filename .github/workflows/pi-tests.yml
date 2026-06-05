@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'private_dot_pi/**'
+      - '.github/workflows/pi-tests.yml'
 
 permissions:
   contents: read

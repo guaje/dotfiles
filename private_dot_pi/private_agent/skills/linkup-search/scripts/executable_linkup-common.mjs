@@ -63,18 +63,20 @@ export function requireApiKey() {
   return config;
 }
 
-export async function postJson(path, body) {
+export async function requestJson(method, path, body) {
   const { apiKey, baseUrl } = requireApiKey();
+  const init = {
+    method,
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      'content-type': 'application/json',
+    },
+  };
+  if (body !== undefined) init.body = JSON.stringify(body);
+
   let response;
   try {
-    response = await fetch(`${baseUrl}${path}`, {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
+    response = await fetch(`${baseUrl}${path}`, init);
   } catch (error) {
     jsonError(`Network error: ${error instanceof Error ? error.message : String(error)}`, 1);
   }
@@ -93,4 +95,12 @@ export async function postJson(path, body) {
   }
 
   console.log(JSON.stringify(json, null, 2));
+}
+
+export async function postJson(path, body) {
+  await requestJson('POST', path, body);
+}
+
+export async function getJson(path) {
+  await requestJson('GET', path);
 }

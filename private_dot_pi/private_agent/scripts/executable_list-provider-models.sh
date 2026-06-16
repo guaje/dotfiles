@@ -141,28 +141,34 @@ jq -r '
   | @tsv
 ' "$CONFIG_FILE" > "$providers_file"
 
+any_failed=0
 while IFS='	' read -r provider_name base_url api api_key_expr compat_json; do
   [ -n "$provider_name" ] || continue
 
   api_key=$(resolve_value "$api_key_expr")
 
-  if ! curl -fsS -X GET "${base_url%/}/models" \
+  if ! curl -fsS --max-time 10 -X GET "${base_url%/}/models" \
       -H "Authorization: Bearer $api_key" \
       -H 'accept: application/json' \
       > "$response_file"; then
     printf 'Failed to fetch models for provider: %s\n' "$provider_name" >&2
-    exit 1
+    any_failed=1
+    continue
   fi
 
   : > "$info_entries_file"
-  jq -r '
+  if ! jq -r '
     def models_array:
       if type == "object" and (.data | type) == "array" then .data
       elif type == "array" then .
       else []
       end;
     models_array | .[] | select(type == "object" and .id) | .id
-  ' "$response_file" > "$model_ids_file"
+  ' "$response_file" > "$model_ids_file"; then
+    printf 'Failed to parse models response for provider: %s\n' "$provider_name" >&2
+    any_failed=1
+    continue
+  fi
 
   info_base_url=${base_url%/}
   case $info_base_url in
@@ -180,36 +186,36 @@ while IFS='	' read -r provider_name base_url api api_key_expr compat_json; do
     [ -n "$model_id" ] || continue
     encoded_model=$(jq -nr --arg model "$model_id" '$model | @uri')
 
-    if curl -fsS -X GET "$info_v1_url/model/info?model=$encoded_model" \
+    if curl -fsS --max-time 5 -X GET "$info_v1_url/model/info?model=$encoded_model" \
         -H "Authorization: Bearer $api_key" \
         -H 'accept: application/json' \
         > "$info_response_file" 2>/dev/null; then
       jq --arg id "$model_id" '
         def info_object:
           if type == "object" then
-            if (.data | type) == "array" then (.data[0] // {})
+            if (.data | type) == "array" then (.data | map(select(.model_name == $id)) | if length > 0 then .[0] else {} end)
             elif (.data | type) == "object" then .data
             else .
             end
           else {}
           end;
         {($id): info_object}
-      ' "$info_response_file" >> "$info_entries_file"
-    elif curl -fsS -X GET "$info_root_url/model/info?model=$encoded_model" \
+      ' "$info_response_file" >> "$info_entries_file" 2>/dev/null || true
+    elif curl -fsS --max-time 5 -X GET "$info_root_url/model/info?model=$encoded_model" \
         -H "Authorization: Bearer $api_key" \
         -H 'accept: application/json' \
         > "$info_response_file" 2>/dev/null; then
       jq --arg id "$model_id" '
         def info_object:
           if type == "object" then
-            if (.data | type) == "array" then (.data[0] // {})
+            if (.data | type) == "array" then (.data | map(select(.model_name == $id)) | if length > 0 then .[0] else {} end)
             elif (.data | type) == "object" then .data
             else .
             end
           else {}
           end;
         {($id): info_object}
-      ' "$info_response_file" >> "$info_entries_file"
+      ' "$info_response_file" >> "$info_entries_file" 2>/dev/null || true
     fi
   done < "$model_ids_file"
 
@@ -339,7 +345,7 @@ while IFS='	' read -r provider_name base_url api api_key_expr compat_json; do
                 cacheRead: ($pricing.cacheRead // $pricing.cache_read // first_number([["cache_read_input_token_cost"]]; null)),
                 cacheWrite: ($pricing.cacheWrite // $pricing.cache_write // first_number([["cache_creation_input_token_cost"]]; null))
               }
-              | with_entries(select(.value != null)) as $derived_cost
+              | with_entries(select(.value != null and .value != 0)) as $derived_cost
               | if ($derived_cost | length) == 0 then {} else {cost: $derived_cost} end
           end;
 
@@ -403,3 +409,4 @@ while IFS='	' read -r provider_name base_url api api_key_expr compat_json; do
 done < "$providers_file"
 
 jq -s '{providers: add}' "$entries_file"
+exit "$any_failed"

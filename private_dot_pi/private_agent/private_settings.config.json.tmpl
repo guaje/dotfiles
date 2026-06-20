@@ -3,10 +3,10 @@
   "autoModelSelectionEnabled": false,
   "defaultModel": "gpt-5.5",
   "defaultProvider": "openai-codex",
-  "defaultThinkingLevel": "medium",
+  "defaultThinkingLevel": "high",
   "enabledModels": [
     "openai-codex/gpt-5.5",
-    "reallms-dev/Kimi-K2.6",
+    "reallms-dev/GLM-5.2",
     "kelley/Kimi-K2.6",
     "reallms/gpt-oss-120b",
     "reallms/gemma-4-31B-it",
@@ -18,7 +18,13 @@
   ],
   "extensions": [
     "-extensions/google-search.ts",
-    "-extensions/scoped-limits.ts"
+    "-extensions/scoped-limits.ts",
+    "extensions/subagent/index.ts",
+    "extensions/auto-model-selection.ts",
+    "extensions/confirm-before-actions.ts",
+    "extensions/model-health-check.ts",
+    "extensions/native-notify.ts",
+    "extensions/reload-merged-settings.ts"
   ],
   "imageGenerationProviders": {
     "reallms-dev": {

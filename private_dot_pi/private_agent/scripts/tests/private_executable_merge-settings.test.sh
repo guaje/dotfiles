@@ -101,7 +101,7 @@ chmod +x "$TMP_ROOT/bin/node" "$TMP_ROOT/bin/dirname" "$TMP_ROOT/bin/rm" "$TMP_R
 cat > "$FIXTURE_AGENT/settings.config.json" <<'JSON'
 {
   "theme": "catppuccin-mocha",
-  "autoModelSelectionEnabled": false
+  "quietStartup": false
 }
 JSON
 cat > "$FIXTURE_AGENT/settings.json" <<'JSON'
@@ -113,10 +113,10 @@ JSON
 OUTPUT=$(cd "$TMP_ROOT" && PATH="$TMP_ROOT/bin" "$FIXTURE_SCRIPTS/merge-settings.sh") || fail "merge-settings.sh should fall back to node when jq is unavailable"
 [ "$OUTPUT" = "Wrote settings.json" ] || fail "node fallback should still print the output path"
 FALLBACK_THEME=$(jq -r '.theme' "$FIXTURE_AGENT/settings.json")
-FALLBACK_AUTO_MODEL=$(jq -r '.autoModelSelectionEnabled' "$FIXTURE_AGENT/settings.json")
+FALLBACK_QUIET=$(jq -r '.quietStartup' "$FIXTURE_AGENT/settings.json")
 FALLBACK_CHANGELOG=$(jq -r '.lastChangelogVersion' "$FIXTURE_AGENT/settings.json")
 [ "$FALLBACK_THEME" = "catppuccin-mocha" ] || fail "node fallback should merge config"
-[ "$FALLBACK_AUTO_MODEL" = "false" ] || fail "node fallback should preserve boolean values"
+[ "$FALLBACK_QUIET" = "false" ] || fail "node fallback should preserve boolean values"
 [ "$FALLBACK_CHANGELOG" = "test-changelog-version" ] || fail "node fallback should preserve lastChangelogVersion"
 pass "merge-settings.sh falls back to node when jq is unavailable"
 

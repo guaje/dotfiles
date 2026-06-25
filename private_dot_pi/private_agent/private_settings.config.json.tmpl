@@ -1,6 +1,5 @@
 {{- /* chezmoi:template */ -}}
 {
-  "autoModelSelectionEnabled": false,
   "defaultModel": "gpt-5.5",
   "defaultProvider": "openai-codex",
   "defaultThinkingLevel": "high",
@@ -10,17 +9,12 @@
     "kelley/Kimi-K2.6",
     "reallms/gpt-oss-120b",
     "reallms/gemma-4-31B-it",
-    "reallms/Qwen3-Coder-Next",
-    "reallms-dev/claude-opus-4-7",
-    "reallms-dev/claude-opus-4-6",
-    "reallms-dev/claude-sonnet-4-6",
-    "reallms-dev/claude-haiku-4-5"
+    "reallms/Qwen3-Coder-Next"
   ],
   "extensions": [
     "-extensions/google-search.ts",
     "-extensions/scoped-limits.ts",
     "extensions/subagent/index.ts",
-    "extensions/auto-model-selection.ts",
     "extensions/confirm-before-actions.ts",
     "extensions/model-health-check.ts",
     "extensions/native-notify.ts",

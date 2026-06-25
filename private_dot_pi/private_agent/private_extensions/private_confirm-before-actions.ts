@@ -401,8 +401,6 @@ export function addManagingStyleSettingToSettingsList(
   }
 
   const insertAt = (() => {
-    const autoModelIndex = settingsList.items.findIndex((entry) => entry.id === "auto-model-selection");
-    if (autoModelIndex !== -1) return autoModelIndex + 1;
     const thinkingIndex = settingsList.items.findIndex((entry) => entry.id === "thinking");
     if (thinkingIndex !== -1) return thinkingIndex + 1;
     return settingsList.items.length;

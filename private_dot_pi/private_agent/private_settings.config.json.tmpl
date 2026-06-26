@@ -32,5 +32,7 @@
   },
   "linkupAPIKey": "{{ (index ((secret "-d" (joinPath .chezmoi.sourceDir "secrets/private_dot_pi/private_agent/private_settings.config.json.sops.yaml") | fromYaml).data | fromYaml) "linkupAPIKey") }}",
   "managingStyle": "Empowerment",
+  "subagentRosterCap": 10,
+  "subagentRosterScope": "user",
   "theme": "catppuccin-mocha"
 }

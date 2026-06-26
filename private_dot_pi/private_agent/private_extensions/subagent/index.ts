@@ -22,6 +22,12 @@ import { type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { type AgentConfig, type AgentScope, discoverAgents } from "./agents.ts";
 import {
+	DELEGATE_GUIDELINES,
+	buildRosterInjection,
+	hasRosterSentinel,
+} from "./roster.ts";
+import { getRosterSettings, patchSettingsMenuForRoster, refreshRosterSettingsCache } from "./roster-settings.ts";
+import {
 	getFinalOutput,
 	getResultOutput,
 	isFailedResult,
@@ -77,6 +83,25 @@ const SubagentParams = Type.Object({
 });
 
 export default function (pi: ExtensionAPI) {
+	// Autotrigger: inject the live agent roster into the system prompt so the
+	// model can match tasks to specialists and delegate on its own.
+	void patchSettingsMenuForRoster();
+
+	pi.on("session_start", async () => {
+		await refreshRosterSettingsCache();
+	});
+
+	pi.on("before_agent_start", async (event, ctx) => {
+		if (hasRosterSentinel(event.systemPrompt)) return;
+		const settings = await getRosterSettings();
+		// Discover with the configured scope. "user" = personal agents only
+		// (trusted); "both" = include project-local .pi/agents.
+		const discovery = discoverAgents(ctx.cwd, settings.scope);
+		const injection = buildRosterInjection(discovery.agents, settings);
+		if (!injection) return;
+		return { systemPrompt: event.systemPrompt + injection };
+	});
+
 	pi.registerTool({
 		name: "subagent",
 		label: "Subagent",
@@ -86,6 +111,7 @@ export default function (pi: ExtensionAPI) {
 			'Default agent scope is "user" (from ~/.pi/agent/agents).',
 			'To enable project-local agents in .pi/agents, set agentScope: "both" (or "project").',
 		].join(" "),
+		promptGuidelines: [DELEGATE_GUIDELINES],
 		parameters: SubagentParams,
 
 		async execute(_toolCallId, params, signal, onUpdate, ctx) {

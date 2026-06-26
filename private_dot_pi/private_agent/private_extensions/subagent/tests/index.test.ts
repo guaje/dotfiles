@@ -11,6 +11,8 @@ const MODULE_PATH = resolve(SUBAGENT_DIR, "index.ts");
 const TESTABLE_PATH = resolve(SUBAGENT_DIR, ".index.testable.ts");
 const AGENTS_STUB = resolve(SUBAGENT_DIR, ".index-agents-stub.ts");
 const SPAWN_STUB = resolve(SUBAGENT_DIR, ".index-spawn-stub.ts");
+const ROSTER_STUB = resolve(SUBAGENT_DIR, ".index-roster-stub.ts");
+const ROSTER_SETTINGS_STUB = resolve(SUBAGENT_DIR, ".index-roster-settings-stub.ts");
 
 const theme = { fg: (_color: string, text: string) => text, bold: (text: string) => text };
 
@@ -42,10 +44,31 @@ async function loadModule() {
 		].join("\n"),
 	);
 
-	// Testable copy: stub out discovery + spawn; keep real render/result/types.
+	// Stub roster (pure) + roster-settings (pi internals) so the test exercises
+	// index.ts orchestration in isolation.
+	writeFileSync(
+		ROSTER_STUB,
+		[
+			"export const DELEGATE_GUIDELINES = 'delegate guideline';",
+			"export function buildRosterInjection() { return ''; }",
+			"export function hasRosterSentinel() { return false; }",
+		].join("\n"),
+	);
+	writeFileSync(
+		ROSTER_SETTINGS_STUB,
+		[
+			"export async function getRosterSettings() { return { scope: 'user', cap: 10 }; }",
+			"export async function refreshRosterSettingsCache() { return { scope: 'user', cap: 10 }; }",
+			"export function patchSettingsMenuForRoster() { return Promise.resolve(); }",
+		].join("\n"),
+	);
+
+	// Testable copy: stub out discovery + spawn + roster; keep real render/result/types.
 	const source = readFileSync(MODULE_PATH, "utf8")
 		.replace(/from "\.\/agents\.ts"/, 'from "./.index-agents-stub.ts"')
-		.replace(/from "\.\/spawn\.ts"/, 'from "./.index-spawn-stub.ts"');
+		.replace(/from "\.\/spawn\.ts"/, 'from "./.index-spawn-stub.ts"')
+		.replace(/from "\.\/roster\.ts"/, 'from "./.index-roster-stub.ts"')
+		.replace(/from "\.\/roster-settings\.ts"/, 'from "./.index-roster-settings-stub.ts"');
 	writeFileSync(TESTABLE_PATH, source);
 
 	const moduleUrl = `${pathToFileURL(TESTABLE_PATH).href}?t=${Date.now()}`;
@@ -56,13 +79,15 @@ function cleanup() {
 	rmSync(TESTABLE_PATH, { force: true });
 	rmSync(AGENTS_STUB, { force: true });
 	rmSync(SPAWN_STUB, { force: true });
+	rmSync(ROSTER_STUB, { force: true });
+	rmSync(ROSTER_SETTINGS_STUB, { force: true });
 	delete (globalThis as any).__subagentDiscovery;
 	delete (globalThis as any).__subagentRunHandler;
 }
 
 function captureTool(mod: any) {
 	let tool: any = null;
-	mod.default({ registerTool: (t: any) => { tool = t; } });
+	mod.default({ on: () => {}, registerTool: (t: any) => { tool = t; } });
 	assert.ok(tool, "tool should be registered");
 	return tool;
 }

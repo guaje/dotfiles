@@ -67,6 +67,42 @@ test("discoverAgents (user scope) loads agents from the user agent dir", async (
 	}
 });
 
+test("discoverAgents parses thinking and contextFiles frontmatter fields", async () => {
+	const mod = await loadModule();
+	const { userDir } = makeTree();
+	(globalThis as any).__subagentAgentDir = userDir;
+	try {
+		writeAgent(
+			join(userDir, "agents"),
+			"scout.md",
+			AGENT_MD("scout", "Fast recon", "tools: read, grep\nthinking: high\ncontextFiles: false"),
+		);
+		writeAgent(
+			join(userDir, "agents"),
+			"planner.md",
+			AGENT_MD("planner", "Planning", "thinking: xhigh"),
+		);
+		// Invalid thinking level is dropped (falls back to undefined).
+		writeAgent(
+			join(userDir, "agents"),
+			"bad.md",
+			AGENT_MD("bad", "Bad thinking", "thinking: bogus"),
+		);
+
+		const result = mod.discoverAgents(resolve(userDir, "anywhere"), "user");
+		const byName = new Map(result.agents.map((a: any) => [a.name, a]));
+		assert.equal(byName.get("scout").thinking, "high");
+		assert.equal(byName.get("scout").contextFiles, false);
+		assert.equal(byName.get("planner").thinking, "xhigh");
+		// contextFiles defaults to undefined when omitted.
+		assert.equal(byName.get("planner").contextFiles, undefined);
+		// Invalid thinking value is rejected.
+		assert.equal(byName.get("bad").thinking, undefined);
+	} finally {
+		cleanup();
+	}
+});
+
 test("discoverAgents (project scope) walks up to find .pi/agents", async () => {
 	const mod = await loadModule();
 	const { userDir, projectRoot } = makeTree();

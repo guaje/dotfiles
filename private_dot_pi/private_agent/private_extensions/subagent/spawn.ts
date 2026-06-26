@@ -97,10 +97,17 @@ export async function runSingleAgent(
 		modelSelector = "explicit";
 	}
 
+	// An explicit thinking: frontmatter field is a hard override that wins over the
+	// auto-estimated effort (and applies to explicit-model agents too).
+	if (agent.thinking) {
+		thinkingLevel = agent.thinking;
+	}
+
 	const args: string[] = ["--mode", "json", "-p", "--no-session"];
 	if (selectedModel) args.push("--model", selectedModel);
 	if (thinkingLevel) args.push("--thinking", thinkingLevel);
 	if (agent.tools && agent.tools.length > 0) args.push("--tools", agent.tools.join(","));
+	if (agent.contextFiles === false) args.push("--no-context-files");
 
 	let tmpPromptDir: string | null = null;
 	let tmpPromptPath: string | null = null;

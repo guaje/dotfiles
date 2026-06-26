@@ -209,3 +209,90 @@ test("runSingleAgent uses an explicit agent.model as a hard override and skips s
 		cleanup();
 	}
 });
+
+test("runSingleAgent lets an explicit thinking: frontmatter override the auto-estimated level", async () => {
+	const mod = await loadModule();
+	// Auto-selection would pick "high", but the agent's thinking: xhigh must win.
+	(globalThis as any).__subagentModelDecision = {
+		modelId: "prov/reasoning-pro",
+		thinkingLevel: "high",
+		selector: "heuristic",
+	};
+	(globalThis as any).__subagentSpawnController = ({ args }: { args: string[] }) => {
+		assert.ok(args.includes("--thinking"));
+		assert.equal(args[args.indexOf("--thinking") + 1], "xhigh");
+		return { lines: [], code: 0 };
+	};
+	try {
+		const result = await mod.runSingleAgent(
+			"/cwd",
+			[{ name: "scout", description: "d", thinking: "xhigh", systemPrompt: "", source: "user", filePath: "/x" }],
+			"scout",
+			"deep analysis",
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			makeDetails,
+			{},
+			false,
+		);
+		assert.equal(result.exitCode, 0);
+		assert.equal(result.thinkingLevel, "xhigh");
+	} finally {
+		cleanup();
+	}
+});
+
+test("runSingleAgent passes --no-context-files when agent.contextFiles is false", async () => {
+	const mod = await loadModule();
+	(globalThis as any).__subagentModelDecision = { modelId: "prov/x", selector: "heuristic" };
+	(globalThis as any).__subagentSpawnController = ({ args }: { args: string[] }) => {
+		assert.ok(args.includes("--no-context-files"), "child should receive --no-context-files");
+		return { lines: [], code: 0 };
+	};
+	try {
+		const result = await mod.runSingleAgent(
+			"/cwd",
+			[{ name: "scout", description: "d", contextFiles: false, systemPrompt: "", source: "user", filePath: "/x" }],
+			"scout",
+			"recon",
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			makeDetails,
+			{},
+			false,
+		);
+		assert.equal(result.exitCode, 0);
+	} finally {
+		cleanup();
+	}
+});
+
+test("runSingleAgent omits --no-context-files by default", async () => {
+	const mod = await loadModule();
+	(globalThis as any).__subagentModelDecision = { modelId: "prov/x", selector: "heuristic" };
+	(globalThis as any).__subagentSpawnController = ({ args }: { args: string[] }) => {
+		assert.ok(!args.includes("--no-context-files"), "should not pass --no-context-files by default");
+		return { lines: [], code: 0 };
+	};
+	try {
+		await mod.runSingleAgent(
+			"/cwd",
+			[{ name: "worker", description: "d", systemPrompt: "", source: "user", filePath: "/x" }],
+			"worker",
+			"build",
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			makeDetails,
+			{},
+			false,
+		);
+	} finally {
+		cleanup();
+	}
+});

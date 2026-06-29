@@ -28,12 +28,14 @@
       "models": [
         {
           "id": "Qwen3-Coder-Next",
-          "name": "Qwen3-Coder-Next"
+          "name": "Qwen3-Coder-Next",
+          "contextWindow": 256000
         },
         {
           "id": "gemma-4-31B-it",
           "name": "Gemma 4 31B IT",
-          "reasoning": true
+          "reasoning": true,
+          "contextWindow": 256000
         },
         {
           "id": "gpt-oss-120b",
@@ -56,7 +58,7 @@
            "name": "GLM-5.2",
            "reasoning": true,
            "input": ["text"],
-           "contextWindow": 524288,
+           "contextWindow": 393216,
            "maxTokens": 8192
          }
       ]

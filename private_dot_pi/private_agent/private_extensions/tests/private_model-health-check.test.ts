@@ -83,6 +83,21 @@ async function loadExtension() {
   return import(moduleUrl);
 }
 
+// Restore original settings + cache before every test so no test can pollute
+// another by leaving a mutated SETTINGS_CONFIG_PATH / cache behind. The
+// originals are captured once at load; tests that need a dirty state set it
+// up themselves and this hook resets it before the next test runs.
+test.beforeEach(() => {
+  writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
+  if (ORIGINAL_CACHE === undefined) {
+    rmSync(CACHE_PATH, { force: true });
+  } else {
+    writeFileSync(CACHE_PATH, ORIGINAL_CACHE);
+  }
+  delete (globalThis as any).__completeSimpleMock;
+});
+
 test("checks model health with a concurrency limit and caches results", async () => {
   const mod = await loadExtension();
   const checkModelHealth = mod.checkModelHealth;

@@ -74,6 +74,10 @@ function isAutoNotificationAvailable() {
   if (!isTermux()) return false;
   if (process.env.IMAGE_FORCE_OPEN === '1') return false;
   if (process.env.IMAGE_DISABLE_AUTONOTIFICATION === '1') return false;
+  // Explicit override so callers (and tests) can force the AutoNotification-available
+  // branch on any OS, instead of relying on `am` being on PATH (which is also true
+  // on macOS via /usr/bin/am, making the detection OS-dependent).
+  if (process.env.IMAGE_FORCE_AUTONOTIFICATION === '1') return true;
   return commandExists('am');
 }
 

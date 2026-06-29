@@ -167,6 +167,8 @@ Useful environment overrides:
 - `IMAGE_SIZE` to request a supported size, defaulting to `1024x1024`.
 - `IMAGE_OUT_DIR` to override the default Pictures/generated output directory.
 - `IMAGE_OPEN_DELAY_SECONDS` to tune delayed Termux image opening.
+- `IMAGE_DISABLE_AUTONOTIFICATION=1` to force the delayed-opener fallback even when AutoNotification is available.
+- `IMAGE_FORCE_AUTONOTIFICATION=1` to force the AutoNotification-available branch (skip immediate open) on any OS, overriding `am` PATH detection. Useful for tests.
 - `IMAGE_AGENT_DIR` for tests or unusual layouts; defaults to the script's containing `agent` directory.
 
 ## User Interaction Rules

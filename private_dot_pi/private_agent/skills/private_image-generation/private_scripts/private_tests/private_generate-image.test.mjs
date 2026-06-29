@@ -127,6 +127,10 @@ test('generate-image.mjs skips immediate Termux image open when AutoNotification
       IMAGE_OUT_DIR: outDir,
       TERMUX_VERSION: 'test-termux',
       PREFIX: '/data/data/com.termux/files/usr',
+      // Force the AutoNotification-available branch deterministically on any OS.
+      // Without this, isAutoNotificationAvailable() falls back to commandExists('am'),
+      // which is true on macOS (/usr/bin/am) and false elsewhere, making the test flaky.
+      IMAGE_FORCE_AUTONOTIFICATION: '1',
     },
   });
 

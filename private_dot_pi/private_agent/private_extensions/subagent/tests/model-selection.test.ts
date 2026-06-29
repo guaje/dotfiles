@@ -25,9 +25,9 @@ async function loadModule() {
 	writeFileSync(
 		HEALTH_STUB_PATH,
 		[
-			"export async function getHealthyEnabledModels(models) {",
-			"  const override = globalThis.__subagentHealthyModels;",
-			"  return override === undefined ? models : override;",
+			"export const MODEL_HEALTH_CACHE_TTL_MS = 15 * 60 * 1000;",
+			"export async function getFreshCachedResults() {",
+			"  return globalThis.__subagentHealthCache ?? null;",
 			"}",
 		].join("\n"),
 	);
@@ -46,7 +46,12 @@ async function loadModule() {
 function cleanup() {
 	rmSync(TESTABLE_PATH, { force: true });
 	rmSync(HEALTH_STUB_PATH, { force: true });
-	delete (globalThis as any).__subagentHealthyModels;
+	delete (globalThis as any).__subagentHealthCache;
+}
+
+// Helper: a fresh cache marking the given model ids as healthy (status "ok").
+function healthyCache(ids: string[]) {
+	return ids.map((id) => ({ id, status: "ok" }));
 }
 
 const FIXTURE_MODELS: ModelMetadata[] = [
@@ -107,7 +112,7 @@ test("selectMostPowerfulThinkingModel prefers reasoning + larger context", async
 
 test("selectModelForSubagent (heuristic) sets model + thinking level without touching the registry", async () => {
 	const mod = await loadModule();
-	(globalThis as any).__subagentHealthyModels = FIXTURE_MODELS;
+	(globalThis as any).__subagentHealthCache = healthyCache(FIXTURE_MODELS.map((m) => m.id));
 	try {
 		// Registry methods must never be called in heuristic mode.
 		const registry = {
@@ -120,6 +125,7 @@ test("selectModelForSubagent (heuristic) sets model + thinking level without tou
 		};
 		const result = await mod.selectModelForSubagent("analyze and debug the architecture", registry, {
 			useLlmSelector: false,
+			models: FIXTURE_MODELS,
 		});
 		assert.equal(result.modelId, "prov-a/reasoning-pro");
 		assert.equal(result.thinkingLevel, "xhigh");
@@ -131,10 +137,11 @@ test("selectModelForSubagent (heuristic) sets model + thinking level without tou
 
 test("selectModelForSubagent (heuristic) omits thinking level for non-reasoning models", async () => {
 	const mod = await loadModule();
-	(globalThis as any).__subagentHealthyModels = FIXTURE_MODELS;
+	(globalThis as any).__subagentHealthCache = healthyCache(FIXTURE_MODELS.map((m) => m.id));
 	try {
 		const result = await mod.selectModelForSubagent("summarize the list quickly", {}, {
 			useLlmSelector: false,
+			models: FIXTURE_MODELS,
 		});
 		assert.equal(result.modelId, "prov-c/flash-mini");
 		assert.equal(result.thinkingLevel, undefined);
@@ -146,11 +153,68 @@ test("selectModelForSubagent (heuristic) omits thinking level for non-reasoning 
 
 test("selectModelForSubagent returns empty when no healthy models are available", async () => {
 	const mod = await loadModule();
-	(globalThis as any).__subagentHealthyModels = [];
+	(globalThis as any).__subagentHealthCache = []; // fresh cache, zero healthy
 	try {
-		const result = await mod.selectModelForSubagent("any task", {}, { useLlmSelector: false });
+		const result = await mod.selectModelForSubagent("any task", {}, { useLlmSelector: false, models: FIXTURE_MODELS });
 		assert.equal(result.modelId, undefined);
 		assert.equal(result.thinkingLevel, undefined);
+	} finally {
+		cleanup();
+	}
+});
+
+test("selectModelForSubagent fails closed when the health cache is missing", async () => {
+	const mod = await loadModule();
+	// No __subagentHealthCache set -> getFreshCachedResults returns null (missing/stale).
+	try {
+		const result = await mod.selectModelForSubagent("analyze the architecture", {}, {
+			useLlmSelector: false,
+			models: FIXTURE_MODELS,
+		});
+		assert.equal(result.modelId, undefined, "missing cache must not auto-select");
+		assert.equal(result.thinkingLevel, undefined);
+	} finally {
+		cleanup();
+	}
+});
+
+test("selectModelForSubagent fails closed when every configured model is unhealthy", async () => {
+	const mod = await loadModule();
+	// Fresh cache, but all probed models are in an error state (e.g. VPN-only).
+	(globalThis as any).__subagentHealthCache = FIXTURE_MODELS.map((m) => ({
+		id: m.id,
+		status: "error",
+		error: "unreachable",
+	}));
+	try {
+		const result = await mod.selectModelForSubagent("analyze the architecture", {}, {
+			useLlmSelector: false,
+			models: FIXTURE_MODELS,
+		});
+		assert.equal(result.modelId, undefined, "unhealthy models must not be selected");
+		assert.equal(result.thinkingLevel, undefined);
+	} finally {
+		cleanup();
+	}
+});
+
+test("selectModelForSubagent only selects from the healthy subset, skipping unhealthy ones", async () => {
+	const mod = await loadModule();
+	// prov-a/reasoning-pro is healthy; the others are unhealthy. A complex task
+	// must pick the one healthy reasoning model, not fall back to the others.
+	(globalThis as any).__subagentHealthCache = [
+		{ id: "prov-a/reasoning-pro", status: "ok" },
+		{ id: "prov-b/coder", status: "error" },
+		{ id: "prov-c/flash-mini", status: "error" },
+		{ id: "prov-d/max-ultra", status: "error" },
+	];
+	try {
+		const result = await mod.selectModelForSubagent("analyze and debug the architecture", {}, {
+			useLlmSelector: false,
+			models: FIXTURE_MODELS,
+		});
+		assert.equal(result.modelId, "prov-a/reasoning-pro");
+		assert.equal(result.selector, "heuristic");
 	} finally {
 		cleanup();
 	}

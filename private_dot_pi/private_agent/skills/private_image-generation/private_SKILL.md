@@ -9,14 +9,18 @@ Use this skill when the user wants a new image or visual asset generated from te
 
 ## Required Availability Check
 
-Before generating any image:
+Before generating any image, confirm the target image-generation model is healthy. Health is tracked **per model** (each cache entry has its own `checkedAt`), so a stale cache does not force a full refresh.
 
-1. Read `agent/model-health-cache.json`.
-2. Only use cached results where:
-   - `service` is `imageGeneration`
-   - `status` is `ok`
-3. If there are no healthy image generation results, do **not** call an image generation endpoint. Tell the user that no image generation models are currently available and suggest running `/model-health` to refresh the cache.
-4. If the cache file is missing, invalid, or stale according to `MODEL_HEALTH_CACHE_TTL_MS` in `model-health-check.ts`, do **not** assume availability. Tell the user the health cache needs to be refreshed with `/model-health` before image generation.
+1. Read `agent/model-health-cache.json` and find the entry for the target model (`provider/model-id`).
+2. If the entry is fresh (per-entry `checkedAt` within `MODEL_HEALTH_CACHE_TTL_MS` from `model-health-check.ts`) and `status` is `ok`, proceed.
+3. If the entry is stale, missing, or not `ok`, **refresh just that model** before refusing:
+   ```bash
+   MODEL_IDS='<provider/model-id>' node agent/skills/image-generation/scripts/refresh-model-health.mjs
+   ```
+   This probes only the target model and updates its cache entry, leaving other entries and the batch `checkedAt` untouched. Re-read the cache and check the refreshed entry.
+4. Only after a refresh confirms `status: ok`, proceed to generate. If the refresh still reports the model unhealthy (auth-missing, error, not-found), do **not** call the generation endpoint. Report the model and status to the user and suggest `/model-health` for a full batch check.
+
+The refresh script only probes image-generation models (it resolves provider config from `models.json` + `settings.config.json` standalone, no pi runtime). Chat models in the cache are not refreshed by the script. To refresh all image-generation models at once, run the script without `MODEL_IDS`.
 
 The health extension gets configured image models from `imageGenerationProviders` in `agent/settings.config.json` or `agent/settings.json`, and provider connection details from `agent/models.json`. Follow that same source-of-truth.
 

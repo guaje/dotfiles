@@ -55,6 +55,10 @@ export interface ModelHealthResult {
   error?: string;
   name?: string;
   service?: "chat" | "imageGeneration";
+  /** Per-result freshness timestamp (ms since epoch). Set by every probe. Absent
+   * on caches written before per-result freshness was introduced; treated as
+   * stale by `getFreshCachedModelResult` so a single-model refresh is forced. */
+  checkedAt?: number;
 }
 
 interface ProbeContext {
@@ -188,7 +192,17 @@ async function resolveApiKey(value: string | undefined): Promise<string> {
 async function readCacheFile(): Promise<CacheFile | null> {
   try {
     const data = await readFile(CACHE_PATH, "utf8");
-    return JSON.parse(data) as CacheFile;
+    const cache = JSON.parse(data) as CacheFile;
+    // Migration: older caches have no per-result checkedAt. Stamp each entry
+    // with the batch checkedAt so batch consumers (getFreshCachedResults) keep
+    // working unchanged; single-model consumers (getFreshCachedModelResult)
+    // will treat the entry as fresh-or-stale against the batch timestamp.
+    if (cache?.results) {
+      for (const result of cache.results) {
+        if (result.checkedAt === undefined) result.checkedAt = cache.checkedAt;
+      }
+    }
+    return cache;
   } catch {
     return null;
   }
@@ -199,11 +213,59 @@ async function writeCacheFile(results: ModelHealthResult[]): Promise<void> {
   await writeFile(CACHE_PATH, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
 }
 
-async function getFreshCachedResults(cacheTtlMs: number): Promise<ModelHealthResult[] | null> {
+export async function getFreshCachedResults(cacheTtlMs: number): Promise<ModelHealthResult[] | null> {
   const cache = await readCacheFile();
   if (!cache) return null;
   if (Date.now() - cache.checkedAt > cacheTtlMs) return null;
   return cache.results;
+}
+
+/** Read one model's cached result if it is fresh at the per-result level. */
+export async function getFreshCachedModelResult(
+  modelId: string,
+  cacheTtlMs: number,
+): Promise<ModelHealthResult | null> {
+  const cache = await readCacheFile();
+  if (!cache) return null;
+  const entry = cache.results.find((r) => r.id === modelId);
+  if (!entry) return null;
+  const checkedAt = entry.checkedAt ?? cache.checkedAt;
+  if (Date.now() - checkedAt > cacheTtlMs) return null;
+  return entry;
+}
+
+/** Update exactly one model's entry in the cache, leaving all others and the
+ * batch `checkedAt` untouched. Used by single-model refresh-on-demand so a
+ * probe of one model cannot make stale entries for other models look fresh. */
+export async function mergeModelResult(result: ModelHealthResult): Promise<void> {
+  const cache = (await readCacheFile()) ?? { checkedAt: Date.now(), results: [] };
+  const index = cache.results.findIndex((r) => r.id === result.id);
+  if (index === -1) cache.results.push(result);
+  else cache.results[index] = result;
+  await writeFile(CACHE_PATH, `${JSON.stringify(cache, null, 2)}\n`, "utf8");
+}
+
+/** Probe a single model and merge its fresh result into the cache. Returns the
+ * fresh result. Does not touch the batch `checkedAt` or any other entry. */
+export async function probeModelHealth(
+  modelId: string,
+  ctx: ProbeContext,
+): Promise<ModelHealthResult> {
+  const allModels = await getEnabledModelsMetadata();
+  const metadata = allModels.find((m) => m.id === modelId);
+  if (!metadata) {
+    const result: ModelHealthResult = {
+      id: modelId,
+      status: "not-found",
+      error: "Model not found in enabled models or imageGenerationProviders",
+      checkedAt: Date.now(),
+    };
+    await mergeModelResult(result);
+    return result;
+  }
+  const result = await probeModel(metadata, ctx);
+  await mergeModelResult(result);
+  return result;
 }
 
 async function mapWithConcurrency<T, R>(
@@ -239,6 +301,7 @@ function modelHealthResult(
     ...(error ? { error } : {}),
     name: metadata.name,
     service: metadata.service || "chat",
+    checkedAt: Date.now(),
   };
 }
 
@@ -419,12 +482,16 @@ export async function getHealthyEnabledModels<T extends { id: string }>(
   models: T[],
   options: { cacheTtlMs?: number } = {},
 ): Promise<T[]> {
+  // Fail closed: no fresh health data -> no model is provably healthy.
+  // A missing or stale cache must not silently promote every enabled model
+  // (including unreachable ones, e.g. VPN-only) to "healthy".
   const cached = await getFreshCachedResults(options.cacheTtlMs ?? MODEL_HEALTH_CACHE_TTL_MS);
-  if (!cached) return models;
+  if (!cached) return [];
 
   const healthyIds = new Set(cached.filter((result) => result.status === "ok").map((result) => result.id));
-  const healthy = models.filter((model) => healthyIds.has(model.id));
-  return healthy.length > 0 ? healthy : models;
+  // Fail closed: if the probe found zero healthy models, return [] rather than
+  // falling back to the full list. The caller asked for *healthy* models.
+  return models.filter((model) => healthyIds.has(model.id));
 }
 
 export default function modelHealthCheckExtension(pi: ExtensionAPI) {

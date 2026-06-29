@@ -17,7 +17,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { completeSimple, type Model } from "@earendil-works/pi-ai";
-import { getHealthyEnabledModels } from "../model-health-check.ts";
+import { getFreshCachedResults, MODEL_HEALTH_CACHE_TTL_MS } from "../model-health-check.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -318,13 +318,25 @@ async function selectModelWithThinkingSelector(
 export async function selectModelForSubagent(
 	task: string,
 	registry: ModelSelectionRegistry,
-	options: { useLlmSelector?: boolean } = {},
+	options: { useLlmSelector?: boolean; models?: ModelMetadata[] } = {},
 ): Promise<ModelSelectionResult> {
 	const useLlm = options.useLlmSelector ?? false;
 	try {
-		const allModels = await getEnabledModelsMetadata();
+		const allModels = options.models ?? (await getEnabledModelsMetadata());
 		if (allModels.length === 0) return {};
-		const models = await getHealthyEnabledModels(allModels);
+
+		// Fail closed: only auto-select from models proven healthy in a FRESH cache.
+		// Mirrors the image-generation SKILL.md availability check. A missing, stale,
+		// or all-unhealthy cache means we do NOT assume availability — return empty
+		// so the child spawns without --model and falls back to its default model
+		// (which is reachable) instead of picking an unreachable one (e.g. a
+		// VPN-only model) and hanging.
+		const cached = await getFreshCachedResults(MODEL_HEALTH_CACHE_TTL_MS);
+		if (!cached) return {};
+		const healthyIds = new Set(
+			cached.filter((r) => r.status === "ok").map((r) => r.id),
+		);
+		const models = allModels.filter((m) => healthyIds.has(m.id));
 		if (models.length === 0) return {};
 
 		if (useLlm) {

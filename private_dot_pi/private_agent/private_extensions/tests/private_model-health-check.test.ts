@@ -223,7 +223,7 @@ test("checks image generation models from settings.config before settings", asyn
     },
   }, { forceRefresh: true });
 
-  assert.deepEqual(results, [{
+  assert.deepEqual(results.map((r) => ({ id: r.id, status: r.status, name: r.name, service: r.service })), [{
     id: "reallms-dev/z-image-turbo",
     status: "ok",
     name: "z-image-turbo",
@@ -267,7 +267,7 @@ test("falls back to settings image generation models when settings.config has no
     },
   }, { forceRefresh: true });
 
-  assert.deepEqual(results, [{
+  assert.deepEqual(results.map((r) => ({ id: r.id, status: r.status, error: r.error, name: r.name, service: r.service })), [{
     id: "reallms-dev/settings-image-model",
     status: "not-found",
     error: "Image generation request failed (404): {\"error\":\"model not found\"}",
@@ -358,7 +358,7 @@ test("filters stale entries out of cached health check results", async () => {
     },
   }, { cacheTtlMs: 60_000 });
 
-  assert.deepEqual(results, [{ id: currentModel.id, status: "ok" }]);
+  assert.deepEqual(results.map((r) => ({ id: r.id, status: r.status })), [{ id: currentModel.id, status: "ok" }]);
 });
 
 test("filters models to healthy cached entries when available", async () => {
@@ -383,6 +383,168 @@ test("filters models to healthy cached entries when available", async () => {
 
   const filtered = await getHealthyEnabledModels(models, { cacheTtlMs: 60_000 });
   assert.deepEqual(filtered, [{ id: healthyModel.id, name: healthyModel.name }]);
+});
+
+test("getHealthyEnabledModels returns [] when the cache is missing", async () => {
+  writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
+  const mod = await loadExtension();
+  const getHealthyEnabledModels = mod.getHealthyEnabledModels;
+
+  const [model] = readAvailableTestModels(1);
+  // No cache file written -> getFreshCachedResults returns null.
+  try { rmSync(CACHE_PATH, { force: true }); } catch { /* may not exist */ }
+
+  const filtered = await getHealthyEnabledModels(
+    [{ id: model.id, name: model.name }],
+    { cacheTtlMs: 60_000 },
+  );
+  assert.deepEqual(filtered, [], "missing cache must not promote models to healthy");
+});
+
+test("getHealthyEnabledModels returns [] when the cache is stale", async () => {
+  writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
+  const mod = await loadExtension();
+  const getHealthyEnabledModels = mod.getHealthyEnabledModels;
+
+  const [model] = readAvailableTestModels(1);
+  writeFileSync(CACHE_PATH, `${JSON.stringify({
+    checkedAt: Date.now() - 60_000, // older than the 1s TTL below
+    results: [{ id: model.id, status: "ok" }],
+  }, null, 2)}\n`);
+
+  const filtered = await getHealthyEnabledModels(
+    [{ id: model.id, name: model.name }],
+    { cacheTtlMs: 1_000 },
+  );
+  assert.deepEqual(filtered, [], "stale cache must not promote models to healthy");
+});
+
+test("getHealthyEnabledModels returns [] when every cached model is unhealthy", async () => {
+  writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
+  const mod = await loadExtension();
+  const getHealthyEnabledModels = mod.getHealthyEnabledModels;
+
+  const [model] = readAvailableTestModels(1);
+  writeFileSync(CACHE_PATH, `${JSON.stringify({
+    checkedAt: Date.now(),
+    results: [{ id: model.id, status: "error", error: "offline" }],
+  }, null, 2)}\n`);
+
+  const filtered = await getHealthyEnabledModels(
+    [{ id: model.id, name: model.name }],
+    { cacheTtlMs: 60_000 },
+  );
+  assert.deepEqual(filtered, [], "zero healthy must not fall back to all models");
+});
+
+test("getFreshCachedModelResult returns a fresh per-model entry and null when stale", async () => {
+  writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
+  const mod = await loadExtension();
+  const getFreshCachedModelResult = mod.getFreshCachedModelResult;
+
+  const [model] = readAvailableTestModels(1);
+  writeFileSync(CACHE_PATH, `${JSON.stringify({
+    checkedAt: Date.now(),
+    results: [{ id: model.id, status: "ok", checkedAt: Date.now() }],
+  }, null, 2)}\n`);
+
+  const fresh = await getFreshCachedModelResult(model.id, 60_000);
+  assert.equal(fresh?.id, model.id);
+  assert.equal(fresh?.status, "ok");
+
+  // Stale per-entry checkedAt -> null even if batch checkedAt is fresh.
+  writeFileSync(CACHE_PATH, `${JSON.stringify({
+    checkedAt: Date.now(),
+    results: [{ id: model.id, status: "ok", checkedAt: Date.now() - 60_000 }],
+  }, null, 2)}\n`);
+  const stale = await getFreshCachedModelResult(model.id, 1_000);
+  assert.equal(stale, null);
+});
+
+test("mergeModelResult updates one entry without touching the batch checkedAt or other entries", async () => {
+  writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
+  const mod = await loadExtension();
+  const mergeModelResult = mod.mergeModelResult;
+
+  const batchCheckedAt = Date.now();
+  writeFileSync(CACHE_PATH, `${JSON.stringify({
+    checkedAt: batchCheckedAt,
+    results: [
+      { id: "prov-a/other", status: "ok", checkedAt: batchCheckedAt },
+    ],
+  }, null, 2)}\n`);
+
+  await mergeModelResult({
+    id: "prov-a/refreshed",
+    status: "ok",
+    service: "imageGeneration",
+    checkedAt: Date.now(),
+  });
+
+  const cache = JSON.parse(readFileSync(CACHE_PATH, "utf8"));
+  assert.equal(cache.checkedAt, batchCheckedAt, "batch checkedAt must be unchanged");
+  const other = cache.results.find((r) => r.id === "prov-a/other");
+  assert.equal(other.checkedAt, batchCheckedAt, "other entry must be unchanged");
+  const refreshed = cache.results.find((r) => r.id === "prov-a/refreshed");
+  assert.equal(refreshed.status, "ok");
+});
+
+test("probeModelHealth probes one image model and merges only its entry", async () => {
+  writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({
+    enabledModels: [],
+    imageGenerationProviders: {
+      "reallms-dev": { models: [{ id: "z-image-turbo", name: "z-image-turbo" }] },
+    },
+  }, null, 2)}\n`);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
+  const mod = await loadExtension();
+  const probeModelHealth = mod.probeModelHealth;
+
+  const batchCheckedAt = Date.now() - 1000;
+  writeFileSync(CACHE_PATH, `${JSON.stringify({
+    checkedAt: batchCheckedAt,
+    results: [{ id: "other/model", status: "ok", checkedAt: batchCheckedAt }],
+  }, null, 2)}\n`);
+
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ data: [{ b64_json: "iVBORw0KGgo=" }] }), { status: 200 })
+  ) as typeof fetch;
+
+  const result = await probeModelHealth("reallms-dev/z-image-turbo", {
+    modelRegistry: {
+      find() { throw new Error("image probe must not use chat registry"); },
+      async getApiKeyAndHeaders() { throw new Error("image probe must not use chat auth"); },
+    },
+  });
+  assert.equal(result.status, "ok");
+  assert.equal(result.service, "imageGeneration");
+  assert.ok(result.checkedAt, "probed result must have a checkedAt");
+
+  // Batch checkedAt and the other entry are untouched.
+  const cache = JSON.parse(readFileSync(CACHE_PATH, "utf8"));
+  assert.equal(cache.checkedAt, batchCheckedAt);
+  const other = cache.results.find((r) => r.id === "other/model");
+  assert.equal(other.checkedAt, batchCheckedAt);
+  const probed = cache.results.find((r) => r.id === "reallms-dev/z-image-turbo");
+  assert.equal(probed.status, "ok");
+});
+
+test("probeModelHealth returns not-found for an unknown model", async () => {
+  writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
+  const mod = await loadExtension();
+  const probeModelHealth = mod.probeModelHealth;
+  rmSync(CACHE_PATH, { force: true });
+
+  const result = await probeModelHealth("prov/does-not-exist", {
+    modelRegistry: { find() { return undefined; }, async getApiKeyAndHeaders() { return { ok: false, error: "x" }; } },
+  });
+  assert.equal(result.status, "not-found");
 });
 
 test("registers a model-health command", async () => {

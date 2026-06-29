@@ -1,5 +1,5 @@
 import { execFile as execFileCallback } from "node:child_process";
-import { access, realpath } from "node:fs/promises";
+import { access, readFile, realpath } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -15,6 +15,26 @@ async function pathExists(filePath: string): Promise<boolean> {
   try {
     await access(filePath);
     return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validate that a candidate dir is the real installed package, not a test
+ * stub. Extension tests materialise minimal stub packages into
+ * agent/extensions/node_modules/ (with a package.json that has no `version`)
+ * so bare specifiers resolve under tsx. jiti's createRequire-based
+ * require.resolve can pick those stubs up as a package-root candidate; a real
+ * npm install always has a `version` field, so requiring it reliably filters
+ * stubs out without depending on a specific install layout.
+ */
+async function isRealPackageRoot(dir: string): Promise<boolean> {
+  const pkgJsonPath = path.resolve(dir, "package.json");
+  if (!(await pathExists(pkgJsonPath))) return false;
+  try {
+    const pkg = JSON.parse(await readFile(pkgJsonPath, "utf8"));
+    return typeof pkg.version === "string" && pkg.version.length > 0;
   } catch {
     return false;
   }
@@ -102,7 +122,7 @@ export async function getPiPackageRoot(): Promise<string> {
       }
 
       for (const candidate of candidates) {
-        if (await pathExists(path.resolve(candidate, "package.json"))) {
+        if (await isRealPackageRoot(candidate)) {
           return candidate;
         }
       }

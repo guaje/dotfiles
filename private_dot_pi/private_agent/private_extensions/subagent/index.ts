@@ -44,6 +44,21 @@ import {
 	type SubagentDetails,
 	emptyUsage,
 } from "./types.ts";
+import { detailsToWidgetState, renderSubagentWidget, type SubagentWidgetState } from "./widget.ts";
+
+// --- BelowEditor subagent status widget (live aggregate state) ---
+let widgetState: SubagentWidgetState | null = null;
+let widgetTui: { requestRender: () => void } | null = null;
+
+function updateSubagentWidget(details: SubagentDetails): void {
+	widgetState = detailsToWidgetState(details);
+	widgetTui?.requestRender();
+}
+
+function clearSubagentWidget(): void {
+	widgetState = null;
+	widgetTui?.requestRender();
+}
 
 const LLM_SELECTOR_DESC =
 	"Use the LLM-based model selector instead of the keyword heuristic (default false). " +
@@ -87,8 +102,28 @@ export default function (pi: ExtensionAPI) {
 	// model can match tasks to specialists and delegate on its own.
 	void patchSettingsMenuForRoster();
 
-	pi.on("session_start", async () => {
+	pi.on("session_start", async (_event, ctx) => {
 		await refreshRosterSettingsCache();
+		if (!ctx.hasUI) return;
+		ctx.ui.setWidget(
+			"subagent",
+			(tui, theme) => {
+				widgetTui = tui;
+				return {
+					render: () => renderSubagentWidget(widgetState, theme),
+					invalidate: () => {},
+					dispose: () => {
+						widgetTui = null;
+					},
+				};
+			},
+			{ placement: "belowEditor" },
+		);
+	});
+
+	pi.on("session_shutdown", () => {
+		widgetState = null;
+		widgetTui = null;
 	});
 
 	pi.on("before_agent_start", async (event, ctx) => {
@@ -172,6 +207,15 @@ export default function (pi: ExtensionAPI) {
 						};
 				}
 			}
+
+
+			const mode = hasChain ? "chain" : hasTasks ? "parallel" : "single";
+			const widgetOnUpdate: OnUpdateCallback = (partial) => {
+				if (partial.details) updateSubagentWidget(partial.details);
+				onUpdate?.(partial);
+			};
+			try {
+			updateSubagentWidget({ mode, results: [] });
 
 			if (params.chain && params.chain.length > 0) {
 				const results: SingleResult[] = [];
@@ -257,16 +301,14 @@ export default function (pi: ExtensionAPI) {
 				}
 
 				const emitParallelUpdate = () => {
-					if (onUpdate) {
-						const running = allResults.filter((r) => r.exitCode === -1).length;
-						const done = allResults.filter((r) => r.exitCode !== -1).length;
-						onUpdate({
-							content: [
-								{ type: "text", text: `Parallel: ${done}/${allResults.length} done, ${running} running...` },
-							],
-							details: makeDetails("parallel")([...allResults]),
-						});
-					}
+					const running = allResults.filter((r) => r.exitCode === -1).length;
+					const done = allResults.filter((r) => r.exitCode !== -1).length;
+					widgetOnUpdate({
+						content: [
+							{ type: "text", text: `Parallel: ${done}/${allResults.length} done, ${running} running...` },
+						],
+						details: makeDetails("parallel")([...allResults]),
+					});
 				};
 
 				const results = await mapWithConcurrencyLimit(params.tasks, MAX_CONCURRENCY, async (t, index) => {
@@ -322,7 +364,7 @@ export default function (pi: ExtensionAPI) {
 					params.cwd,
 					undefined,
 					signal,
-					onUpdate,
+					widgetOnUpdate,
 					makeDetails("single"),
 					ctx.modelRegistry,
 					defaultUseLlmSelector,
@@ -347,6 +389,9 @@ export default function (pi: ExtensionAPI) {
 				content: [{ type: "text", text: `Invalid parameters. Available agents: ${available}` }],
 				details: makeDetails("single")([]),
 			};
+			} finally {
+				clearSubagentWidget();
+			}
 		},
 
 		renderCall: (args, theme, _context) => renderSubagentCall(args, theme),

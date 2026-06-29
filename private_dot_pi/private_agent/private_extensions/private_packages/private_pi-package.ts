@@ -21,13 +21,15 @@ async function pathExists(filePath: string): Promise<boolean> {
 }
 
 /**
- * Validate that a candidate dir is the real installed package, not a test
- * stub. Extension tests materialise minimal stub packages into
- * agent/extensions/node_modules/ (with a package.json that has no `version`)
- * so bare specifiers resolve under tsx. jiti's createRequire-based
- * require.resolve can pick those stubs up as a package-root candidate; a real
- * npm install always has a `version` field, so requiring it reliably filters
- * stubs out without depending on a specific install layout.
+ * Distinguish the real installed package from a minimal test stub for the
+ * require.resolve-discovered candidate. Extension tests materialise stub
+ * packages into agent/extensions/node_modules/ (package.json with no
+ * `version`) so bare specifiers resolve under tsx; jiti's createRequire-based
+ * require.resolve can pick one up as the package root. A real npm install
+ * always has a `version` field, so requiring it reliably filters stubs out
+ * without depending on a specific install layout. Only the require.resolve
+ * candidate is gated this way — env-var candidates (PI_PACKAGE_DIR,
+ * PI_CODING_AGENT_PACKAGE_ROOT) are explicit intent and trusted as-is.
  */
 async function isRealPackageRoot(dir: string): Promise<boolean> {
   const pkgJsonPath = path.resolve(dir, "package.json");
@@ -82,7 +84,14 @@ export async function getPiPackageRoot(): Promise<string> {
       }
 
       try {
-        candidates.push(path.dirname(require.resolve(`${PI_PACKAGE_NAME}/package.json`)));
+        // require.resolve can land on a minimal test stub materialised
+        // under agent/extensions/node_modules/ by extension tests (its
+        // package.json has no `version`); skip those so we fall through to
+        // the real install discovered via `which pi`/brew below.
+        const resolved = path.dirname(require.resolve(`${PI_PACKAGE_NAME}/package.json`));
+        if (await isRealPackageRoot(resolved)) {
+          candidates.push(resolved);
+        }
       } catch {
         // Ignore and continue through other candidates.
       }
@@ -122,7 +131,7 @@ export async function getPiPackageRoot(): Promise<string> {
       }
 
       for (const candidate of candidates) {
-        if (await isRealPackageRoot(candidate)) {
+        if (await pathExists(path.resolve(candidate, "package.json"))) {
           return candidate;
         }
       }

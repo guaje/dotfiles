@@ -26,8 +26,8 @@ Work through these areas in order. For each, examine real files, cite specific e
 - Build output / generated directories that must not be edited
 
 ### 2. Naming Conventions
-- File naming by type (components, utils, tests)
-- Directory, function, class, type/interface, constant naming
+- File naming by type (components, utils, tests, modules)
+- Directory, function, class, type/struct/interface, constant naming
 - Test file naming and location
 - Prefix/suffix conventions (e.g., `use` hooks, `Service` suffix)
 
@@ -47,10 +47,10 @@ Adapt to the language/framework. For frontend: component structure, state manage
 - Logging library and patterns
 
 ### 6. Type System & Data Modeling
-- Strictness level (tsconfig if applicable)
+- Type strictness (tsconfig/mypy/pyright/strict mode, if applicable)
 - Where types are defined: co-located, centralized, or both?
-- `any`/`unknown`/strict typing usage
-- Enum vs union types vs const objects
+- Dynamic/loose typing vs strict typing usage
+- Enum vs union types vs const objects (or language equivalents)
 - Validation library and where validation happens
 
 ### 7. Testing Patterns

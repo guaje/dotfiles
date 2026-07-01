@@ -69,17 +69,15 @@ Be honest about gaps. A false GO wastes more time than a HOLD. Score conservativ
 ## Files Retrieved
 
 List with exact line ranges:
-1. `path/to/file.ts` (lines 10-50) - Description of what's here
-2. `path/to/other.ts` (lines 100-150) - Description
+1. `path/to/file.ext` (lines 10-50) - Description of what's here
+2. `path/to/other.ext` (lines 100-150) - Description
 
 ## Key Code
 
 Critical types, interfaces, or functions:
 
-```typescript
-interface Example {
-  // actual code from the files
-}
+```
+// actual code from the files (use the file's own language)
 ```
 
 ## Architecture

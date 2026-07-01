@@ -44,9 +44,9 @@ severity/category file:line — description → action
 
 Example:
 ```
-critical/spec-deviation src/store.ts:15 — Uses REST API instead of GraphQL per plan → Rewrite data layer using GraphQL client as specified
-high/pattern-mismatch src/store.ts:42 — Direct state mutation; history-store.ts uses immutable updates → Use spread operators matching the pattern
-medium/testing tests/store.test.ts:8 — Missing edge case for empty input → Add test for empty array input
+critical/spec-deviation src/store.ext:15 — Uses REST API instead of GraphQL per plan → Rewrite data layer using GraphQL client as specified
+high/pattern-mismatch src/store.ext:42 — Direct state mutation; history-store.ext uses immutable updates → Use spread operators matching the pattern
+medium/testing tests/store.test:8 — Missing edge case for empty input → Add test for empty array input
 ```
 
 ## Verdict

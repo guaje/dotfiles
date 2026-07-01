@@ -26,11 +26,11 @@ Numbered steps, each small and actionable:
 3. ...
 
 ## Files to Modify
-- `path/to/file.ts` - what changes
-- `path/to/other.ts` - what changes
+- `path/to/file.ext` - what changes
+- `path/to/other.ext` - what changes
 
 ## New Files (if any)
-- `path/to/new.ts` - purpose
+- `path/to/new.ext` - purpose
 
 ## Conventions to Follow
 - {patterns from the conventions-analyst or codebase that the builder must match}

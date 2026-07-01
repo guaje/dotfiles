@@ -29,7 +29,7 @@ You are a worker agent with full capabilities. You operate in an isolated contex
 What was done.
 
 ## Files Changed
-- `path/to/file.ts` - what changed
+- `path/to/file.ext` - what changed
 
 ## Verification
 - What was run to verify (test commands + results)

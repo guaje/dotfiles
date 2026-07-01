@@ -22,6 +22,7 @@ const ORIGINAL_CACHE = (() => {
 const STUB_PACKAGE_DIR = resolve("agent/extensions/node_modules");
 const PI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@earendil-works/pi-coding-agent");
 const PI_AI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@earendil-works/pi-ai");
+const PI_TUI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@earendil-works/pi-tui");
 
 interface AvailableTestModel {
   id: string;
@@ -76,6 +77,25 @@ async function loadExtension() {
     "export async function completeSimple(model, context, options) {",
     "  if (typeof globalThis.__completeSimpleMock === 'function') return globalThis.__completeSimpleMock(model, context, options);",
     "  return { stopReason: 'stop', content: [{ type: 'text', text: 'OK' }] };",
+    "}",
+  ].join("\n"));
+
+  mkdirSync(PI_TUI_PACKAGE_DIR, { recursive: true });
+  writeFileSync(resolve(PI_TUI_PACKAGE_DIR, "package.json"), JSON.stringify({
+    name: "@earendil-works/pi-tui",
+    type: "module",
+    exports: "./index.js",
+  }));
+  writeFileSync(resolve(PI_TUI_PACKAGE_DIR, "index.js"), [
+    "export class Container {",
+    "  constructor() { this.children = []; }",
+    "  addChild(c) { this.children.push(c); return c; }",
+    "  render() { return this.children.map((c) => (typeof c.text === 'string' ? c.text : '')).join(''); }",
+    "  invalidate() {}",
+    "}",
+    "export class Text {",
+    "  constructor(text) { this.text = text; }",
+    "  render() { return this.text; }",
     "}",
   ].join("\n"));
 
@@ -153,13 +173,13 @@ test("checks model health with a concurrency limit and caches results", async ()
     [...results].map((result: any) => [result.id, result.status]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
     expectedStatuses,
   );
-  assert.match(notifications[0]!.message, /checked model availability/);
+  assert.match(notifications[0]!.message, /Model health:/);
 
   delete (globalThis as any).__completeSimpleMock;
   notifications.length = 0;
   const cachedResults = await checkModelHealth(ctx, { notify: true, cacheTtlMs: 60_000 });
   assert.deepEqual(cachedResults, results);
-  assert.match(notifications[0]!.message, /Model health check used cached results/);
+  assert.match(notifications[0]!.message, /Model health \(cached\)/);
 });
 
 test("uses settings.config enabled models and skips stale scoped-provider models", async () => {
@@ -335,7 +355,7 @@ test("notify summary groups healthy chat and image generation models", async () 
   assert.equal(notifications[0]?.level, "info");
   assert.equal(
     notifications[0]?.message,
-    `Model health check used cached results: 2 enabled models queryable. 1 chat model (${chatModel.name}), 1 image generation model (z-image-turbo)`,
+    `Model health (cached): 2 enabled models queryable. 1 chat model (${chatModel.name}), 1 image generation model (z-image-turbo)`,
   );
 });
 
@@ -582,6 +602,117 @@ test("registers a model-health command", async () => {
   assert.equal(registeredCommand.description, "Check availability of enabled models and update health cache");
 });
 
+test("formatHealthTable renders chat model table with throughput and latency", async () => {
+  const mod = await loadExtension();
+  const formatHealthTable = mod.formatHealthTable;
+
+  const lines = formatHealthTable([
+    { id: "p/a", status: "ok", name: "Alpha", service: "chat", latencyMs: 1930, tokensPerSecond: 4.2 },
+    { id: "p/b", status: "ok", name: "Beta", service: "chat", latencyMs: 500 },
+    { id: "p/img", status: "ok", name: "img", service: "imageGeneration" },
+    { id: "p/bad", status: "error", name: "bad", service: "chat", error: "offline" },
+  ]);
+
+  assert.match(lines[0]!, /3 enabled models queryable/);
+  const table = lines.join("\n");
+  assert.match(table, /Model\s+Est\. tok\/s\s+E2E latency/);
+  assert.match(table, /Alpha\s+4\.2\s+1\.93s/);
+  assert.match(table, /Beta\s+—\s+0\.50s/);
+  assert.match(table, /1 image generation model \(img\)/);
+  assert.match(table, /Unavailable: p\/bad \(offline\)/);
+});
+
+test("formatHealthTable omits the chat table when only image models are healthy", async () => {
+  const mod = await loadExtension();
+  const lines = mod.formatHealthTable([
+    { id: "p/img", status: "ok", name: "img", service: "imageGeneration" },
+  ]);
+  const table = lines.join("\n");
+  assert.match(lines[0]!, /1 enabled model queryable/);
+  assert.doesNotMatch(table, /Est\. tok\/s/);
+  assert.match(table, /1 image generation model \(img\)/);
+});
+
+test("healthMessageRenderer builds a themed Container from message.details", async () => {
+  const mod = await loadExtension();
+  // Register the renderer via the extension factory with a capturing fake pi.
+  let renderer: any;
+  const pi: any = {
+    on() {},
+    registerCommand() {},
+    registerMessageRenderer(_type: string, r: any) { renderer = r; },
+  };
+  mod.default(pi);
+  assert.ok(typeof renderer === "function", "renderer was registered");
+
+  const results = [
+    { id: "p/a", status: "ok", name: "Alpha", service: "chat", latencyMs: 1000, tokensPerSecond: 8 },
+    { id: "p/img", status: "ok", name: "img", service: "imageGeneration" },
+  ];
+  const comp = renderer({ details: results }, { expanded: false }, { fg: (_c: string, t: string) => t, bold: (t: string) => t });
+  // Flatten the Container's Text children back to lines.
+  const table = comp.children.map((c: any) => c.text ?? "").join("\n");
+  assert.match(table, /2 enabled models queryable/);
+  assert.match(table, /Alpha/);
+  assert.match(table, /1 image generation model \(img\)/);
+});
+
+test("formatHealthTable applies theme color tokens per cell", async () => {
+  const mod = await loadExtension();
+  const fgCalls: { color: string; text: string }[] = [];
+  const boldCalls: string[] = [];
+  const recTheme = {
+    fg: (color: string, text: string) => { fgCalls.push({ color, text }); return text; },
+    bold: (text: string) => { boldCalls.push(text); return text; },
+  };
+  mod.formatHealthTable([
+    { id: "p/a", status: "ok", name: "Alpha", service: "chat", latencyMs: 1000, tokensPerSecond: 8 },
+    { id: "p/img", status: "ok", name: "img", service: "imageGeneration" },
+    { id: "p/bad", status: "error", name: "bad", service: "chat", error: "offline" },
+  ], recTheme);
+  const colors = new Set(fgCalls.map((c) => c.color));
+  assert.ok(colors.has("toolTitle"), "header uses toolTitle");
+  assert.ok(colors.has("dim"), "column header + separator + caveat use dim");
+  assert.ok(colors.has("text"), "model name uses text");
+  assert.ok(colors.has("toolOutput"), "values use toolOutput");
+  assert.ok(colors.has("muted"), "image line uses muted");
+  assert.ok(colors.has("error"), "unavailable line uses error");
+  assert.ok(boldCalls.some((t) => /queryable/.test(t)), "header label is bolded");
+});
+
+test("renderHealthTable notifies joined lines in non-tui mode", async () => {
+  const mod = await loadExtension();
+  const notifications: string[] = [];
+  await mod.renderHealthTable(
+    [{ id: "p/a", status: "ok", name: "Alpha", service: "chat", latencyMs: 1000, tokensPerSecond: 8 }],
+    { mode: "print", ui: { notify: (m: string) => notifications.push(m) } } as any,
+    {} as any,
+  );
+  assert.equal(notifications.length, 1);
+  assert.match(notifications[0]!, /1 enabled model queryable/);
+  assert.match(notifications[0]!, /\n/);
+  assert.match(notifications[0]!, /Alpha/);
+});
+
+test("renderHealthTable appends a custom chat message in tui mode", async () => {
+  const mod = await loadExtension();
+  const results = [{ id: "p/a", status: "ok", name: "Alpha", service: "chat", latencyMs: 1000, tokensPerSecond: 8 }];
+  let sent: { message: any; options: any } | undefined;
+  const pi = {
+    sendMessage: async (message: any, options?: any) => { sent = { message, options }; },
+  };
+  await mod.renderHealthTable(
+    results,
+    { mode: "tui", ui: { notify: () => { throw new Error("notify should not be used in tui mode"); } } } as any,
+    pi as any,
+  );
+  assert.ok(sent, "sendMessage was called");
+  assert.equal(sent!.message.customType, "model-health");
+  assert.equal(sent!.message.display, true);
+  assert.deepEqual(sent!.message.details, results);
+  assert.equal(sent!.options?.triggerTurn, false);
+});
+
 test.after(() => {
   delete (globalThis as any).__completeSimpleMock;
   writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
@@ -594,4 +725,5 @@ test.after(() => {
   }
   rmSync(PI_PACKAGE_DIR, { recursive: true, force: true });
   rmSync(PI_AI_PACKAGE_DIR, { recursive: true, force: true });
+  rmSync(PI_TUI_PACKAGE_DIR, { recursive: true, force: true });
 });

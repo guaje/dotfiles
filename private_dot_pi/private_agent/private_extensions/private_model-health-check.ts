@@ -3,8 +3,9 @@ import { readFile, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { completeSimple } from "@earendil-works/pi-ai";
+import { Container, Text } from "@earendil-works/pi-tui";
 
 const execAsync = promisify(exec);
 
@@ -59,6 +60,10 @@ export interface ModelHealthResult {
    * on caches written before per-result freshness was introduced; treated as
    * stale by `getFreshCachedModelResult` so a single-model refresh is forced. */
   checkedAt?: number;
+  /** End-to-end latency (ms) of the chat probe request, when measured. */
+  latencyMs?: number;
+  /** Estimated completion throughput (tokens/sec) from the 8-token probe sample. */
+  tokensPerSecond?: number;
 }
 
 interface ProbeContext {
@@ -294,6 +299,7 @@ function modelHealthResult(
   metadata: ModelMetadata,
   status: ModelHealthResult["status"],
   error?: string,
+  metrics?: { latencyMs?: number; tokensPerSecond?: number },
 ): ModelHealthResult {
   return {
     id: metadata.id,
@@ -302,6 +308,8 @@ function modelHealthResult(
     name: metadata.name,
     service: metadata.service || "chat",
     checkedAt: Date.now(),
+    ...(metrics?.latencyMs !== undefined ? { latencyMs: metrics.latencyMs } : {}),
+    ...(metrics?.tokensPerSecond !== undefined ? { tokensPerSecond: metrics.tokensPerSecond } : {}),
   };
 }
 
@@ -383,7 +391,8 @@ async function probeModel(metadata: ModelMetadata, ctx: ProbeContext): Promise<M
       return modelHealthResult(metadata, "auth-missing", auth.ok ? "No API key or request headers available" : (auth.error || "Authentication unavailable"));
     }
 
-    await completeSimple(
+    const t0 = Date.now();
+    const response = await completeSimple(
       model as never,
       {
         messages: [{ role: "user", content: "Reply with OK.", timestamp: Date.now() }],
@@ -395,8 +404,19 @@ async function probeModel(metadata: ModelMetadata, ctx: ProbeContext): Promise<M
         signal: AbortSignal.timeout(10000),
       },
     );
+    const latencyMs = Date.now() - t0;
 
-    return modelHealthResult(metadata, "ok");
+    // completeSimple does not throw on model-level errors; a non-ok stopReason
+    // means the request reached the API but the model is not usable (e.g. it
+    // aborted or errored mid-generation). Surface that as an error instead of
+    // a false-positive "ok".
+    if (response.stopReason === "error" || response.stopReason === "aborted") {
+      return modelHealthResult(metadata, "error", response.errorMessage || `model stopped: ${response.stopReason}`, { latencyMs });
+    }
+
+    const outputTokens = response.usage?.output ?? 0;
+    const tokensPerSecond = latencyMs > 0 && outputTokens > 0 ? outputTokens / (latencyMs / 1000) : undefined;
+    return modelHealthResult(metadata, "ok", undefined, { latencyMs, ...(tokensPerSecond !== undefined ? { tokensPerSecond } : {}) });
   } catch (error) {
     return modelHealthResult(metadata, "error", formatProbeError(error));
   }
@@ -433,7 +453,7 @@ function formatHealthySummary(healthy: ModelHealthResult[]): string {
 function notifyProbeSummary(results: ModelHealthResult[], ctx: ProbeContext, usedCache: boolean): void {
   if (!ctx.ui) return;
 
-  const prefix = usedCache ? "Model health check used cached results" : "Model health check checked model availability";
+  const prefix = usedCache ? "Model health (cached)" : "Model health";
   const failing = results.filter((result) => result.status !== "ok");
   const healthy = results.filter((result) => result.status === "ok");
 
@@ -494,7 +514,131 @@ export async function getHealthyEnabledModels<T extends { id: string }>(
   return models.filter((model) => healthyIds.has(model.id));
 }
 
+/** Build the /model-health table as pre-formatted monospaced lines: a header
+ * line, a per-model table of available chat models with estimated throughput
+ * and E2E latency, then one-line summaries for image-generation models and any
+ * unavailable models. Pure: no I/O, no TUI — fully unit-testable. */
+/** Minimal theme interface for the health table renderer. The real pi Theme
+ * satisfies this; keeping it narrow avoids depending on the full Theme type. */
+export interface HealthTheme {
+  fg(color: string, text: string): string;
+  bold(text: string): string;
+}
+
+const PASSTHROUGH_HEALTH_THEME: HealthTheme = { fg: (_c, t) => t, bold: (t) => t };
+
+/** Build the /model-health table as pre-formatted, theme-colored lines: a
+ * header line, a per-model table of available chat models with estimated
+ * throughput and E2E latency, then one-line summaries for image-generation
+ * models and any unavailable models. Pure: no I/O, no TUI — fully unit-testable. */
+/** Pi caps widget content at InteractiveMode.MAX_WIDGET_LINES (10). The widget
+ * path passes this so the table compacts to fit (folds image/unavailable
+ * counts into the header and drops decorations when short on space) instead
+ * of being truncated with "... (widget truncated)". The notify path omits it
+ * for the full layout. */
+/** Build the /model-health table as pre-formatted, theme-colored lines: a
+ * header line, a per-model table of available chat models with estimated
+ * throughput and E2E latency, then summaries for image-generation models and
+ * any unavailable models. Pure: no I/O, no TUI — fully unit-testable. */
+export function formatHealthTable(
+  results: ModelHealthResult[],
+  theme: HealthTheme = PASSTHROUGH_HEALTH_THEME,
+): string[] {
+  const okChat = results.filter((r) => r.status === "ok" && (r.service || "chat") === "chat");
+  const okImage = results.filter((r) => r.status === "ok" && r.service === "imageGeneration");
+  const failing = results.filter((r) => r.status !== "ok");
+  const healthy = okChat.length + okImage.length;
+
+  const lines: string[] = [];
+  lines.push(
+    theme.fg("toolTitle", theme.bold(
+      `Model health: ${healthy} enabled model${healthy === 1 ? "" : "s"} queryable`,
+    )),
+  );
+
+  if (okChat.length > 0) {
+    const NAME_W = 30;
+    const truncate = (t: string) => (t.length > NAME_W ? `${t.slice(0, NAME_W - 1)}…` : t);
+    const nameCol = (r: ModelHealthResult) => truncate(r.name || r.id.split("/")[1] || r.id).padEnd(NAME_W);
+    const tpsCol = (r: ModelHealthResult) =>
+      (r.tokensPerSecond !== undefined ? r.tokensPerSecond.toFixed(1) : "—").padStart(10);
+    const latCol = (r: ModelHealthResult) =>
+      (r.latencyMs !== undefined ? `${(r.latencyMs / 1000).toFixed(2)}s` : "—").padStart(11);
+
+    lines.push("");
+    lines.push(`  ${theme.fg("dim", `${"Model".padEnd(NAME_W)}  ${"Est. tok/s".padStart(10)}  ${"E2E latency".padStart(11)}`)}`);
+    lines.push(`  ${theme.fg("dim", `${"─".repeat(NAME_W)}  ${"─".repeat(10)}  ${"─".repeat(11)}`)}`);
+    for (const r of okChat) {
+      lines.push(`  ${theme.fg("text", nameCol(r))}  ${theme.fg("toolOutput", tpsCol(r))}  ${theme.fg("toolOutput", latCol(r))}`);
+    }
+  }
+
+  if (okImage.length > 0) {
+    lines.push("");
+    lines.push(
+      theme.fg("muted",
+        `${okImage.length} image generation model${okImage.length === 1 ? "" : "s"} (${okImage.map((r) => r.name || r.id).join(", ")})`,
+      ),
+    );
+  }
+
+  if (failing.length > 0) {
+    lines.push("");
+    lines.push(
+      theme.fg("error",
+        `Unavailable: ${failing.map((r) => `${r.id} (${r.error || r.status})`).join(", ")}`,
+      ),
+    );
+  }
+
+  return lines;
+}
+
+/** Custom-message renderer for the "model-health" chat entry. Builds a themed
+ * Container of Text lines from the results carried in `message.details`. The
+ * real Theme satisfies HealthTheme (fg/bold), so it is passed straight through
+ * to formatHealthTable. */
+function healthMessageRenderer(
+  message: { details?: ModelHealthResult[] },
+  _options: { expanded: boolean },
+  theme: HealthTheme,
+) {
+  const container = new Container();
+  for (const line of formatHealthTable(message.details ?? [], theme)) {
+    container.addChild(new Text(line, 1, 0));
+  }
+  return container;
+}
+
+/** Render the /model-health table. In the TUI it appends the table to the chat
+ * scrollback as a custom message (rendered by healthMessageRenderer) so it
+ * persists with the conversation and is never replaced by generated text; in
+ * non-interactive modes it falls back to a single multi-line notification. */
+export async function renderHealthTable(
+  results: ModelHealthResult[],
+  ctx: ExtensionCommandContext,
+  pi: ExtensionAPI,
+): Promise<void> {
+  const ui = ctx.ui as {
+    theme?: HealthTheme;
+    notify?: (message: string, type?: "info" | "warning" | "error") => void;
+  };
+  const sendMessage = (pi as { sendMessage?: (message: unknown, options?: { triggerTurn?: boolean }) => Promise<void> }).sendMessage;
+  if (ctx.mode === "tui" && typeof sendMessage === "function") {
+    await sendMessage?.(
+      { customType: "model-health", content: "", display: true, details: results },
+      { triggerTurn: false },
+    );
+    return;
+  }
+  ui.notify?.(formatHealthTable(results, ui.theme ?? PASSTHROUGH_HEALTH_THEME).join("\n"), "info");
+}
+
 export default function modelHealthCheckExtension(pi: ExtensionAPI) {
+  // Render /model-health results as a custom chat message (customMessageRenderer
+  // appends a themed table to the chat scrollback). Registered once at load.
+  pi.registerMessageRenderer?.("model-health", healthMessageRenderer as never);
+
   // Run health check once on initial startup (session_start) only.
   pi.on("session_start", async (_event, ctx) => {
     // Use a global flag so that a reload (which re‑imports this module) does not trigger another check.
@@ -506,7 +650,8 @@ export default function modelHealthCheckExtension(pi: ExtensionAPI) {
   pi.registerCommand?.("model-health", {
     description: "Check availability of enabled models and update health cache",
     handler: async (_args, ctx) => {
-      await checkModelHealth(ctx, { notify: true, forceRefresh: true, cacheTtlMs: 3600_000 });
+      const results = await checkModelHealth(ctx, { notify: false, forceRefresh: true, cacheTtlMs: 3600_000 });
+      await renderHealthTable(results, ctx, pi);
     },
   });
 }

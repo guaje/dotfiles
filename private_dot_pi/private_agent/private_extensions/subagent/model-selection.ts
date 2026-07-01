@@ -11,6 +11,19 @@
  *   - Heuristic (default, free): keyword classification of the task.
  *   - LLM selector (opt-in): a short LLM call to a powerful thinking model that
  *     picks the execution model + reasoning effort semantically.
+ *
+ * Layered selection (availability → capability → performance):
+ *   1. Availability: a fresh health cache with status "ok" (hard gate, fail
+ *      closed — never auto-select an unreachable model). See selectModelForSubagent.
+ *   2. Capability: reasoning flag + manual params/activeParams/quant metadata.
+ *      Hard-excludes weak models for xhigh/high tasks; ranks the rest.
+ *   3. Performance: latency/throughput from the health probe, used as a
+ *      tiebreak weighted by task length (latency for short tasks, throughput
+ *      for long tasks). Missing metrics are neutral, never penalizing.
+ *
+ * Models without manual metadata (params/activeParams/quant) fall back to the
+ * legacy keyword heuristic so unannotated fixtures/agents keep their proven
+ * behavior; the hard capability gate (reasoning flag) still applies.
  */
 
 import { readFile } from "node:fs/promises";
@@ -34,6 +47,14 @@ export interface ModelMetadata {
 	name: string;
 	reasoning?: boolean;
 	contextWindow?: number;
+	/** Total parameter count in billions (e.g. 120 for a 120B model). */
+	params?: number;
+	/** MoE active parameter count in billions. Predicts capability/throughput
+	 * better than total for Mixture-of-Experts models. */
+	activeParams?: number;
+	/** Serving quantization (e.g. "bf16", "fp8", "mxfp4", "int4"). The serving
+	 * quant of self-hosted endpoints; manual annotation is the source of truth. */
+	quant?: string;
 }
 
 interface Provider {
@@ -46,6 +67,12 @@ interface ModelsFile {
 
 interface SettingsFile {
 	enabledModels?: string[];
+}
+
+/** A model's probed performance metrics from the health cache. */
+export interface ModelPerfMetrics {
+	latencyMs?: number;
+	tokensPerSecond?: number;
 }
 
 /**
@@ -161,7 +188,114 @@ export function estimateReasoningEffort(task: string): ThinkingLevel {
 	return "medium";
 }
 
-export function selectMostPowerfulThinkingModel(models: ModelMetadata[]): string {
+/**
+ * Task length classification drives perf-tiebreak weights: latency dominates
+ * short tasks (summarize, ping), throughput dominates long tasks (implement,
+ * refactor, write). Mirrors estimateReasoningEffort's keyword style.
+ */
+export function estimateTaskLength(task: string): "short" | "long" | "balanced" {
+	const taskLower = task.toLowerCase();
+	if (/summarize|list|ping|status|quick|brief|short/i.test(taskLower)) return "short";
+	if (/implement|refactor|write|build|generate|scaffold|migration/i.test(taskLower)) return "long";
+	return "balanced";
+}
+
+/**
+ * Quantization tier (higher = higher fidelity). Used as a capability signal and
+ * a hard floor for high-reasoning tasks. Returns undefined for unannotated
+ * models so they are treated as neutral (not penalized) — the serving quant of
+ * self-hosted endpoints cannot be auto-detected, so absence is "unknown", not
+ * "low". Tier ordering: bf16/fp16 > fp8 > int4/fp4/mxfp4.
+ */
+export function quantTier(quant: string | undefined): number | undefined {
+	if (!quant) return undefined;
+	const q = quant.toLowerCase();
+	if (/\b(bf16|fp16|f16)\b/.test(q)) return 4;
+	if (/\bfp8\b/.test(q)) return 3;
+	if (/\b(int4|fp4|nf4|mxfp4|awq|gptq)\b/.test(q)) return 1;
+	return undefined;
+}
+
+/**
+ * Effective parameter count in billions. Prefers MoE activeParams (which
+ * predict capability/throughput far better than total for MoE), then total
+ * params, then a name-scraped estimate for unannotated models.
+ */
+export function effectiveParams(model: ModelMetadata): number {
+	if (model.activeParams !== undefined) return model.activeParams;
+	if (model.params !== undefined) return model.params;
+	return estimateParameterScale(modelSearchText(model));
+}
+
+/** True when any model carries manual capability metadata (params/activeParams/
+ * quant). When false, selectModel falls back to the legacy keyword heuristic so
+ * unannotated fixtures/agents keep their proven behavior. */
+export function hasCapabilityMetadata(models: ModelMetadata[]): boolean {
+	return models.some((m) => m.params !== undefined || m.activeParams !== undefined || m.quant !== undefined);
+}
+
+/**
+ * Capability score (higher = more capable). Reasoning is the dominant signal;
+ * quant tier and parameter count refine it. Unannotated quant is neutral (2).
+ */
+export function capabilityScore(model: ModelMetadata): number {
+	const text = modelSearchText(model);
+	let score = model.reasoning ? 10_000 : 0;
+	score += (quantTier(model.quant) ?? 2) * 1_000;
+	score += effectiveParams(model);
+	if (/\b(pro|ultra|max|large|high)\b/.test(text)) score += 1_000;
+	if (/\b(coder|code)\b/.test(text)) score += 150;
+	if (/\b(flash|mini|small|lite|fast)\b/.test(text)) score -= 250;
+	return score;
+}
+
+/**
+ * Hard capability gate for high-reasoning tasks (decision: hard-exclude for
+ * xhigh/high). A model is excluded if it is not reasoning-capable, or if it is
+ * annotated with a quant below the fp8 floor. Unannotated reasoning models pass
+ * (cannot prove they are below floor). medium/low tasks have no gate.
+ */
+export function passesCapabilityGate(model: ModelMetadata, reasoningEffort: ThinkingLevel): boolean {
+	if (reasoningEffort !== "high" && reasoningEffort !== "xhigh") return true;
+	if (!model.reasoning) return false;
+	const tier = quantTier(model.quant);
+	if (tier !== undefined && tier < 3) return false; // below fp8 floor
+	return true;
+}
+
+/** Min-max normalize to [0,1]; all-equal (or single) → 0.5 (no signal). */
+function normalizeMinMax(values: number[]): number[] {
+	if (values.length === 0) return [];
+	const min = Math.min(...values);
+	const max = Math.max(...values);
+	if (max === min) return values.map(() => 0.5);
+	const span = max - min;
+	return values.map((v) => (v - min) / span);
+}
+
+/**
+ * Performance score in [0,1] (higher = better). Latency is lower-is-better
+ * (normalized against a 10s probe timeout); throughput is higher-is-better
+ * (normalized against 100 tok/s). Missing metrics are neutral (0.5), NEVER
+ * zero — a reasoning model that spent the 8-token probe thinking has no
+ * throughput and must not be penalized. Weights by task length.
+ */
+export function perfScore(
+	model: ModelMetadata,
+	metricsById: Map<string, ModelPerfMetrics>,
+	length: "short" | "long" | "balanced",
+): number {
+	const m = metricsById.get(model.id);
+	const latencyScore = m?.latencyMs !== undefined ? Math.max(0, 1 - m.latencyMs / 10_000) : 0.5;
+	const throughputScore = m?.tokensPerSecond !== undefined ? Math.min(m.tokensPerSecond / 100, 1) : 0.5;
+	const weights = length === "short" ? [0.8, 0.2] : length === "long" ? [0.2, 0.8] : [0.5, 0.5];
+	return weights[0]! * latencyScore + weights[1]! * throughputScore;
+}
+
+export function selectMostPowerfulThinkingModel(
+	models: ModelMetadata[],
+	metricsById: Map<string, ModelPerfMetrics> = new Map(),
+): string {
 	const scoreModel = (model: ModelMetadata): number => {
 		const text = modelSearchText(model);
 		let score = model.reasoning ? 10_000 : 0;
@@ -172,11 +306,19 @@ export function selectMostPowerfulThinkingModel(models: ModelMetadata[]): string
 		if (/\b(flash|mini|small|lite|fast)\b/.test(text)) score -= 250;
 		return score;
 	};
+	// Latency tiebreak (decision: keep most-powerful-thinking selector, tiebreak
+	// equal-power candidates by lower latency). A tiny epsilon so latency only
+	// breaks ties, never overrides capability.
+	const latencyOf = (model: ModelMetadata): number => metricsById.get(model.id)?.latencyMs ?? Infinity;
 
-	return [...models].sort((a, b) => scoreModel(b) - scoreModel(a))[0]?.id || "unknown";
+	return [...models]
+		.sort((a, b) => scoreModel(b) - scoreModel(a) || latencyOf(a) - latencyOf(b))[0]?.id || "unknown";
 }
 
-export function selectModel(task: string, models: ModelMetadata[]): string {
+/** Legacy keyword-based selection. Preserved as the fallback for unannotated
+ * models (no params/activeParams/quant) so fixtures and agents without manual
+ * metadata keep their proven behavior. Operates on the already-gated set. */
+function selectModelByKeyword(task: string, models: ModelMetadata[]): string {
 	const taskLower = task.toLowerCase();
 
 	const isComplex = /reasoning|complex|architecture|design|debug|difficult|deep|think|analyze/i.test(taskLower);
@@ -210,8 +352,61 @@ export function selectModel(task: string, models: ModelMetadata[]): string {
 	return balancedModel?.id || models[0]?.id || "unknown";
 }
 
+/**
+ * Select an execution model for a task.
+ *
+ * Layered (availability is handled by the caller; this does capability → perf):
+ *   1. Hard capability gate (passesCapabilityGate) — for xhigh/high tasks,
+ *      excludes non-reasoning models and annotated-below-fp8 models. If no
+ *      candidate passes, returns undefined (caller defers to the child default
+ *      rather than sending a hard task to a weak model).
+ *   2. If no model carries manual metadata, fall back to selectModelByKeyword
+ *      on the gated set (legacy behavior).
+ *   3. Otherwise rank by capabilityScore (min-max normalized) + perfScore,
+ *      weighted by task length: capability dominates hard tasks, performance
+ *      dominates easy tasks (negative capability weight so easy tasks prefer
+ *      smaller/cheaper models).
+ *
+ * Returns undefined when no capable candidate exists (xhigh/high with no
+ * reasoning model); the caller then defers to the child's default model.
+ */
+export function selectModel(
+	task: string,
+	models: ModelMetadata[],
+	metricsById: Map<string, ModelPerfMetrics> = new Map(),
+): string | undefined {
+	const effort = estimateReasoningEffort(task);
+	const passing = models.filter((m) => passesCapabilityGate(m, effort));
+	if ((effort === "high" || effort === "xhigh") && passing.length === 0) return undefined;
+	const candidates = passing.length > 0 ? passing : models;
+
+	if (!hasCapabilityMetadata(models)) {
+		const id = selectModelByKeyword(task, candidates);
+		return id === "unknown" ? undefined : id;
+	}
+
+	const length = estimateTaskLength(task);
+	const normCap = normalizeMinMax(candidates.map(capabilityScore));
+	const perf = candidates.map((m) => perfScore(m, metricsById, length));
+	// Capability dominates hard tasks; performance dominates easy tasks. Negative
+	// capability weight for low tasks so easy tasks prefer smaller/cheaper models.
+	const capWeight = effort === "low" ? -0.3 : effort === "medium" || effort === "off" || effort === "minimal" ? 0.5 : 1.0;
+	const perfWeight = effort === "low" ? 1.0 : effort === "medium" || effort === "off" || effort === "minimal" ? 0.5 : 0.1;
+
+	let bestIdx = 0;
+	let bestScore = -Infinity;
+	for (let i = 0; i < candidates.length; i++) {
+		const score = capWeight * normCap[i]! + perfWeight * perf[i]!;
+		if (score > bestScore) {
+			bestScore = score;
+			bestIdx = i;
+		}
+	}
+	return candidates[bestIdx]?.id;
+}
+
 interface ModelSelectionDecision {
-	modelId: string;
+	modelId?: string;
 	reasoningEffort?: ThinkingLevel;
 	reason?: string;
 }
@@ -242,10 +437,24 @@ function sanitizeSelectionDecision(
 	decision: Partial<ModelSelectionDecision> | undefined,
 	task: string,
 	models: ModelMetadata[],
+	metricsById: Map<string, ModelPerfMetrics> = new Map(),
 ): ModelSelectionDecision {
-	const fallbackModelId = selectModel(task, models);
+	const effort = estimateReasoningEffort(task);
+	const fallbackModelId = selectModel(task, models, metricsById);
 	const candidateId = typeof decision?.modelId === "string" ? decision.modelId : fallbackModelId;
-	const modelId = models.some((model) => model.id === candidateId) ? candidateId : fallbackModelId;
+	let modelId = candidateId && models.some((model) => model.id === candidateId) ? candidateId : fallbackModelId;
+	// Enforce the capability hard gate on the LLM's choice: for xhigh/high
+	// tasks, a non-reasoning or below-fp8 model is never acceptable, even if
+	// the selector picked it. Fall back to the gated heuristic selection. The
+	// gate uses the task's intrinsic difficulty (keyword estimate), not the
+	// LLM's chosen reasoningEffort — a hard task stays hard regardless of
+	// reasoning budget.
+	if (modelId !== undefined && modelId !== fallbackModelId) {
+		const chosen = models.find((m) => m.id === modelId);
+		if (chosen && !passesCapabilityGate(chosen, effort)) {
+			modelId = fallbackModelId;
+		}
+	}
 	const selectedModel = models.find((model) => model.id === modelId);
 	const candidateEffort = decision?.reasoningEffort;
 	const validEffort =
@@ -272,11 +481,25 @@ async function selectModelWithThinkingSelector(
 	models: ModelMetadata[],
 	selectorModel: unknown,
 	auth?: { apiKey?: string; headers?: Record<string, string> },
+	metricsById: Map<string, ModelPerfMetrics> = new Map(),
 ): Promise<ModelSelectionDecision> {
+	// Annotate the model list with capability + perf signals so the selector can
+	// reason about both quality and speed, not just model names.
 	const modelList = models
-		.map((model) => `- ${model.id}${model.reasoning ? " (thinking/reasoning capable)" : ""}`)
+		.map((model) => {
+			const parts: string[] = [model.id];
+			if (model.reasoning) parts.push("reasoning");
+			if (model.activeParams !== undefined) parts.push(`${model.activeParams}B active`);
+			else if (model.params !== undefined) parts.push(`${model.params}B params`);
+			if (model.quant) parts.push(model.quant);
+			if (model.contextWindow !== undefined) parts.push(`${Math.round(model.contextWindow / 1000)}K ctx`);
+			const m = metricsById.get(model.id);
+			if (m?.latencyMs !== undefined) parts.push(`${(m.latencyMs / 1000).toFixed(2)}s latency`);
+			if (m?.tokensPerSecond !== undefined) parts.push(`${m.tokensPerSecond.toFixed(1)} tok/s`);
+			return `- ${parts.join(" · ")}`;
+		})
 		.join("\n");
-	const prompt = `User task:\n${task}\n\nAvailable models:\n${modelList}\n\nChoose the model that should perform the task. You may choose yourself if the task needs the strongest thinking model, and may set reasoningEffort to minimal, low, medium, high, or xhigh for reasoning-capable models. Respond with strict JSON only: {"modelId":"provider/model","reasoningEffort":"medium","reason":"short rationale"}`;
+	const prompt = `User task:\n${task}\n\nAvailable models:\n${modelList}\n\nChoose the model that should perform the task. You may choose yourself if the task needs the strongest thinking model, and may set reasoningEffort to minimal, low, medium, high, or xhigh for reasoning-capable models. Prefer cheaper/faster models for simple tasks and the strongest thinking model for complex reasoning. Respond with strict JSON only: {"modelId":"provider/model","reasoningEffort":"medium","reason":"short rationale"}`;
 
 	try {
 		const response = await completeSimple(
@@ -298,10 +521,10 @@ async function selectModelWithThinkingSelector(
 			throw new Error(response.errorMessage || `selector stopped: ${response.stopReason}`);
 		}
 
-		return sanitizeSelectionDecision(parseSelectionDecision(extractTextContent(response)), task, models);
+		return sanitizeSelectionDecision(parseSelectionDecision(extractTextContent(response)), task, models, metricsById);
 	} catch (error) {
 		console.error("Auto model selector failed; falling back to heuristic selection:", error);
-		return sanitizeSelectionDecision(undefined, task, models);
+		return sanitizeSelectionDecision(undefined, task, models, metricsById);
 	}
 }
 
@@ -330,17 +553,29 @@ export async function selectModelForSubagent(
 		// or all-unhealthy cache means we do NOT assume availability — return empty
 		// so the child spawns without --model and falls back to its default model
 		// (which is reachable) instead of picking an unreachable one (e.g. a
-		// VPN-only model) and hanging.
+		// VPN-only model) and hanging. getFreshCachedResults is batch-gated on
+		// checkedAt, so every returned result is within TTL (entry.checkedAt is
+		// always >= batch.checkedAt), i.e. per-entry freshness is guaranteed.
 		const cached = await getFreshCachedResults(MODEL_HEALTH_CACHE_TTL_MS);
 		if (!cached) return {};
-		const healthyIds = new Set(
-			cached.filter((r) => r.status === "ok").map((r) => r.id),
+		// Health-cache results can include image-generation models; only chat
+		// models are valid execution candidates, and only healthy ones contribute
+		// performance metrics. (service defaults to "chat" for older cache entries.)
+		const healthyChat = cached.filter(
+			(r: { status?: string; service?: string }) => r.status === "ok" && (r.service ?? "chat") === "chat",
 		);
+		const healthyIds = new Set(healthyChat.map((r: { id: string }) => r.id));
 		const models = allModels.filter((m) => healthyIds.has(m.id));
 		if (models.length === 0) return {};
+		const metricsById = new Map<string, ModelPerfMetrics>(
+			healthyChat.map((r: { id: string; latencyMs?: number; tokensPerSecond?: number }) => [
+				r.id,
+				{ latencyMs: r.latencyMs, tokensPerSecond: r.tokensPerSecond },
+			]),
+		);
 
 		if (useLlm) {
-			const selectorId = selectMostPowerfulThinkingModel(models);
+			const selectorId = selectMostPowerfulThinkingModel(models, metricsById);
 			const selectorParts = splitModelId(selectorId);
 			const selectorRuntimeModel = selectorParts ? registry.find(selectorParts.provider, selectorParts.modelId) : undefined;
 			const selectorAuth =
@@ -353,11 +588,12 @@ export async function selectModelForSubagent(
 						models,
 						selectorRuntimeModel,
 						selectorAuth && selectorAuth.ok ? { apiKey: selectorAuth.apiKey, headers: selectorAuth.headers } : undefined,
+						metricsById,
 					)
-				: sanitizeSelectionDecision(undefined, task, models);
+				: sanitizeSelectionDecision(undefined, task, models, metricsById);
 			const selectedModel = models.find((m) => m.id === decision.modelId);
 			return {
-				modelId: decision.modelId !== "unknown" ? decision.modelId : undefined,
+				modelId: decision.modelId && decision.modelId !== "unknown" ? decision.modelId : undefined,
 				thinkingLevel: selectedModel?.reasoning ? decision.reasoningEffort : undefined,
 				reason: decision.reason,
 				selector: "llm",
@@ -365,8 +601,8 @@ export async function selectModelForSubagent(
 		}
 
 		// Heuristic
-		const modelId = selectModel(task, models);
-		if (modelId === "unknown") return {};
+		const modelId = selectModel(task, models, metricsById);
+		if (modelId === undefined) return {};
 		const modelInfo = models.find((m) => m.id === modelId);
 		return {
 			modelId,

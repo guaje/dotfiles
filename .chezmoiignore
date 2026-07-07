@@ -4,6 +4,11 @@
 .bashrc
 {{ end }}
 
+# SwiftBar is macOS-only
+{{ if ne .chezmoi.os "darwin" }}
+.config/swiftbar/**
+{{ end }}
+
 # Ignore the age private key backup (if any)
 key.txt.age
 

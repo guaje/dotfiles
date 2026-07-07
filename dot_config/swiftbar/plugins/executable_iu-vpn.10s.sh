@@ -15,9 +15,9 @@ if pgrep -f "openconnect.*${VPN_HOST}" >/dev/null 2>&1 || pgrep -f "openconnect-
 fi
 
 if [[ "$connected" == true ]]; then
-  echo "IU VPN: On | color=green"
+  echo "IU | sfimage=lock.shield"
 else
-  echo "IU VPN: Off | color=red"
+  echo "IU | sfimage=lock.open"
 fi
 
 echo "---"

@@ -1,0 +1,25 @@
+# Prefer vi-compatible tools as the default editor.
+export EDITOR=vi
+
+# Pi coding agent launcher.
+# This wrapper loads the local ~/.pi/agent configuration, merged settings,
+# extensions, skills, and themes managed by this dotfiles repo.
+alias pi="$HOME/.pi/agent/scripts/pi-launch.sh"
+
+# Starship prompt initialization.
+export STARSHIP_CONFIG="$HOME/.config/starship/config.toml"
+if command -v starship >/dev/null 2>&1; then
+  eval "$(starship init bash)"
+fi
+
+# OpenStack cloud switcher (requires fzf).
+# Picks a clouds.yaml under ~/.config/openstack/ and exports OS_CLIENT_CONFIG_FILE
+# and OS_CLOUD so the starship prompt and openstack CLI target that cloud.
+# Read-only clouds show green in the prompt, unrestricted red.
+# Usage: os_cloud [query]   e.g.  os_cloud ro | os_cloud tra | os_cloud
+os_cloud() {
+  command -v fzf >/dev/null 2>&1 || { echo "os_cloud: fzf not found" >&2; return 1; }
+  local f
+  f=$(ls "$HOME/.config/openstack/"*.yaml 2>/dev/null | fzf --query="${1:-}" --select-1 --exit-0)
+  [ -n "$f" ] && { export OS_CLIENT_CONFIG_FILE="$f"; export OS_CLOUD=openstack; echo "→ $(basename "$f")"; }
+}

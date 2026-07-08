@@ -1,7 +1,11 @@
-# Manage .bashrc only on Termux/Android for now. Other Linux hosts keep
-# their host-specific .bashrc until branches are added to private_dot_bashrc.tmpl.
-{{ if ne .chezmoi.os "android" }}
+# Manage .bashrc only where bash is installed.
+{{ if not (lookPath "bash") }}
 .bashrc
+{{ end }}
+
+# Manage .zshrc only where zsh is installed.
+{{ if not (lookPath "zsh") }}
+.zshrc
 {{ end }}
 
 # SwiftBar is macOS-only

@@ -3,7 +3,7 @@ continuation_prompt = "[∙](mauve) "
 
 "$schema" = 'https://starship.rs/config-schema.json'
 
-format = '$username$hostname$sudo$directory$git_branch$git_commit$git_status$git_metrics$hg_branch$fossil_branch$pijul_channel$openstack$docker_context$kubernetes$terraform$nix_shell$conda$guix_shell$pixi$python$nodejs$bun$deno$ruby$perl$php$java$julia$haskell$rlang$scala$kotlin$elixir$elm$crystal$swift$c$cpp$cmake$rust$golang$nim$fortran$haxe$lua$fennel$zig$xmake$meson$buf$package$os$memory_usage$status$character'
+format = '$username$hostname$sudo$directory$git_branch$git_commit$git_status$git_metrics$hg_branch$fossil_branch$pijul_channel$custom$docker_context$kubernetes$terraform$nix_shell$conda$guix_shell$pixi$python$nodejs$bun$deno$ruby$perl$php$java$julia$haskell$rlang$scala$kotlin$elixir$elm$crystal$swift$c$cpp$cmake$rust$golang$nim$fortran$haxe$lua$fennel$zig$xmake$meson$buf$package$os$memory_usage$status$character'
 
 [character]
 success_symbol = "[❯](bold green)"
@@ -211,10 +211,42 @@ style = "bold green"
 symbol = " "
 style = "bold peach"
 
-[openstack]
-symbol = "󰗚 "
+# --- OpenStack cloud indicator, keyed on OS_CLIENT_CONFIG_FILE ---
+# The built-in $openstack module is unused: it reads OS_CLOUD, which is "openstack"
+# for every clouds.yaml here, so it can't tell clouds apart. These custom modules
+# key off OS_CLIENT_CONFIG_FILE instead. All four are referenced by a single $custom
+# token in `format`; their `when` conditions are mutually exclusive, so exactly one
+# renders at a time:
+#   green  = read-only app cred    (filename contains ReadOnly)
+#   red    = unrestricted app cred (filename contains Unrestricted)
+#   peach  = file without a recognised access tag, or plain OS_CLOUD fallback
+[custom.oscloud_ro]
+description = "OpenStack read-only application credential (green)"
+command = "f=$(basename \"$OS_CLIENT_CONFIG_FILE\"); echo \"${f%.*}\""
+when = '''[ -n "$OS_CLIENT_CONFIG_FILE" ] && printf '%s' "$OS_CLIENT_CONFIG_FILE" | grep -q 'ReadOnly' '''
+format = "on [󰗚 $output]($style) "
+style = "bold green"
+
+[custom.oscloud_rw]
+description = "OpenStack unrestricted application credential (red)"
+command = "f=$(basename \"$OS_CLIENT_CONFIG_FILE\"); echo \"${f%.*}\""
+when = '''[ -n "$OS_CLIENT_CONFIG_FILE" ] && printf '%s' "$OS_CLIENT_CONFIG_FILE" | grep -q 'Unrestricted' '''
+format = "on [󰗚 $output]($style) "
+style = "bold red"
+
+[custom.oscloud_other]
+description = "OpenStack cloud file without a recognised access tag (peach)"
+command = "f=$(basename \"$OS_CLIENT_CONFIG_FILE\"); echo \"${f%.*}\""
+when = '''[ -n "$OS_CLIENT_CONFIG_FILE" ] && ! printf '%s' "$OS_CLIENT_CONFIG_FILE" | grep -qE 'ReadOnly|Unrestricted' '''
+format = "on [󰗚 $output]($style) "
 style = "bold peach"
-format = 'on [$symbol$cloud(\($project\))]($style) '
+
+[custom.oscloud_env]
+description = "Fallback: OS_CLOUD set without OS_CLIENT_CONFIG_FILE (peach)"
+command = "printf '%s' \"$OS_CLOUD\""
+when = '''[ -z "$OS_CLIENT_CONFIG_FILE" ] && [ -n "$OS_CLOUD" ]'''
+format = "on [󰗚 $output]($style) "
+style = "bold peach"
 
 [os.symbols]
 Alpaquita = " "

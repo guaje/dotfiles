@@ -713,6 +713,28 @@ test("renderHealthTable appends a custom chat message in tui mode", async () => 
   assert.equal(sent!.options?.triggerTurn, false);
 });
 
+test("session_start renders the table only on startup and reload", async () => {
+  const mod = await loadExtension();
+  let sessionHandler: ((event: any, ctx: any) => Promise<void>) | undefined;
+  let sentCount = 0;
+  const pi: any = {
+    on(event: string, handler: any) {
+      if (event === "session_start") sessionHandler = handler;
+    },
+    registerCommand() {},
+    registerMessageRenderer() {},
+    sendMessage: async () => { sentCount++; },
+  };
+  mod.default(pi);
+  assert.ok(typeof sessionHandler === "function", "session_start handler was registered");
+
+  // "new"/"resume"/"fork" must early-return without rendering (no probing, no I/O).
+  await sessionHandler!({ type: "session_start", reason: "new" }, { mode: "tui", ui: {} } as any);
+  await sessionHandler!({ type: "session_start", reason: "resume" }, { mode: "tui", ui: {} } as any);
+  await sessionHandler!({ type: "session_start", reason: "fork" }, { mode: "tui", ui: {} } as any);
+  assert.equal(sentCount, 0, "new/resume/fork must not render the health table");
+});
+
 test.after(() => {
   delete (globalThis as any).__completeSimpleMock;
   writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);

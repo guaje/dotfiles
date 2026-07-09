@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { completeSimple } from "@earendil-works/pi-ai";
 import { Container, Text } from "@earendil-works/pi-tui";
 
@@ -616,7 +616,7 @@ function healthMessageRenderer(
  * non-interactive modes it falls back to a single multi-line notification. */
 export async function renderHealthTable(
   results: ModelHealthResult[],
-  ctx: ExtensionCommandContext,
+  ctx: ExtensionContext,
   pi: ExtensionAPI,
 ): Promise<void> {
   const ui = ctx.ui as {
@@ -639,12 +639,15 @@ export default function modelHealthCheckExtension(pi: ExtensionAPI) {
   // appends a themed table to the chat scrollback). Registered once at load.
   pi.registerMessageRenderer?.("model-health", healthMessageRenderer as never);
 
-  // Run health check once on initial startup (session_start) only.
-  pi.on("session_start", async (_event, ctx) => {
-    // Use a global flag so that a reload (which re‑imports this module) does not trigger another check.
-    if ((globalThis as any).__modelHealthChecked) return;
-    (globalThis as any).__modelHealthChecked = true;
-    await checkModelHealth(ctx, { notify: true, cacheTtlMs: MODEL_HEALTH_CACHE_TTL_MS });
+  // Render the full health table on startup and on /reload (which re-emits
+  // session_start with reason "reload"), so launch/reload match /model-health
+  // instead of the legacy one-line toast. Skip "new"/"resume"/"fork" so
+  // switching sessions does not re-render. Uses the fresh cache when available
+  // and only re-probes when stale, so reload is instant unless the cache expired.
+  pi.on("session_start", async (event, ctx) => {
+    if (event.reason !== "startup" && event.reason !== "reload") return;
+    const results = await checkModelHealth(ctx, { notify: false, cacheTtlMs: MODEL_HEALTH_CACHE_TTL_MS });
+    await renderHealthTable(results, ctx, pi);
   });
 
   pi.registerCommand?.("model-health", {

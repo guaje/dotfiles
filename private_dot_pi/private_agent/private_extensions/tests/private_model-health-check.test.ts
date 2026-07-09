@@ -608,13 +608,15 @@ test("formatHealthTable renders chat model table with throughput and latency", a
 
   const lines = formatHealthTable([
     { id: "p/a", status: "ok", name: "Alpha", service: "chat", latencyMs: 1930, tokensPerSecond: 4.2 },
-    { id: "p/b", status: "ok", name: "Beta", service: "chat", latencyMs: 500 },
+    { id: "p/b", status: "ok", name: "Beta", service: "chat", source: "user", latencyMs: 500 },
     { id: "p/img", status: "ok", name: "img", service: "imageGeneration" },
     { id: "p/bad", status: "error", name: "bad", service: "chat", error: "offline" },
   ]);
 
-  assert.match(lines[0]!, /3 enabled models queryable/);
+  assert.match(lines[0]!, /\[Models\]/);
   const table = lines.join("\n");
+  assert.match(table, /\n  auth\n/);
+  assert.match(table, /\n  user\n/);
   assert.match(table, /Model\s+Est\. tok\/s\s+E2E latency/);
   assert.match(table, /Alpha\s+4\.2\s+1\.93s/);
   assert.match(table, /Beta\s+—\s+0\.50s/);
@@ -628,7 +630,7 @@ test("formatHealthTable omits the chat table when only image models are healthy"
     { id: "p/img", status: "ok", name: "img", service: "imageGeneration" },
   ]);
   const table = lines.join("\n");
-  assert.match(lines[0]!, /1 enabled model queryable/);
+  assert.match(lines[0]!, /\[Models\]/);
   assert.doesNotMatch(table, /Est\. tok\/s/);
   assert.match(table, /1 image generation model \(img\)/);
 });
@@ -652,7 +654,7 @@ test("healthMessageRenderer builds a themed Container from message.details", asy
   const comp = renderer({ details: results }, { expanded: false }, { fg: (_c: string, t: string) => t, bold: (t: string) => t });
   // Flatten the Container's Text children back to lines.
   const table = comp.children.map((c: any) => c.text ?? "").join("\n");
-  assert.match(table, /2 enabled models queryable/);
+  assert.match(table, /\[Models\]/);
   assert.match(table, /Alpha/);
   assert.match(table, /1 image generation model \(img\)/);
 });
@@ -671,13 +673,14 @@ test("formatHealthTable applies theme color tokens per cell", async () => {
     { id: "p/bad", status: "error", name: "bad", service: "chat", error: "offline" },
   ], recTheme);
   const colors = new Set(fgCalls.map((c) => c.color));
-  assert.ok(colors.has("toolTitle"), "header uses toolTitle");
-  assert.ok(colors.has("dim"), "column header + separator + caveat use dim");
-  assert.ok(colors.has("text"), "model name uses text");
-  assert.ok(colors.has("toolOutput"), "values use toolOutput");
-  assert.ok(colors.has("muted"), "image line uses muted");
+  assert.ok(colors.has("mdHeading"), "resource heading uses the same color as /reload sections");
+  assert.ok(colors.has("accent"), "source groups use the same color as /reload scopes");
+  assert.ok(colors.has("dim"), "table headers, rows, and image line use the same dim color as /reload entries");
   assert.ok(colors.has("error"), "unavailable line uses error");
-  assert.ok(boldCalls.some((t) => /queryable/.test(t)), "header label is bolded");
+  assert.ok(!colors.has("text"), "model rows should not use chat-table text color");
+  assert.ok(!colors.has("toolOutput"), "model rows should not use chat-table output color");
+  assert.ok(!colors.has("muted"), "image line should follow /reload dim entry color");
+  assert.ok(!boldCalls.some((t) => /\[Models\]/.test(t)), "resource heading matches /reload and is not bolded");
 });
 
 test("renderHealthTable notifies joined lines in non-tui mode", async () => {
@@ -689,28 +692,35 @@ test("renderHealthTable notifies joined lines in non-tui mode", async () => {
     {} as any,
   );
   assert.equal(notifications.length, 1);
-  assert.match(notifications[0]!, /1 enabled model queryable/);
+  assert.match(notifications[0]!, /\[Models\]/);
   assert.match(notifications[0]!, /\n/);
   assert.match(notifications[0]!, /Alpha/);
 });
 
-test("renderHealthTable appends a custom chat message in tui mode", async () => {
+test("renderHealthTable uses a transient widget in tui mode", async () => {
   const mod = await loadExtension();
   const results = [{ id: "p/a", status: "ok", name: "Alpha", service: "chat", latencyMs: 1000, tokensPerSecond: 8 }];
-  let sent: { message: any; options: any } | undefined;
+  let widget: { key: string; factory: any; options: any } | undefined;
   const pi = {
-    sendMessage: async (message: any, options?: any) => { sent = { message, options }; },
+    sendMessage: async () => { throw new Error("sendMessage should not be used when widgets are available"); },
   };
   await mod.renderHealthTable(
     results,
-    { mode: "tui", ui: { notify: () => { throw new Error("notify should not be used in tui mode"); } } } as any,
+    {
+      mode: "tui",
+      ui: {
+        notify: () => { throw new Error("notify should not be used in tui mode"); },
+        setWidget: (key: string, factory: any, options: any) => { widget = { key, factory, options }; },
+      },
+    } as any,
     pi as any,
   );
-  assert.ok(sent, "sendMessage was called");
-  assert.equal(sent!.message.customType, "model-health");
-  assert.equal(sent!.message.display, true);
-  assert.deepEqual(sent!.message.details, results);
-  assert.equal(sent!.options?.triggerTurn, false);
+  assert.ok(widget, "setWidget was called");
+  assert.equal(widget!.key, "model-health");
+  assert.equal(widget!.options?.placement, "aboveEditor");
+  const rendered = widget!.factory({}, { fg: (_c: string, t: string) => t, bold: (t: string) => t }).render();
+  assert.match(rendered, /\[Models\]/);
+  assert.match(rendered, /Alpha/);
 });
 
 test("session_start renders startup immediately and reload after Pi's reload status", async () => {
@@ -724,31 +734,75 @@ test("session_start renders startup immediately and reload after Pi's reload sta
   }, null, 2)}\n`);
 
   let sessionHandler: ((event: any, ctx: any) => Promise<void>) | undefined;
+  let widgetCount = 0;
+  let clearCount = 0;
   let sentCount = 0;
+  const widgetKeys: string[] = [];
+  const reloadCallbacks: Array<() => void> = [];
+  const originalSetTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = ((callback: () => void, _delay?: number) => {
+    reloadCallbacks.push(callback);
+    return 0 as any;
+  }) as any;
+  const ctx = {
+    mode: "tui",
+    ui: {
+      setWidget: (key: string, factory: any, options: any) => {
+        assert.equal(key, "model-health");
+        assert.equal(options?.placement, "aboveEditor");
+        if (factory === undefined) {
+          clearCount++;
+          return;
+        }
+        widgetCount++;
+        widgetKeys.push(key);
+        const rendered = factory({}, { fg: (_c: string, t: string) => t, bold: (t: string) => t }).render();
+        assert.match(rendered, /\[Models\]/);
+      },
+    },
+  } as any;
+  let beforeAgentStartHandler: ((event: any, ctx: any) => Promise<void>) | undefined;
   const pi: any = {
     on(event: string, handler: any) {
       if (event === "session_start") sessionHandler = handler;
+      if (event === "before_agent_start") beforeAgentStartHandler = handler;
     },
     registerCommand() {},
     registerMessageRenderer() {},
     sendMessage: async () => { sentCount++; },
   };
-  mod.default(pi);
-  assert.ok(typeof sessionHandler === "function", "session_start handler was registered");
+  try {
+    mod.default(pi);
+    assert.ok(typeof sessionHandler === "function", "session_start handler was registered");
+    assert.ok(typeof beforeAgentStartHandler === "function", "before_agent_start handler was registered");
 
-  // "new"/"resume"/"fork" must early-return without rendering (no probing, no I/O).
-  await sessionHandler!({ type: "session_start", reason: "new" }, { mode: "tui", ui: {} } as any);
-  await sessionHandler!({ type: "session_start", reason: "resume" }, { mode: "tui", ui: {} } as any);
-  await sessionHandler!({ type: "session_start", reason: "fork" }, { mode: "tui", ui: {} } as any);
-  assert.equal(sentCount, 0, "new/resume/fork must not render the health table");
+    // "new"/"resume"/"fork" must early-return without rendering (no probing, no I/O).
+    await sessionHandler!({ type: "session_start", reason: "new" }, ctx);
+    await sessionHandler!({ type: "session_start", reason: "resume" }, ctx);
+    await sessionHandler!({ type: "session_start", reason: "fork" }, ctx);
+    assert.equal(widgetCount, 0, "new/resume/fork must not render the health table");
+    assert.equal(sentCount, 0, "automatic health should not append chat messages");
 
-  await sessionHandler!({ type: "session_start", reason: "startup" }, { mode: "tui", ui: {} } as any);
-  assert.equal(sentCount, 1, "startup should render before the handler resolves");
+    await sessionHandler!({ type: "session_start", reason: "startup" }, ctx);
+    assert.equal(widgetCount, 1, "startup should render before the handler resolves");
+    assert.equal(sentCount, 0, "startup should use a replaceable widget, not a chat message");
 
-  await sessionHandler!({ type: "session_start", reason: "reload" }, { mode: "tui", ui: {} } as any);
-  assert.equal(sentCount, 1, "reload should defer rendering until after Pi prints its reload status");
-  await new Promise((resolve) => setTimeout(resolve, mod.RELOAD_HEALTH_RENDER_DELAY_MS + 25));
-  assert.equal(sentCount, 2, "reload should render the table after the delay");
+    await sessionHandler!({ type: "session_start", reason: "reload" }, ctx);
+    assert.equal(widgetCount, 1, "reload should defer rendering until after Pi prints its reload status");
+    assert.equal(reloadCallbacks.length, 1, "only the reload render delay should be scheduled");
+    reloadCallbacks[0]!();
+    for (let i = 0; i < 20 && widgetCount < 2; i++) {
+      await new Promise((resolve) => originalSetTimeout(resolve, 0));
+    }
+    assert.equal(widgetCount, 2, "reload should replace the health widget after the delay");
+    assert.equal(sentCount, 0, "reload should not leave persistent chat tables behind");
+    assert.deepEqual(widgetKeys, ["model-health", "model-health"]);
+    assert.equal(clearCount, 0, "widget should remain visible until the next agent turn starts");
+    await beforeAgentStartHandler!({ type: "before_agent_start" }, ctx);
+    assert.equal(clearCount, 1, "model-health widget should clear when new content starts generating");
+  } finally {
+    globalThis.setTimeout = originalSetTimeout;
+  }
 });
 
 test.after(() => {

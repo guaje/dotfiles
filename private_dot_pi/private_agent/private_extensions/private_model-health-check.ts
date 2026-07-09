@@ -25,6 +25,7 @@ interface ModelMetadata {
   name: string;
   reasoning?: boolean;
   service?: "chat" | "imageGeneration";
+  source?: "auth" | "user";
   providerConfig?: Provider;
 }
 
@@ -65,6 +66,8 @@ export interface ModelHealthResult {
   latencyMs?: number;
   /** Estimated completion throughput (tokens/sec) from the 8-token probe sample. */
   tokensPerSecond?: number;
+  /** Resource source bucket matching Pi's reload resource list style. */
+  source?: "auth" | "user";
 }
 
 interface ProbeContext {
@@ -128,6 +131,7 @@ function getConfiguredImageGenerationModels(settingsFile: SettingsFile, modelsFi
         id: fullId,
         name: model.name || model.id,
         service: "imageGeneration",
+        source: "user",
         providerConfig: modelsFile.providers[providerId],
       });
     }
@@ -151,7 +155,7 @@ async function getEnabledModelsMetadata(): Promise<ModelMetadata[]> {
       for (const model of provider.models) {
         const fullId = `${providerId}/${model.id}`;
         if (enabledModelIds.includes(fullId)) {
-          allMetadata.push({ ...model, id: fullId, service: "chat" });
+          allMetadata.push({ ...model, id: fullId, service: "chat", source: "user" });
         }
       }
     }
@@ -168,7 +172,7 @@ async function getEnabledModelsMetadata(): Promise<ModelMetadata[]> {
       // are no longer available to this account.
       if (Object.hasOwn(modelsFile.providers, parts.provider)) continue;
 
-      allMetadata.push({ id: enabledId, name: parts.modelId, service: "chat" });
+      allMetadata.push({ id: enabledId, name: parts.modelId, service: "chat", source: "auth" });
     }
 
     allMetadata.push(...getConfiguredImageGenerationModels(settingsFile, modelsFile));
@@ -308,6 +312,7 @@ function modelHealthResult(
     ...(error ? { error } : {}),
     name: metadata.name,
     service: metadata.service || "chat",
+    source: metadata.source,
     checkedAt: Date.now(),
     ...(metrics?.latencyMs !== undefined ? { latencyMs: metrics.latencyMs } : {}),
     ...(metrics?.tokensPerSecond !== undefined ? { tokensPerSecond: metrics.tokensPerSecond } : {}),
@@ -485,7 +490,15 @@ export async function checkModelHealth(ctx: ProbeContext, options: ModelHealthOp
       const cachedIds = new Set(cached.map((result) => result.id));
       const hasAllCurrentModels = models.every((model) => cachedIds.has(model.id));
       if (hasAllCurrentModels) {
-        const currentCached = cached.filter((result) => currentIds.has(result.id));
+        const metadataById = new Map(models.map((model) => [model.id, model]));
+        const currentCached = cached
+          .filter((result) => currentIds.has(result.id))
+          .map((result) => {
+            const metadata = metadataById.get(result.id);
+            return metadata
+              ? { ...result, name: result.name ?? metadata.name, service: result.service ?? metadata.service, source: result.source ?? metadata.source }
+              : result;
+          });
         if (options.notify) notifyProbeSummary(currentCached, ctx, true);
         return currentCached;
       }
@@ -527,6 +540,7 @@ export interface HealthTheme {
 }
 
 const PASSTHROUGH_HEALTH_THEME: HealthTheme = { fg: (_c, t) => t, bold: (t) => t };
+const MODEL_HEALTH_WIDGET_KEY = "model-health";
 
 /** Build the /model-health table as pre-formatted, theme-colored lines: a
  * header line, a per-model table of available chat models with estimated
@@ -550,46 +564,48 @@ export function formatHealthTable(
   const failing = results.filter((r) => r.status !== "ok");
   const healthy = okChat.length + okImage.length;
 
+  const NAME_W = 30;
+  const truncate = (t: string) => (t.length > NAME_W ? `${t.slice(0, NAME_W - 1)}…` : t);
+  const nameCol = (r: ModelHealthResult) => truncate(r.name || r.id.split("/")[1] || r.id).padEnd(NAME_W);
+  const tpsCol = (r: ModelHealthResult) =>
+    (r.tokensPerSecond !== undefined ? r.tokensPerSecond.toFixed(1) : "—").padStart(10);
+  const latCol = (r: ModelHealthResult) =>
+    (r.latencyMs !== undefined ? `${(r.latencyMs / 1000).toFixed(2)}s` : "—").padStart(11);
+  const header = `${"Model".padEnd(NAME_W)}  ${"Est. tok/s".padStart(10)}  ${"E2E latency".padStart(11)}`;
+  const separator = `${"─".repeat(NAME_W)}  ${"─".repeat(10)}  ${"─".repeat(11)}`;
+
   const lines: string[] = [];
-  lines.push(
-    theme.fg("toolTitle", theme.bold(
-      `Model health: ${healthy} enabled model${healthy === 1 ? "" : "s"} queryable`,
-    )),
-  );
+  lines.push(theme.fg("mdHeading", "[Models]"));
 
-  if (okChat.length > 0) {
-    const NAME_W = 30;
-    const truncate = (t: string) => (t.length > NAME_W ? `${t.slice(0, NAME_W - 1)}…` : t);
-    const nameCol = (r: ModelHealthResult) => truncate(r.name || r.id.split("/")[1] || r.id).padEnd(NAME_W);
-    const tpsCol = (r: ModelHealthResult) =>
-      (r.tokensPerSecond !== undefined ? r.tokensPerSecond.toFixed(1) : "—").padStart(10);
-    const latCol = (r: ModelHealthResult) =>
-      (r.latencyMs !== undefined ? `${(r.latencyMs / 1000).toFixed(2)}s` : "—").padStart(11);
-
-    lines.push("");
-    lines.push(`  ${theme.fg("dim", `${"Model".padEnd(NAME_W)}  ${"Est. tok/s".padStart(10)}  ${"E2E latency".padStart(11)}`)}`);
-    lines.push(`  ${theme.fg("dim", `${"─".repeat(NAME_W)}  ${"─".repeat(10)}  ${"─".repeat(11)}`)}`);
-    for (const r of okChat) {
-      lines.push(`  ${theme.fg("text", nameCol(r))}  ${theme.fg("toolOutput", tpsCol(r))}  ${theme.fg("toolOutput", latCol(r))}`);
+  for (const source of ["auth", "user"] as const) {
+    const group = okChat.filter((r) => (r.source ?? "auth") === source);
+    if (group.length === 0) continue;
+    lines.push(`  ${theme.fg("accent", source)}`);
+    lines.push(theme.fg("dim", `    ${header}`));
+    lines.push(theme.fg("dim", `    ${separator}`));
+    for (const r of group) {
+      lines.push(theme.fg("dim", `    ${nameCol(r)}  ${tpsCol(r)}  ${latCol(r)}`));
     }
   }
 
   if (okImage.length > 0) {
-    lines.push("");
     lines.push(
-      theme.fg("muted",
-        `${okImage.length} image generation model${okImage.length === 1 ? "" : "s"} (${okImage.map((r) => r.name || r.id).join(", ")})`,
+      theme.fg("dim",
+        `  ${okImage.length} image generation model${okImage.length === 1 ? "" : "s"} (${okImage.map((r) => r.name || r.id).join(", ")})`,
       ),
     );
   }
 
   if (failing.length > 0) {
-    lines.push("");
     lines.push(
-      theme.fg("error",
+      `  ${theme.fg("error",
         `Unavailable: ${failing.map((r) => `${r.id} (${r.error || r.status})`).join(", ")}`,
-      ),
+      )}`,
     );
+  }
+
+  if (healthy === 0 && failing.length === 0) {
+    lines.push(theme.fg("muted", "  No enabled models found."));
   }
 
   return lines;
@@ -611,10 +627,24 @@ function healthMessageRenderer(
   return container;
 }
 
-/** Render the /model-health table. In the TUI it appends the table to the chat
- * scrollback as a custom message (rendered by healthMessageRenderer) so it
- * persists with the conversation and is never replaced by generated text; in
- * non-interactive modes it falls back to a single multi-line notification. */
+/** Clear the transient model-health widget, if the current UI supports it. */
+export function clearHealthWidget(ctx: ExtensionContext): boolean {
+  const ui = ctx.ui as {
+    setWidget?: (
+      key: string,
+      content: ((tui: unknown, theme: HealthTheme) => { render?: (width?: number) => string[] | string; invalidate?: () => void }) | undefined,
+      options?: { placement?: "aboveEditor" | "belowEditor" },
+    ) => void;
+  };
+  if (ctx.mode !== "tui" || typeof ui.setWidget !== "function") return false;
+  ui.setWidget(MODEL_HEALTH_WIDGET_KEY, undefined, { placement: "aboveEditor" });
+  return true;
+}
+
+/** Render the model-health table. In the TUI it uses a replaceable transient
+ * widget, matching /reload's non-persistent lifecycle: the table remains until
+ * the next agent turn starts, then it is cleared. In non-interactive modes it
+ * falls back to a single multi-line notification. */
 export async function renderHealthTable(
   results: ModelHealthResult[],
   ctx: ExtensionContext,
@@ -624,6 +654,8 @@ export async function renderHealthTable(
     theme?: HealthTheme;
     notify?: (message: string, type?: "info" | "warning" | "error") => void;
   };
+  if (renderHealthWidget(results, ctx)) return;
+
   const sendMessage = (pi as { sendMessage?: (message: unknown, options?: { triggerTurn?: boolean }) => Promise<void> }).sendMessage;
   if (ctx.mode === "tui" && typeof sendMessage === "function") {
     await sendMessage?.(
@@ -635,10 +667,41 @@ export async function renderHealthTable(
   ui.notify?.(formatHealthTable(results, ui.theme ?? PASSTHROUGH_HEALTH_THEME).join("\n"), "info");
 }
 
+/** Render model health as a replaceable TUI widget. This avoids persistent chat
+ * entries and repeated reloads simply replace the previous table. */
+export function renderHealthWidget(results: ModelHealthResult[], ctx: ExtensionContext): boolean {
+  const ui = ctx.ui as {
+    setWidget?: (
+      key: string,
+      content: ((tui: unknown, theme: HealthTheme) => { render?: (width?: number) => string[] | string; invalidate?: () => void }) | undefined,
+      options?: { placement?: "aboveEditor" | "belowEditor" },
+    ) => void;
+  };
+  if (ctx.mode !== "tui" || typeof ui.setWidget !== "function") return false;
+  ui.setWidget(
+    MODEL_HEALTH_WIDGET_KEY,
+    (_tui, theme) => {
+      const container = new Container();
+      for (const line of formatHealthTable(results, theme ?? PASSTHROUGH_HEALTH_THEME)) {
+        container.addChild(new Text(line, 1, 0));
+      }
+      return container;
+    },
+    { placement: "aboveEditor" },
+  );
+  return true;
+}
+
 export default function modelHealthCheckExtension(pi: ExtensionAPI) {
   // Render /model-health results as a custom chat message (customMessageRenderer
   // appends a themed table to the chat scrollback). Registered once at load.
   pi.registerMessageRenderer?.("model-health", healthMessageRenderer as never);
+
+  // Match /reload's lifecycle: transient resource-style output is cleared when
+  // the next prompt starts generating content.
+  pi.on("before_agent_start", async (_event, ctx) => {
+    clearHealthWidget(ctx);
+  });
 
   // Render the full health table on startup and on /reload (which re-emits
   // session_start with reason "reload"), so launch/reload match /model-health

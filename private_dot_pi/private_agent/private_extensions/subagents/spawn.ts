@@ -153,6 +153,7 @@ export async function runSingleAgent(
 				cwd: cwd ?? defaultCwd,
 				shell: false,
 				stdio: ["ignore", "pipe", "pipe"],
+				env: { ...process.env, PI_SUBAGENT_CHILD: "1" },
 			});
 			let buffer = "";
 

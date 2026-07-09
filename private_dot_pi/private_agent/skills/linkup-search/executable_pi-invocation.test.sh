@@ -26,7 +26,7 @@ Return strict JSON only, with no markdown fences and no prose, using this exact 
 Make each scenario/useWhen/reason accurately reflect the skill guidance.'
 
 if [ -n "${PI_LINKUP_SKILL_MODEL:-}" ]; then
-  pi -p \
+  pi --no-session -p \
     --no-tools \
     --no-extensions \
     --no-prompt-templates \
@@ -35,7 +35,7 @@ if [ -n "${PI_LINKUP_SKILL_MODEL:-}" ]; then
     --model "$PI_LINKUP_SKILL_MODEL" \
     "$PROMPT" > "$OUTPUT_FILE"
 else
-  pi -p \
+  pi --no-session -p \
     --no-tools \
     --no-extensions \
     --no-prompt-templates \

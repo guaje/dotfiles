@@ -39,6 +39,20 @@ function createPiHarness() {
   return harness;
 }
 
+test("isSubagentChildContext returns true when PI_SUBAGENT_CHILD=1", async () => {
+  const { isSubagentChildContext } = await loadExtension();
+  assert.equal(isSubagentChildContext({ PI_SUBAGENT_CHILD: "1" }), true);
+  assert.equal(isSubagentChildContext({ PI_SUBAGENT_CHILD: "1", OTHER: "x" }), true);
+});
+
+test("isSubagentChildContext returns false when PI_SUBAGENT_CHILD is absent or not 1", async () => {
+  const { isSubagentChildContext } = await loadExtension();
+  assert.equal(isSubagentChildContext({}), false);
+  assert.equal(isSubagentChildContext({ PI_SUBAGENT_CHILD: "" }), false);
+  assert.equal(isSubagentChildContext({ PI_SUBAGENT_CHILD: "0" }), false);
+  assert.equal(isSubagentChildContext({ PI_SUBAGENT_CHILD: "yes" }), false);
+});
+
 test("detectNotificationTarget detects Termux from Termux-specific environment", async () => {
   const { detectNotificationTarget } = await loadExtension();
 
@@ -507,6 +521,27 @@ test("getNotificationTitle uses a short session description outside tmux", async
   };
 
   assert.equal(await getNotificationTitle({ ctx, env: {} }), "Native Notifications Approval");
+});
+
+test("native-notify skips agent_end notifications in subagent child context", async () => {
+  const { createNativeNotifyExtension } = await loadExtension();
+  const calls: Array<{ command: string; args: string[] }> = [];
+  const execFile = ((command: string, args: string[], _options: unknown, callback: () => void) => {
+    calls.push({ command, args });
+    callback();
+  }) as any;
+  const harness = createPiHarness();
+
+  createNativeNotifyExtension({ execFile, target: "termux", env: { HOME: "/nonexistent/pi-native-notify-test", PI_SUBAGENT_CHILD: "1" }, iconPath: "" })(harness.pi as any);
+
+  assert.equal(harness.handlerCount("session_start"), 1);
+  assert.equal(harness.handlerCount("agent_end"), 1);
+  await harness.emit("session_start", {}, { cwd: "/tmp/test-project" });
+  await harness.emit("agent_end", {}, { cwd: "/tmp/test-project" });
+  await harness.emit("agent_end", {}, { cwd: "/tmp/test-project" });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(calls.length, 0, "agent_end must not trigger notifications in subagent child context");
 });
 
 test("native-notify checks readiness at session start and sends a notification every time agent_end fires", async () => {

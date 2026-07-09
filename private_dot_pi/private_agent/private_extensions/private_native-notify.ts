@@ -790,6 +790,10 @@ export async function notifyPiWaitingForUser(
   );
 }
 
+export function isSubagentChildContext(env: EnvironmentLike = process.env): boolean {
+  return env.PI_SUBAGENT_CHILD === "1";
+}
+
 export function createNativeNotifyExtension(options: {
   execFile?: ExecFileLike;
   target?: NotificationTarget;
@@ -805,6 +809,7 @@ export function createNativeNotifyExtension(options: {
     });
 
     pi.on("agent_end", (_event, ctx) => {
+      if (isSubagentChildContext(options.env)) return;
       void notifyPiWaitingForUser(options.body ?? "Ready for input", ctx, {
         ...options,
         onReply: (reply) => pi.sendUserMessage(reply, { deliverAs: "followUp" }),

@@ -11,7 +11,7 @@ Run from `~/.pi` unless noted.
 
 - TypeScript tests: `npx -y tsx --test <path>` (CI auto-discovers every `*.test.ts` via `find agent -name '*.test.ts'`)
 - Shell tests: `sh agent/scripts/tests/merge-settings.test.sh`
-- Extension load check: `pi --no-extensions -e <ext-path> --no-tools -p "reply: ok"`
+- Extension load check: `pi --no-session --no-extensions -e <ext-path> --no-tools -p "reply: ok"`
 - Regenerate `settings.json`: `sh agent/scripts/merge-settings.sh`
 - Chezmoi status: `chezmoi status`
 - Failed CI run: `gh run view <run-id> --repo guaje/dotfiles --log-failed`
@@ -45,7 +45,7 @@ Skill tests:
 
 - Validate frontmatter and location: `SKILL.md` in `agent/skills/<skill-name>/`, `name` matches the parent directory (lowercase, hyphens, numbers only), `description` present and under the limit.
 - Prefer POSIX shell assertions (`#!/bin/sh`, `set -eu`, portable tools) for shell-based skill tests.
-- For live pi skill invocation tests: `pi -p` with the target skill loaded and unrelated subsystems disabled (`--no-tools`, `--no-extensions`, `--no-prompt-templates`, `--no-themes`, `--skill agent/skills/<skill-name>`).
+- For live pi skill invocation tests: `pi --no-session -p` with the target skill loaded and unrelated subsystems disabled (`--no-tools`, `--no-extensions`, `--no-prompt-templates`, `--no-themes`, `--skill agent/skills/<skill-name>`).
 - Ask for constrained, machine-checkable output (strict JSON), then assert with POSIX shell or TypeScript.
 - Keep live model tests deterministic: avoid requiring web/tool/API access unless the test is specifically for that integration. Allow an optional model override (`PI_<SKILL_NAME>_MODEL`).
 

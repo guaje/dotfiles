@@ -1,5 +1,6 @@
-# Manage .bashrc only where bash is installed.
-{{ if not (lookPath "bash") }}
+# Manage .bashrc only on Android/Termux and Linux for now. Other hosts keep
+# their host-specific .bashrc until branches are added to dot_bashrc.tmpl.
+{{ if and (ne .chezmoi.os "android") (ne .chezmoi.os "linux") }}
 .bashrc
 {{ end }}
 

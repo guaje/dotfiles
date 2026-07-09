@@ -1,0 +1,5 @@
+# Starship prompt initialization.
+export STARSHIP_CONFIG="$HOME/.config/starship/config.toml"
+if command -v starship >/dev/null 2>&1; then
+  eval "$(starship init {{ .shell }})"
+fi

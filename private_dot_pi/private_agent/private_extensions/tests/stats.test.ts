@@ -26,8 +26,9 @@ async function loadExtension() {
     exports: "./index.js",
   }));
   writeFileSync(resolve(PI_TUI_PACKAGE_DIR, "index.js"), [
-    "export class Container { constructor() { this.children = []; } addChild(c) { this.children.push(c); return c; } }",
-    "export class Text { constructor(text) { this.text = text; } }",
+    "export const Key = { escape: 'escape', up: 'up', down: 'down', pageUp: 'pageUp', pageDown: 'pageDown', home: 'home', end: 'end', space: 'space', ctrl: (k) => `ctrl+${k}` };",
+    "export function matchesKey(data, key) { return data === key || (key === 'escape' && data === '\\x1b') || (key === 'ctrl+c' && data === '\\x03'); }",
+    "export function truncateToWidth(text, width) { return String(text).slice(0, Math.max(0, width)); }",
   ].join("\n"));
 
   const moduleUrl = `${pathToFileURL(EXTENSION_PATH).href}?t=${Date.now()}`;
@@ -165,37 +166,83 @@ test("formatStatsTable omits cost when all costs are zero and renders empty stat
   assert.match(empty, /No usage data available/);
 });
 
-test("renderer builds a Container of Text children from summary details", async () => {
+test("StatsTableView clips long tables, scrolls, and closes with close keys", async () => {
   const mod = await loadExtension();
-  let renderer: any;
-  mod.default({
-    on() {},
-    registerCommand() {},
-    registerMessageRenderer(type: string, r: any) { if (type === "stats") renderer = r; },
-  } as any);
-  assert.ok(typeof renderer === "function");
-  const comp = renderer({ details: { main: [], subagents: [], modelChanges: [], hasCost: false, hasNotionalCost: false } }, { expanded: false }, { fg: (_c: string, t: string) => t, bold: (t: string) => t });
-  assert.ok(Array.isArray(comp.children));
-  assert.match(comp.children.map((c: any) => c.text).join("\n"), /No usage data available/);
+  const summary = {
+    main: Array.from({ length: 30 }, (_v, i) => ({ model: `prov/model-${String(i).padStart(2, "0")}`, turns: 1, input: i, output: i, cacheRead: 0, cacheWrite: 0, cost: 0 })),
+    subagents: [],
+    modelChanges: [],
+    hasCost: false,
+    hasNotionalCost: false,
+  };
+  let closed = false;
+  let renderRequests = 0;
+  const view = new mod.StatsTableView(
+    summary,
+    { fg: (_c: string, t: string) => t, bold: (t: string) => t },
+    () => { closed = true; },
+    () => { renderRequests += 1; },
+  );
+
+  const fullTable = mod.formatStatsTable(summary, { fg: (_c: string, t: string) => t, bold: (t: string) => t });
+  const firstPage = view.render(80);
+  assert.ok(firstPage.length < fullTable.length, "custom view clips long stats tables");
+  assert.ok(firstPage.every((line: string) => line.length <= 80), "rendered lines are clipped to the view width");
+  assert.match(firstPage.join("\n"), /q\/esc\/ctrl\+c close/);
+  assert.doesNotMatch(firstPage.join("\n"), /model-29/);
+
+  view.handleInput("end");
+  const lastPage = view.render(80).join("\n");
+  assert.equal(renderRequests, 1);
+  assert.match(lastPage, /model-29/);
+
+  view.handleInput("q");
+  assert.equal(closed, true);
 });
 
-test("extension registers /stats and renders a stats custom message", async () => {
+test("renderStatsTable uses notify fallback outside tui mode", async () => {
+  const mod = await loadExtension();
+  const notifications: Array<{ message: string; type?: string }> = [];
+  await mod.renderStatsTable(
+    { main: [], subagents: [], modelChanges: [], hasCost: false, hasNotionalCost: false },
+    {
+      mode: "print",
+      ui: {
+        notify: (message: string, type?: string) => notifications.push({ message, type }),
+        custom: async () => { throw new Error("custom view should not be used outside tui mode"); },
+        theme: { fg: (_c: string, t: string) => t, bold: (t: string) => t },
+      },
+    },
+    {},
+  );
+  assert.equal(notifications.length, 1);
+  assert.equal(notifications[0].type, "info");
+  assert.match(notifications[0].message, /No usage data available/);
+});
+
+test("extension registers /stats and opens a stats custom view in tui mode without a message renderer", async () => {
   const mod = await loadExtension();
   const commands = new Map<string, any>();
-  let sent: any;
+  let registeredRenderer = false;
+  let component: any;
   const pi: any = {
-    registerMessageRenderer() {},
+    registerMessageRenderer() { registeredRenderer = true; },
     registerCommand(name: string, spec: any) { commands.set(name, spec); },
-    sendMessage: async (message: any, options: any) => { sent = { message, options }; },
+    sendMessage: async () => { throw new Error("sendMessage should not be used for stats tui rendering"); },
   };
   mod.default(pi);
+  assert.equal(registeredRenderer, false);
   assert.ok(commands.has("stats"));
   await commands.get("stats").handler("", {
     mode: "tui",
-    ui: { notify: () => { throw new Error("notify should not be used in tui mode"); } },
+    ui: {
+      notify: () => { throw new Error("notify should not be used in tui mode"); },
+      custom: async (factory: any) => {
+        component = await factory({ requestRender() {} }, { fg: (_c: string, t: string) => t, bold: (t: string) => t }, {}, () => {});
+      },
+    },
     sessionManager: { getBranch: () => [] },
   });
-  assert.equal(sent.message.customType, "stats");
-  assert.equal(sent.message.display, true);
-  assert.equal(sent.options.triggerTurn, false);
+  assert.ok(component, "custom view component was created");
+  assert.match(component.render(80).join("\n"), /No usage data available/);
 });

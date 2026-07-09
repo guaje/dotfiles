@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { Container, Text } from "@earendil-works/pi-tui";
+import { Key, matchesKey, truncateToWidth, type Component } from "@earendil-works/pi-tui";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -377,30 +377,107 @@ export function formatStatsTable(summary: StatsSummary, theme: StatsTheme = PASS
   return lines;
 }
 
-function statsMessageRenderer(
-  message: { details?: StatsSummary },
-  _options: { expanded: boolean },
-  theme: StatsTheme,
-) {
-  const container = new Container();
-  for (const line of formatStatsTable(message.details ?? { main: [], subagents: [], modelChanges: [], hasCost: false, hasNotionalCost: false }, theme)) {
-    container.addChild(new Text(line, 1, 0));
-  }
-  return container;
+export const STATS_VIEW_BODY_LINES = 22;
+
+interface CustomStatsUi {
+  theme?: StatsTheme;
+  notify?: (message: string, type?: "info" | "warning" | "error") => void;
+  custom?: <T>(
+    factory: (
+      tui: { requestRender?: () => void },
+      theme: StatsTheme,
+      keybindings: unknown,
+      done: (result: T) => void,
+    ) => Component | Promise<Component>,
+    options?: unknown,
+  ) => Promise<T>;
 }
 
-export async function renderStatsTable(summary: StatsSummary, ctx: ExtensionContext, pi: ExtensionAPI): Promise<void> {
-  const ui = ctx.ui as { theme?: StatsTheme; notify?: (message: string, type?: "info" | "warning" | "error") => void };
-  const sendMessage = (pi as { sendMessage?: (message: unknown, options?: { triggerTurn?: boolean }) => Promise<void> }).sendMessage;
-  if (ctx.mode === "tui" && typeof sendMessage === "function") {
-    await sendMessage({ customType: "stats", content: "", display: true, details: summary }, { triggerTurn: false });
+function fitsWidth(line: string, width: number): string {
+  if (width <= 0) return "";
+  return truncateToWidth(line, width);
+}
+
+function borderLine(width: number, theme: StatsTheme): string {
+  return theme.fg("borderMuted", "─".repeat(Math.max(0, width)));
+}
+
+function closeHint(theme: StatsTheme, scroll: number, maxScroll: number): string {
+  const scrollText = maxScroll > 0 ? `↑↓/PgUp/PgDn scroll (${scroll + 1}/${maxScroll + 1}) • ` : "";
+  return theme.fg("dim", `  ${scrollText}q/esc/ctrl+c close`);
+}
+
+export class StatsTableView implements Component {
+  private scroll = 0;
+  private lastPageSize = STATS_VIEW_BODY_LINES;
+
+  constructor(
+    private readonly summary: StatsSummary,
+    private readonly theme: StatsTheme,
+    private readonly done: () => void,
+    private readonly requestRender: () => void = () => {},
+  ) {}
+
+  render(width: number): string[] {
+    const content = formatStatsTable(this.summary, this.theme);
+    const pageSize = Math.min(STATS_VIEW_BODY_LINES, Math.max(1, content.length));
+    this.lastPageSize = pageSize;
+    const maxScroll = Math.max(0, content.length - pageSize);
+    this.scroll = Math.max(0, Math.min(this.scroll, maxScroll));
+    const body = content.slice(this.scroll, this.scroll + pageSize);
+    return [
+      borderLine(width, this.theme),
+      ...body.map((line) => fitsWidth(line, width)),
+      fitsWidth(closeHint(this.theme, this.scroll, maxScroll), width),
+      borderLine(width, this.theme),
+    ];
+  }
+
+  handleInput(data: string): void {
+    if (matchesKey(data, Key.escape) || matchesKey(data, Key.ctrl("c")) || matchesKey(data, "q")) {
+      this.done();
+      return;
+    }
+
+    const previous = this.scroll;
+    if (matchesKey(data, Key.up) || matchesKey(data, "k")) {
+      this.scroll -= 1;
+    } else if (matchesKey(data, Key.down) || matchesKey(data, "j")) {
+      this.scroll += 1;
+    } else if (matchesKey(data, Key.pageUp)) {
+      this.scroll -= Math.max(1, this.lastPageSize - 1);
+    } else if (matchesKey(data, Key.pageDown) || matchesKey(data, Key.space)) {
+      this.scroll += Math.max(1, this.lastPageSize - 1);
+    } else if (matchesKey(data, Key.home)) {
+      this.scroll = 0;
+    } else if (matchesKey(data, Key.end)) {
+      this.scroll = Number.MAX_SAFE_INTEGER;
+    } else {
+      return;
+    }
+
+    this.scroll = Math.max(0, this.scroll);
+    if (this.scroll !== previous) this.requestRender();
+  }
+
+  invalidate(): void {}
+}
+
+export async function renderStatsTable(summary: StatsSummary, ctx: ExtensionContext, _pi: ExtensionAPI): Promise<void> {
+  const ui = ctx.ui as CustomStatsUi;
+  if (ctx.mode === "tui" && typeof ui.custom === "function") {
+    await ui.custom<void>((tui, theme, _keybindings, done) => new StatsTableView(
+      summary,
+      theme ?? PASSTHROUGH_STATS_THEME,
+      () => done(undefined),
+      () => tui.requestRender?.(),
+    ));
     return;
   }
   ui.notify?.(formatStatsTable(summary, ui.theme ?? PASSTHROUGH_STATS_THEME).join("\n"), "info");
 }
 
 export default function statsExtension(pi: ExtensionAPI) {
-  pi.registerMessageRenderer?.("stats", statsMessageRenderer as never);
   pi.registerCommand?.("stats", {
     description: "Show per-model and subagent token/cost stats for this session",
     handler: async (_args, ctx) => {

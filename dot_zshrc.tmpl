@@ -1,11 +1,9 @@
 ## ENV VARS SETUP
 
 {{ includeTemplate ".chezmoitemplates/shell_editor.sh.tmpl" . }}
-
 ## SOFTWARE SETUP
 
 {{ includeTemplate ".chezmoitemplates/shell_pi.sh.tmpl" . }}
-
 # PyEnv Setup
 export PYENV_ROOT="$HOME/.pyenv"
 [[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
@@ -19,5 +17,4 @@ export WORKON_HOME=$HOME/.virtualenvs
 [[ -r $PYENV_ROOT/versions/3.13.5/bin/virtualenvwrapper.sh ]] && source $PYENV_ROOT/versions/3.13.5/bin/virtualenvwrapper.sh
 
 {{ includeTemplate ".chezmoitemplates/shell_starship.sh.tmpl" (dict "shell" "zsh") }}
-
 {{ includeTemplate ".chezmoitemplates/shell_openstack.sh.tmpl" . }}

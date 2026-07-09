@@ -34,7 +34,7 @@ import { getFreshCachedResults, MODEL_HEALTH_CACHE_TTL_MS } from "../model-healt
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-// This file lives at <agent>/extensions/subagent/model-selection.ts, so models
+// This file lives at <agent>/extensions/subagents/model-selection.ts, so models
 // and settings are two levels up.
 const MODELS_PATH = path.resolve(__dirname, "../../models.json");
 const SETTINGS_CONFIG_PATH = path.resolve(__dirname, "../../settings.config.json");

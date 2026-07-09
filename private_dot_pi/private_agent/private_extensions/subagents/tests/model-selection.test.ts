@@ -1,4 +1,4 @@
-// Run with: npx -y tsx --test agent/extensions/subagent/tests/model-selection.test.ts
+// Run with: npx -y tsx --test agent/extensions/subagents/tests/model-selection.test.ts
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { writePackageStubs } from "./_stubs.ts";
 
-const SUBAGENT_DIR = resolve("agent/extensions/subagent");
+const SUBAGENT_DIR = resolve("agent/extensions/subagents");
 const MODULE_PATH = resolve(SUBAGENT_DIR, "model-selection.ts");
 const TESTABLE_PATH = resolve(SUBAGENT_DIR, ".model-selection.testable.ts");
 const HEALTH_STUB_PATH = resolve(SUBAGENT_DIR, ".model-health-check-stub.ts");

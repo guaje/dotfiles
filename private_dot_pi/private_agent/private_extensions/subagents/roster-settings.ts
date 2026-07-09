@@ -26,7 +26,7 @@ const execFile = promisify(execFileCallback);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-// extensions/subagent/ -> ../../settings.config.json
+// extensions/subagents/ -> ../../settings.config.json
 const SETTINGS_CONFIG_PATH = path.resolve(__dirname, "../../settings.config.json");
 const SETTINGS_PATH = path.resolve(__dirname, "../../settings.json");
 const MERGE_SETTINGS_SCRIPT_PATH = path.resolve(__dirname, "../../scripts/merge-settings.sh");

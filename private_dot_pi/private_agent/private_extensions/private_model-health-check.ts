@@ -18,6 +18,7 @@ const CACHE_PATH = path.resolve(__dirname, "../model-health-cache.json");
 
 export const MODEL_HEALTH_CACHE_TTL_MS = 15 * 60 * 1000;
 export const MODEL_PROBE_CONCURRENCY_LIMIT = 3;
+export const RELOAD_HEALTH_RENDER_DELAY_MS = 100;
 
 interface ModelMetadata {
   id: string;
@@ -644,10 +645,24 @@ export default function modelHealthCheckExtension(pi: ExtensionAPI) {
   // instead of the legacy one-line toast. Skip "new"/"resume"/"fork" so
   // switching sessions does not re-render. Uses the fresh cache when available
   // and only re-probes when stale, so reload is instant unless the cache expired.
+  // Pi emits session_start during /reload before it appends the
+  // "Reloaded keybindings..." status line, so the reload table is scheduled
+  // shortly after the event returns to keep the status line above the table.
   pi.on("session_start", async (event, ctx) => {
     if (event.reason !== "startup" && event.reason !== "reload") return;
-    const results = await checkModelHealth(ctx, { notify: false, cacheTtlMs: MODEL_HEALTH_CACHE_TTL_MS });
-    await renderHealthTable(results, ctx, pi);
+    const render = async () => {
+      const results = await checkModelHealth(ctx, { notify: false, cacheTtlMs: MODEL_HEALTH_CACHE_TTL_MS });
+      await renderHealthTable(results, ctx, pi);
+    };
+    if (event.reason === "reload") {
+      globalThis.setTimeout(() => {
+        void render().catch((error) => {
+          console.error(`model-health reload render failed: ${error instanceof Error ? error.message : String(error)}`);
+        });
+      }, RELOAD_HEALTH_RENDER_DELAY_MS);
+      return;
+    }
+    await render();
   });
 
   pi.registerCommand?.("model-health", {

@@ -713,8 +713,16 @@ test("renderHealthTable appends a custom chat message in tui mode", async () => 
   assert.equal(sent!.options?.triggerTurn, false);
 });
 
-test("session_start renders the table only on startup and reload", async () => {
+test("session_start renders startup immediately and reload after Pi's reload status", async () => {
   const mod = await loadExtension();
+  const [chatModel] = readAvailableTestModels(1);
+  writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({ enabledModels: [chatModel.id] }, null, 2)}\n`);
+  writeFileSync(SETTINGS_PATH, `${JSON.stringify({ enabledModels: [chatModel.id] }, null, 2)}\n`);
+  writeFileSync(CACHE_PATH, `${JSON.stringify({
+    checkedAt: Date.now(),
+    results: [{ id: chatModel.id, status: "ok", name: chatModel.name, service: "chat" }],
+  }, null, 2)}\n`);
+
   let sessionHandler: ((event: any, ctx: any) => Promise<void>) | undefined;
   let sentCount = 0;
   const pi: any = {
@@ -733,6 +741,14 @@ test("session_start renders the table only on startup and reload", async () => {
   await sessionHandler!({ type: "session_start", reason: "resume" }, { mode: "tui", ui: {} } as any);
   await sessionHandler!({ type: "session_start", reason: "fork" }, { mode: "tui", ui: {} } as any);
   assert.equal(sentCount, 0, "new/resume/fork must not render the health table");
+
+  await sessionHandler!({ type: "session_start", reason: "startup" }, { mode: "tui", ui: {} } as any);
+  assert.equal(sentCount, 1, "startup should render before the handler resolves");
+
+  await sessionHandler!({ type: "session_start", reason: "reload" }, { mode: "tui", ui: {} } as any);
+  assert.equal(sentCount, 1, "reload should defer rendering until after Pi prints its reload status");
+  await new Promise((resolve) => setTimeout(resolve, mod.RELOAD_HEALTH_RENDER_DELAY_MS + 25));
+  assert.equal(sentCount, 2, "reload should render the table after the delay");
 });
 
 test.after(() => {

@@ -1,12 +1,14 @@
 {{- /* chezmoi:template */ -}}
 {
-  "defaultModel": "gpt-5.5",
+  "defaultModel": "gpt-5.6-terra",
   "defaultProvider": "openai-codex",
   "defaultThinkingLevel": "high",
   "enabledModels": [
-    "openai-codex/gpt-5.5",
+    "openai-codex/gpt-5.6-sol",
+    "openai-codex/gpt-5.6-terra",
     "reallms-dev/GLM-5.2",
     "kelley/Kimi-K2.6",
+    "openai-codex/gpt-5.6-luna",
     "reallms/gpt-oss-120b",
     "reallms/gemma-4-31B-it",
     "reallms/Qwen3-Coder-Next"
@@ -30,7 +32,7 @@
       ]
     }
   },
-  "linkupAPIKey": "{{ (index ((secret "-d" (joinPath .chezmoi.sourceDir "secrets/private_dot_pi/private_agent/private_settings.config.json.sops.yaml") | fromYaml).data | fromYaml) "linkupAPIKey") }}",
+  "linkupAPIKey": "{{ (index (secret "-d" (joinPath .chezmoi.sourceDir "secrets/private_dot_pi/private_agent/private_settings.config.json.sops.yaml.cujuMr") | fromYaml) "linkupAPIKey") }}",
   "managingStyle": "Empowerment",
   "subagentRosterCap": 10,
   "subagentRosterScope": "user",

@@ -8,6 +8,7 @@
     "openai-codex/gpt-5.6-terra",
     "reallms-dev/GLM-5.2",
     "kelley/Kimi-K2.6",
+    "reallms-dev/Ornith-1.0-397B-FP8",
     "openai-codex/gpt-5.6-luna",
     "reallms/gpt-oss-120b",
     "reallms/gemma-4-31B-it",
@@ -32,7 +33,7 @@
       ]
     }
   },
-  "linkupAPIKey": "{{ (index (secret "-d" (joinPath .chezmoi.sourceDir "secrets/private_dot_pi/private_agent/private_settings.config.json.sops.yaml.cujuMr") | fromYaml) "linkupAPIKey") }}",
+  "linkupAPIKey": "{{ (index ((secret "-d" (joinPath .chezmoi.sourceDir "secrets/private_dot_pi/private_agent/private_settings.config.json.sops.yaml") | fromYaml).data | fromYaml) "linkupAPIKey") }}",
   "managingStyle": "Empowerment",
   "subagentRosterCap": 10,
   "subagentRosterScope": "user",

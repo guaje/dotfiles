@@ -145,12 +145,10 @@ async function loadExtension() {
 	})) {
 		const dir = resolve(stubs, name); mkdirSync(dir, { recursive: true }); writeFileSync(resolve(dir, "package.json"), JSON.stringify({ name, type: "module", exports: "./index.js" })); writeFileSync(resolve(dir, "index.js"), source);
 	}
-	const testable = resolve("agent/extensions/web-retrieval/.index.testable.ts");
+	// Use an ESM TypeScript extension so tsx does not apply CommonJS interop in CI.
+	const testable = resolve("agent/extensions/web-retrieval/.index.testable.mts");
 	writeFileSync(testable, readFileSync(extensionPath, "utf8"));
-	const loaded = await import(`${pathToFileURL(testable).href}?${Date.now()}`);
-	const extension = typeof loaded.default === "function" ? loaded.default : (loaded.default as { default?: unknown })?.default;
-	if (typeof extension !== "function") throw new Error("web-retrieval extension did not export a default function.");
-	return extension;
+	return (await import(`${pathToFileURL(testable).href}?${Date.now()}`)).default;
 }
 
 test("extension registers one constrained tool and emits preview plus final content", async () => {
@@ -168,4 +166,4 @@ test("extension registers one constrained tool and emits preview plus final cont
 	} finally { globalThis.fetch = originalFetch; }
 });
 
-test.after(() => { rmSync(stubs, { recursive: true, force: true }); rmSync(resolve("agent/extensions/web-retrieval/.index.testable.ts"), { force: true }); });
+test.after(() => { rmSync(stubs, { recursive: true, force: true }); rmSync(resolve("agent/extensions/web-retrieval/.index.testable.mts"), { force: true }); });

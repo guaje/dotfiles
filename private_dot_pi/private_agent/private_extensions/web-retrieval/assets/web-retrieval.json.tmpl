@@ -1,0 +1,24 @@
+{{- /* chezmoi:template */ -}}
+{
+  "providers": {
+    "linkup": {
+      "apiKey": "{{ (index ((secret "-d" (joinPath .chezmoi.sourceDir "secrets/private_dot_pi/private_agent/private_extensions/web-retrieval/assets/web-retrieval.json.sops.yaml") | fromYaml).data | fromYaml) "apiKey__1") }}"
+    },
+    "tavily": {
+      "apiKey": "{{ (index ((secret "-d" (joinPath .chezmoi.sourceDir "secrets/private_dot_pi/private_agent/private_extensions/web-retrieval/assets/web-retrieval.json.sops.yaml") | fromYaml).data | fromYaml) "apiKey__2") }}"
+    }
+  },
+  "fallbackProviders": [
+    "tavily"
+  ],
+  "limits": {
+    "maxResults": 8,
+    "maxResponseBytes": 1000000,
+    "maxFetchChars": 30000,
+    "maxCalls": 8,
+    "timeoutMs": 30000,
+    "retries": 1,
+    "pollIntervalMs": 1000,
+    "pollTimeoutMs": 120000
+  }
+}

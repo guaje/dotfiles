@@ -30,6 +30,16 @@ const AGENTS = [
 	{ name: "conventions-analyst", description: "Conventions" },
 ];
 
+test("delegate guidelines route normal web work to researcher and reserve direct retrieval for diagnostics", async () => {
+	const mod = await loadModule();
+	try {
+		assert.match(mod.DELEGATE_GUIDELINES, /researcher for normal web search, fetching, source gathering, and investigation/i);
+		assert.match(mod.DELEGATE_GUIDELINES, /web_retrieval directly only for diagnostics or an explicit low-level provider request/i);
+	} finally {
+		cleanup();
+	}
+});
+
 test("parseRosterSettings applies defaults for missing/invalid values", async () => {
 	const mod = await loadModule();
 	try {

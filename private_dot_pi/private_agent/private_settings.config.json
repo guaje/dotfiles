@@ -1,4 +1,3 @@
-{{- /* chezmoi:template */ -}}
 {
   "defaultModel": "gpt-5.6-terra",
   "defaultProvider": "openai-codex",
@@ -16,12 +15,13 @@
   ],
   "extensions": [
     "-extensions/google-search.ts",
+    "extensions/stats/index.ts",
     "extensions/subagents/index.ts",
+    "extensions/web-retrieval/index.ts",
     "extensions/confirm-before-actions.ts",
     "extensions/model-health-check.ts",
     "extensions/native-notify.ts",
-    "extensions/reload-merged-settings.ts",
-    "extensions/stats/index.ts"
+    "extensions/reload-merged-settings.ts"
   ],
   "imageGenerationProviders": {
     "reallms-dev": {
@@ -33,7 +33,6 @@
       ]
     }
   },
-  "linkupAPIKey": "{{ (index ((secret "-d" (joinPath .chezmoi.sourceDir "secrets/private_dot_pi/private_agent/private_settings.config.json.sops.yaml") | fromYaml).data | fromYaml) "linkupAPIKey") }}",
   "managingStyle": "Empowerment",
   "subagentRosterCap": 10,
   "subagentRosterScope": "user",

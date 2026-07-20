@@ -114,15 +114,28 @@ jobs:
           }
           JSON
 
-          # settings.config.json can be a chezmoi template that references
-          # encrypted secrets unavailable in CI. Strip the template marker and
-          # replace the Linkup secret expression with a deterministic placeholder
-          # before parsing it as JSON.
-          settings_config="$dst/agent/settings.config.json"
-          if grep -q '{{' "$settings_config"; then
-            sed -i '1{/^{{-/d;}' "$settings_config"
-            perl -0pi -e 's/^  "linkupAPIKey": .*$/  "linkupAPIKey": "TEST_PLACEHOLDER_LINKUP_API_KEY",/m' "$settings_config"
-          fi
+          # web-retrieval.json is a chezmoi template backed by encrypted
+          # provider keys, neither of which is available in CI. Replace it with
+          # deterministic test credentials before extension tests parse it.
+          cat > "$dst/agent/extensions/web-retrieval/assets/web-retrieval.json" <<'JSON'
+          {
+            "providers": {
+              "linkup": {"apiKey": "TEST_PLACEHOLDER_LINKUP_API_KEY"},
+              "tavily": {"apiKey": "TEST_PLACEHOLDER_TAVILY_API_KEY"}
+            },
+            "fallbackProviders": ["tavily"],
+            "limits": {
+              "maxResults": 8,
+              "maxResponseBytes": 1000000,
+              "maxFetchChars": 30000,
+              "maxCalls": 8,
+              "timeoutMs": 30000,
+              "retries": 1,
+              "pollIntervalMs": 1000,
+              "pollTimeoutMs": 120000
+            }
+          }
+          JSON
 
           # The checked-in source can include real enabled model IDs. Replace them
           # with placeholders for CI, and create the runtime settings.json that pi
@@ -198,25 +211,6 @@ jobs:
           export PATH="$RUNNER_TEMP/bin:$PATH"
           find "$HOME/.pi" -name '*.test.sh' -type f -print0 | sort -z | xargs -0 -n1 sh
 
-      - name: Run Linkup script tests
-        shell: bash
-        env:
-          # This workflow does not consume repository secrets. Keep common token
-          # variables empty so tests cannot accidentally print or exfiltrate them.
-          GITHUB_TOKEN: ''
-          GH_TOKEN: ''
-          OPENAI_API_KEY: ''
-          ANTHROPIC_API_KEY: ''
-          GOOGLE_API_KEY: ''
-          GEMINI_API_KEY: ''
-          LINKUP_API_KEY: ''
-        run: |
-          set -euo pipefail
-          cd "$HOME/.pi"
-          for test_file in agent/skills/linkup-search/scripts/tests/linkup-*.test.mjs; do
-            node "$test_file"
-          done
-
       - name: Run TypeScript tests
         shell: bash
         env:
@@ -229,6 +223,7 @@ jobs:
           GOOGLE_API_KEY: ''
           GEMINI_API_KEY: ''
           LINKUP_API_KEY: ''
+          TAVILY_API_KEY: ''
         run: |
           set -euo pipefail
           fake_pi_package="$RUNNER_TEMP/pi-package/node_modules/@earendil-works/pi-coding-agent"

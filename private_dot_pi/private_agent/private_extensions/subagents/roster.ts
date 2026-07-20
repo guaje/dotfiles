@@ -38,7 +38,7 @@ export const ROSTER_SENTINEL = "<!-- pi-subagent-roster -->";
  * roster (handler) tells it *who* is available.
  */
 export const DELEGATE_GUIDELINES = [
-	"When a task would benefit from a specialist (codebase recon, planning, conventions analysis, web research, code review), delegate to a subagent via the `subagent` tool instead of doing it inline.",
+	"When a task would benefit from a specialist (codebase recon, planning, conventions analysis, web research, code review), delegate to a subagent via the `subagent` tool instead of doing it inline. Use the researcher for normal web search, fetching, source gathering, and investigation; call web_retrieval directly only for diagnostics or an explicit low-level provider request.",
 	"Delegating keeps bulky intermediate output (file contents, search results, page text) out of this context. The subagent runs in its own context and returns only a summary.",
 	"Prefer a chain (scout → planner → worker → reviewer) for multi-step work, and parallel tasks for independent investigation. Only delegate when the specialist's isolation is worth the spawn cost; don't delegate trivial one-liners.",
 ].join(" ");

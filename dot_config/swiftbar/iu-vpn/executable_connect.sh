@@ -28,7 +28,8 @@ echo "- Leave this Terminal window open while connected." | tee -a "$LOG_FILE"
 echo "- Press Ctrl-C here, or use the SwiftBar Disconnect item, to disconnect." | tee -a "$LOG_FILE"
 echo "" | tee -a "$LOG_FILE"
 
-if pgrep -f "openconnect.*${VPN_HOST}" >/dev/null 2>&1 || pgrep -f "openconnect-saml.*${VPN_HOST}" >/dev/null 2>&1; then
+# A SAML wrapper or sudo prompt alone is not an active VPN tunnel.
+if pgrep -x openconnect >/dev/null 2>&1; then
   echo "IU VPN already appears to be running." | tee -a "$LOG_FILE"
   exit 0
 fi

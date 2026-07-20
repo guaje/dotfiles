@@ -9,8 +9,10 @@ export PATH="$HOME/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bi
 VPN_HOST="${VPN_HOST:-vpn.uits.iu.edu}"
 LOG_FILE="${LOG_FILE:-$BASE/iu-vpn.log}"
 
+# Only the actual openconnect tunnel process means the VPN is connected.
+# openconnect-saml and sudo may still be waiting for browser or sudo auth.
 connected=false
-if pgrep -f "openconnect.*${VPN_HOST}" >/dev/null 2>&1 || pgrep -f "openconnect-saml.*${VPN_HOST}" >/dev/null 2>&1; then
+if pgrep -x openconnect >/dev/null 2>&1; then
   connected=true
 fi
 

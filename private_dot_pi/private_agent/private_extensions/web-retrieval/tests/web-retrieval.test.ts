@@ -147,7 +147,10 @@ async function loadExtension() {
 	}
 	const testable = resolve("agent/extensions/web-retrieval/.index.testable.ts");
 	writeFileSync(testable, readFileSync(extensionPath, "utf8"));
-	return (await import(`${pathToFileURL(testable).href}?${Date.now()}`)).default;
+	const loaded = await import(`${pathToFileURL(testable).href}?${Date.now()}`);
+	const extension = typeof loaded.default === "function" ? loaded.default : (loaded.default as { default?: unknown })?.default;
+	if (typeof extension !== "function") throw new Error("web-retrieval extension did not export a default function.");
+	return extension;
 }
 
 test("extension registers one constrained tool and emits preview plus final content", async () => {

@@ -114,10 +114,10 @@ jobs:
           }
           JSON
 
-          # web-retrieval.json is a chezmoi template backed by encrypted
+          # Browse's web-retrieval.json is a chezmoi template backed by encrypted
           # provider keys, neither of which is available in CI. Replace it with
           # deterministic test credentials before extension tests parse it.
-          cat > "$dst/agent/extensions/web-retrieval/assets/web-retrieval.json" <<'JSON'
+          cat > "$dst/agent/extensions/05-browse/assets/web-retrieval.json" <<'JSON'
           {
             "providers": {
               "linkup": {"apiKey": "TEST_PLACEHOLDER_LINKUP_API_KEY"},

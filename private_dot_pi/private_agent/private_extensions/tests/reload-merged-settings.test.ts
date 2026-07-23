@@ -5,7 +5,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const EXTENSION_PATH = resolve("agent/extensions/reload-merged-settings.ts");
+const EXTENSION_PATH = resolve("agent/extensions/08-reload-merged-settings.ts");
 const STUB_PACKAGE_DIR = resolve("agent/extensions/node_modules");
 const CHILD_PROCESS_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "node:child_process");
 const FS_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "node:fs");

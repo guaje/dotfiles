@@ -1,6 +1,6 @@
 # Tasker + AutoNotification setup for Pi native notifications
 
-Use this setup for the default Termux notification path in `agent/extensions/native-notify.ts`. On Termux, Pi sends notifications through Tasker/AutoNotification first so notifications can use the Pi icons; if that command fails, Pi falls back to Termux:API's `termux-notification`.
+Use this setup for the default Termux notification path in `agent/extensions/07-native-notify.ts`. On Termux, Pi sends notifications through Tasker/AutoNotification first so notifications can use the Pi icons; if that command fails, Pi falls back to Termux:API's `termux-notification`.
 
 ## Prerequisites
 
@@ -213,7 +213,7 @@ You should see a notification created by Tasker/AutoNotification.
 
 ## 6. Start Pi
 
-Tasker/AutoNotification is the default Termux notification backend. If the icons exist in shared storage, `agent/extensions/native-notify.ts` automatically discovers them from:
+Tasker/AutoNotification is the default Termux notification backend. If the icons exist in shared storage, `agent/extensions/07-native-notify.ts` automatically discovers them from:
 
 ```text
 $HOME/storage/shared/Pictures/pi/pi-logo.png
@@ -234,7 +234,7 @@ PI_NATIVE_NOTIFY_STATUS_ICON_PATH=/storage/emulated/0/Pictures/pi/pi-logo-status
 pi
 ```
 
-If the Tasker broadcast command itself fails, `agent/extensions/native-notify.ts` falls back to `termux-notification`.
+If the Tasker broadcast command itself fails, `agent/extensions/07-native-notify.ts` falls back to `termux-notification`.
 
 ## Optional chezmoi setup script
 

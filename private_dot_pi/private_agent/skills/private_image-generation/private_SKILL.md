@@ -12,7 +12,7 @@ Use this skill when the user wants a new image or visual asset generated from te
 Before generating any image, confirm the target image-generation model is healthy. Health is tracked **per model** (each cache entry has its own `checkedAt`), so a stale cache does not force a full refresh.
 
 1. Read `agent/model-health-cache.json` and find the entry for the target model (`provider/model-id`).
-2. If the entry is fresh (per-entry `checkedAt` within `MODEL_HEALTH_CACHE_TTL_MS` from `model-health-check.ts`) and `status` is `ok`, proceed.
+2. If the entry is fresh (per-entry `checkedAt` within `MODEL_HEALTH_CACHE_TTL_MS` from `06-model-health-check.ts`) and `status` is `ok`, proceed.
 3. If the entry is stale, missing, or not `ok`, **refresh just that model** before refusing:
    ```bash
    MODEL_IDS='<provider/model-id>' node agent/skills/image-generation/scripts/refresh-model-health.mjs
@@ -44,7 +44,7 @@ The health extension gets configured image models from `imageGenerationProviders
 7. Display the saved image for the user:
    - In supported non-Termux terminals, use pi's inline terminal image rendering. From extension/tool rendering code, return an `Image` component from `@mariozechner/pi-tui` when `context.showImages` is true, using the saved file's base64 data and MIME type.
    - In Termux, do not rely on inline terminal image rendering. If AutoNotification is available, do not immediately open the image; let the generated-image notification handle preview and tap-to-open behavior. If AutoNotification is unavailable, schedule a delayed, background image opener so pi can finish rendering its response before Android switches apps: first `am start -a android.intent.action.VIEW -d file://<realSavedImagePath> -t image/png`; if that fails, try `termux-open --chooser --content-type image/png <savedImagePath>`; if image opening still fails, open the generated image directory with `termux-open --chooser <generatedImageDirectory>`.
-8. Trigger a generated-image notification by calling `notifyGeneratedImage(savedImagePath, ctx)` from `agent/extensions/native-notify.ts` when you are operating from extension code that has a Pi extension context. If you generated the image from a script or shell workflow without an extension context, ask Pi/the user to call that function with the saved path rather than reimplementing notification logic.
+8. Trigger a generated-image notification by calling `notifyGeneratedImage(savedImagePath, ctx)` from `agent/extensions/07-native-notify.ts` when you are operating from extension code that has a Pi extension context. If you generated the image from a script or shell workflow without an extension context, ask Pi/the user to call that function with the saved path rather than reimplementing notification logic.
 9. Return the saved path, model, provider, display method, and a short note about any assumptions.
 
 ## Listing Healthy Image Models

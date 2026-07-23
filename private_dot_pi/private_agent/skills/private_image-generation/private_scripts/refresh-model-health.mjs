@@ -72,7 +72,7 @@ function getConfiguredImageModels(settingsFile, modelsFile) {
 	return models;
 }
 
-/** Probe one image-generation model. Mirrors probeImageGenerationModel in model-health-check.ts. */
+/** Probe one image-generation model. Mirrors probeImageGenerationModel in 06-model-health-check.ts. */
 async function probeImageModel(metadata) {
 	const parts = splitModelId(metadata.id);
 	if (!parts) return { id: metadata.id, status: "error", error: "Invalid model id", name: metadata.name, service: "imageGeneration", checkedAt: Date.now() };

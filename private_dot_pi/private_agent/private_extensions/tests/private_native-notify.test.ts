@@ -6,11 +6,11 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const EXTENSION_PATH = resolve("agent/extensions/native-notify.ts");
+const EXTENSION_PATH = resolve("agent/extensions/07-native-notify.ts");
 
 async function loadExtension() {
   const moduleUrl = `${pathToFileURL(EXTENSION_PATH).href}?t=${Date.now()}-${Math.random()}`;
-  return import(moduleUrl) as Promise<typeof import("../native-notify.ts")>;
+  return import(moduleUrl) as Promise<typeof import("../07-native-notify.ts")>;
 }
 
 function createPiHarness() {
@@ -322,7 +322,7 @@ test("notifyGeneratedImage resolves symlinked generated image paths for Tasker",
   }
 
   const piPictureIndex = calls[0]!.args.indexOf("pi_picture");
-  assert.equal(calls[0]!.args[piPictureIndex + 1], generatedPath);
+  assert.equal(String(calls[0]!.args[piPictureIndex + 1]).replace(/^\/private/, ""), generatedPath.replace(/^\/private/, ""));
 });
 
 test("notifyGeneratedImage sends generated image as Tasker picture only for generated-image notifications", async () => {
@@ -428,8 +428,8 @@ test("notifyPiWaitingForUser prefers shared-storage icons for Tasker notificatio
   assert.equal(calls[0]?.command, "am");
   const iconIndex = calls[0]!.args.indexOf("icon");
   const statusIconIndex = calls[0]!.args.indexOf("status_icon");
-  assert.equal(calls[0]!.args[iconIndex + 1], iconPath);
-  assert.equal(calls[0]!.args[statusIconIndex + 1], statusIconPath);
+  assert.equal(String(calls[0]!.args[iconIndex + 1]).replace(/^\/private/, ""), iconPath.replace(/^\/private/, ""));
+  assert.equal(String(calls[0]!.args[statusIconIndex + 1]).replace(/^\/private/, ""), statusIconPath.replace(/^\/private/, ""));
 });
 
 test("notifyPiWaitingForUser sends the standard waiting notification", async () => {

@@ -62,7 +62,7 @@ async function createFixture(t) {
       { id: 'test-provider/test-image-model', status: 'ok', name: 'test-image-model', service: 'imageGeneration' },
     ],
   }));
-  await writeFile(join(extensionsDir, 'model-health-check.ts'), 'export const MODEL_HEALTH_CACHE_TTL_MS = 15 * 60 * 1000;\n');
+  await writeFile(join(extensionsDir, '06-model-health-check.ts'), 'export const MODEL_HEALTH_CACHE_TTL_MS = 15 * 60 * 1000;\n');
   await writeFile(join(agentDir, 'models.json'), JSON.stringify({
     providers: {
       'test-provider': {

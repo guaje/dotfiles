@@ -15,13 +15,15 @@
   ],
   "extensions": [
     "-extensions/google-search.ts",
-    "extensions/stats/index.ts",
-    "extensions/subagents/index.ts",
-    "extensions/web-retrieval/index.ts",
-    "extensions/confirm-before-actions.ts",
-    "extensions/model-health-check.ts",
-    "extensions/native-notify.ts",
-    "extensions/reload-merged-settings.ts"
+    "extensions/00-hud/index.ts",
+    "extensions/01-confirm-before-actions.ts",
+    "extensions/02-handoff/index.ts",
+    "extensions/03-stats/index.ts",
+    "extensions/04-subagents/index.ts",
+    "extensions/05-browse/index.ts",
+    "extensions/06-model-health-check.ts",
+    "extensions/07-native-notify.ts",
+    "extensions/08-reload-merged-settings.ts"
   ],
   "imageGenerationProviders": {
     "reallms-dev": {

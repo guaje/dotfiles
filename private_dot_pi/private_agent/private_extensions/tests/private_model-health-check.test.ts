@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const EXTENSION_PATH = resolve("agent/extensions/model-health-check.ts");
+const EXTENSION_PATH = resolve("agent/extensions/06-model-health-check.ts");
 const SETTINGS_CONFIG_PATH = resolve("agent/settings.config.json");
 const SETTINGS_PATH = resolve("agent/settings.json");
 const MODELS_PATH = resolve("agent/models.json");

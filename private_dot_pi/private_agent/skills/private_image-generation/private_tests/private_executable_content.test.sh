@@ -26,7 +26,7 @@ assert_not_contains() {
 
 assert_contains 'Read `agent/model-health-cache\.json`' 'skill should require reading the model health cache before use'
 assert_contains 'MODEL_HEALTH_CACHE_TTL_MS' 'skill should use the extension cache TTL when judging freshness'
-assert_contains 'model-health-check\.ts' 'skill should reference model-health-check.ts for cache staleness'
+assert_contains 'model-health-check\.ts' 'skill should reference 06-model-health-check.ts for cache staleness'
 assert_contains 'service` is `imageGeneration`|service == "imageGeneration"' 'skill should filter image generation health results'
 assert_contains 'status` is `ok`|status == "ok"' 'skill should require ok health status'
 assert_contains 'no image generation models are currently available|No image generation models are currently available' 'skill should fail clearly when no healthy image models are available'

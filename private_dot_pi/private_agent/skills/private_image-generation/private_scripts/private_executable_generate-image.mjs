@@ -11,7 +11,7 @@ const modelsPath = join(agentDir, 'models.json');
 const settingsConfigPath = join(agentDir, 'settings.config.json');
 const settingsPath = join(agentDir, 'settings.json');
 const cachePath = join(agentDir, 'model-health-cache.json');
-const healthExtensionPath = join(agentDir, 'extensions/model-health-check.ts');
+const healthExtensionPath = join(agentDir, 'extensions/06-model-health-check.ts');
 
 const prompt = process.env.IMAGE_PROMPT || 'A concise image prompt goes here';
 const requestedModel = process.env.IMAGE_MODEL || '';
@@ -189,5 +189,5 @@ console.log(JSON.stringify({
   model: selected.model.id,
   size,
   display,
-  notification: 'Call notifyGeneratedImage(outPath, ctx) from agent/extensions/native-notify.ts when an extension context is available.',
+  notification: 'Call notifyGeneratedImage(outPath, ctx) from agent/extensions/07-native-notify.ts when an extension context is available.',
 }, null, 2));

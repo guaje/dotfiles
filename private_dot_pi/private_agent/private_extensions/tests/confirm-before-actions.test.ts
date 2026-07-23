@@ -12,10 +12,11 @@ class StubText {
 }
 import { pathToFileURL } from "node:url";
 
-const EXTENSION_PATH = resolve("agent/extensions/confirm-before-actions.ts");
+const EXTENSION_PATH = resolve("agent/extensions/01-confirm-before-actions.ts");
 const SETTINGS_CONFIG_PATH = resolve("agent/settings.config.json");
 const STUB_PACKAGE_DIR = resolve("agent/extensions/node_modules/@earendil-works/pi-coding-agent");
 const STUB_TUI_PACKAGE_DIR = resolve("agent/extensions/node_modules/@earendil-works/pi-tui");
+const STUB_HANDOFF_PACKAGE_DIR = resolve("agent/extensions/node_modules/@local/handoff-stub");
 
 function stripAnsi(text: string) {
   return text.replace(/\x1b\[[0-9;]*m/g, "");
@@ -30,6 +31,17 @@ const nativeNotifyCalls: string[] = [];
 async function loadExtensionModule() {
   mkdirSync(STUB_PACKAGE_DIR, { recursive: true });
   mkdirSync(STUB_TUI_PACKAGE_DIR, { recursive: true });
+  mkdirSync(STUB_HANDOFF_PACKAGE_DIR, { recursive: true });
+  writeFileSync(resolve(STUB_HANDOFF_PACKAGE_DIR, "package.json"), JSON.stringify({
+    name: "@local/handoff-stub",
+    type: "module",
+    exports: "./index.js",
+  }));
+  writeFileSync(resolve(STUB_HANDOFF_PACKAGE_DIR, "index.js"), [
+    "export function setRemoteBashBackend() {}",
+    "export function getBashBackend() { return undefined; }",
+    "export function getBashTargetLabel() { return undefined; }",
+  ].join("\n"));
   writeFileSync(resolve(STUB_PACKAGE_DIR, "package.json"), JSON.stringify({
     name: "@earendil-works/pi-coding-agent",
     type: "module",
@@ -92,7 +104,7 @@ async function loadExtensionModule() {
 
   const patchedExtensionPath = resolve("agent/extensions/.confirm-before-actions.testable.ts");
   const source = readFileSync(EXTENSION_PATH, "utf8")
-    .replace('import { notifyPiWaitingForUser } from "./native-notify.ts";', 'const notifyPiWaitingForUser = (globalThis as any).__nativeNotifyMock;')
+    .replace('import { notifyPiWaitingForUser } from "./07-native-notify.ts";', 'const notifyPiWaitingForUser = (globalThis as any).__nativeNotifyMock;')
     .replaceAll(
       "import.meta.dirname",
       JSON.stringify(dirname(EXTENSION_PATH)),
@@ -394,6 +406,30 @@ test("bash confirmation leaves the editor unchanged and includes command summary
   assert.match(body, /Warning: rm -rf can recursively and forcibly delete files/);
 });
 
+test("bash confirmation shows remote target label when backend is remote", async () => {
+  const extension = await loadExtension();
+  const { pi, getHandler } = createPiHarness();
+  extension(pi as any);
+  const handler = getHandler("tool_call");
+
+  const uiHarness = createUiHarness(true);
+  const backendMod = await import("../02-handoff/backend-registry.ts");
+  backendMod.setRemoteBashBackend(() => ({ exec: async () => ({ exitCode: 0 }) } as any), () => "work:/repo");
+  try {
+    const result = await handler(
+      { toolName: "bash", input: { command: "sudo echo hello" } },
+      { hasUI: true, ui: uiHarness.ui },
+    );
+    assert.equal(result, undefined);
+    assert.equal(uiHarness.confirmCalls.length, 1);
+    const body = stripAnsi(uiHarness.confirmCalls[0]!.body);
+    assert.match(body, /Remote target:/);
+    assert.match(body, /work:\/repo/);
+  } finally {
+    backendMod.setRemoteBashBackend(undefined);
+  }
+});
+
 test("bash programs list excludes heredoc script fragments", async () => {
   const originalSettings = readFileSync(SETTINGS_CONFIG_PATH, "utf8");
   try {
@@ -473,7 +509,7 @@ test("bash programs list ignores line-continuation paths and only includes actua
     {
       toolName: "bash",
       input: {
-        command: "cd ~/.local/share/chezmoi && git add \\\n  private_dot_pi/private_agent/settings.config.json \\\n  private_dot_pi/private_agent/private_extensions/reload-merged-settings.ts \\\n  private_dot_pi/private_agent/private_extensions/tests/reload-merged-settings.test.ts && \\\n git commit -m \"Split pi settings config\"",
+        command: "cd ~/.local/share/chezmoi && git add \\\n  private_dot_pi/private_agent/settings.config.json \\\n  private_dot_pi/private_agent/private_extensions/08-reload-merged-settings.ts \\\n  private_dot_pi/private_agent/private_extensions/tests/reload-merged-settings.test.ts && \\\n git commit -m \"Split pi settings config\"",
       },
     },
     {
@@ -728,74 +764,21 @@ test("managing style setting updates stale settings list values", async () => {
   assert.equal(settingsList.filteredItems, settingsList.items);
 });
 
-test("management style status shows styled icon and selected style as continuous minimal text", async () => {
-  const originalSettings = readFileSync(SETTINGS_CONFIG_PATH, "utf8");
-  try {
-    const settings = JSON.parse(originalSettings);
-    settings.managingStyle = "Guidance";
-    writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify(settings, null, 2)}\n`);
+test("management style HUD variants remain semantic and ANSI-free", async () => {
+  const mod = await loadExtensionModule();
+  const variants = mod.getManagingStyleSegments("Guidance");
+  assert.equal(variants.full.map((segment: { text: string }) => segment.text).join(""), "◆ Guiding");
+  assert.equal(variants.icon[0].text, "◆");
+  assert.equal(variants.icon[0].tone, "warning");
+  assert.equal(mod.getManagingStyleSegments("Micromanagement").icon[0].tone, "error");
+  assert.equal(mod.getManagingStyleSegments("Empowerment").icon[0].tone, "success");
+});
 
-    const mod = await loadExtensionModule();
-    await mod.refreshManagingStyleCache();
-    const extension = mod.default as (pi: { on: (event: string, handler: Function) => void; registerTool: Function }) => void;
-    const { pi, getHandler } = createPiHarness();
-    extension(pi as any);
-
-    const uiHarness = createUiHarness(true);
-    let footerFactory: any;
-    const ui = {
-      ...uiHarness.ui,
-      setFooter(factory: any) {
-        footerFactory = factory;
-      },
-    };
-    await getHandler("session_start")({}, { ui });
-    ui.setFooter((_tui: unknown, _theme: unknown, footerData: { getExtensionStatuses: () => ReadonlyMap<string, string> }) => ({
-      render: () => ["~/project", Array.from(footerData.getExtensionStatuses().values()).join(" ")],
-    }));
-    const footer = footerFactory(
-      { requestRender() {} },
-      { fg: (_color: string, text: string) => text },
-      { getExtensionStatuses: () => new Map([["management-style", "fallback"], ["other", "other status"]]) },
-    );
-    assert.equal(footer.render(40)[1], "other status");
-    assert.match(stripAnsi(footer.render(40)[0]), /^~\/project\s+◆ Guiding$/);
-
-    class PrototypeFooterData {
-      getExtensionStatuses() {
-        return new Map([["management-style", "fallback"], ["other", "prototype status"]]);
-      }
-      getGitBranch() {
-        return "main";
-      }
-    }
-    ui.setFooter((_tui: unknown, _theme: unknown, footerData: { getExtensionStatuses: () => ReadonlyMap<string, string>; getGitBranch: () => string }) => ({
-      render: () => [`~/project (${footerData.getGitBranch()})`, Array.from(footerData.getExtensionStatuses().values()).join(" ")],
-    }));
-    const prototypeFooter = footerFactory(
-      { requestRender() {} },
-      { fg: (_color: string, text: string) => text },
-      new PrototypeFooterData(),
-    );
-    assert.equal(prototypeFooter.render(40)[1], "prototype status");
-    assert.match(stripAnsi(prototypeFooter.render(40)[0]), /^~\/project \(main\)\s+◆ Guiding$/);
-    assert.equal(uiHarness.setStatusCalls.at(-1)!.id, "management-style");
-    assert.equal(stripAnsi(uiHarness.setStatusCalls.at(-1)!.status!), "◆ Guiding");
-
-    settings.managingStyle = "Empowerment";
-    writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify(settings, null, 2)}\n`);
-    await getHandler("tool_call")(
-      { toolName: "bash", input: { command: "git status --short" } },
-      { cwd: resolve("agent"), hasUI: false, ui },
-    );
-    assert.match(stripAnsi(footer.render(40)[0]), /^~\/project\s+▲ Empowering$/);
-
-    await getHandler("session_shutdown")({}, { ui });
-    assert.deepEqual(uiHarness.setStatusCalls.at(-1), { id: "management-style", status: undefined });
-  }
-  finally {
-    writeFileSync(SETTINGS_CONFIG_PATH, originalSettings);
-  }
+test("management style no longer patches footer or status APIs", () => {
+  const source = readFileSync(EXTENSION_PATH, "utf8");
+  assert.equal(source.includes("FooterComponent"), false);
+  assert.equal(source.includes("setFooter"), false);
+  assert.equal(source.includes("getActiveHandoffStatus"), false);
 });
 
 test("management style shortcut cycles session style without changing settings", async () => {
@@ -831,13 +814,13 @@ test("management style shortcut cycles session style without changing settings",
     assert.equal(backwardShortcut.description, "Cycle management style backward for this session");
 
     await shortcut.handler({ ui });
-    assert.equal(stripAnsi(uiHarness.setStatusCalls.at(-1)!.status!), "◆ Guiding");
+    assert.equal(uiHarness.setStatusCalls.length, 0);
     await shortcut.handler({ ui });
-    assert.equal(stripAnsi(uiHarness.setStatusCalls.at(-1)!.status!), "▲ Empowering");
+    assert.equal(uiHarness.setStatusCalls.length, 0);
     await backwardShortcut.handler({ ui });
-    assert.equal(stripAnsi(uiHarness.setStatusCalls.at(-1)!.status!), "◆ Guiding");
+    assert.equal(uiHarness.setStatusCalls.length, 0);
     await shortcut.handler({ ui });
-    assert.equal(stripAnsi(uiHarness.setStatusCalls.at(-1)!.status!), "▲ Empowering");
+    assert.equal(uiHarness.setStatusCalls.length, 0);
     assert.deepEqual(notifications.map((entry) => entry.message), [
       "Management style: Guiding (session only)",
       "Management style: Empowering (session only)",
@@ -868,38 +851,15 @@ test("management style backward shortcut handles terminal ctrl-colon fallback", 
   assert.equal(mod.isShiftCtrlSemicolonFallbackInput("\x1b[59;6u"), false);
 });
 
-test("management style settings submenu immediately updates active status", async () => {
-  const mod = await loadExtensionModule();
-  const extension = mod.default as (pi: { on: (event: string, handler: Function) => void; registerTool: Function }) => void;
+test("management style session lifecycle publishes through the HUD registry", async () => {
+  const extension = await loadExtension();
+  const registry = await import("../00-hud/registry.ts");
   const { pi, getHandler } = createPiHarness();
   extension(pi as any);
-
-  const uiHarness = createUiHarness(true);
-  let footerFactory: any;
-  const ui = {
-    ...uiHarness.ui,
-    setFooter(factory: any) {
-      footerFactory = factory;
-    },
-  };
-  await getHandler("session_start")({}, { ui });
-  ui.setFooter(() => ({ render: () => ["~/project", "stats"] }));
-  const footer = footerFactory(
-    { requestRender() {} },
-    { fg: (_color: string, text: string) => text },
-    {},
-  );
-
-  const settingsList = {
-    items: [{ id: "thinking", label: "Thinking", currentValue: "medium" }],
-    filteredItems: [] as any[],
-    onChange() {},
-  };
-  mod.addManagingStyleSettingToSettingsList(settingsList, "Micromanagement", () => {});
-
-  settingsList.onChange("managing-style", "Guidance");
-
-  assert.match(stripAnsi(footer.render(40)[0]), /^~\/project\s+◆ Guiding$/);
+  await getHandler("session_start")({}, { ui: createUiHarness().ui });
+  assert.equal(registry.hudItems().some((item) => item.owner === "confirm-before-actions" && item.id === "management-style"), true);
+  await getHandler("session_shutdown")({}, { ui: createUiHarness().ui });
+  assert.equal(registry.hudItems().some((item) => item.owner === "confirm-before-actions" && item.id === "management-style"), false);
 });
 
 test("management style submenu lists modes with descriptions and selects a value", async () => {
@@ -1002,4 +962,5 @@ test.after(() => {
   delete (globalThis as any).__nativeNotifyMock;
   rmSync(resolve("agent/extensions/node_modules"), { recursive: true, force: true });
   rmSync(resolve("agent/extensions/.confirm-before-actions.testable.ts"), { force: true });
+  rmSync(STUB_HANDOFF_PACKAGE_DIR, { recursive: true, force: true });
 });

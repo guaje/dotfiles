@@ -1,8 +1,40 @@
 // Run with: npx -y tsx --test agent/extensions/00-hud/tests/adapter.test.ts
 import assert from "node:assert/strict";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import test, { after } from "node:test";
+
+const originalPiPackageRoot = process.env.PI_CODING_AGENT_PACKAGE_ROOT;
+const fakePiPackageRoot = mkdtempSync(join(tmpdir(), "hud-pi-package-"));
+const fakeThemeDir = resolve(fakePiPackageRoot, "dist/modes/interactive/theme");
+const fakeComponentDir = resolve(fakePiPackageRoot, "dist/modes/interactive/components");
+mkdirSync(fakeThemeDir, { recursive: true });
+mkdirSync(fakeComponentDir, { recursive: true });
+writeFileSync(resolve(fakePiPackageRoot, "package.json"), JSON.stringify({ name: "@earendil-works/pi-coding-agent", type: "module" }));
+writeFileSync(resolve(fakeThemeDir, "theme.js"), `
+export const theme = {
+  fg(tone, text) {
+    const code = tone === "success" ? 32 : tone === "warning" ? 33 : tone === "error" ? 31 : tone === "dim" ? 2 : 36;
+    return "\\x1b[" + code + "m" + text + "\\x1b[0m";
+  },
+};
+export function initTheme() {}
+`);
+writeFileSync(resolve(fakeComponentDir, "footer.js"), `
+export class FooterComponent {
+  constructor(session, footerData) { this.session = session; this.footerData = footerData; }
+  render(_width) {
+    const lines = [this.session.sessionManager.getCwd(), "10.0%/1.0k test-model • high"];
+    const statuses = [...this.footerData.getExtensionStatuses().entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, value]) => value);
+    if (statuses.length) lines.push(statuses.join(" "));
+    return lines;
+  }
+}
+`);
+process.env.PI_CODING_AGENT_PACKAGE_ROOT = fakePiPackageRoot;
 
 const stubDir = resolve("agent/extensions/node_modules/@earendil-works/pi-tui");
 mkdirSync(stubDir, { recursive: true });
@@ -16,7 +48,12 @@ export function truncateToWidth(value, width, marker = "") {
 }
 `);
 
-after(() => rmSync(resolve("agent/extensions/node_modules"), { recursive: true, force: true }));
+after(() => {
+  rmSync(resolve("agent/extensions/node_modules"), { recursive: true, force: true });
+  rmSync(fakePiPackageRoot, { recursive: true, force: true });
+  if (originalPiPackageRoot === undefined) delete process.env.PI_CODING_AGENT_PACKAGE_ROOT;
+  else process.env.PI_CODING_AGENT_PACKAGE_ROOT = originalPiPackageRoot;
+});
 
 const stripAnsi = (value: string) => value.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
 

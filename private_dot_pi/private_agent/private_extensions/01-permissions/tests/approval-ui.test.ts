@@ -1,7 +1,13 @@
 // Run with: npx -y tsx --test agent/extensions/01-permissions/tests/approval-ui.test.ts
 import assert from "node:assert/strict";
 import test from "node:test";
-import { confirmBash, confirmFileMutation, editPreview, writePreview } from "../approval-ui.ts";
+import { confirmBash, confirmFileMutation, editPreview, formatBashApproval, formatFileApproval, writePreview } from "../approval-ui.ts";
+import { analyzeBash } from "../shell/policy.ts";
+
+const markerTheme = {
+  fg: (color: string, text: string) => `<${color}>${text}</${color}>`,
+  bold: (text: string) => `<b>${text}</b>`,
+};
 
 test("write and edit previews preserve full numbered content", () => {
   assert.equal(writePreview("one\ntwo"), "1 │ one\n2 │ two");
@@ -10,18 +16,32 @@ test("write and edit previews preserve full numbered content", () => {
   assert.equal(editPreview([]), "<no diff available>");
 });
 
+test("approval formatters apply semantic Catppuccin theme roles", () => {
+  const ui = { confirm: async () => true, theme: markerTheme };
+  const file = formatFileApproval(ui, "file.txt", "\n\nChanges: 1 replacement");
+  assert.match(file, /<toolTitle><b>Path:<\/b><\/toolTitle>/);
+  assert.match(file, /<mdCode>file\.txt<\/mdCode>/);
+  assert.match(file, /<toolTitle><b>Changes:<\/b><\/toolTitle> <muted>1 replacement<\/muted>/);
+  const bash = formatBashApproval(ui, analyzeBash("rm file"));
+  assert.match(bash, /<toolTitle><b>Command:<\/b><\/toolTitle>/);
+  assert.match(bash, /<warning><b>rm<\/b><\/warning>/);
+  assert.match(bash, /<toolTitle><b>Programs to run:<\/b><\/toolTitle>/);
+  assert.match(bash, /<error>rm can change files or system state<\/error>/);
+});
+
 test("file confirmation restores editor and working state after rejection", async () => {
   let editor = "original";
   const editorValues: string[] = [];
   const working: boolean[] = [];
   const notifications: string[] = [];
   const ui = {
+    theme: markerTheme,
     getEditorText: () => editor,
     setEditorText(value: string) { editor = value; editorValues.push(value); },
     setWorkingVisible(value: boolean) { working.push(value); },
     async confirm(title: string, message: string) {
-      assert.equal(title, "Allow file edit?");
-      assert.match(message, /Path:\n\nfile\.txt/);
+      assert.equal(title, "<warning><b>Allow file edit?</b></warning>");
+      assert.match(message, /<toolTitle><b>Path:<\/b><\/toolTitle>\n\n<mdCode>file\.txt<\/mdCode>/);
       assert.equal(editor, "diff preview");
       return false;
     },
@@ -40,13 +60,16 @@ test("file confirmation restores editor and working state after rejection", asyn
 test("bash confirmation hides and restores the working indicator", async () => {
   const working: boolean[] = [];
   const ui = {
+    theme: markerTheme,
     setWorkingVisible(value: boolean) { working.push(value); },
     async confirm(title: string, message: string) {
-      assert.equal(title, "Allow bash command?");
-      assert.equal(message, "Programs to run: 1) rm");
+      assert.equal(title, "<warning><b>Allow bash command?</b></warning>");
+      assert.match(message, /<toolTitle><b>Command:<\/b><\/toolTitle>/);
+      assert.match(message, /<toolTitle><b>Programs to run:<\/b><\/toolTitle>/);
+      assert.match(message, /<error>rm can change files or system state<\/error>/);
       return true;
     },
   };
-  assert.equal(await confirmBash({ ui }, "Programs to run: 1) rm", async () => {}), true);
+  assert.equal(await confirmBash({ ui }, analyzeBash("rm file"), undefined, async () => {}), true);
   assert.deepEqual(working, [false, true]);
 });

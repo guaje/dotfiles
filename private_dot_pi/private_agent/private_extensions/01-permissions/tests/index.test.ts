@@ -99,6 +99,8 @@ test("Empowerment allows read-only remote Bash, splits mixed calls, and gates mu
   await app.handler("session_start")({}, { cwd: process.cwd(), ui: {} });
   const call = app.handler("tool_call");
   assert.equal(await call({ toolName: "bash", input: { command: "ssh -o BatchMode=yes host 'git status'" } }, { cwd: process.cwd(), hasUI: false, ui: {} }), undefined);
+  assert.equal(await call({ toolName: "bash", input: { command: "chezmoi status --verbose" } }, { cwd: process.cwd(), hasUI: false, ui: {} }), undefined);
+  assert.equal(await call({ toolName: "bash", input: { command: "chezmoi diff -- install-pi-notification-icons.sh" } }, { cwd: process.cwd(), hasUI: false, ui: {} }), undefined);
   const mixed = await call({ toolName: "bash", input: { command: "git status && git add file" } }, { cwd: process.cwd(), hasUI: false, ui: {} });
   assert.match(mixed.reason, /Split read-only/);
   const mutation = await call({ toolName: "bash", input: { command: "rm file" } }, { cwd: process.cwd(), hasUI: false, ui: {} });

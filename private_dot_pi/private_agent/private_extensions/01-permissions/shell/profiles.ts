@@ -12,6 +12,8 @@ const MUTATING = new Set(["rm", "mv", "cp", "mkdir", "rmdir", "touch", "ln", "tr
 const INTERPRETERS = new Set(["sh", "bash", "zsh", "fish", "ksh", "node", "python", "python3", "ruby", "perl", "php", "lua", "awk"]);
 const EXECUTION_WRAPPERS = new Set(["sudo", "doas", "su", "xargs", "nohup"]);
 const GIT_QUERY = new Set(["status", "diff", "show", "log", "rev-parse", "ls-files", "grep", "cat-file"]);
+const CHEZMOI_QUERY = new Set(["status", "diff", "verify", "managed", "unmanaged", "ignored", "cat", "source-path", "target-path", "dump-config", "cat-config", "help", "version", "completion"]);
+const CHEZMOI_MUTATION = new Set(["add", "apply", "chattr", "destroy", "edit", "encrypt", "forget", "git", "import", "init", "merge", "merge-all", "purge", "re-add", "remove", "rm", "unmanage", "update", "upgrade"]);
 
 function executable(name: string) {
   return name.replace(/^.*[\\/]/, "").toLowerCase();
@@ -49,6 +51,7 @@ export function classifyProfile(rawName: string, argv: string[]): Verdict {
   if (name === "rg" && hasOption(argv, "--pre")) return { effect: "unknown", reason: "rg --pre executes another command" };
   if (name === "find") return classifyFind(argv);
   if (name === "git") return classifyGit(argv);
+  if (name === "chezmoi") return classifyChezmoi(argv);
   if (name === "command" && argv[0] === "-v" && argv.length === 2) return { effect: "read-only" };
   if (name === "env" && argv.length === 0) return { effect: "read-only" };
   if (["command", "env", "timeout"].includes(name)) return { effect: "unknown", reason: `${name} must be safely unwrapped before classification` };
@@ -62,6 +65,37 @@ function classifyFind(argv: string[]): Verdict {
   return unsafe
     ? { effect: unsafe === "-delete" ? "mutating" : "unknown", reason: `find action ${unsafe} is not read-only` }
     : { effect: "read-only" };
+}
+
+function classifyChezmoi(argv: string[]): Verdict {
+  if (hasOption(argv, "-o", "--output")) return { effect: "mutating", reason: "chezmoi output option writes a file" };
+  if (hasOption(argv, "--init", "--apply")) return { effect: "mutating", reason: "chezmoi initialization/application changes managed state" };
+  const refresh = argv.findIndex((arg) => arg === "--refresh-externals" || arg.startsWith("--refresh-externals="));
+  if (refresh >= 0) {
+    const value = argv[refresh]!.includes("=") ? argv[refresh]!.split("=", 2)[1] : argv[refresh + 1];
+    if (value !== "never") return { effect: "mutating", reason: "chezmoi external refresh can update its cache" };
+  }
+  if (["--config", "--source", "--destination", "--persistent-state", "--pager", "--diff-command"].some((option) => hasOption(argv, option))) {
+    return { effect: "unknown", reason: "chezmoi path or helper overrides cross the reviewed configuration boundary" };
+  }
+
+  let index = 0;
+  while (index < argv.length && argv[index]!.startsWith("-")) {
+    const option = argv[index]!;
+    if (option === "--") break;
+    if (["-h", "--help", "--version", "-v", "--verbose", "--debug", "--no-tty", "--no-pager", "--use-builtin-diff", "--skip-secrets"].includes(option)
+      || /^(?:--color|--log-level)=/.test(option)) { index++; continue; }
+    if (["--color", "--log-level"].includes(option) && argv[index + 1]) { index += 2; continue; }
+    if (option === "--refresh-externals" && argv[index + 1] === "never") { index += 2; continue; }
+    if (option === "--refresh-externals=never") { index++; continue; }
+    return { effect: "unknown", reason: `unreviewed chezmoi global option: ${option}` };
+  }
+
+  const subcommand = argv[index];
+  if (!subcommand) return { effect: "read-only" };
+  if (CHEZMOI_QUERY.has(subcommand)) return { effect: "read-only" };
+  if (CHEZMOI_MUTATION.has(subcommand)) return { effect: "mutating", reason: `chezmoi ${subcommand} can change source, destination, or managed state` };
+  return { effect: "unknown", reason: `unreviewed chezmoi subcommand: ${subcommand}` };
 }
 
 function classifyGit(argv: string[]): Verdict {

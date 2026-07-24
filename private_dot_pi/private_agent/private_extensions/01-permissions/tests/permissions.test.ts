@@ -65,6 +65,27 @@ test("ssh retains remote metadata and distinguishes remote payload from local &&
   assert.equal(parseShell("ssh -V").effect, "read-only");
   assert.equal(parseShell("GIT_SSH_COMMAND=evil ssh host 'git status'").effect, "unknown");
 });
+test("chezmoi inspection commands are read-only while mutations and helper overrides require approval", () => {
+  for (const command of [
+    "chezmoi status --verbose",
+    "chezmoi diff -- install-pi-notification-icons.sh",
+    "chezmoi --verbose managed",
+    "chezmoi --color auto --log-level info status",
+    "chezmoi --refresh-externals=never --skip-secrets diff -- file",
+    "chezmoi verify",
+    "chezmoi cat agent/settings.config.json",
+    "chezmoi source-path agent/settings.config.json",
+  ]) assert.equal(parseShell(command).effect, "read-only", command);
+  for (const command of ["chezmoi add file", "chezmoi apply", "chezmoi edit file", "chezmoi forget file", "chezmoi update"]) {
+    assert.equal(parseShell(command).effect, "mutating", command);
+  }
+  assert.equal(parseShell("chezmoi diff --output report.patch").effect, "mutating");
+  assert.equal(parseShell("chezmoi status --refresh-externals=always").effect, "mutating");
+  assert.equal(parseShell("chezmoi diff --pager=custom-pager").effect, "unknown");
+  assert.equal(parseShell("chezmoi --config other.toml status").effect, "unknown");
+  assert.equal(parseShell("chezmoi execute-template '{{ output \"cmd\" }}'").effect, "unknown");
+});
+
 test("curl classifies request and local output effects without treating networking as a verdict", () => {
   assert.equal(parseShell("curl -I https://example.test | jq .").effect, "read-only");
   assert.equal(parseShell("curl -X POST --data x https://example.test").effect, "mutating");

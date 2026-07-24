@@ -12,7 +12,6 @@ import { injectPromptGuidance, BASH_PROMPT_GUIDANCE } from "./prompt-guidance.ts
 import { patchBuiltInSettingsMenu } from "./settings-ui.ts";
 import { decideBash } from "./shell/policy.ts";
 import { renderShell } from "./shell/render.ts";
-import { summarizeShell } from "./shell/summary.ts";
 import type { ManagingStyle, ShellContext } from "./types.ts";
 
 export const MANAGEMENT_STYLE_CYCLE_SHORTCUT = "ctrl+;";
@@ -57,7 +56,7 @@ export default function permissions(pi: ExtensionAPI) {
       if (decision.allow) return undefined;
       if (!decision.needsApproval) return { block: true, reason: decision.reason };
       if (!hasUi(ctx)) return { block: true, reason: "Bash command blocked (no UI available for confirmation)" };
-      const ok = await confirmBash(ctx, `${summarizeShell(decision.analysis!)}${remoteLabel ? `\n\nRemote target: ${remoteLabel}` : ""}`);
+      const ok = await confirmBash(ctx, decision.analysis!, remoteLabel);
       return ok ? undefined : { block: true, reason: "Bash command blocked by user" };
     }
     if (isToolCallEventType("write", event) || isToolCallEventType("edit", event)) {

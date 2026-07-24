@@ -26,3 +26,5 @@ Configure portable disposable roots in `agent/settings.config.json`:
 Shell parsing is intentionally conservative. Only completely consumed, reviewed syntax and executable/argument profiles can be read-only. Unsupported syntax, dynamic commands, programmable interpreters, ambiguous SSH payloads, and unreviewed curl options are unknown and require approval.
 
 Remote/network execution is metadata rather than an approval category: `ssh host ls` and a curl GET can be read-only, while remote mutations, HTTP writes, forwarding, uploads, and local output files are not.
+
+Reviewed chezmoi inspection commands such as `chezmoi status --verbose`, `chezmoi diff -- <target>`, `verify`, `managed`, and `cat` are read-only. Source/destination mutations, local output files, external refreshes, and explicit helper/configuration overrides require approval.

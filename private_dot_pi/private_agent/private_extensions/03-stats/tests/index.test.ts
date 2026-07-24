@@ -62,6 +62,14 @@ test("loadModelCostRates applies stats-only auth model overrides with nonzero co
     cacheRead: 0.5,
     cacheWrite: 6.25,
   });
+  const lagunaRates = rates.get("reallms-dev/Laguna-S-2.1-FP8");
+  assert.deepEqual(lagunaRates, {
+    input: 0.1,
+    output: 0.2,
+    cacheRead: 0.01,
+    cacheWrite: 0.1,
+  });
+  assert.equal(Number(mod.calculateUsageCost({ input: 1_000_000, output: 1_000_000, cacheRead: 1_000_000, cacheWrite: 1_000_000 }, lagunaRates).toFixed(2)), 0.41);
 
   const summary = mod.extractStats([
     { type: "message", message: { role: "assistant", provider: "openai-codex", model: "gpt-5.5", usage: { input: 1_000_000, output: 1_000_000, cacheRead: 1_000_000, cacheWrite: 1_000_000 } } },

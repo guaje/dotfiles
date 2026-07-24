@@ -53,7 +53,7 @@ Skill tests:
 
 - Preferred theme: `agent/themes/catppuccin-mocha.json`. Keep UI colors, warnings, previews, and syntax styling consistent with it.
 - Prefer existing theme tokens and output conventions over inventing styling.
-- `01-confirm-before-actions.ts` and `00-hud/` must preserve Catppuccin-compatible semantic theme roles unless intentionally redesigning.
+- `01-permissions/` and `00-hud/` must preserve Catppuccin-compatible semantic theme roles unless intentionally redesigning.
 
 ## Chezmoi sync
 
@@ -67,7 +67,7 @@ Common mappings:
 
 - `~/.pi/agent/extensions/google-search.ts` → `~/.local/share/chezmoi/private_dot_pi/private_agent/private_extensions/private_google-search.ts`
 - `~/.pi/agent/extensions/tests/google-search.test.ts` → `~/.local/share/chezmoi/private_dot_pi/private_agent/private_extensions/tests/private_google-search.test.ts`
-- `~/.pi/agent/extensions/01-confirm-before-actions.ts` → `~/.local/share/chezmoi/private_dot_pi/private_agent/private_extensions/private_01-confirm-before-actions.ts`
+- `~/.pi/agent/extensions/01-permissions/` → `~/.local/share/chezmoi/private_dot_pi/private_agent/private_extensions/01-permissions/`
 - `~/.pi/agent/themes/catppuccin-mocha.json` → `~/.local/share/chezmoi/private_dot_pi/private_agent/private_themes/private_catppuccin-mocha.json`
 
 ## Commits

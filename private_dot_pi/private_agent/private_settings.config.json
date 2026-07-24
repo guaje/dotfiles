@@ -16,7 +16,7 @@
   "extensions": [
     "-extensions/google-search.ts",
     "extensions/00-hud/index.ts",
-    "extensions/01-confirm-before-actions.ts",
+    "extensions/01-permissions/index.ts",
     "extensions/02-handoff/index.ts",
     "extensions/03-stats/index.ts",
     "extensions/04-subagents/index.ts",
@@ -36,6 +36,9 @@
     }
   },
   "managingStyle": "Empowerment",
+  "empowermentDisposableRoots": [
+    "@user-temp"
+  ],
   "subagentRosterCap": 10,
   "subagentRosterScope": "user",
   "theme": "catppuccin-mocha"

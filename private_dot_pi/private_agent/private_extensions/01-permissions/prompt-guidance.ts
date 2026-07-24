@@ -1,0 +1,4 @@
+const MARKER = "permissions-shell-guidance-v1";
+export const BASH_PROMPT_GUIDANCE = `<!-- ${MARKER} -->
+Permissions policy: make one Bash call per side-effect class. Separate inspections from mutations; never combine them. Good: \`git status\` then \`git add file\`. Bad: \`git status && git add file\`. Good remote: \`ssh host 'git status'\`; bad: \`ssh host 'git status && rm x'\`. Good network read: \`curl -I https://example.test\`; bad: \`curl -X POST --data x https://example.test\`. In Empowerment, a mixed read-only/non-read-only Bash call is immediately blocked with a split request; Pi never automatically splits shell text. In Micromanagement every Bash call is approved.`;
+export function injectPromptGuidance(current: string | undefined) { return current?.includes(MARKER) ? current : `${current ?? ""}${current ? "\n\n" : ""}${BASH_PROMPT_GUIDANCE}`; }

@@ -19,7 +19,7 @@ function restored(branch: any[]): HandoffState { for (let i = branch.length - 1;
 export default function (pi: ExtensionAPI) {
   let state = initialState(); let activeCtx: any; let hud: HudItemHandle | undefined;
   const setState = (next: HandoffState, persist = true) => { state = next; hud?.update({ variants: handoffHudVariants(state), visible: true }); if (persist) appendContext(pi, state); };
-  const remote = () => state.target && state.connection === "connected" ? createRemoteOperations({ alias: state.target.alias, user: state.target.user, port: state.target.port, workspace: state.target.workspace, localCwd: activeCtx?.cwd ?? process.cwd() }) : undefined;
+  const remote = () => state.target && state.connection === "connected" && state.toolRoute === "remote" ? createRemoteOperations({ alias: state.target.alias, user: state.target.user, port: state.target.port, workspace: state.target.workspace, localCwd: activeCtx?.cwd ?? process.cwd() }) : undefined;
   const chooseWorkspace = async (ctx: any, target: Omit<RemoteTarget, "workspace">) => {
     const home = (await sshExec(target, "printf %s \"$HOME\"")).stdout.toString().trim();
     const choice = await select(ctx, "Remote workspace", [{ label: home, value: home }, { label: "Enter a path…", value: "__manual__" }]);
@@ -80,8 +80,8 @@ export default function (pi: ExtensionAPI) {
   };
   pi.registerCommand("ssh", { description: "Connect, synchronize, or route tools through SSH", handler: command as any });
   pi.registerShortcut?.(DEFAULT_SHORTCUT, { description: "Toggle SSH tool routing", handler: async (ctx: any) => command("toggle", ctx) });
-  pi.on("session_start", (_event: any, ctx: any) => { activeCtx = ctx; state = restored(ctx.sessionManager.getBranch?.() ?? []); hud?.dispose(); hud = registerHudItem({ owner: "handoff", id: "route", zone: "workspaceRight", order: 100, importance: "normal", variants: handoffHudVariants(state) }); setRemoteBashBackend(() => remote()?.bash, () => state.target ? `${state.target.alias}:${state.target.workspace}` : undefined); });
-  pi.on("session_shutdown", () => { hud?.dispose(); hud = undefined; });
+  pi.on("session_start", (_event: any, ctx: any) => { activeCtx = ctx; state = restored(ctx.sessionManager.getBranch?.() ?? []); hud?.dispose(); hud = registerHudItem({ owner: "handoff", id: "route", zone: "workspaceRight", order: 100, importance: "normal", variants: handoffHudVariants(state) }); setRemoteBashBackend(() => remote()?.bash, () => state.target && state.connection === "connected" && state.toolRoute === "remote" ? `${state.target.alias}:${state.target.workspace}` : undefined, () => state.target && state.connection === "connected" && state.toolRoute === "remote" ? activeCtx?.cwd : undefined); });
+  pi.on("session_shutdown", () => { hud?.dispose(); hud = undefined; setRemoteBashBackend(undefined); });
   pi.on("agent_settled", async (_event: any, ctx: any) => { if (state.sessionAuthority === "remote" && state.syncState === "dirty" && ctx.isIdle?.()) await command("sync", ctx); });
   pi.on("user_bash", (_event: any) => { const backend = remote()?.bash; return backend ? { operations: backend } : undefined; });
   for (const [factory, name] of [[createReadTool, "read"], [createWriteTool, "write"], [createEditTool, "edit"], [createGrepTool, "grep"], [createFindTool, "find"], [createLsTool, "ls"]] as const) {

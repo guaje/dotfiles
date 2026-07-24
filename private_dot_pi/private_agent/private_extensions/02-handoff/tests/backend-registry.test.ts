@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getBashBackend, getBashTargetLabel, setRemoteBashBackend } from "../backend-registry.ts";
+import { getBashBackend, getBashLocalBoundary, getBashTargetLabel, setRemoteBashBackend } from "../backend-registry.ts";
 
 test("backend-registry round-trips bash backend and label", () => {
   let opsCalled = false;
   const fakeOps = { exec: () => { opsCalled = true; return Promise.resolve({ exitCode: 0 }); } } as any;
-  setRemoteBashBackend(() => fakeOps, () => "host:/repo");
+  setRemoteBashBackend(() => fakeOps, () => "host:/repo", () => "/local/repo");
   assert.equal(getBashTargetLabel(), "host:/repo");
+  assert.equal(getBashLocalBoundary(), "/local/repo");
   const backend = getBashBackend();
   assert.ok(backend);
   assert.equal(backend, fakeOps);
@@ -16,6 +17,7 @@ test("backend-registry returns undefined after reset", () => {
   setRemoteBashBackend(undefined);
   assert.equal(getBashBackend(), undefined);
   assert.equal(getBashTargetLabel(), undefined);
+  assert.equal(getBashLocalBoundary(), undefined);
 });
 
 test("backend-registry delegates to mutable provider", () => {

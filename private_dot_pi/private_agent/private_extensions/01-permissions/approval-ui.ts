@@ -1,6 +1,6 @@
 import { notifyPiWaitingForUser } from "../07-native-notify.ts";
 import type { ShellAnalysis, ShellEffect } from "./types.ts";
-import { renderShell, type RenderTheme } from "./shell/render.ts";
+import type { RenderTheme } from "./shell/render.ts";
 
 type ApprovalTheme = RenderTheme;
 export type Ui = {
@@ -47,13 +47,13 @@ export function formatFileApproval(ui: Ui, path: string, summary: string) {
 export function formatBashApproval(ui: Ui, analysis: ShellAnalysis, remoteLabel?: string) {
   const theme = themeFor(ui);
   const programs = analysis.commands.length
-    ? analysis.commands.map((command, index) => `${theme.fg("syntaxNumber", `${index + 1})`)} ${theme.fg("warning", theme.bold(command.name))}`).join(", ")
+    ? analysis.commands.map((command, index) => `${theme.fg("mdCode", `${index + 1})`)} ${theme.fg("syntaxFunction", command.name)}`).join(", ")
     : theme.fg("muted", "No supported command detected.");
   const reasons = analysis.reasons.length
     ? `\n\n${label(theme, "Approval reasons:")} ${theme.fg(reasonTone(analysis.effect), [...new Set(analysis.reasons)].join("; "))}`
     : "";
   const remote = remoteLabel ? `\n\n${label(theme, "Remote target:")} ${theme.fg("mdCode", remoteLabel)}` : "";
-  return `${label(theme, "Command:")}\n${renderShell(analysis.source, theme)}\n\n${label(theme, "Programs to run:")} ${programs}${reasons}${remote}`;
+  return `${label(theme, "Programs to run:")} ${programs}${reasons}${remote}`;
 }
 
 async function hiddenConfirm(ui: Ui, dialogTitle: string, message: string) {

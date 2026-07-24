@@ -22,11 +22,14 @@ test("approval formatters apply semantic Catppuccin theme roles", () => {
   assert.match(file, /<toolTitle><b>Path:<\/b><\/toolTitle>/);
   assert.match(file, /<mdCode>file\.txt<\/mdCode>/);
   assert.match(file, /<toolTitle><b>Changes:<\/b><\/toolTitle> <muted>1 replacement<\/muted>/);
-  const bash = formatBashApproval(ui, analyzeBash("rm file"));
-  assert.match(bash, /<toolTitle><b>Command:<\/b><\/toolTitle>/);
-  assert.match(bash, /<warning><b>rm<\/b><\/warning>/);
+  const bash = formatBashApproval(ui, analyzeBash("agent/scripts/list-provider-models.sh --type chat"), "host:/repo");
+  assert.doesNotMatch(bash, /Command:/);
+  assert.match(bash, /<mdCode>1\)<\/mdCode>/);
+  assert.match(bash, /<syntaxFunction>agent\/scripts\/list-provider-models\.sh<\/syntaxFunction>/);
+  assert.doesNotMatch(bash, /<b>agent\/scripts\/list-provider-models\.sh<\/b>/);
   assert.match(bash, /<toolTitle><b>Programs to run:<\/b><\/toolTitle>/);
-  assert.match(bash, /<error>rm can change files or system state<\/error>/);
+  assert.match(bash, /<warning>unreviewed executable: list-provider-models\.sh<\/warning>/);
+  assert.match(bash, /<toolTitle><b>Remote target:<\/b><\/toolTitle> <mdCode>host:\/repo<\/mdCode>/);
 });
 
 test("file confirmation restores editor and working state after rejection", async () => {
@@ -64,7 +67,8 @@ test("bash confirmation hides and restores the working indicator", async () => {
     setWorkingVisible(value: boolean) { working.push(value); },
     async confirm(title: string, message: string) {
       assert.equal(title, "<warning><b>Allow bash command?</b></warning>");
-      assert.match(message, /<toolTitle><b>Command:<\/b><\/toolTitle>/);
+      assert.doesNotMatch(message, /Command:/);
+      assert.match(message, /<mdCode>1\)<\/mdCode> <syntaxFunction>rm<\/syntaxFunction>/);
       assert.match(message, /<toolTitle><b>Programs to run:<\/b><\/toolTitle>/);
       assert.match(message, /<error>rm can change files or system state<\/error>/);
       return true;

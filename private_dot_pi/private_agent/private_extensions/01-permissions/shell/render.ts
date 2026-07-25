@@ -7,6 +7,9 @@ export type RenderTheme = {
 };
 
 const SHELL_KEYWORDS = new Set(["if", "then", "else", "elif", "fi", "for", "while", "until", "do", "done", "case", "esac", "in"]);
+const DESTRUCTIVE_EXECUTABLES = new Set(["rm", "rmdir", "dd", "mkfs", "chmod", "chown", "chgrp", "truncate"]);
+const ELEVATED_EXECUTABLES = new Set(["sudo", "doas", "su"]);
+const ELEVATED_OPTIONS_WITH_VALUE = new Set(["-u", "--user", "-g", "--group", "-h", "--host", "-p", "--prompt", "-C", "--close-from", "-R", "--chroot", "-D", "--chdir", "-r", "--role", "-t", "--type"]);
 const MUTATING_CURL = /^(?:-X(?:POST|PUT|PATCH|DELETE)|--request=(?:POST|PUT|PATCH|DELETE)|--data|--json|--form|--upload-file|-T|-o|--output|-O|--remote-name)/i;
 
 /** Presentation is deliberately tolerant; authorization uses parser.ts. */
@@ -49,12 +52,14 @@ function highlightLine(line: string, theme: RenderTheme) {
   let output = "";
   let index = 0;
   let expectCommand = true;
+  let elevatedWrapperPending = false;
+  let wrapperOptionValuePending = false;
   while (index < line.length) {
     const current = line[index]!;
     if (current === "#") { output += theme.fg("syntaxComment", theme.italic ? theme.italic(line.slice(index)) : line.slice(index)); break; }
     if (/\s/.test(current)) { output += current; index++; continue; }
     const operator = /^(?:&&|\|\||\|&|>>|<<|[|&;<>()[\]{}])/.exec(line.slice(index))?.[0];
-    if (operator) { output += theme.fg("accent", operator); index += operator.length; if (/^(?:&&|\|\||\||;)$/.test(operator)) expectCommand = true; continue; }
+    if (operator) { output += theme.fg("accent", operator); index += operator.length; if (/^(?:&&|\|\||\||;)$/.test(operator)) { expectCommand = true; elevatedWrapperPending = false; wrapperOptionValuePending = false; } continue; }
     if (current === "'" || current === '"') {
       const end = quotedEnd(line, index, current);
       output += theme.fg("syntaxString", line.slice(index, end));
@@ -63,8 +68,26 @@ function highlightLine(line: string, theme: RenderTheme) {
     }
     const token = /^[^\s|&;<>()[\]{}]+/.exec(line.slice(index))?.[0];
     if (!token) { output += theme.fg("text", current); index++; continue; }
-    output += styleToken(token, expectCommand, theme);
-    if (expectCommand && !/^[A-Za-z_][A-Za-z0-9_]*=/.test(token) && !SHELL_KEYWORDS.has(token)) expectCommand = false;
+    const assignment = /^[A-Za-z_][A-Za-z0-9_]*=/.test(token);
+    if (elevatedWrapperPending && wrapperOptionValuePending) {
+      output += styleToken(token, false, theme);
+      wrapperOptionValuePending = false;
+      index += token.length;
+      continue;
+    }
+    if (elevatedWrapperPending && token.startsWith("-")) {
+      output += styleToken(token, false, theme);
+      wrapperOptionValuePending = ELEVATED_OPTIONS_WITH_VALUE.has(token);
+      index += token.length;
+      continue;
+    }
+    const commandPosition = expectCommand || elevatedWrapperPending;
+    output += styleToken(token, commandPosition, theme);
+    if (commandPosition && !assignment && !SHELL_KEYWORDS.has(token)) {
+      const executable = token.replace(/^.*[\\/]/, "").toLowerCase();
+      elevatedWrapperPending = ELEVATED_EXECUTABLES.has(executable);
+      expectCommand = false;
+    }
     index += token.length;
   }
   return output;
@@ -72,13 +95,19 @@ function highlightLine(line: string, theme: RenderTheme) {
 
 function styleToken(token: string, command: boolean, theme: RenderTheme) {
   if (SHELL_KEYWORDS.has(token)) return theme.fg("bashMode", token);
-  if (command) return theme.fg("warning", theme.bold(token));
-  if (/^https?:\/\//i.test(token)) return theme.fg("mdLink", token);
-  if (/^\$[A-Za-z_][A-Za-z0-9_]*/.test(token)) return theme.fg("mdLink", token);
   if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(token)) {
     const split = token.indexOf("=");
     return `${theme.fg("mdLink", token.slice(0, split))}${theme.fg("accent", "=")}${theme.fg("text", token.slice(split + 1))}`;
   }
+  if (command) {
+    const executable = token.replace(/^.*[\\/]/, "").toLowerCase();
+    if (DESTRUCTIVE_EXECUTABLES.has(executable)) return theme.fg("error", token);
+    if (ELEVATED_EXECUTABLES.has(executable)) return theme.fg("warning", token);
+    return theme.fg("syntaxFunction", token);
+  }
+  if (/^https?:\/\//i.test(token)) return theme.fg("mdLink", token);
+  if (/^\$[A-Za-z_][A-Za-z0-9_]*/.test(token)) return theme.fg("mdLink", token);
+  if (token === "-X" || token === "--request") return theme.fg("warning", token);
   if (MUTATING_CURL.test(token)) return theme.fg("error", token);
   if (token.startsWith("-")) return theme.fg("toolTitle", token);
   if (/^\d+(?:\.\d+)?$/.test(token)) return theme.fg("syntaxNumber", token);

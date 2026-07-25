@@ -28,6 +28,8 @@ function hasOption(argv: string[], ...names: string[]) {
 export function classifyProfile(rawName: string, argv: string[]): Verdict {
   const name = executable(rawName);
   if (MUTATING.has(name)) return { effect: "mutating", reason: `${name} can change files or system state` };
+  if (name === "sudo" || name === "doas") return { effect: "unknown", reason: `${name} runs with elevated privileges` };
+  if (name === "su") return { effect: "unknown", reason: "su changes user identity" };
   if (EXECUTION_WRAPPERS.has(name)) return { effect: "unknown", reason: `${name} changes execution semantics` };
   if (INTERPRETERS.has(name)) return { effect: "unknown", reason: `${name} is a programmable interpreter` };
 
@@ -52,6 +54,7 @@ export function classifyProfile(rawName: string, argv: string[]): Verdict {
   if (name === "find") return classifyFind(argv);
   if (name === "git") return classifyGit(argv);
   if (name === "chezmoi") return classifyChezmoi(argv);
+  if (name === "glab" || name === "gh") return classifyForgeCli(name, argv);
   if (name === "command" && argv[0] === "-v" && argv.length === 2) return { effect: "read-only" };
   if (name === "env" && argv.length === 0) return { effect: "read-only" };
   if (["command", "env", "timeout"].includes(name)) return { effect: "unknown", reason: `${name} must be safely unwrapped before classification` };
@@ -65,6 +68,11 @@ function classifyFind(argv: string[]): Verdict {
   return unsafe
     ? { effect: unsafe === "-delete" ? "mutating" : "unknown", reason: `find action ${unsafe} is not read-only` }
     : { effect: "read-only" };
+}
+
+function classifyForgeCli(name: "glab" | "gh", argv: string[]): Verdict {
+  if (argv[0] === "issue" && argv[1] === "create") return { effect: "mutating", reason: `${name} issue create creates a remote issue` };
+  return { effect: "unknown", reason: `unreviewed ${name} command` };
 }
 
 function classifyChezmoi(argv: string[]): Verdict {
@@ -136,5 +144,6 @@ function classifyGit(argv: string[]): Verdict {
       ? { effect: "read-only" }
       : { effect: "mutating", reason: "git config form can change configuration" };
   }
-  return { effect: "mutating", reason: `git ${subcommand} is not a reviewed query` };
+  if (subcommand === "commit") return { effect: "mutating", reason: "git commit creates a commit and updates repository history" };
+  return { effect: "mutating", reason: `git ${subcommand} can change repository state` };
 }

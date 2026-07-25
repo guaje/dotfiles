@@ -28,3 +28,7 @@ Shell parsing is intentionally conservative. Only completely consumed, reviewed 
 Remote/network execution is metadata rather than an approval category: `ssh host ls` and a curl GET can be read-only, while remote mutations, HTTP writes, forwarding, uploads, and local output files are not.
 
 Reviewed chezmoi inspection commands such as `chezmoi status --verbose`, `chezmoi diff -- <target>`, `verify`, `managed`, and `cat` are read-only. Source/destination mutations, local output files, external refreshes, and explicit helper/configuration overrides require approval.
+
+## Visual hierarchy
+
+Permissions uses semantic theme roles rather than fixed colors: only dialog titles and section labels are bold; paths and remote targets are cool gray-blue secondary text; metadata is muted; ordinary executables are blue; elevated wrappers are warnings; destructive executables and mutating options are errors. Flags, strings, numbers, URLs, and nested SSH payloads keep distinct syntax roles. Authorization never depends on presentation colors.

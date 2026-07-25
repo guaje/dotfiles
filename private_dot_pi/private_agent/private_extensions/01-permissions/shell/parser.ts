@@ -88,7 +88,7 @@ function unwrap(argv: string[]): Unwrapped {
   }
   return { index };
 }
-function summarize(source: string, complete: boolean, commands: ShellCommand[], reasons: string[]): ShellAnalysis { const effect = commands.reduce((result, command) => combine(result, command.effect), complete ? "read-only" as ShellEffect : "unknown"); return { source, complete, effect, reasons, commands, containsReadOnly: commands.some((x) => x.effect === "read-only"), containsNonReadOnly: commands.some((x) => x.effect !== "read-only"), context: local }; }
+function summarize(source: string, complete: boolean, commands: ShellCommand[], reasons: string[]): ShellAnalysis { const effect = commands.reduce((result, command) => combine(result, command.effect), complete ? "read-only" as ShellEffect : "unknown"); const independent = commands.filter((command) => !command.coupledDependency); return { source, complete, effect, reasons, commands, containsReadOnly: independent.some((x) => x.effect === "read-only"), containsNonReadOnly: independent.some((x) => x.effect !== "read-only"), context: local }; }
 function withoutHeredocBodies(source: string) {
   const lines = source.split("\n"); const result: string[] = [];
   for (let index = 0; index < lines.length; index++) { const line = lines[index]!; result.push(line); const match = line.match(/<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?/); if (!match) continue; const delimiter = match[1]!; while (++index < lines.length && lines[index]!.trim() !== delimiter) {} }
@@ -113,9 +113,11 @@ export function parseShell(source: string): ShellAnalysis {
       ? { effect: "unknown" as ShellEffect, reason: unwrapped.reason }
       : classifyProfile(executable.text, argv.slice(commandIndex + 1));
     let context = local;
-    for (const word of words) for (const nested of word.substitutions) { const analysis = parseShell(nested); result.effect = combine(result.effect, analysis.effect); reasons.push(...analysis.reasons); commands.push(...analysis.commands); }
-    if (executable.text === "curl") { const curl = classifyCurl(argv.slice(commandIndex + 1)); result = curl; context = { location: "local", usesNetwork: true }; }
-    if (executable.text === "ssh") { const ssh = parseSsh(argv.slice(commandIndex + 1), source, executable.start); context = { location: "remote", transport: "ssh", target: ssh.target, usesNetwork: true }; result = ssh; if (ssh.payload && ssh.target && ssh.effect === "read-only") { const nested = remoteContext(parseShell(ssh.payload), ssh.target); result = { effect: nested.effect, reason: nested.reasons[0] }; commands.push(...nested.commands); } }
+    for (const word of words) for (const nested of word.substitutions) { const analysis = parseShell(nested); result.effect = combine(result.effect, analysis.effect); reasons.push(...analysis.reasons); commands.push(...analysis.commands.map((command) => ({ ...command, coupledDependency: true }))); }
+    const executableName = executable.text.replace(/^.*[\\/]/, "").toLowerCase();
+    if (executableName === "glab" || executableName === "gh") context = { location: "local", usesNetwork: true };
+    if (executableName === "curl") { const curl = classifyCurl(argv.slice(commandIndex + 1)); result = curl; context = { location: "local", usesNetwork: true }; }
+    if (executableName === "ssh") { const ssh = parseSsh(argv.slice(commandIndex + 1), source, executable.start); context = { location: "remote", transport: "ssh", target: ssh.target, usesNetwork: true }; result = ssh; if (ssh.payload && ssh.target && ssh.effect === "read-only") { const nested = remoteContext(parseShell(ssh.payload), ssh.target); result = { effect: nested.effect, reason: nested.reasons[0] }; commands.push(...nested.commands); } }
     const command: ShellCommand = { name: executable.text, argv: argv.slice(commandIndex + 1), span: { start: executable.start, end: words.at(-1)!.end }, effect: result.effect, reason: result.reason, context };
     commands.push(command); if (result.reason) reasons.push(result.reason);
   }

@@ -19,6 +19,18 @@ function themeFor(ui: Ui) { return ui.theme ?? PLAIN_THEME; }
 function title(theme: ApprovalTheme, text: string) { return theme.fg("warning", theme.bold(text)); }
 function label(theme: ApprovalTheme, text: string) { return theme.fg("toolTitle", theme.bold(text)); }
 function reasonTone(effect: ShellEffect) { return effect === "mutating" ? "error" : effect === "unknown" ? "warning" : "muted"; }
+function formatApprovalReason(theme: ApprovalTheme, analysis: ShellAnalysis, reason: string) {
+  const subjects = analysis.commands.flatMap((command) => [
+    command.argv[0] ? `${command.name} ${command.argv[0]}` : "",
+    command.name,
+  ]).filter(Boolean).sort((left, right) => right.length - left.length);
+  const canonicalSubject = /^((?:glab|gh)\s+\S+\s+\S+|git\s+\S+|chezmoi\s+\S+|sudo|doas|su)(?:\s|$)/.exec(reason)?.[1];
+  const subject = canonicalSubject ?? subjects.find((candidate) => reason === candidate || reason.startsWith(`${candidate} `));
+  if (!subject) return theme.fg(reasonTone(analysis.effect), reason);
+  const detail = reason.slice(subject.length).trimStart();
+  const tone = /^(?:git(?:\s|$)|sudo(?:\s|$)|doas(?:\s|$)|su(?:\s|$))/.test(subject) ? "warning" : reasonTone(analysis.effect);
+  return `${theme.fg(tone, subject)}${detail ? ` ${theme.fg("muted", detail)}` : ""}`;
+}
 
 export function writePreview(content: string | undefined) {
   if (content === undefined) return "";
@@ -41,7 +53,7 @@ export function formatFileApproval(ui: Ui, path: string, summary: string) {
   let formattedSummary = summary;
   const match = /^\n\n([^:\n]+:)(?:\s*)(.*)$/s.exec(summary);
   if (match) formattedSummary = `\n\n${label(theme, match[1]!)} ${theme.fg("muted", match[2]!)}`;
-  return `${label(theme, "Path:")}\n\n${theme.fg("mdCode", path)}${formattedSummary}`;
+  return `${label(theme, "Path:")}\n\n${theme.fg("toolOutput", path)}${formattedSummary}`;
 }
 
 export function formatBashApproval(ui: Ui, analysis: ShellAnalysis, remoteLabel?: string) {
@@ -50,9 +62,9 @@ export function formatBashApproval(ui: Ui, analysis: ShellAnalysis, remoteLabel?
     ? analysis.commands.map((command, index) => `${theme.fg("mdCode", `${index + 1})`)} ${theme.fg("syntaxFunction", command.name)}`).join(", ")
     : theme.fg("muted", "No supported command detected.");
   const reasons = analysis.reasons.length
-    ? `\n\n${label(theme, "Approval reasons:")} ${theme.fg(reasonTone(analysis.effect), [...new Set(analysis.reasons)].join("; "))}`
+    ? `\n\n${label(theme, "Approval reasons:")} ${[...new Set(analysis.reasons)].map((reason) => formatApprovalReason(theme, analysis, reason)).join(theme.fg("dim", "; "))}`
     : "";
-  const remote = remoteLabel ? `\n\n${label(theme, "Remote target:")} ${theme.fg("mdCode", remoteLabel)}` : "";
+  const remote = remoteLabel ? `\n\n${label(theme, "Remote target:")} ${theme.fg("toolOutput", remoteLabel)}` : "";
   return `${label(theme, "Programs to run:")} ${programs}${reasons}${remote}`;
 }
 

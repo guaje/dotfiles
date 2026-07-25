@@ -33,6 +33,8 @@ test("parser makes writes, dynamic syntax, interpreters, wrappers, and output re
   assert.equal(parseShell("python3 script.py").effect, "unknown");
   assert.equal(parseShell("find . -exec rm {} \\;").effect, "unknown");
   assert.equal(parseShell("git add file").effect, "mutating");
+  assert.deepEqual(parseShell("git commit -m message").reasons, ["git commit creates a commit and updates repository history"]);
+  assert.deepEqual(parseShell("sudo ls").reasons, ["sudo runs with elevated privileges"]);
   assert.equal(parseShell("date --set now").effect, "mutating");
   assert.equal(parseShell("sort --output result.txt input.txt").effect, "mutating");
   assert.equal(parseShell("tree -o listing.txt").effect, "mutating");
@@ -44,6 +46,24 @@ test("parser makes writes, dynamic syntax, interpreters, wrappers, and output re
   assert.equal(parseShell("git diff --output=patch.txt").effect, "mutating");
   assert.equal(parseShell("git cat-file --filters HEAD:file").effect, "unknown");
 });
+test("coupled command substitutions do not trigger split guidance for one mutating action", () => {
+  const command = "glab issue create -t \"Analysis\" -d \"$(cat /tmp/issue_analysis.md)\" -l \"analysis,tech-debt,monitoring\" --linked-mr 19";
+  const analysis = parseShell(command);
+  assert.equal(analysis.effect, "mutating");
+  assert.equal(analysis.containsReadOnly, false);
+  assert.equal(analysis.containsNonReadOnly, true);
+  assert.equal(analysis.commands.find((item) => item.name === "cat")?.coupledDependency, true);
+  const glab = analysis.commands.find((item) => item.name === "glab");
+  assert.equal(glab?.effect, "mutating");
+  assert.equal(glab?.context.usesNetwork, true);
+  assert.equal(glab?.reason, "glab issue create creates a remote issue");
+  const decision = decideBash(command, "Empowerment");
+  assert.equal(decision.allow, false);
+  assert.equal(decision.needsApproval, true);
+  assert.doesNotMatch(decision.reason ?? "", /Split read-only/);
+  assert.match(decideBash("cat /tmp/issue_analysis.md && glab issue create -t Analysis", "Empowerment").reason ?? "", /Split read-only/);
+});
+
 test("parser does not merge newline, background, or heredoc execution into a read-only command", () => {
   for (const command of ["git status\nrm file", "git status & rm file", "cat file&&rm file", "cat <<EOF\n$(rm file)\nEOF"]) {
     const decision = decideBash(command, "Empowerment");
@@ -154,7 +174,8 @@ test("renderer separates nested ssh payloads and preserves local suffixes", () =
   const quoted = renderShell("ssh -o BatchMode=yes host 'git status && rg todo'", theme);
   assert.match(quoted, /BatchMode/);
   assert.match(quoted, /remote shell \(host\):/);
-  assert.match(quoted, /<warning><b>git<\/b><\/warning>/);
+  assert.match(quoted, /<syntaxFunction>git<\/syntaxFunction>/);
+  assert.doesNotMatch(quoted, /<b>git<\/b>/);
   const localSuffix = renderShell("ssh host git status && rg local", theme);
   assert.match(localSuffix, /local shell:/);
   assert.match(renderShell("curl -I https://example.test", theme), /<mdLink>https:\/\/example\.test<\/mdLink>/);

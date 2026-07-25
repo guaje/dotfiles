@@ -29,6 +29,12 @@ Remote/network execution is metadata rather than an approval category: `ssh host
 
 Reviewed chezmoi inspection commands such as `chezmoi status --verbose`, `chezmoi diff -- <target>`, `verify`, `managed`, and `cat` are read-only. Source/destination mutations, local output files, external refreshes, and explicit helper/configuration overrides require approval.
 
+### Structural parser
+
+Permissions has one bounded structural parser. Its mandatory execution units are the sole input to authorization and split guidance; flattened commands are presentation metadata only. Only direct children of the outermost sequence can be separated. Pipelines, substitutions, wrappers, redirections, groups, and SSH payloads are coupled and require one decision.
+
+Unsupported syntax and parser failures fail closed. Source input is limited to 32 KiB, graphs to 256 nodes, and nested structure to depth 8. SSH analyzes its already-built payload graph, retaining the distinction between local substitutions in the SSH invocation and remote substitutions in its payload.
+
 ## Visual hierarchy
 
 Permissions uses semantic theme roles rather than fixed colors: only dialog titles and section labels are bold; paths and remote targets are cool gray-blue secondary text; metadata is muted; ordinary executables are blue; elevated wrappers are warnings; destructive executables and mutating options are errors. Flags, strings, numbers, URLs, and nested SSH payloads keep distinct syntax roles. Authorization never depends on presentation colors.

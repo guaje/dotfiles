@@ -86,7 +86,7 @@ test("entry registers one Bash owner and injects split guidance once", async () 
   const tool = app.bashTool();
   assert.ok(tool);
   assert.deepEqual(tool.promptGuidelines.slice(0, 1), ["original guideline"]);
-  assert.match(tool.promptGuidelines.at(-1), /one Bash call per side-effect class/);
+  assert.match(tool.promptGuidelines.at(-1), /one Bash call per top-level side-effect class/);
   const first = await app.handler("before_agent_start")({ systemPrompt: "base" });
   const second = await app.handler("before_agent_start")({ systemPrompt: first.systemPrompt });
   assert.equal(second.systemPrompt, first.systemPrompt);
@@ -103,6 +103,12 @@ test("Empowerment allows read-only remote Bash, splits mixed calls, and gates mu
   assert.equal(await call({ toolName: "bash", input: { command: "chezmoi diff -- install-pi-notification-icons.sh" } }, { cwd: process.cwd(), hasUI: false, ui: {} }), undefined);
   const mixed = await call({ toolName: "bash", input: { command: "git status && git add file" } }, { cwd: process.cwd(), hasUI: false, ui: {} });
   assert.match(mixed.reason, /Split read-only/);
+  assert.equal(await call({ toolName: "bash", input: { command: "cat file | jq ." } }, { cwd: process.cwd(), hasUI: false, ui: {} }), undefined);
+  for (const command of ["cat file | tee out", "glab issue create -d \"$(cat body)\""]) {
+    const coupled = await call({ toolName: "bash", input: { command } }, { cwd: process.cwd(), hasUI: false, ui: {} });
+    assert.match(coupled.reason, /no UI/, command);
+    assert.doesNotMatch(coupled.reason, /Split read-only/, command);
+  }
   const mutation = await call({ toolName: "bash", input: { command: "rm file" } }, { cwd: process.cwd(), hasUI: false, ui: {} });
   assert.match(mutation.reason, /no UI/);
   await app.handler("session_shutdown")();

@@ -4,14 +4,32 @@ import type { PermissionDecision, ShellAnalysis, ShellContext } from "../types.t
 const LOCAL_CONTEXT: ShellContext = { location: "local", usesNetwork: false };
 
 export function analyzeBash(command: string | undefined, executionContext: ShellContext = LOCAL_CONTEXT): ShellAnalysis {
-  const analysis = parseShell(command ?? "");
-  if (executionContext.location === "local" && !executionContext.transport) return analysis;
+  return parseShell(command ?? "", executionContext);
+}
+
+/** Decides exclusively from structural analysis; flattened commands are display metadata. */
+export function decideAnalysis(analysis: ShellAnalysis, style: "Micromanagement" | "Empowerment"): PermissionDecision {
+  if (style === "Micromanagement") {
+    return { allow: false, needsApproval: true, analysis, reason: "Micromanagement asks before every Bash call" };
+  }
+  const hasReadOnlyUnit = analysis.executionUnits.some((unit) => unit.effect === "read-only");
+  const hasNonReadOnlyUnit = analysis.executionUnits.some((unit) => unit.effect !== "read-only");
+  if (hasReadOnlyUnit && hasNonReadOnlyUnit) {
+    return {
+      allow: false,
+      needsApproval: false,
+      analysis,
+      reason: "Split read-only top-level inspection units from mutations or unknown units, preserving any &&/|| condition; Pi will not split shell text automatically.",
+    };
+  }
+  if (analysis.complete && analysis.executionUnits.length > 0 && analysis.executionUnits.every((unit) => unit.effect === "read-only")) {
+    return { allow: true, needsApproval: false, analysis };
+  }
   return {
-    ...analysis,
-    context: executionContext,
-    commands: analysis.commands.map((item) => item.context.transport || item.context.usesNetwork
-      ? item
-      : { ...item, context: executionContext }),
+    allow: false,
+    needsApproval: true,
+    analysis,
+    reason: analysis.reasons[0] ?? "Bash command is not a fully classified read-only command",
   };
 }
 
@@ -20,23 +38,5 @@ export function decideBash(
   style: "Micromanagement" | "Empowerment",
   executionContext: ShellContext = LOCAL_CONTEXT,
 ): PermissionDecision {
-  const analysis = analyzeBash(command, executionContext);
-  if (style === "Micromanagement") {
-    return { allow: false, needsApproval: true, analysis, reason: "Micromanagement asks before every Bash call" };
-  }
-  if (analysis.containsReadOnly && analysis.containsNonReadOnly) {
-    return {
-      allow: false,
-      needsApproval: false,
-      analysis,
-      reason: "Split read-only inspection commands from mutations or unknown commands; Pi will not split shell text automatically.",
-    };
-  }
-  if (analysis.complete && analysis.effect === "read-only") return { allow: true, needsApproval: false, analysis };
-  return {
-    allow: false,
-    needsApproval: true,
-    analysis,
-    reason: analysis.reasons[0] ?? "Bash command is not a fully classified read-only command",
-  };
+  return decideAnalysis(analyzeBash(command, executionContext), style);
 }

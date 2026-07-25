@@ -1,4 +1,4 @@
-import type { ShellAnalysis, ShellEffect } from "../types.ts";
+import type { ShellEffect } from "../types.ts";
 
 export interface SshInvocation {
   target?: string;
@@ -72,11 +72,6 @@ export function parseSsh(argv: string[], source: string, offset: number): SshInv
 
 function unknown(reason: string): SshInvocation {
   return { effect: "unknown", reason };
-}
-
-export function remoteContext(analysis: ShellAnalysis, target: string): ShellAnalysis {
-  const context = { location: "remote" as const, transport: "ssh" as const, target, usesNetwork: true };
-  return { ...analysis, context, commands: analysis.commands.map((command) => ({ ...command, context })) };
 }
 
 export interface SshRenderParts {

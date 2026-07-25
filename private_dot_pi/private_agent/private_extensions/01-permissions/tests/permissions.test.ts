@@ -22,7 +22,7 @@ test("two management styles normalize legacy Guidance without a third mode", () 
 });
 test("parser authorizes fully classified read-only lists, pipelines, substitutions, and narrow wrappers", () => {
   const analysis = parseShell("git status --short && rg todo . | sort && cat $(realpath README.md)");
-  assert.equal(analysis.complete, true); assert.equal(analysis.effect, "read-only"); assert.equal(analysis.containsReadOnly, true); assert.equal(analysis.containsNonReadOnly, false);
+  assert.equal(analysis.complete, true); assert.equal(analysis.effect, "read-only"); assert.deepEqual(analysis.executionUnits.map((unit) => unit.effect), ["read-only", "read-only", "read-only"]);
   for (const command of ["echo ok;", "printf '%s\\n' ok", "command ls", "command -v git", "timeout 2 rg todo .", "env -i LANG=C ls", "git -C . status --short"]) {
     assert.equal(parseShell(command).effect, "read-only", command);
   }
@@ -50,9 +50,8 @@ test("coupled command substitutions do not trigger split guidance for one mutati
   const command = "glab issue create -t \"Analysis\" -d \"$(cat /tmp/issue_analysis.md)\" -l \"analysis,tech-debt,monitoring\" --linked-mr 19";
   const analysis = parseShell(command);
   assert.equal(analysis.effect, "mutating");
-  assert.equal(analysis.containsReadOnly, false);
-  assert.equal(analysis.containsNonReadOnly, true);
-  assert.equal(analysis.commands.find((item) => item.name === "cat")?.coupledDependency, true);
+  assert.equal(analysis.executionUnits.length, 1);
+  assert.equal(analysis.executionUnits[0]?.effect, "mutating");
   const glab = analysis.commands.find((item) => item.name === "glab");
   assert.equal(glab?.effect, "mutating");
   assert.equal(glab?.context.usesNetwork, true);

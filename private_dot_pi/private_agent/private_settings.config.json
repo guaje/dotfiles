@@ -39,6 +39,7 @@
   "empowermentDisposableRoots": [
     "@user-temp"
   ],
+  "permissionsSessionApprovalMaxRules": 100,
   "subagentRosterCap": 10,
   "subagentRosterScope": "user",
   "theme": "catppuccin-mocha"

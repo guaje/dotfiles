@@ -1,7 +1,7 @@
 // Run with: npx -y tsx --test agent/extensions/01-permissions/tests/approval-ui.test.ts
 import assert from "node:assert/strict";
 import test from "node:test";
-import { confirmBash, confirmFileMutation, editPreview, formatBashApproval, formatFileApproval, writePreview } from "../approval-ui.ts";
+import { chooseBashApproval, confirmBash, confirmFileMutation, editPreview, formatBashApproval, formatFileApproval, writePreview } from "../approval-ui.ts";
 import { analyzeBash } from "../shell/policy.ts";
 
 const markerTheme = {
@@ -76,7 +76,7 @@ test("bash confirmation hides and restores the working indicator", async () => {
     theme: markerTheme,
     setWorkingVisible(value: boolean) { working.push(value); },
     async confirm(title: string, message: string) {
-      assert.equal(title, "<warning><b>Allow bash command?</b></warning>");
+      assert.equal(title, "<warning><b>Allow Bash command?</b></warning>");
       assert.doesNotMatch(message, /Command:/);
       assert.match(message, /<mdCode>1\)<\/mdCode> <syntaxFunction>rm<\/syntaxFunction>/);
       assert.match(message, /<toolTitle><b>Programs to run:<\/b><\/toolTitle>/);
@@ -85,5 +85,53 @@ test("bash confirmation hides and restores the working indicator", async () => {
     },
   };
   assert.equal(await confirmBash({ ui }, analyzeBash("rm file"), undefined, async () => {}), true);
+  assert.deepEqual(working, [false, true]);
+});
+
+test("Bash session approval uses one selector with preview, rule, and three choices", async () => {
+  const prompts: string[] = [];
+  const choices: string[][] = [];
+  const ui = {
+    theme: markerTheme,
+    confirm: async () => { throw new Error("select should be used"); },
+    select: async (prompt: string, items: string[]) => {
+      prompts.push(prompt);
+      choices.push(items);
+      return "Allow similar commands for this session";
+    },
+  };
+  const result = await chooseBashApproval(
+    { ui },
+    analyzeBash("git add file.txt"),
+    { optionLabel: "Allow similar commands for this session", ruleDescription: "git add <paths inside this workspace>" },
+    undefined,
+    async () => {},
+  );
+  assert.equal(result, "remember");
+  assert.equal(prompts.length, 1);
+  assert.match(prompts[0]!, /Allow Bash command\?/);
+  assert.match(prompts[0]!, /Programs to run:/);
+  assert.match(prompts[0]!, /git add <paths inside this workspace>/);
+  assert.deepEqual(choices[0], ["Deny", "Allow once", "Allow similar commands for this session"]);
+});
+
+test("ineligible Bash approvals expose only deny and once", async () => {
+  let choices: string[] = [];
+  const result = await chooseBashApproval({ ui: {
+    confirm: async () => false,
+    select: async (_prompt: string, items: string[]) => { choices = items; return "Allow once"; },
+  } }, analyzeBash("echo $(rm file)"), undefined, undefined, async () => {});
+  assert.equal(result, "once");
+  assert.deepEqual(choices, ["Deny", "Allow once"]);
+});
+
+test("Bash selector errors deny and restore the working indicator", async () => {
+  const working: boolean[] = [];
+  const result = await chooseBashApproval({ ui: {
+    confirm: async () => true,
+    select: async () => { throw new Error("fixture"); },
+    setWorkingVisible(value: boolean) { working.push(value); },
+  } }, analyzeBash("rm file"), { optionLabel: "Allow this exact command for this session", ruleDescription: "Exact local invocation of rm" }, undefined, async () => {});
+  assert.equal(result, "deny");
   assert.deepEqual(working, [false, true]);
 });

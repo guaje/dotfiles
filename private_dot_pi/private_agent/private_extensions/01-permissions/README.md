@@ -21,6 +21,20 @@ Configure portable disposable roots in `agent/settings.config.json`:
 
 `@user-temp` is a private, owner-only directory below the OS temporary directory. Absolute paths and `~/...` paths are also accepted when they already exist and canonicalize safely. Shared `/tmp` itself is never trusted automatically.
 
+## Session Bash approvals
+
+In Empowerment, one approval selector offers **Deny**, **Allow once**, and—when structural identity is stable—**Allow similar commands for this session** or **Allow this exact command for this session**. Remembered rules are HMAC fingerprints with safe labels only; command text, arguments, paths, and remote payloads are not retained. `/session-approvals` lists, revokes, or clears active rules.
+
+The audited semantic rule `git add <workspace paths>` allows literal path operands to vary only inside the same canonical CWD and Git worktree. Other complete literal mutations and unknown commands use exact normalized rules. Parser failures, dynamic expansion, substitutions, coupled shell structures, and interactive commands remain approve-once only. Local, Handoff, and SSH rules are isolated; initial Handoff and SSH rules are exact and target/workspace bound. Rules never apply in Micromanagement or to mixed read/non-read-only units.
+
+The in-memory bound is configured in `agent/settings.config.json`:
+
+```json
+"permissionsSessionApprovalMaxRules": 100
+```
+
+At capacity, existing rules continue and a new remember choice allows only the current invocation. Rules survive `/reload`; they are cleared on quit, new/resumed/forked sessions, startup, and management-style changes.
+
 ## Shell policy
 
 Shell parsing is intentionally conservative. Only completely consumed, reviewed syntax and executable/argument profiles can be read-only. Unsupported syntax, dynamic commands, programmable interpreters, ambiguous SSH payloads, and unreviewed curl options are unknown and require approval.

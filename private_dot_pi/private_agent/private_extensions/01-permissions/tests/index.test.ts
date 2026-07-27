@@ -6,6 +6,7 @@ import { join, resolve } from "node:path";
 import test, { after } from "node:test";
 import { setRemoteBashBackend } from "../../02-handoff/backend-registry.ts";
 import { setSessionManagingStyle } from "../management-settings.ts";
+import { approvalFingerprint, findSessionApproval, listSessionApprovals, rememberSessionApproval, resetSessionApprovalsForTests } from "../session-command-approvals.ts";
 
 const packageDir = resolve("agent/extensions/node_modules/@earendil-works/pi-coding-agent");
 const tuiDir = resolve("agent/extensions/node_modules/@earendil-works/pi-tui");
@@ -50,15 +51,18 @@ after(() => {
 function harness() {
   const handlers = new Map<string, Function>();
   const shortcuts = new Map<string, any>();
+  const commands = new Map<string, any>();
   let bashTool: any;
   return {
     pi: {
       on(name: string, handler: Function) { handlers.set(name, handler); },
       registerShortcut(name: string, spec: any) { shortcuts.set(name, spec); },
+      registerCommand(name: string, spec: any) { commands.set(name, spec); },
       registerTool(tool: any) { if (tool.name === "bash") bashTool = tool; },
     },
     handler(name: string) { const value = handlers.get(name); assert.ok(value, `missing ${name} handler`); return value!; },
     shortcuts,
+    commands,
     bashTool: () => bashTool,
   };
 }
@@ -111,6 +115,7 @@ test("Empowerment allows read-only remote Bash, splits mixed calls, and gates mu
   }
   const mutation = await call({ toolName: "bash", input: { command: "rm file" } }, { cwd: process.cwd(), hasUI: false, ui: {} });
   assert.match(mutation.reason, /no UI/);
+  assert.equal(listSessionApprovals().length, 0);
   await app.handler("session_shutdown")();
 });
 
@@ -132,6 +137,183 @@ test("Micromanagement gates every Bash call and current-directory writes are all
     await app.handler("session_shutdown")();
   }
   finally { rmSync(cwd, { recursive: true, force: true }); }
+});
+
+test("session-approvals command revokes safe remembered rules and lifecycle preserves only reloads", async () => {
+  const extension = (await import("../index.ts")).default;
+  const app = harness(); extension(app.pi as any);
+  const identity = approvalFingerprint("command-rule");
+  const rule = { ...identity, kind: "exact" as const, label: "command · exact · local" };
+  rememberSessionApproval(rule, 2);
+  assert.equal(listSessionApprovals().length, 1);
+  const notifications: string[] = [];
+  let selections = 0;
+  await app.commands.get("session-approvals").handler("", { ui: {
+    select: async (_title: string, items: string[]) => {
+      selections++;
+      if (selections === 1) { assert.match(items[0]!, /command · exact/); return items[0]; }
+      return "Revoke approval";
+    },
+    notify: (message: string) => { notifications.push(message); },
+  } });
+  assert.equal(findSessionApproval(identity), undefined);
+  assert.deepEqual(notifications, ["Revoked session approval"]);
+
+  rememberSessionApproval(rule, 2);
+  await app.commands.get("session-approvals").handler("", { ui: {
+    select: async (_title: string, items: string[]) => items.find((item) => item === "Clear all session approvals"),
+    notify: (message: string) => { notifications.push(message); },
+  } });
+  assert.equal(findSessionApproval(identity), undefined);
+  assert.deepEqual(notifications, ["Revoked session approval", "Cleared session approvals"]);
+
+  const reloadIdentity = approvalFingerprint("reload-rule");
+  const reloadRule = { ...reloadIdentity, kind: "exact" as const, label: "command · exact · local" };
+  rememberSessionApproval(reloadRule, 2);
+  await app.handler("session_shutdown")({ reason: "reload" });
+  await app.handler("session_start")({ reason: "reload" }, { cwd: process.cwd(), ui: {} });
+  assert.ok(findSessionApproval(reloadIdentity));
+  await app.handler("session_start")({ reason: "startup" }, { cwd: process.cwd(), ui: {} });
+  assert.equal(findSessionApproval(reloadIdentity), undefined);
+
+  for (const reason of ["new", "resume", "fork"]) {
+    const seeded = approvalFingerprint(`start-${reason}`);
+    rememberSessionApproval({ ...seeded, kind: "exact", label: "fixture" }, 2);
+    await app.handler("session_start")({ reason }, { cwd: process.cwd(), ui: {} });
+    assert.equal(findSessionApproval(seeded), undefined, reason);
+  }
+  for (const reason of ["quit", "new", "resume", "fork"]) {
+    const seeded = approvalFingerprint(`shutdown-${reason}`);
+    rememberSessionApproval({ ...seeded, kind: "exact", label: "fixture" }, 2);
+    await app.handler("session_shutdown")({ reason });
+    assert.equal(findSessionApproval(seeded), undefined, reason);
+  }
+  resetSessionApprovalsForTests();
+});
+
+test("Empowerment remembers a semantic git-add rule while Micromanagement still prompts", async () => {
+  resetSessionApprovalsForTests();
+  const extension = (await import("../index.ts")).default;
+  const app = harness(); extension(app.pi as any);
+  const cwd = mkdtempSync(join(tmpdir(), "permissions-remember-"));
+  try {
+    const { execFileSync } = await import("node:child_process");
+    execFileSync("git", ["init", "-q", cwd]);
+    await app.handler("session_start")({ reason: "startup" }, { cwd, ui: {} });
+    const call = app.handler("tool_call");
+    let prompts = 0;
+    const ctx = { cwd, hasUI: true, ui: {
+      confirm: async () => true,
+      select: async () => { prompts++; return "Allow similar commands for this session"; },
+      notify() {},
+    } };
+    assert.equal(await call({ toolName: "bash", input: { command: "git add file1.txt" } }, ctx), undefined);
+    assert.equal(await call({ toolName: "bash", input: { command: "git add file2.md" } }, ctx), undefined);
+    assert.equal(prompts, 1);
+
+    setSessionManagingStyle("Micromanagement");
+    ctx.ui.select = async () => { prompts++; return "Allow once"; };
+    assert.equal(await call({ toolName: "bash", input: { command: "git add file2.md" } }, ctx), undefined);
+    assert.equal(prompts, 2);
+    await app.shortcuts.get("ctrl+;").handler({ ui: { notify() {} } });
+    assert.equal(await call({ toolName: "bash", input: { command: "git add file2.md" } }, ctx), undefined);
+    assert.equal(prompts, 3);
+    await app.handler("session_shutdown")({ reason: "quit" });
+  }
+  finally {
+    rmSync(cwd, { recursive: true, force: true });
+    resetSessionApprovalsForTests();
+  }
+});
+
+test("Empowerment remembers exact unknown and context-isolated Handoff commands", async () => {
+  resetSessionApprovalsForTests();
+  const extension = (await import("../index.ts")).default;
+  const app = harness(); extension(app.pi as any);
+  const cwd = mkdtempSync(join(tmpdir(), "permissions-exact-"));
+  const executable = `'${process.execPath.replace(/'/g, `'\\''`)}'`;
+  try {
+    await app.handler("session_start")({ reason: "startup" }, { cwd, ui: {} });
+    const call = app.handler("tool_call");
+    let prompts = 0;
+    const ctx = { cwd, hasUI: true, ui: {
+      confirm: async () => true,
+      select: async () => { prompts++; return "Allow this exact command for this session"; },
+      notify() {},
+    } };
+    assert.equal(await call({ toolName: "bash", input: { command: `${executable} task.js` } }, ctx), undefined);
+    assert.equal(await call({ toolName: "bash", input: { command: `${executable} \"task.js\"` } }, ctx), undefined);
+    assert.equal(prompts, 1);
+    ctx.ui.select = async () => { prompts++; return "Allow once"; };
+    assert.equal(await call({ toolName: "bash", input: { command: `${executable} other.js` } }, ctx), undefined);
+    assert.equal(prompts, 2);
+
+    ctx.ui.select = async () => { prompts++; return "Allow this exact command for this session"; };
+    assert.equal(await call({ toolName: "bash", input: { command: "ssh -p 22 host 'rm file'" } }, ctx), undefined);
+    assert.equal(await call({ toolName: "bash", input: { command: "ssh -p 22 host 'rm file'" } }, ctx), undefined);
+    assert.equal(prompts, 3);
+
+    setRemoteBashBackend(
+      () => ({ exec: async () => ({ stdout: Buffer.from(""), stderr: Buffer.from(""), code: 0 }) } as any),
+      () => "host:/repo",
+      () => cwd,
+      () => ["host", "user", "22", "/repo"].join("\0"),
+    );
+    ctx.ui.select = async () => { prompts++; return "Allow this exact command for this session"; };
+    assert.equal(await call({ toolName: "bash", input: { command: "rm file" } }, ctx), undefined);
+    assert.equal(await call({ toolName: "bash", input: { command: "rm file" } }, ctx), undefined);
+    assert.equal(prompts, 4);
+    setRemoteBashBackend(
+      () => ({ exec: async () => ({ stdout: Buffer.from(""), stderr: Buffer.from(""), code: 0 }) } as any),
+      () => "host:/other",
+      () => cwd,
+      () => ["host", "user", "22", "/other"].join("\0"),
+    );
+    ctx.ui.select = async () => { prompts++; return "Allow once"; };
+    assert.equal(await call({ toolName: "bash", input: { command: "rm file" } }, ctx), undefined);
+    assert.equal(prompts, 5);
+    await app.handler("session_shutdown")({ reason: "quit" });
+  }
+  finally {
+    setRemoteBashBackend(undefined);
+    rmSync(cwd, { recursive: true, force: true });
+    resetSessionApprovalsForTests();
+  }
+});
+
+test("a full configured store keeps existing rules and degrades a new remember choice to allow once", async () => {
+  resetSessionApprovalsForTests();
+  const extension = (await import("../index.ts")).default;
+  const app = harness(); extension(app.pi as any);
+  const cwd = mkdtempSync(join(tmpdir(), "permissions-cap-"));
+  const executable = `'${process.execPath.replace(/'/g, `'\\''`)}'`;
+  try {
+    await app.handler("session_start")({ reason: "startup" }, { cwd, ui: {} });
+    let firstIdentity: ReturnType<typeof approvalFingerprint> | undefined;
+    for (let index = 0; index < 100; index++) {
+      const identity = approvalFingerprint("fixture", String(index));
+      firstIdentity ??= identity;
+      assert.equal(rememberSessionApproval({ ...identity, kind: "exact", label: `fixture-${index}` }, 100), true);
+    }
+    const notifications: string[] = [];
+    const result = await app.handler("tool_call")(
+      { toolName: "bash", input: { command: `${executable} new-task.js` } },
+      { cwd, hasUI: true, ui: {
+        confirm: async () => true,
+        select: async () => "Allow this exact command for this session",
+        notify: (message: string) => { notifications.push(message); },
+      } },
+    );
+    assert.equal(result, undefined);
+    assert.equal(listSessionApprovals().length, 100);
+    assert.ok(findSessionApproval(firstIdentity!));
+    assert.deepEqual(notifications, ["Session approval limit reached; allowed once without remembering"]);
+    await app.handler("session_shutdown")({ reason: "quit" });
+  }
+  finally {
+    rmSync(cwd, { recursive: true, force: true });
+    resetSessionApprovalsForTests();
+  }
 });
 
 test("Bash execution chooses the Handoff backend at execution time", async () => {

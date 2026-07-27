@@ -10,6 +10,8 @@ export interface ShellParserDependencies {
   analyzeShellGraph: (graph: ShellGraph, context?: ShellContext) => ShellAnalysis;
 }
 
+export type ParsedShellInspection = { graph: ShellGraph; analysis: ShellAnalysis };
+
 const defaultDependencies: ShellParserDependencies = { parseShellAst, analyzeShellGraph };
 
 function failedAnalysis(source: string, context: ShellContext): ShellAnalysis {
@@ -25,16 +27,24 @@ function failedAnalysis(source: string, context: ShellContext): ShellAnalysis {
 }
 
 /** Builds a bounded parser whose unexpected failures always become one unknown unit. */
-export function createShellParser(dependencies: ShellParserDependencies = defaultDependencies) {
-  return (source: string, context: ShellContext = LOCAL_CONTEXT): ShellAnalysis => {
+export function createShellInspector(dependencies: ShellParserDependencies = defaultDependencies) {
+  return (source: string, context: ShellContext = LOCAL_CONTEXT): ParsedShellInspection => {
     try {
-      return dependencies.analyzeShellGraph(dependencies.parseShellAst(source), context);
+      const graph = dependencies.parseShellAst(source);
+      return { graph, analysis: dependencies.analyzeShellGraph(graph, context) };
     }
     catch {
-      return failedAnalysis(source, context);
+      return { graph: { root: { kind: "unsupported", reason: "structural shell parser failed closed", span: { start: 0, end: source.length } }, source, complete: false, errors: [], nodeCount: 0, maxDepth: 0 }, analysis: failedAnalysis(source, context) };
     }
   };
 }
 
+/** Compatibility view of the sole shell authorization parser. */
+export function createShellParser(dependencies: ShellParserDependencies = defaultDependencies) {
+  const inspect = createShellInspector(dependencies);
+  return (source: string, context: ShellContext = LOCAL_CONTEXT) => inspect(source, context).analysis;
+}
+
 /** The sole shell authorization parser. */
-export const parseShell = createShellParser();
+export const inspectShell = createShellInspector();
+export const parseShell = (source: string, context: ShellContext = LOCAL_CONTEXT) => inspectShell(source, context).analysis;

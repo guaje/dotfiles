@@ -5,6 +5,7 @@ import type { RenderTheme } from "./shell/render.ts";
 type ApprovalTheme = RenderTheme;
 export type Ui = {
   confirm: (title: string, message: string, opts?: { signal?: AbortSignal }) => Promise<boolean>;
+  select?: (title: string, items: string[]) => Promise<string | undefined>;
   theme?: ApprovalTheme;
   getEditorText?: () => string;
   setEditorText?: (text: string) => void;
@@ -89,7 +90,51 @@ export async function confirmFileMutation(ctx: { ui: Ui }, options: { title: str
   finally { ctx.ui.setEditorText?.(previous); }
 }
 
-export async function confirmBash(ctx: { ui: Ui }, analysis: ShellAnalysis, remoteLabel?: string, notify: Notify = notifyPiWaitingForUser) {
+export type BashApprovalChoice = "deny" | "once" | "remember";
+export type BashRememberOption = { optionLabel: string; ruleDescription: string };
+
+/** The Bash flow is intentionally one select dialog: deny, once, or a session rule. */
+export async function chooseBashApproval(
+  ctx: { ui: Ui },
+  analysis: ShellAnalysis,
+  remember: BashRememberOption | undefined,
+  remoteLabel?: string,
+  notify: Notify = notifyPiWaitingForUser,
+): Promise<BashApprovalChoice> {
   await notify("Approval needed: bash command", ctx);
-  return hiddenConfirm(ctx.ui, title(themeFor(ctx.ui), "Allow bash command?"), formatBashApproval(ctx.ui, analysis, remoteLabel));
+  const ui = ctx.ui;
+  ui.setWorkingVisible?.(false);
+  ui.setWorkingMessage?.("");
+  ui.setWorkingIndicator?.({ frames: [] });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  try {
+    const formatted = formatBashApproval(ui, analysis, remoteLabel);
+    if (ui.select) {
+      const rememberedScope = remember
+        ? `\n\n${label(themeFor(ui), "Remembered rule:")} ${themeFor(ui).fg("toolOutput", remember.ruleDescription)}`
+        : "";
+      const prompt = `${title(themeFor(ui), "Allow Bash command?")}\n\n${formatted}${rememberedScope}`;
+      const deny = "Deny";
+      const once = "Allow once";
+      const choices = [deny, once, ...(remember ? [remember.optionLabel] : [])];
+      const choice = await ui.select(prompt, choices);
+      if (choice === once) return "once";
+      if (remember && choice === remember.optionLabel) return "remember";
+      return "deny";
+    }
+    // Compatibility for hosts without select: confirmation can grant this call once only.
+    return await ui.confirm(title(themeFor(ui), "Allow Bash command?"), formatted) ? "once" : "deny";
+  }
+  catch {
+    return "deny";
+  }
+  finally {
+    ui.setWorkingMessage?.();
+    ui.setWorkingIndicator?.();
+    ui.setWorkingVisible?.(true);
+  }
+}
+
+export async function confirmBash(ctx: { ui: Ui }, analysis: ShellAnalysis, remoteLabel?: string, notify: Notify = notifyPiWaitingForUser) {
+  return (await chooseBashApproval(ctx, analysis, undefined, remoteLabel, notify)) === "once";
 }

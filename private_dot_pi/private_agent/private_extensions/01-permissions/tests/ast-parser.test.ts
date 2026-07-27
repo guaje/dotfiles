@@ -1,10 +1,26 @@
 // Run with: npx -y tsx --test agent/extensions/01-permissions/tests/ast-parser.test.ts
 import assert from "node:assert/strict";
 import test from "node:test";
+import { analyzeShellGraph } from "../shell/ast-analysis.ts";
 import { parseShellAst } from "../shell/ast-parser.ts";
 import { SHELL_GRAPH_LIMITS } from "../shell/ast.ts";
+import { createShellInspector } from "../shell/parser.ts";
 
 function nestedSubstitutions(depth: number) { let value = "echo ok"; for (let index = 0; index < depth; index++) value = `echo $(${value})`; return value; }
+
+test("the detailed inspector parses once for shared analysis and approval matching", () => {
+  let parses = 0;
+  let analyses = 0;
+  const inspect = createShellInspector({
+    parseShellAst(source) { parses++; return parseShellAst(source); },
+    analyzeShellGraph(graph, context) { analyses++; return analyzeShellGraph(graph, context); },
+  });
+  const inspection = inspect("git add file.txt");
+  assert.equal(inspection.graph.root.kind, "command");
+  assert.equal(inspection.analysis.effect, "mutating");
+  assert.equal(parses, 1);
+  assert.equal(analyses, 1);
+});
 
 test("AST preserves sequence, pipeline, group, substitution, source, and spans", () => {
   const source = "git status && (cat $(realpath file) | jq .)";

@@ -1,10 +1,17 @@
-import { parseShell } from "./parser.ts";
+import { inspectShell } from "./parser.ts";
+import type { ShellGraph } from "./ast.ts";
 import type { PermissionDecision, ShellAnalysis, ShellContext } from "../types.ts";
 
 const LOCAL_CONTEXT: ShellContext = { location: "local", usesNetwork: false };
 
+export type ShellInspection = { graph: ShellGraph; analysis: ShellAnalysis };
+
+/** Parse once so authorization and remembered-approval matching share one structural graph. */
+export function inspectBash(command: string | undefined, executionContext: ShellContext = LOCAL_CONTEXT): ShellInspection {
+  return inspectShell(command ?? "", executionContext);
+}
 export function analyzeBash(command: string | undefined, executionContext: ShellContext = LOCAL_CONTEXT): ShellAnalysis {
-  return parseShell(command ?? "", executionContext);
+  return inspectBash(command, executionContext).analysis;
 }
 
 /** Decides exclusively from structural analysis; flattened commands are display metadata. */
@@ -38,5 +45,5 @@ export function decideBash(
   style: "Micromanagement" | "Empowerment",
   executionContext: ShellContext = LOCAL_CONTEXT,
 ): PermissionDecision {
-  return decideAnalysis(analyzeBash(command, executionContext), style);
+  return decideAnalysis(inspectBash(command, executionContext).analysis, style);
 }

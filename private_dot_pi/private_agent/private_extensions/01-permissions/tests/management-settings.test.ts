@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { afterEach } from "node:test";
-import { readConfiguredManagingStyle, resetManagementSettingsForTests, setManagingStyle } from "../management-settings.ts";
+import { permissionsSessionApprovalMaxRules, readConfiguredManagingStyle, resetManagementSettingsForTests, setManagingStyle } from "../management-settings.ts";
 
 afterEach(() => resetManagementSettingsForTests());
 
@@ -16,6 +16,25 @@ test("legacy Guidance reads as Empowerment without rewriting the source", async 
     await writeFile(path, source);
     assert.equal(await readConfiguredManagingStyle(path), "Empowerment");
     assert.equal(await readFile(path, "utf8"), source);
+  }
+  finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("approval cap reads the configured value and accepts only non-negative integers", async () => {
+  assert.equal(await permissionsSessionApprovalMaxRules(), 100);
+  const root = await mkdtemp(join(tmpdir(), "permissions-settings-"));
+  const path = join(root, "settings.config.json");
+  try {
+    await writeFile(path, '{"permissionsSessionApprovalMaxRules":7}\n');
+    assert.equal(await permissionsSessionApprovalMaxRules(path), 7);
+    await writeFile(path, '{"permissionsSessionApprovalMaxRules":"7"}\n');
+    assert.equal(await permissionsSessionApprovalMaxRules(path), 0);
+    await writeFile(path, '{"permissionsSessionApprovalMaxRules":-1}\n');
+    assert.equal(await permissionsSessionApprovalMaxRules(path), 0);
+    await writeFile(path, '{"permissionsSessionApprovalMaxRules":1.5}\n');
+    assert.equal(await permissionsSessionApprovalMaxRules(path), 0);
+    await writeFile(path, '{}\n');
+    assert.equal(await permissionsSessionApprovalMaxRules(path), 0);
   }
   finally { await rm(root, { recursive: true, force: true }); }
 });

@@ -11,12 +11,12 @@ type WorktreeCache = { expires: number; roots: string[] };
 const worktreeCache = new Map<string, WorktreeCache>();
 let disposableRoot: string | undefined;
 
-function contained(root: string, target: string) {
+export function contained(root: string, target: string) {
   const path = relative(root, target);
   return path === "" || (!path.startsWith(`..${sep}`) && path !== ".." && !isAbsolute(path));
 }
 
-async function canonicalExistingOrParent(path: string) {
+export async function canonicalExistingOrParent(path: string) {
   let candidate = resolve(path);
   const suffix: string[] = [];
   for (;;) {
@@ -109,6 +109,14 @@ export async function canAutoAllowHandoffFile(path: string | undefined, cwd: str
   if (!base || !mapped || base !== mapped) return false;
   const target = await canonicalExistingOrParent(resolve(base, path)).catch(() => undefined);
   return Boolean(target && contained(base, target));
+}
+
+export async function canonicalGitWorktree(cwd: string) {
+  const canonicalCwd = await realpath(cwd).catch(() => undefined);
+  if (!canonicalCwd) return undefined;
+  const { stdout } = await execFile("git", ["-C", canonicalCwd, "--no-optional-locks", "rev-parse", "--show-toplevel"], { timeout: 3_000, maxBuffer: 1024 * 1024, encoding: "utf8" }).catch(() => ({ stdout: "" }));
+  const worktree = await realpath(String(stdout).trim()).catch(() => undefined);
+  return worktree ? { cwd: canonicalCwd, worktree } : undefined;
 }
 
 export function invalidateAccessPolicyCache() {

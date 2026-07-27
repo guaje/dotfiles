@@ -16,6 +16,8 @@ export async function currentManagingStyle() { return sessionStyle ?? cache ?? r
 export function setSessionManagingStyle(style: ManagingStyle | undefined) { sessionStyle = style; }
 export function clearSessionManagingStyle() { sessionStyle = undefined; }
 export async function empowermentDisposableRoots() { const roots = (await readConfig()).empowermentDisposableRoots; return Array.isArray(roots) && roots.every((root) => typeof root === "string") ? roots : ["@user-temp"]; }
+/** Invalid or absent limits fail closed: no new remembered approvals are stored. */
+export async function permissionsSessionApprovalMaxRules(configPath = SETTINGS_CONFIG_PATH) { const value = (await readConfig(configPath)).permissionsSessionApprovalMaxRules; return Number.isSafeInteger(value) && (value as number) >= 0 ? value as number : 0; }
 /** Serializes atomic writes; cache changes only after the normal merge completes. */
 export function setManagingStyle(style: ManagingStyle, runMerge: () => Promise<void>, configPath = SETTINGS_CONFIG_PATH): Promise<void> {
   const work = async () => {

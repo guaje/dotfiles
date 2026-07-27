@@ -31,9 +31,9 @@ export default function (pi: ExtensionAPI) {
     const hosts = await discoverSshHosts(); const pick = await select(ctx, "SSH host", [...hosts.map((host) => ({ label: host.alias, value: host.alias })), { label: "Enter host…", value: "__manual__" }]);
     if (!pick) return;
     let target: Omit<RemoteTarget, "workspace">;
-    if (pick === "__manual__") { const host = await ctx.ui.input("SSH host"); if (!host) return; const user = await ctx.ui.input("SSH user (optional)"); const port = await ctx.ui.input("SSH port (optional)"); target = { alias: validateManualTarget(host, user, port).host, user: user || undefined, port: port ? Number(port) : undefined }; }
+    if (pick === "__manual__") { const host = await ctx.ui.input("SSH host"); if (!host) return; const user = await ctx.ui.input("SSH user (optional)"); const port = await ctx.ui.input("SSH port (optional)"); const validated = validateManualTarget(host, user, port); target = { alias: validated.host, host: validated.host, user: validated.user, port: validated.port }; }
     else { // ssh -G happens only after the user explicitly selected the alias; retain alias for execution.
-      const resolved = await sshGetConfig(pick); target = { alias: pick, user: resolved.user, port: resolved.port ? Number(resolved.port) : undefined };
+      const resolved = await sshGetConfig(pick); target = { alias: pick, host: resolved.hostname ?? pick, user: resolved.user, port: resolved.port ? Number(resolved.port) : undefined };
     }
     const selected = await chooseWorkspace(ctx, target); if (!selected) return;
     setState({ ...state, connection: "connected", target: selected, syncState: "clean" });
@@ -80,7 +80,7 @@ export default function (pi: ExtensionAPI) {
   };
   pi.registerCommand("ssh", { description: "Connect, synchronize, or route tools through SSH", handler: command as any });
   pi.registerShortcut?.(DEFAULT_SHORTCUT, { description: "Toggle SSH tool routing", handler: async (ctx: any) => command("toggle", ctx) });
-  pi.on("session_start", (_event: any, ctx: any) => { activeCtx = ctx; state = restored(ctx.sessionManager.getBranch?.() ?? []); hud?.dispose(); hud = registerHudItem({ owner: "handoff", id: "route", zone: "workspaceRight", order: 100, importance: "normal", variants: handoffHudVariants(state) }); setRemoteBashBackend(() => remote()?.bash, () => state.target && state.connection === "connected" && state.toolRoute === "remote" ? `${state.target.alias}:${state.target.workspace}` : undefined, () => state.target && state.connection === "connected" && state.toolRoute === "remote" ? activeCtx?.cwd : undefined); });
+  pi.on("session_start", (_event: any, ctx: any) => { activeCtx = ctx; state = restored(ctx.sessionManager.getBranch?.() ?? []); hud?.dispose(); hud = registerHudItem({ owner: "handoff", id: "route", zone: "workspaceRight", order: 100, importance: "normal", variants: handoffHudVariants(state) }); setRemoteBashBackend(() => remote()?.bash, () => state.target && state.connection === "connected" && state.toolRoute === "remote" ? `${state.target.alias}:${state.target.workspace}` : undefined, () => state.target && state.connection === "connected" && state.toolRoute === "remote" ? activeCtx?.cwd : undefined, () => state.target && state.connection === "connected" && state.toolRoute === "remote" ? `${state.target.alias}\0${state.target.host ?? state.target.alias}\0${state.target.user ?? ""}\0${state.target.port ?? ""}\0${state.target.workspace}` : undefined); });
   pi.on("session_shutdown", () => { hud?.dispose(); hud = undefined; setRemoteBashBackend(undefined); });
   pi.on("agent_settled", async (_event: any, ctx: any) => { if (state.sessionAuthority === "remote" && state.syncState === "dirty" && ctx.isIdle?.()) await command("sync", ctx); });
   pi.on("user_bash", (_event: any) => { const backend = remote()?.bash; return backend ? { operations: backend } : undefined; });

@@ -10,9 +10,11 @@ import type { Message } from "@earendil-works/pi-ai";
 import type { AgentScope } from "./agents.ts";
 import type { ThinkingLevel } from "./model-selection.ts";
 
-/** Limits and tuning constants shared across orchestration / rendering. */
-export const MAX_PARALLEL_TASKS = 8;
-export const MAX_CONCURRENCY = 4;
+/** User-configurable workload defaults and non-configurable safety ceilings. */
+export const DEFAULT_MAX_PARALLEL_TASKS = 8;
+export const HARD_MAX_PARALLEL_TASKS = 32;
+export const DEFAULT_MAX_CONCURRENCY = 4;
+export const HARD_MAX_CONCURRENCY = 16;
 export const COLLAPSED_ITEM_COUNT = 10;
 export const PER_TASK_OUTPUT_CAP = 50 * 1024;
 

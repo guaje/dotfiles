@@ -103,7 +103,7 @@ test("Bash session approval uses one selector with preview, rule, and three choi
   const result = await chooseBashApproval(
     { ui },
     analyzeBash("git add file.txt"),
-    { optionLabel: "Allow similar commands for this session", ruleDescription: "git add <paths inside this workspace>" },
+    { optionLabel: "Allow similar commands for this session", ruleDescription: "git add <paths inside this workspace>", strength: "audited", slotCount: 1 },
     undefined,
     async () => {},
   );
@@ -112,7 +112,8 @@ test("Bash session approval uses one selector with preview, rule, and three choi
   assert.match(prompts[0]!, /Allow Bash command\?/);
   assert.match(prompts[0]!, /Programs to run:/);
   assert.match(prompts[0]!, /git add <paths inside this workspace>/);
-  assert.deepEqual(choices[0], ["Deny", "Allow once", "Allow similar commands for this session"]);
+  assert.match(prompts[0]!, /audited · 1 variable slot/);
+  assert.deepEqual(choices[0], ["Allow similar commands for this session", "Allow once", "Deny"]);
 });
 
 test("ineligible Bash approvals expose only deny and once", async () => {
@@ -122,7 +123,7 @@ test("ineligible Bash approvals expose only deny and once", async () => {
     select: async (_prompt: string, items: string[]) => { choices = items; return "Allow once"; },
   } }, analyzeBash("echo $(rm file)"), undefined, undefined, async () => {});
   assert.equal(result, "once");
-  assert.deepEqual(choices, ["Deny", "Allow once"]);
+  assert.deepEqual(choices, ["Allow once", "Deny"]);
 });
 
 test("Bash selector errors deny and restore the working indicator", async () => {
@@ -131,7 +132,7 @@ test("Bash selector errors deny and restore the working indicator", async () => 
     confirm: async () => true,
     select: async () => { throw new Error("fixture"); },
     setWorkingVisible(value: boolean) { working.push(value); },
-  } }, analyzeBash("rm file"), { optionLabel: "Allow this exact command for this session", ruleDescription: "Exact local invocation of rm" }, undefined, async () => {});
+  } }, analyzeBash("rm file"), { optionLabel: "Allow similar commands for this session", ruleDescription: "rm · same operation/options", strength: "conservative", slotCount: 0 }, undefined, async () => {});
   assert.equal(result, "deny");
   assert.deepEqual(working, [false, true]);
 });

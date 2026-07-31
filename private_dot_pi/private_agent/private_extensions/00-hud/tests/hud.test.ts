@@ -23,7 +23,7 @@ function load() {
     .then(([registry, layout, sanitize, render]) => ({ registry, layoutFooter: layout.layoutFooter, sanitizeHudText: sanitize.sanitizeHudText, render }));
 }
 
-after(() => rmSync(resolve("agent/extensions/node_modules"), { recursive: true, force: true }));
+after(() => rmSync(stubDir, { recursive: true, force: true }));
 
 const variants = (text: string) => ({ full: [{ text }], compact: [{ text: text.slice(0, 4) }], icon: [{ text: text.slice(0, 1) }] });
 

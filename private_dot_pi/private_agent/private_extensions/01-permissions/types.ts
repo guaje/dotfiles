@@ -2,6 +2,8 @@ export type ManagingStyle = "Micromanagement" | "Empowerment";
 export type ShellEffect = "read-only" | "mutating" | "unknown";
 export type ShellLocation = "local" | "remote";
 export type ShellTransport = "ssh" | "handoff" | undefined;
+export type SessionApprovalTemplateStrength = "audited" | "conservative";
+export type SessionApprovalSlotType = "workspace-path" | "workspace-path-list" | "opaque";
 
 export interface ShellContext { location: ShellLocation; transport?: ShellTransport; target?: string; usesNetwork: boolean; }
 /** Flattened command metadata is presentation-only. */

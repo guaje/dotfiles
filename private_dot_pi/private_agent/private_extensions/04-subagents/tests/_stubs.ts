@@ -9,13 +9,16 @@
  * Each subagent test writes the SAME superset stubs, so the three test files
  * are safe to run in any order (and even in a shared process).
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { after } from "node:test";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // subagent/tests/ -> ../.. -> agent/extensions
 const NODE_MODULES = resolve(HERE, "../../node_modules");
+const STUB_PACKAGES = ["@earendil-works/pi-ai", "@earendil-works/pi-coding-agent", "@earendil-works/pi-tui", "typebox"];
+after(() => { for (const name of STUB_PACKAGES) rmSync(resolve(NODE_MODULES, ...name.split("/")), { recursive: true, force: true }); });
 
 function writePkg(name: string, indexContent: string): void {
 	const dir = resolve(NODE_MODULES, ...name.split("/"));

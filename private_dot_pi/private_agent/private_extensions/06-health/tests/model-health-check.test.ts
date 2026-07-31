@@ -1,16 +1,32 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const EXTENSION_PATH = resolve("agent/extensions/06-model-health-check.ts");
-const SETTINGS_CONFIG_PATH = resolve("agent/settings.config.json");
-const SETTINGS_PATH = resolve("agent/settings.json");
-const MODELS_PATH = resolve("agent/models.json");
+const TEST_ROOT = mkdtempSync(resolve(tmpdir(), "pi-health-fixture-"));
+const TEST_AGENT = resolve(TEST_ROOT, "agent");
+const TEST_EXTENSIONS = resolve(TEST_AGENT, "extensions");
+mkdirSync(TEST_EXTENSIONS, { recursive: true });
+cpSync(resolve("agent/extensions/06-health"), resolve(TEST_EXTENSIONS, "06-health"), { recursive: true });
+cpSync(resolve("agent/extensions/08-settings"), resolve(TEST_EXTENSIONS, "08-settings"), { recursive: true });
+writeFileSync(resolve(TEST_AGENT, "models.json"), JSON.stringify({ providers: {
+  reallms: { baseUrl: "https://models.test", apiKey: "test-api-key-fixture", models: [{ id: "test-scoped", name: "Scoped", reasoning: true }] },
+  "openai-codex": { models: [{ id: "test-built-in", name: "Built In", reasoning: true }] },
+  "test-provider": { models: [{ id: "fast-model", name: "Fast", reasoning: false }] },
+  "reallms-dev": { baseUrl: "https://images.test", apiKey: "test-api-key-fixture", models: [] },
+} }));
+const fixtureSettings = { enabledModels: ["reallms/test-scoped", "openai-codex/test-built-in", "test-provider/fast-model"], imageGenerationProviders: { "reallms-dev": { models: [{ id: "z-image-turbo", name: "z-image-turbo" }] } } };
+writeFileSync(resolve(TEST_AGENT, "settings.config.json"), JSON.stringify(fixtureSettings));
+writeFileSync(resolve(TEST_AGENT, "settings.json"), JSON.stringify(fixtureSettings));
+const EXTENSION_PATH = resolve(TEST_EXTENSIONS, "06-health/index.ts");
+const SETTINGS_CONFIG_PATH = resolve(TEST_AGENT, "settings.config.json");
+const SETTINGS_PATH = resolve(TEST_AGENT, "settings.json");
+const MODELS_PATH = resolve(TEST_AGENT, "models.json");
 const ORIGINAL_SETTINGS_CONFIG = readFileSync(SETTINGS_CONFIG_PATH, "utf8");
 const ORIGINAL_SETTINGS = readFileSync(SETTINGS_PATH, "utf8");
-const CACHE_PATH = resolve("agent/model-health-cache.json");
+const CACHE_PATH = resolve(TEST_AGENT, "model-health-cache.json");
 const ORIGINAL_FETCH = globalThis.fetch;
 const ORIGINAL_CACHE = (() => {
   try {
@@ -19,7 +35,7 @@ const ORIGINAL_CACHE = (() => {
     return undefined;
   }
 })();
-const STUB_PACKAGE_DIR = resolve("agent/extensions/node_modules");
+const STUB_PACKAGE_DIR = resolve(TEST_EXTENSIONS, "node_modules");
 const PI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@earendil-works/pi-coding-agent");
 const PI_AI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@earendil-works/pi-ai");
 const PI_TUI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@earendil-works/pi-tui");
@@ -818,4 +834,5 @@ test.after(() => {
   rmSync(PI_PACKAGE_DIR, { recursive: true, force: true });
   rmSync(PI_AI_PACKAGE_DIR, { recursive: true, force: true });
   rmSync(PI_TUI_PACKAGE_DIR, { recursive: true, force: true });
+  rmSync(TEST_ROOT, { recursive: true, force: true });
 });

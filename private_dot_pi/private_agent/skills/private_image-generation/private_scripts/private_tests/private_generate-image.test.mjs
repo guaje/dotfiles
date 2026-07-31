@@ -62,7 +62,8 @@ async function createFixture(t) {
       { id: 'test-provider/test-image-model', status: 'ok', name: 'test-image-model', service: 'imageGeneration' },
     ],
   }));
-  await writeFile(join(extensionsDir, '06-model-health-check.ts'), 'export const MODEL_HEALTH_CACHE_TTL_MS = 15 * 60 * 1000;\n');
+  await mkdir(join(extensionsDir, '06-health', 'assets'), { recursive: true });
+  await writeFile(join(extensionsDir, '06-health', 'assets', 'policy.json'), JSON.stringify({ cacheTtlMs: { default: 900000, minimum: 1000, maximum: 86400000 }, probeConcurrency: { default: 3, minimum: 1, maximum: 8 } }));
   await writeFile(join(agentDir, 'models.json'), JSON.stringify({
     providers: {
       'test-provider': {

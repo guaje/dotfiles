@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { execFileSync, execSync } from 'node:child_process';
+import { getModelHealthCacheTtlMs } from '../../../extensions/06-health/scripts/read-policy.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const agentDir = resolve(process.env.IMAGE_AGENT_DIR || resolve(scriptDir, '../../..'));
@@ -11,7 +12,6 @@ const modelsPath = join(agentDir, 'models.json');
 const settingsConfigPath = join(agentDir, 'settings.config.json');
 const settingsPath = join(agentDir, 'settings.json');
 const cachePath = join(agentDir, 'model-health-cache.json');
-const healthExtensionPath = join(agentDir, 'extensions/06-model-health-check.ts');
 
 const prompt = process.env.IMAGE_PROMPT || 'A concise image prompt goes here';
 const requestedModel = process.env.IMAGE_MODEL || '';
@@ -32,10 +32,8 @@ function resolveApiKey(value) {
 }
 
 function getCacheTtlMs() {
-  const source = readFileSync(healthExtensionPath, 'utf8');
-  const match = source.match(/MODEL_HEALTH_CACHE_TTL_MS\s*=\s*(\d+)\s*\*\s*(\d+)\s*\*\s*(\d+)/);
-  if (match) return Number(match[1]) * Number(match[2]) * Number(match[3]);
-  return 15 * 60 * 1000;
+  try { return getModelHealthCacheTtlMs(agentDir); }
+  catch { return 15 * 60 * 1000; }
 }
 
 function getDefaultGeneratedImagesDir() {

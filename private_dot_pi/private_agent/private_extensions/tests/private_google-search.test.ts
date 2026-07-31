@@ -394,6 +394,6 @@ test("google_web_search shows an aggregated actionable message after fallback fa
 test.after(() => {
   delete (globalThis as any).__googleGenAICreate;
   delete (globalThis as any).__googleGenAIConstructorCalls;
-  rmSync(resolve("agent/extensions/node_modules"), { recursive: true, force: true });
+  for (const name of ["@earendil-works/pi-coding-agent", "@sinclair/typebox", "@google/genai"]) rmSync(resolve(STUB_PACKAGE_DIR, name), { recursive: true, force: true });
   rmSync(resolve("agent/extensions/.google-search.testable.ts"), { force: true });
 });

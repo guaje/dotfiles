@@ -1,7 +1,9 @@
 // Run with: npx -y tsx --test agent/extensions/05-browse/tests/web-retrieval.test.ts
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { loadConfig } from "../config.ts";
@@ -21,17 +23,18 @@ const config: WebRetrievalConfig = {
 
 function response(body: unknown, status = 200) { return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } }); }
 
-test("web retrieval configuration is extension-local and configures Linkup as a provider", async () => {
-	const settings = JSON.parse(readFileSync("agent/settings.config.json", "utf8"));
-	const extensionConfig = JSON.parse(readFileSync("agent/extensions/05-browse/assets/web-retrieval.json", "utf8"));
-	assert.equal("linkupAPIKey" in settings, false);
-	assert.equal("webRetrieval" in settings, false);
-	assert.equal(typeof extensionConfig.providers?.linkup?.apiKey, "string");
-	assert.ok(extensionConfig.providers.linkup.apiKey);
-	const loaded = await loadConfig();
-	assert.equal(loaded.providers.linkup?.baseUrl, "https://api.linkup.so");
-	assert.ok(loaded.providers.linkup?.apiKey);
-	assert.deepEqual(loaded.fallbackProviders, ["tavily"]);
+test("web retrieval resolves synthetic config with environment precedence", async () => {
+	const root = mkdtempSync(resolve(tmpdir(), "pi-browse-"));
+	const fixture = resolve(root, "web-retrieval.json");
+	writeFileSync(fixture, JSON.stringify({ providers: { linkup: { apiKey: "$TEST_LINKUP", baseUrl: "https://linkup.test/" }, tavily: { apiKey: "!secret-command" } }, fallbackProviders: ["tavily", "invalid"], limits: { maxResults: 999 } }));
+	try {
+		const loaded = await loadConfig({ configPath: fixture, env: { LINKUP_API_KEY: "environment-key", TEST_LINKUP: "fixture-key" }, secretCommand: async () => "synthetic-secret\n" });
+		assert.equal(loaded.providers.linkup?.apiKey, "environment-key");
+		assert.equal(loaded.providers.linkup?.baseUrl, "https://linkup.test");
+		assert.equal(loaded.providers.tavily?.apiKey, "synthetic-secret");
+		assert.deepEqual(loaded.fallbackProviders, ["tavily"]);
+		assert.equal(loaded.limits.maxResults, 20);
+	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 function success(provider: "linkup" | "tavily"): ProviderAdapter {
@@ -137,21 +140,34 @@ test("URL security rejects host-side SSRF targets and injected web text remains 
 });
 
 const extensionPath = resolve("agent/extensions/05-browse/index.ts");
-const stubs = resolve("agent/extensions/node_modules");
+const extensionFixtures: string[] = [];
 async function loadExtension() {
-	for (const [name, source] of Object.entries({
-		"@earendil-works/pi-coding-agent": "",
-		"@sinclair/typebox": "export const Type={Object:p=>({p}),Union:v=>({v}),Literal:v=>v,Optional:v=>v,String:()=>({}),Integer:()=>({}),Array:()=>({}),Boolean:()=>({}),Any:()=>({})};",
-	})) {
-		const dir = resolve(stubs, name); mkdirSync(dir, { recursive: true }); writeFileSync(resolve(dir, "package.json"), JSON.stringify({ name, type: "module", exports: "./index.js" })); writeFileSync(resolve(dir, "index.js"), source);
-	}
-	// Use an ESM TypeScript extension so tsx does not apply CommonJS interop in CI.
-	const testable = resolve("agent/extensions/05-browse/.index.testable.mts");
-	writeFileSync(testable, readFileSync(extensionPath, "utf8"));
-	return (await import(`${pathToFileURL(testable).href}?${Date.now()}`)).default;
+	const root = mkdtempSync(resolve(tmpdir(), "pi-browse-stubs-"));
+	extensionFixtures.push(root);
+	const stubs = resolve(root, "node_modules");
+		for (const [name, source] of Object.entries({
+			"@earendil-works/pi-coding-agent": "",
+			"@sinclair/typebox": "export const Type={Object:p=>({p}),Union:v=>({v}),Literal:v=>v,Optional:v=>v,String:()=>({}),Integer:()=>({}),Array:()=>({}),Boolean:()=>({}),Any:()=>({})};",
+		})) {
+			const dir = resolve(stubs, name);
+			mkdirSync(dir, { recursive: true });
+			writeFileSync(resolve(dir, "package.json"), JSON.stringify({ name, type: "module", exports: "./index.js" }));
+			writeFileSync(resolve(dir, "index.js"), source);
+		}
+	const extensionFixture = resolve(root, "05-browse");
+	cpSync(resolve(extensionPath, ".."), extensionFixture, { recursive: true, filter: (source) => !source.endsWith("assets/web-retrieval.json") });
+	mkdirSync(resolve(extensionFixture, "assets"), { recursive: true });
+	writeFileSync(resolve(extensionFixture, "assets/web-retrieval.json"), JSON.stringify({
+		providers: { linkup: { apiKey: "$LINKUP_API_KEY", baseUrl: "https://linkup.test" }, tavily: { apiKey: "synthetic-tavily", baseUrl: "https://tavily.test" } },
+		fallbackProviders: ["tavily"],
+		limits: config.limits,
+	}));
+	return (await import(`${pathToFileURL(resolve(extensionFixture, "index.ts")).href}?${Date.now()}`)).default;
 }
 
 test("extension registers one constrained tool and emits preview plus final content", async () => {
+	const previousKey = process.env.LINKUP_API_KEY;
+	process.env.LINKUP_API_KEY = "synthetic-extension-key";
 	const extension = await loadExtension(); let tool: any;
 	extension({ registerTool(value: any) { tool = value; } });
 	assert.equal(tool.name, "web_retrieval");
@@ -163,7 +179,11 @@ test("extension registers one constrained tool and emits preview plus final cont
 		assert.ok(updates.length >= 2);
 		assert.match(value.content[0].text, /Provider: linkup/);
 		assert.equal(value.details.untrustedWebContent, true);
-	} finally { globalThis.fetch = originalFetch; }
+	} finally {
+		globalThis.fetch = originalFetch;
+		if (previousKey === undefined) delete process.env.LINKUP_API_KEY;
+		else process.env.LINKUP_API_KEY = previousKey;
+	}
 });
 
-test.after(() => { rmSync(stubs, { recursive: true, force: true }); rmSync(resolve("agent/extensions/05-browse/.index.testable.mts"), { force: true }); });
+test.after(() => { for (const root of extensionFixtures) rmSync(root, { recursive: true, force: true }); });

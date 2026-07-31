@@ -30,7 +30,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { completeSimple, type Model } from "@earendil-works/pi-ai";
-import { getFreshCachedResults, MODEL_HEALTH_CACHE_TTL_MS } from "../06-model-health-check.ts";
+import { getFreshCachedResults } from "../06-health/index.ts";
+import { getModelHealthSettings } from "../06-health/settings.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -556,7 +557,8 @@ export async function selectModelForSubagent(
 		// VPN-only model) and hanging. getFreshCachedResults is batch-gated on
 		// checkedAt, so every returned result is within TTL (entry.checkedAt is
 		// always >= batch.checkedAt), i.e. per-entry freshness is guaranteed.
-		const cached = await getFreshCachedResults(MODEL_HEALTH_CACHE_TTL_MS);
+		const { cacheTtlMs } = await getModelHealthSettings();
+		const cached = await getFreshCachedResults(cacheTtlMs);
 		if (!cached) return {};
 		// Health-cache results can include image-generation models; only chat
 		// models are valid execution candidates, and only healthy ones contribute

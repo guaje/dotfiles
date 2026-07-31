@@ -10,14 +10,15 @@ import { MANAGING_STYLE_LABELS, nextManagingStyle } from "./management-style.ts"
 import { clearSessionManagingStyle, currentManagingStyle, empowermentDisposableRoots, permissionsSessionApprovalMaxRules, refreshManagingStyleCache, setManagingStyle, setSessionManagingStyle } from "./management-settings.ts";
 import { injectPromptGuidance, BASH_PROMPT_GUIDANCE } from "./prompt-guidance.ts";
 import { patchBuiltInSettingsMenu } from "./settings-ui.ts";
+import { MANAGEMENT_STYLE_BACKWARD_SHORTCUT, MANAGEMENT_STYLE_FORWARD_SHORTCUT } from "./shortcuts.ts";
 import { decideAnalysis, inspectBash } from "./shell/policy.ts";
 import { approvalCandidate } from "./shell/session-approval-candidate.ts";
 import { approvalFingerprint, bindSessionApprovalsToStyle, clearSessionApprovals, findSessionApproval, listSessionApprovals, rememberSessionApproval, revokeSessionApproval, withPendingApproval } from "./session-command-approvals.ts";
 import { renderShell } from "./shell/render.ts";
 import type { ManagingStyle, ShellContext } from "./types.ts";
 
-export const MANAGEMENT_STYLE_CYCLE_SHORTCUT = "ctrl+;";
-export const MANAGEMENT_STYLE_CYCLE_BACKWARD_SHORTCUT = "shift+ctrl+;";
+export const MANAGEMENT_STYLE_CYCLE_SHORTCUT = MANAGEMENT_STYLE_FORWARD_SHORTCUT;
+export const MANAGEMENT_STYLE_CYCLE_BACKWARD_SHORTCUT = MANAGEMENT_STYLE_BACKWARD_SHORTCUT;
 let hud: HudItemHandle | undefined;
 let hudStyle: ManagingStyle = "Micromanagement";
 function segments(style: ManagingStyle): { full: HudSegment[]; compact: HudSegment[]; icon: HudSegment[] } {
@@ -97,7 +98,7 @@ export default function permissions(pi: ExtensionAPI) {
         const choice = await chooseBashApproval(
           ctx,
           inspection.analysis,
-          candidate ? { optionLabel: candidate.rememberLabel, ruleDescription: candidate.ruleDescription } : undefined,
+          candidate ? { optionLabel: candidate.rememberLabel, ruleDescription: candidate.ruleDescription, strength: candidate.rule.strength, slotCount: candidate.rule.slotCount } : undefined,
           remoteLabel,
         );
         if (choice !== "remember" || !candidate) return choice;

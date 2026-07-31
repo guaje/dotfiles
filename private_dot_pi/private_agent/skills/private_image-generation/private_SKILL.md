@@ -12,7 +12,7 @@ Use this skill when the user wants a new image or visual asset generated from te
 Before generating any image, confirm the target image-generation model is healthy. Health is tracked **per model** (each cache entry has its own `checkedAt`), so a stale cache does not force a full refresh.
 
 1. Read `agent/model-health-cache.json` and find the entry for the target model (`provider/model-id`).
-2. If the entry is fresh (per-entry `checkedAt` within `MODEL_HEALTH_CACHE_TTL_MS` from `06-model-health-check.ts`) and `status` is `ok`, proceed.
+2. If the entry is fresh (per-entry `checkedAt` within the shared `06-health` policy reader) and `status` is `ok`, proceed.
 3. If the entry is stale, missing, or not `ok`, **refresh just that model** before refusing:
    ```bash
    MODEL_IDS='<provider/model-id>' node agent/skills/image-generation/scripts/refresh-model-health.mjs

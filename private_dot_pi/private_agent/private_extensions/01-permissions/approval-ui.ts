@@ -1,5 +1,5 @@
 import { notifyPiWaitingForUser } from "../07-native-notify.ts";
-import type { ShellAnalysis, ShellEffect } from "./types.ts";
+import type { SessionApprovalTemplateStrength, ShellAnalysis, ShellEffect } from "./types.ts";
 import type { RenderTheme } from "./shell/render.ts";
 
 type ApprovalTheme = RenderTheme;
@@ -91,7 +91,7 @@ export async function confirmFileMutation(ctx: { ui: Ui }, options: { title: str
 }
 
 export type BashApprovalChoice = "deny" | "once" | "remember";
-export type BashRememberOption = { optionLabel: string; ruleDescription: string };
+export type BashRememberOption = { optionLabel: string; ruleDescription: string; strength: SessionApprovalTemplateStrength; slotCount: number };
 
 /** The Bash flow is intentionally one select dialog: deny, once, or a session rule. */
 export async function chooseBashApproval(
@@ -111,12 +111,13 @@ export async function chooseBashApproval(
     const formatted = formatBashApproval(ui, analysis, remoteLabel);
     if (ui.select) {
       const rememberedScope = remember
-        ? `\n\n${label(themeFor(ui), "Remembered rule:")} ${themeFor(ui).fg("toolOutput", remember.ruleDescription)}`
+        ? `\n\n${label(themeFor(ui), "Similarity rule:")} ${themeFor(ui).fg("toolOutput", remember.ruleDescription)}`
+          + `\n${label(themeFor(ui), "Template:")} ${themeFor(ui).fg("muted", `${remember.strength} · ${remember.slotCount ? `${remember.slotCount} variable slot${remember.slotCount === 1 ? "" : "s"}` : "no variable slots"}`)}`
         : "";
       const prompt = `${title(themeFor(ui), "Allow Bash command?")}\n\n${formatted}${rememberedScope}`;
       const deny = "Deny";
       const once = "Allow once";
-      const choices = [deny, once, ...(remember ? [remember.optionLabel] : [])];
+      const choices = remember ? [remember.optionLabel, once, deny] : [once, deny];
       const choice = await ui.select(prompt, choices);
       if (choice === once) return "once";
       if (remember && choice === remember.optionLabel) return "remember";

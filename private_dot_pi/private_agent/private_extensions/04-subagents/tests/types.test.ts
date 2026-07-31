@@ -42,14 +42,10 @@ test("emptyUsage returns a zeroed usage record with all fields", async () => {
 	}
 });
 
-test("tuning constants are exported with expected values", async () => {
-	const mod = await loadModule();
-	try {
-		assert.equal(mod.MAX_PARALLEL_TASKS, 8);
-		assert.equal(mod.MAX_CONCURRENCY, 4);
-		assert.equal(mod.COLLAPSED_ITEM_COUNT, 10);
-		assert.equal(mod.PER_TASK_OUTPUT_CAP, 50 * 1024);
-	} finally {
-		cleanup();
-	}
+test("execution settings enforce validity, hard bounds, and concurrency ordering", async () => {
+	const { resolveSubagentExecutionSettings } = await import("../settings.ts");
+	assert.deepEqual(resolveSubagentExecutionSettings({ subagentMaxParallelTasks: 6, subagentMaxConcurrency: 3 }), { maxParallelTasks: 6, maxConcurrency: 3 });
+	assert.deepEqual(resolveSubagentExecutionSettings({ subagentMaxParallelTasks: 2, subagentMaxConcurrency: 8 }), { maxParallelTasks: 2, maxConcurrency: 2 });
+	assert.deepEqual(resolveSubagentExecutionSettings({ subagentMaxParallelTasks: -1, subagentMaxConcurrency: "many" }), { maxParallelTasks: 8, maxConcurrency: 4 });
+	assert.deepEqual(resolveSubagentExecutionSettings({ subagentMaxParallelTasks: 10_000, subagentMaxConcurrency: 10_000 }), { maxParallelTasks: 8, maxConcurrency: 4 });
 });

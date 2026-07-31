@@ -24,22 +24,21 @@ interface ModelMetadata {
 async function loadModule() {
 	writePackageStubs();
 
-	// Stub the relative model-health-check import via a passthrough controllable through globalThis.
+	// Stub the Health extension import via a passthrough controllable through globalThis.
 	writeFileSync(
 		HEALTH_STUB_PATH,
 		[
-			"export const MODEL_HEALTH_CACHE_TTL_MS = 15 * 60 * 1000;",
+			"export async function getModelHealthSettings() { return { cacheTtlMs: 15 * 60 * 1000, concurrency: 3 }; }",
 			"export async function getFreshCachedResults() {",
 			"  return globalThis.__subagentHealthCache ?? null;",
 			"}",
 		].join("\n"),
 	);
 
-	// Patched copy: redirect the model-health-check import to the stub.
-	const source = readFileSync(MODULE_PATH, "utf8").replace(
-		/from "\.\.\/06-model-health-check\.ts"/,
-		'from "./.model-health-check-stub.ts"',
-	);
+	// Patched copy: redirect the Health extension import to the stub.
+	const source = readFileSync(MODULE_PATH, "utf8")
+		.replace(/from "\.\.\/06-health\/index\.ts"/, 'from "./.model-health-check-stub.ts"')
+		.replace(/from "\.\.\/06-health\/settings\.ts"/, 'from "./.model-health-check-stub.ts"');
 	writeFileSync(TESTABLE_PATH, source);
 
 	const moduleUrl = `${pathToFileURL(TESTABLE_PATH).href}?t=${Date.now()}`;

@@ -23,9 +23,9 @@ Configure portable disposable roots in `agent/settings.config.json`:
 
 ## Session Bash approvals
 
-In Empowerment, one approval selector offers **Deny**, **Allow once**, and—when structural identity is stable—**Allow similar commands for this session** or **Allow this exact command for this session**. Remembered rules are HMAC fingerprints with safe labels only; command text, arguments, paths, and remote payloads are not retained. `/session-approvals` lists, revokes, or clears active rules.
+In Empowerment, one approval selector prioritizes **Allow similar commands for this session**, followed by **Allow once** and **Deny**. There is no separate exact-command approval action. The dialog previews the effective similarity template, whether it is audited or conservative, and how many operand slots may vary. Remembered rules are HMAC fingerprints with safe metadata only; command text, arguments, paths, URLs, and remote payloads are not retained. `/session-approvals` lists, revokes, or clears active rules.
 
-The audited semantic rule `git add <workspace paths>` allows literal path operands to vary only inside the same canonical CWD and Git worktree. Other complete literal mutations and unknown commands use exact normalized rules. Parser failures, dynamic expansion, substitutions, coupled shell structures, and interactive commands remain approve-once only. Local, Handoff, and SSH rules are isolated; initial Handoff and SSH rules are exact and target/workspace bound. Rules never apply in Micromanagement or to mixed read/non-read-only units.
+A data-driven signature registry provides audited templates for Git staging/commit messages, `npx -y tsx --test`, common filesystem mutators, and workspace-contained `chezmoi add`. Audited options and operation anchors remain fixed while canonical workspace operands may vary; copy/move/link rules also fix operand arity and destination. Test globs are accepted only when every current match canonicalizes inside the workspace. Other complete literal commands receive conservative templates: executable, operation, options, effect, context, and ambiguous operands stay fixed, while only high-confidence contained paths can vary. Shell/programming interpreters, runtime executors, unaudited package-runner or chezmoi forms, parser failures, dynamic expansion, substitutions, pipelines, groups, redirections, and interactive commands remain approve-once only. Handoff and SSH use conservative target/workspace-bound templates without remote path generalization. Rules never apply in Micromanagement or to mixed read/non-read-only units.
 
 The in-memory bound is configured in `agent/settings.config.json`:
 
@@ -33,7 +33,7 @@ The in-memory bound is configured in `agent/settings.config.json`:
 "permissionsSessionApprovalMaxRules": 100
 ```
 
-At capacity, existing rules continue and a new remember choice allows only the current invocation. Rules survive `/reload`; they are cleared on quit, new/resumed/forked sessions, startup, and management-style changes.
+At capacity, existing rules continue and a new remember choice allows only the current invocation. Rules survive `/reload`; they are cleared on quit, new/resumed/forked sessions, startup, and management-style changes. The template-schema upgrade invalidates older exact/special-case rules once while preserving the active session identity.
 
 ## Shell policy
 

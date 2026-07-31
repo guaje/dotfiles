@@ -1,0 +1,4 @@
+{
+  "cacheTtlMs": { "default": 900000, "minimum": 1000, "maximum": 86400000 },
+  "probeConcurrency": { "default": 3, "minimum": 1, "maximum": 8 }
+}

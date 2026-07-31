@@ -21,6 +21,10 @@ jobs:
         with:
           node-version: '22'
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Install test dependencies
         run: |
           sudo apt-get update
@@ -150,23 +154,6 @@ jobs:
           mv "$dst/agent/settings.config.json.tmp" "$dst/agent/settings.config.json"
           cp -p "$dst/agent/settings.config.json" "$dst/agent/settings.json"
 
-          # Keep CI-only test inputs generic even if a source test contains
-          # provider names from a local/private configuration.
-          model_health_test="$dst/agent/extensions/tests/model-health-check.test.ts"
-          if [ -f "$model_health_test" ]; then
-            perl -0pi -e '
-              my $chat = "test-chat-provider";
-              my $image = "test-image-provider";
-              my $builtin = "test-built-in-provider";
-              s/\.startsWith\("[^"]+\/"\)/.startsWith("$chat\/")/g;
-              s/"[^"]+\/not-in-current-scope"/"$chat\/not-in-current-scope"/g;
-              s/"[^"]+\/generated-only-model"/"$builtin\/generated-only-model"/g;
-              s/"[^"]+\/test-built-in"/"$builtin\/test-built-in"/g;
-              s/"[^"]+"\s*:\s*\{\s*models:\s*\[\{\s*id:\s*"(z-image-turbo|generated-only-image-model|settings-image-model)"/"$image": {\n        models: [{ id: "$1"/g;
-              s/"[^"]+\/(z-image-turbo|settings-image-model)"/"$image\/$1"/g;
-            ' "$model_health_test"
-          fi
-
       - name: Add deterministic pi stub for live invocation test
         shell: bash
         run: |
@@ -194,24 +181,7 @@ jobs:
           SH
           chmod +x "$RUNNER_TEMP/bin/pi"
 
-      - name: Run shell tests
-        shell: bash
-        env:
-          # This workflow does not consume repository secrets. Keep common token
-          # variables empty so tests cannot accidentally print or exfiltrate them.
-          GITHUB_TOKEN: ''
-          GH_TOKEN: ''
-          OPENAI_API_KEY: ''
-          ANTHROPIC_API_KEY: ''
-          GOOGLE_API_KEY: ''
-          GEMINI_API_KEY: ''
-          LINKUP_API_KEY: ''
-        run: |
-          set -euo pipefail
-          export PATH="$RUNNER_TEMP/bin:$PATH"
-          find "$HOME/.pi" -name '*.test.sh' -type f -print0 | sort -z | xargs -0 -n1 sh
-
-      - name: Run TypeScript tests
+      - name: Run deterministic Pi test suite
         shell: bash
         env:
           # This workflow does not consume repository secrets. Keep common token
@@ -230,8 +200,6 @@ jobs:
           mkdir -p "$fake_pi_package"
           printf '{"name":"@earendil-works/pi-coding-agent"}\n' > "$fake_pi_package/package.json"
           export PI_CODING_AGENT_PACKAGE_ROOT="$fake_pi_package"
-
+          export PATH="$RUNNER_TEMP/bin:$PATH"
           cd "$HOME/.pi"
-          while IFS= read -r -d '' test_file; do
-            npx -y tsx --test "$test_file"
-          done < <(find agent -name '*.test.ts' -type f -print0 | sort -z)
+          sh agent/scripts/run-extension-tests.sh

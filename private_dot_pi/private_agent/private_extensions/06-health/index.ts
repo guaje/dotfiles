@@ -6,18 +6,20 @@ import { fileURLToPath } from "node:url";
 import { type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { completeSimple } from "@earendil-works/pi-ai";
 import { Container, Text } from "@earendil-works/pi-tui";
+import { MODEL_HEALTH_CACHE_TTL_MS as POLICY_CACHE_TTL_MS, MODEL_PROBE_CONCURRENCY_LIMIT as POLICY_PROBE_CONCURRENCY_LIMIT } from "./policy.ts";
+import { getModelHealthSettings } from "./settings.ts";
 
 const execAsync = promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const MODELS_PATH = path.resolve(__dirname, "../models.json");
-const SETTINGS_CONFIG_PATH = path.resolve(__dirname, "../settings.config.json");
-const SETTINGS_PATH = path.resolve(__dirname, "../settings.json");
-const CACHE_PATH = path.resolve(__dirname, "../model-health-cache.json");
+const MODELS_PATH = path.resolve(__dirname, "../../models.json");
+const SETTINGS_CONFIG_PATH = path.resolve(__dirname, "../../settings.config.json");
+const SETTINGS_PATH = path.resolve(__dirname, "../../settings.json");
+const CACHE_PATH = path.resolve(__dirname, "../../model-health-cache.json");
 
-export const MODEL_HEALTH_CACHE_TTL_MS = 15 * 60 * 1000;
-export const MODEL_PROBE_CONCURRENCY_LIMIT = 3;
+export const MODEL_HEALTH_CACHE_TTL_MS = POLICY_CACHE_TTL_MS;
+export const MODEL_PROBE_CONCURRENCY_LIMIT = POLICY_PROBE_CONCURRENCY_LIMIT;
 export const RELOAD_HEALTH_RENDER_DELAY_MS = 100;
 
 interface ModelMetadata {
@@ -478,8 +480,9 @@ function notifyProbeSummary(results: ModelHealthResult[], ctx: ProbeContext, use
 }
 
 export async function checkModelHealth(ctx: ProbeContext, options: ModelHealthOptions = {}): Promise<ModelHealthResult[]> {
-  const cacheTtlMs = options.cacheTtlMs ?? MODEL_HEALTH_CACHE_TTL_MS;
-  const concurrencyLimit = options.concurrencyLimit ?? MODEL_PROBE_CONCURRENCY_LIMIT;
+  const configured = await getModelHealthSettings();
+  const cacheTtlMs = options.cacheTtlMs ?? configured.cacheTtlMs;
+  const concurrencyLimit = options.concurrencyLimit ?? configured.concurrency;
 
   const models = await getEnabledModelsMetadata();
 
@@ -519,7 +522,8 @@ export async function getHealthyEnabledModels<T extends { id: string }>(
   // Fail closed: no fresh health data -> no model is provably healthy.
   // A missing or stale cache must not silently promote every enabled model
   // (including unreachable ones, e.g. VPN-only) to "healthy".
-  const cached = await getFreshCachedResults(options.cacheTtlMs ?? MODEL_HEALTH_CACHE_TTL_MS);
+  const configured = await getModelHealthSettings();
+  const cached = await getFreshCachedResults(options.cacheTtlMs ?? configured.cacheTtlMs);
   if (!cached) return [];
 
   const healthyIds = new Set(cached.filter((result) => result.status === "ok").map((result) => result.id));
@@ -714,7 +718,7 @@ export default function modelHealthCheckExtension(pi: ExtensionAPI) {
   pi.on("session_start", async (event, ctx) => {
     if (event.reason !== "startup" && event.reason !== "reload") return;
     const render = async () => {
-      const results = await checkModelHealth(ctx, { notify: false, cacheTtlMs: MODEL_HEALTH_CACHE_TTL_MS });
+      const results = await checkModelHealth(ctx, { notify: false });
       await renderHealthTable(results, ctx, pi);
     };
     if (event.reason === "reload") {

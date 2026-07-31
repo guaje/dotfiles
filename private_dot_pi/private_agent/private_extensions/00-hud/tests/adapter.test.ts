@@ -49,7 +49,7 @@ export function truncateToWidth(value, width, marker = "") {
 `);
 
 after(() => {
-  rmSync(resolve("agent/extensions/node_modules"), { recursive: true, force: true });
+  rmSync(stubDir, { recursive: true, force: true });
   rmSync(fakePiPackageRoot, { recursive: true, force: true });
   if (originalPiPackageRoot === undefined) delete process.env.PI_CODING_AGENT_PACKAGE_ROOT;
   else process.env.PI_CODING_AGENT_PACKAGE_ROOT = originalPiPackageRoot;

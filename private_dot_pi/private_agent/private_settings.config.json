@@ -21,9 +21,9 @@
     "extensions/03-stats/index.ts",
     "extensions/04-subagents/index.ts",
     "extensions/05-browse/index.ts",
-    "extensions/06-model-health-check.ts",
+    "extensions/06-health/index.ts",
     "extensions/07-native-notify.ts",
-    "extensions/08-reload-merged-settings.ts"
+    "extensions/08-settings/index.ts"
   ],
   "imageGenerationProviders": {
     "reallms-dev": {
@@ -42,5 +42,11 @@
   "permissionsSessionApprovalMaxRules": 100,
   "subagentRosterCap": 10,
   "subagentRosterScope": "user",
+  "subagentMaxParallelTasks": 8,
+  "subagentMaxConcurrency": 4,
+  "modelHealthCacheTtlMs": 900000,
+  "modelHealthProbeConcurrency": 3,
+  "handoffRemoteRoot": "~/.local/state/pi/remote-sessions",
+  "handoffShortcut": "ctrl+alt+s",
   "theme": "catppuccin-mocha"
 }

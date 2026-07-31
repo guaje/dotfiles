@@ -15,12 +15,16 @@ import {
 
 afterEach(() => resetSessionApprovalsForTests());
 
+function rule(identity: ReturnType<typeof approvalFingerprint>, executable = "command") {
+  return { ...identity, kind: "similar" as const, strength: "conservative" as const, contextLabel: "local", anchorCount: 1, slotCount: 0, slotTypes: [], label: `${executable} · conservative · no variable slots` };
+}
+
 test("session rules are capped, revocable, and contain safe metadata only", () => {
   const identity = approvalFingerprint("exact", "local", "/workspace", "rm", "private.txt");
-  const first = { ...identity, kind: "exact" as const, label: "rm · exact · 1 argument · local" };
+  const first = rule(identity, "rm");
   assert.equal(rememberSessionApproval(first, 1), true);
   const secondIdentity = approvalFingerprint("exact", "second");
-  assert.equal(rememberSessionApproval({ ...secondIdentity, kind: "exact", label: "second · exact · local" }, 1), false);
+  assert.equal(rememberSessionApproval(rule(secondIdentity, "second"), 1), false);
   assert.ok(findSessionApproval(identity));
   const listed = listSessionApprovals();
   assert.equal(listed.length, 1);
@@ -30,33 +34,77 @@ test("session rules are capped, revocable, and contain safe metadata only", () =
   assert.deepEqual(listSessionApprovals(), []);
 });
 
+test("remember rejects sensitive metadata and re-HMACs every persisted identity", () => {
+  const identity = approvalFingerprint("safe");
+  assert.equal(rememberSessionApproval({ ...rule(identity), label: "/private/payload · conservative · no variable slots" }, 2), false);
+  assert.equal(rememberSessionApproval({ ...rule(identity), fingerprint: "raw command text" }, 2), false);
+  assert.equal(rememberSessionApproval({ ...rule(identity), signatureId: "payload-encoded-as-an-id" }, 2), false);
+  const callerValue = "a".repeat(43);
+  assert.equal(rememberSessionApproval({ ...rule(identity), fingerprint: callerValue }, 2), true);
+  assert.notEqual(listSessionApprovals()[0]?.fingerprint, callerValue);
+  assert.doesNotMatch(JSON.stringify(listSessionApprovals()), /private|payload|a{43}/);
+});
+
 test("clearing rotates the session identity and rejects stale rules", () => {
   const before = approvalFingerprint("stable");
-  const rule = { ...before, kind: "exact" as const, label: "command · exact · local" };
-  assert.equal(rememberSessionApproval(rule, 2), true);
+  const staleRule = rule(before);
+  assert.equal(rememberSessionApproval(staleRule, 2), true);
   clearSessionApprovals();
   const after = approvalFingerprint("stable");
   assert.notEqual(after.epoch, before.epoch);
   assert.notEqual(after.fingerprint, before.fingerprint);
   assert.equal(findSessionApproval(before), undefined);
-  assert.equal(rememberSessionApproval(rule, 2), false);
+  assert.equal(rememberSessionApproval(staleRule, 2), false);
 });
 
 test("management-style binding preserves reloads only while the style is unchanged", () => {
   bindSessionApprovalsToStyle("Empowerment");
   const identity = approvalFingerprint("style-bound");
-  rememberSessionApproval({ ...identity, kind: "exact", label: "fixture" }, 2);
+  rememberSessionApproval(rule(identity, "fixture"), 2);
   bindSessionApprovalsToStyle("Empowerment");
   assert.ok(findSessionApproval(identity));
   bindSessionApprovalsToStyle("Micromanagement");
   assert.equal(findSessionApproval(identity), undefined);
 });
 
-test("a schema mismatch replaces the reload-safe store", () => {
+test("an older schema migrates in place while clearing unsafe state", () => {
   const root = globalThis as typeof globalThis & { [key: symbol]: unknown };
-  root[Symbol.for("pi.permissions.session-command-approvals")] = { schema: 0, epoch: "stale", key: "stale", rules: new Map([["raw", { label: "stale" }]]), pending: new Map() };
+  const key = Symbol.for("pi.permissions.session-command-approvals");
+  const legacy = {
+    schema: 1,
+    epoch: "preserved-epoch",
+    key: "preserved-key",
+    rules: new Map([["raw", { label: "stale" }]]),
+    pending: new Map([["raw", Promise.resolve()]]),
+    managingStyle: "Empowerment" as const,
+  };
+  root[key] = legacy;
   const identity = approvalFingerprint("fresh");
-  assert.notEqual(identity.epoch, "stale");
+  assert.equal(identity.epoch, legacy.epoch);
+  assert.strictEqual(root[key], legacy);
+  assert.equal(legacy.schema, 3);
+  assert.equal(legacy.key, "preserved-key");
+  assert.equal(legacy.managingStyle, "Empowerment");
+  assert.deepEqual(listSessionApprovals(), []);
+  assert.equal(legacy.pending.size, 0);
+});
+
+test("the short-lived schema-2 exact store is invalidated without rotating its session key", () => {
+  const root = globalThis as typeof globalThis & { [key: symbol]: unknown };
+  const key = Symbol.for("pi.permissions.session-command-approvals");
+  const transitional = {
+    schema: 2,
+    epoch: "schema-two-epoch",
+    key: "schema-two-key",
+    rules: new Map([["raw", { kind: "exact", label: "stale" }]]),
+    pending: new Map(),
+    managingStyle: "Empowerment" as const,
+  };
+  root[key] = transitional;
+  assert.equal(approvalFingerprint("fresh").epoch, transitional.epoch);
+  assert.strictEqual(root[key], transitional);
+  assert.equal(transitional.schema, 3);
+  assert.equal(transitional.key, "schema-two-key");
   assert.deepEqual(listSessionApprovals(), []);
 });
 

@@ -10,7 +10,21 @@ const READ_ONLY = new Set([
 ]);
 const MUTATING = new Set(["rm", "mv", "cp", "mkdir", "rmdir", "touch", "ln", "truncate", "tee", "install", "rsync", "dd", "patch", "chmod", "chown", "chgrp"]);
 const INTERPRETERS = new Set(["sh", "bash", "zsh", "fish", "ksh", "node", "python", "python3", "ruby", "perl", "php", "lua", "awk"]);
+export function isProgrammableInterpreter(executable: string) { return INTERPRETERS.has(executable.replace(/^.*[\\/]/, "").toLowerCase()); }
 const EXECUTION_WRAPPERS = new Set(["sudo", "doas", "su", "xargs", "nohup"]);
+const DYNAMIC_EXECUTORS = new Set(["make", "gmake", "parallel", "watch"]);
+
+export function hasRuntimeExecutionRisk(rawName: string, argv: string[]) {
+  const name = rawName.replace(/^.*[\\/]/, "").toLowerCase();
+  if (INTERPRETERS.has(name) || name === "sed" || EXECUTION_WRAPPERS.has(name) || DYNAMIC_EXECUTORS.has(name)) return true;
+  if (name === "find") return argv.some((argument) => ["-exec", "-execdir", "-ok", "-okdir"].includes(argument));
+  if (name === "fd") return argv.some((argument) => ["-x", "-X", "--exec", "--exec-batch"].includes(argument) || /^-(?:x|X).+/.test(argument) || argument.startsWith("--exec="));
+  if (name === "rg") return argv.some((argument) => argument === "--pre" || argument.startsWith("--pre="));
+  if (name === "sort") return argv.some((argument) => argument === "--compress-program" || argument.startsWith("--compress-program="));
+  if (name === "tar") return argv.some((argument) => argument.startsWith("--checkpoint-action=exec="));
+  if (name === "rsync") return argv.some((argument) => argument === "-e" || /^-e.+/.test(argument) || argument === "--rsh" || argument.startsWith("--rsh=") || argument === "--rsync-path" || argument.startsWith("--rsync-path="));
+  return false;
+}
 const GIT_QUERY = new Set(["status", "diff", "show", "log", "rev-parse", "ls-files", "grep", "cat-file"]);
 const CHEZMOI_QUERY = new Set(["status", "diff", "verify", "managed", "unmanaged", "ignored", "cat", "source-path", "target-path", "dump-config", "cat-config", "help", "version", "completion"]);
 const CHEZMOI_MUTATION = new Set(["add", "apply", "chattr", "destroy", "edit", "encrypt", "forget", "git", "import", "init", "merge", "merge-all", "purge", "re-add", "remove", "rm", "unmanage", "update", "upgrade"]);

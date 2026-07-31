@@ -2,7 +2,7 @@
 # End-to-end test for the image-generation skill's generate-image script.
 # Stubs the image generation HTTP endpoint with a minimal Node HTTP server,
 # builds temporary fixture files (models.json, settings.config.json,
-# model-health-cache.json, 06-model-health-check.ts), runs the script, then asserts
+# model-health-cache.json and the shared 06-health policy), runs the script, then asserts
 # a PNG was written and the JSON output matches expectations.
 set -eu
 
@@ -139,10 +139,14 @@ cat > "$AGENT_DIR/model-health-cache.json" <<CACHEEOF
 }
 CACHEEOF
 
-# 06-model-health-check.ts: stub that exports only the TTL constant.
-cat > "$EXTENSIONS_DIR/06-model-health-check.ts" <<EXTEOF
-export const MODEL_HEALTH_CACHE_TTL_MS = 15 * 60 * 1000;
-EXTEOF
+# Shared Health policy used by the generation script.
+mkdir -p "$EXTENSIONS_DIR/06-health/assets"
+cat > "$EXTENSIONS_DIR/06-health/assets/policy.json" <<POLICYEOF
+{
+  "cacheTtlMs": { "default": 900000, "minimum": 1000, "maximum": 86400000 },
+  "probeConcurrency": { "default": 3, "minimum": 1, "maximum": 8 }
+}
+POLICYEOF
 
 # models.json: test provider with stub base URL.
 cat > "$AGENT_DIR/models.json" <<MODELSEOF

@@ -1,0 +1,16 @@
+{
+  "validRequests": [
+    { "version": 2, "command": "version" },
+    { "version": 2, "command": "list-sessions", "args": [] },
+    { "version": 2, "command": "acquire-lock", "args": ["session", "--owner", "fixture"] }
+  ],
+  "invalidRequests": [
+    { "version": 2, "command": "" },
+    { "version": 2, "command": "version", "args": [1] },
+    { "version": 2, "command": "version", "args": [], "dataBase64": "not base64!" }
+  ],
+  "validResponses": [
+    { "ok": true },
+    { "ok": false, "error": "fixture" }
+  ]
+}

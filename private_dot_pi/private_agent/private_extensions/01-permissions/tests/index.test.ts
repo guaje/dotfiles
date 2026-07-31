@@ -42,11 +42,16 @@ process.env.PI_CODING_AGENT_PACKAGE_ROOT = fakePiRoot;
 
 after(() => {
   setRemoteBashBackend(undefined);
-  rmSync(resolve("agent/extensions/node_modules"), { recursive: true, force: true });
+  rmSync(packageDir, { recursive: true, force: true });
+  rmSync(tuiDir, { recursive: true, force: true });
   rmSync(fakePiRoot, { recursive: true, force: true });
   if (originalPiRoot === undefined) delete process.env.PI_CODING_AGENT_PACKAGE_ROOT;
   else process.env.PI_CODING_AGENT_PACKAGE_ROOT = originalPiRoot;
 });
+
+function approvalRule(identity: ReturnType<typeof approvalFingerprint>, executable = "fixture") {
+  return { ...identity, kind: "similar" as const, strength: "conservative" as const, contextLabel: "local", anchorCount: 1, slotCount: 0, slotTypes: [], label: `${executable} · conservative · no variable slots` };
+}
 
 function harness() {
   const handlers = new Map<string, Function>();
@@ -80,7 +85,8 @@ test("settings decoration exposes two modes and migrates legacy Guidance", async
   list.onChange("managing-style", "Guidance");
   await Promise.resolve();
   assert.deepEqual(saved, ["Empowerment"]);
-  assert.equal(isShiftCtrlSemicolonFallbackInput("ctrl+:"), true);
+  assert.equal(isShiftCtrlSemicolonFallbackInput("ctrl+:"), false);
+  assert.equal(isShiftCtrlSemicolonFallbackInput("shift+ctrl+:"), true);
 });
 
 test("entry registers one Bash owner and injects split guidance once", async () => {
@@ -143,7 +149,7 @@ test("session-approvals command revokes safe remembered rules and lifecycle pres
   const extension = (await import("../index.ts")).default;
   const app = harness(); extension(app.pi as any);
   const identity = approvalFingerprint("command-rule");
-  const rule = { ...identity, kind: "exact" as const, label: "command · exact · local" };
+  const rule = approvalRule(identity, "command");
   rememberSessionApproval(rule, 2);
   assert.equal(listSessionApprovals().length, 1);
   const notifications: string[] = [];
@@ -151,7 +157,7 @@ test("session-approvals command revokes safe remembered rules and lifecycle pres
   await app.commands.get("session-approvals").handler("", { ui: {
     select: async (_title: string, items: string[]) => {
       selections++;
-      if (selections === 1) { assert.match(items[0]!, /command · exact/); return items[0]; }
+      if (selections === 1) { assert.match(items[0]!, /command · conservative/); return items[0]; }
       return "Revoke approval";
     },
     notify: (message: string) => { notifications.push(message); },
@@ -168,7 +174,7 @@ test("session-approvals command revokes safe remembered rules and lifecycle pres
   assert.deepEqual(notifications, ["Revoked session approval", "Cleared session approvals"]);
 
   const reloadIdentity = approvalFingerprint("reload-rule");
-  const reloadRule = { ...reloadIdentity, kind: "exact" as const, label: "command · exact · local" };
+  const reloadRule = approvalRule(reloadIdentity, "command");
   rememberSessionApproval(reloadRule, 2);
   await app.handler("session_shutdown")({ reason: "reload" });
   await app.handler("session_start")({ reason: "reload" }, { cwd: process.cwd(), ui: {} });
@@ -178,13 +184,13 @@ test("session-approvals command revokes safe remembered rules and lifecycle pres
 
   for (const reason of ["new", "resume", "fork"]) {
     const seeded = approvalFingerprint(`start-${reason}`);
-    rememberSessionApproval({ ...seeded, kind: "exact", label: "fixture" }, 2);
+    rememberSessionApproval(approvalRule(seeded), 2);
     await app.handler("session_start")({ reason }, { cwd: process.cwd(), ui: {} });
     assert.equal(findSessionApproval(seeded), undefined, reason);
   }
   for (const reason of ["quit", "new", "resume", "fork"]) {
     const seeded = approvalFingerprint(`shutdown-${reason}`);
-    rememberSessionApproval({ ...seeded, kind: "exact", label: "fixture" }, 2);
+    rememberSessionApproval(approvalRule(seeded), 2);
     await app.handler("session_shutdown")({ reason });
     assert.equal(findSessionApproval(seeded), undefined, reason);
   }
@@ -226,32 +232,55 @@ test("Empowerment remembers a semantic git-add rule while Micromanagement still 
   }
 });
 
-test("Empowerment remembers exact unknown and context-isolated Handoff commands", async () => {
+test("Empowerment remembers similar npx tsx workspace test commands", async () => {
   resetSessionApprovalsForTests();
   const extension = (await import("../index.ts")).default;
   const app = harness(); extension(app.pi as any);
-  const cwd = mkdtempSync(join(tmpdir(), "permissions-exact-"));
-  const executable = `'${process.execPath.replace(/'/g, `'\\''`)}'`;
+  const cwd = mkdtempSync(join(tmpdir(), "permissions-npx-template-"));
+  try {
+    mkdirSync(join(cwd, "tests"));
+    writeFileSync(join(cwd, "tests", "one.test.ts"), "export {};\n");
+    writeFileSync(join(cwd, "tests", "two.test.ts"), "export {};\n");
+    await app.handler("session_start")({ reason: "startup" }, { cwd, ui: {} });
+    const call = app.handler("tool_call");
+    let prompts = 0;
+    const ctx = { cwd, hasUI: true, ui: {
+      confirm: async () => true,
+      select: async () => { prompts++; return "Allow similar commands for this session"; },
+      notify() {},
+    } };
+    assert.equal(await call({ toolName: "bash", input: { command: "npx -y tsx --test --test-concurrency=1 tests/one.test.ts tests/two.test.ts" } }, ctx), undefined);
+    assert.equal(await call({ toolName: "bash", input: { command: "npx -y tsx --test --test-concurrency=1 tests/*.test.ts" } }, ctx), undefined);
+    assert.equal(prompts, 1);
+    await app.handler("session_shutdown")({ reason: "quit" });
+  }
+  finally {
+    rmSync(cwd, { recursive: true, force: true });
+    resetSessionApprovalsForTests();
+  }
+});
+
+test("Empowerment remembers conservative unknown and context-isolated remote commands", async () => {
+  resetSessionApprovalsForTests();
+  const extension = (await import("../index.ts")).default;
+  const app = harness(); extension(app.pi as any);
+  const cwd = mkdtempSync(join(tmpdir(), "permissions-conservative-"));
   try {
     await app.handler("session_start")({ reason: "startup" }, { cwd, ui: {} });
     const call = app.handler("tool_call");
     let prompts = 0;
     const ctx = { cwd, hasUI: true, ui: {
       confirm: async () => true,
-      select: async () => { prompts++; return "Allow this exact command for this session"; },
+      select: async () => { prompts++; return "Allow similar commands for this session"; },
       notify() {},
     } };
-    assert.equal(await call({ toolName: "bash", input: { command: `${executable} task.js` } }, ctx), undefined);
-    assert.equal(await call({ toolName: "bash", input: { command: `${executable} \"task.js\"` } }, ctx), undefined);
+    assert.equal(await call({ toolName: "bash", input: { command: "git frobnicate task.js" } }, ctx), undefined);
+    assert.equal(await call({ toolName: "bash", input: { command: "git frobnicate other.js" } }, ctx), undefined);
     assert.equal(prompts, 1);
-    ctx.ui.select = async () => { prompts++; return "Allow once"; };
-    assert.equal(await call({ toolName: "bash", input: { command: `${executable} other.js` } }, ctx), undefined);
-    assert.equal(prompts, 2);
 
-    ctx.ui.select = async () => { prompts++; return "Allow this exact command for this session"; };
     assert.equal(await call({ toolName: "bash", input: { command: "ssh -p 22 host 'rm file'" } }, ctx), undefined);
     assert.equal(await call({ toolName: "bash", input: { command: "ssh -p 22 host 'rm file'" } }, ctx), undefined);
-    assert.equal(prompts, 3);
+    assert.equal(prompts, 2);
 
     setRemoteBashBackend(
       () => ({ exec: async () => ({ stdout: Buffer.from(""), stderr: Buffer.from(""), code: 0 }) } as any),
@@ -259,10 +288,9 @@ test("Empowerment remembers exact unknown and context-isolated Handoff commands"
       () => cwd,
       () => ["host", "user", "22", "/repo"].join("\0"),
     );
-    ctx.ui.select = async () => { prompts++; return "Allow this exact command for this session"; };
     assert.equal(await call({ toolName: "bash", input: { command: "rm file" } }, ctx), undefined);
     assert.equal(await call({ toolName: "bash", input: { command: "rm file" } }, ctx), undefined);
-    assert.equal(prompts, 4);
+    assert.equal(prompts, 3);
     setRemoteBashBackend(
       () => ({ exec: async () => ({ stdout: Buffer.from(""), stderr: Buffer.from(""), code: 0 }) } as any),
       () => "host:/other",
@@ -271,7 +299,7 @@ test("Empowerment remembers exact unknown and context-isolated Handoff commands"
     );
     ctx.ui.select = async () => { prompts++; return "Allow once"; };
     assert.equal(await call({ toolName: "bash", input: { command: "rm file" } }, ctx), undefined);
-    assert.equal(prompts, 5);
+    assert.equal(prompts, 4);
     await app.handler("session_shutdown")({ reason: "quit" });
   }
   finally {
@@ -286,21 +314,20 @@ test("a full configured store keeps existing rules and degrades a new remember c
   const extension = (await import("../index.ts")).default;
   const app = harness(); extension(app.pi as any);
   const cwd = mkdtempSync(join(tmpdir(), "permissions-cap-"));
-  const executable = `'${process.execPath.replace(/'/g, `'\\''`)}'`;
   try {
     await app.handler("session_start")({ reason: "startup" }, { cwd, ui: {} });
     let firstIdentity: ReturnType<typeof approvalFingerprint> | undefined;
     for (let index = 0; index < 100; index++) {
       const identity = approvalFingerprint("fixture", String(index));
       firstIdentity ??= identity;
-      assert.equal(rememberSessionApproval({ ...identity, kind: "exact", label: `fixture-${index}` }, 100), true);
+      assert.equal(rememberSessionApproval(approvalRule(identity, `fixture-${index}`), 100), true);
     }
     const notifications: string[] = [];
     const result = await app.handler("tool_call")(
-      { toolName: "bash", input: { command: `${executable} new-task.js` } },
+      { toolName: "bash", input: { command: "git frobnicate new-task.js" } },
       { cwd, hasUI: true, ui: {
         confirm: async () => true,
-        select: async () => "Allow this exact command for this session",
+        select: async () => "Allow similar commands for this session",
         notify: (message: string) => { notifications.push(message); },
       } },
     );

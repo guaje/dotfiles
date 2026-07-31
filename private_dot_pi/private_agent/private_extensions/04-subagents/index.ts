@@ -36,9 +36,8 @@ import {
 } from "./result.ts";
 import { renderSubagentCall, renderSubagentResult } from "./render.ts";
 import { runSingleAgent } from "./spawn.ts";
+import { getSubagentExecutionSettings } from "./settings.ts";
 import {
-	MAX_CONCURRENCY,
-	MAX_PARALLEL_TASKS,
 	type OnUpdateCallback,
 	type SingleResult,
 	type SubagentDetails,
@@ -273,12 +272,13 @@ export default function (pi: ExtensionAPI) {
 			}
 
 			if (params.tasks && params.tasks.length > 0) {
-				if (params.tasks.length > MAX_PARALLEL_TASKS)
+				const executionSettings = await getSubagentExecutionSettings();
+				if (params.tasks.length > executionSettings.maxParallelTasks)
 					return {
 						content: [
 							{
 								type: "text",
-								text: `Too many parallel tasks (${params.tasks.length}). Max is ${MAX_PARALLEL_TASKS}.`,
+								text: `Too many parallel tasks (${params.tasks.length}). Max is ${executionSettings.maxParallelTasks}.`,
 							},
 						],
 						details: makeDetails("parallel")([]),
@@ -311,7 +311,7 @@ export default function (pi: ExtensionAPI) {
 					});
 				};
 
-				const results = await mapWithConcurrencyLimit(params.tasks, MAX_CONCURRENCY, async (t, index) => {
+				const results = await mapWithConcurrencyLimit(params.tasks, executionSettings.maxConcurrency, async (t, index) => {
 					const result = await runSingleAgent(
 						ctx.cwd,
 						agents,

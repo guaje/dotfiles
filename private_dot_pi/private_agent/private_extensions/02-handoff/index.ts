@@ -1,6 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createEditTool, createFindTool, createGrepTool, createLsTool, createReadTool, createWriteTool } from "@earendil-works/pi-coding-agent";
 import { cacheRoot, DEFAULT_SHORTCUT } from "./config.ts";
+import { getHandoffSettings } from "./settings.ts";
 import { setRemoteBashBackend } from "./backend-registry.ts";
 import { createRemoteOperations } from "./operations.ts";
 import { discoverSshHosts, validateManualTarget } from "./ssh-config.ts";
@@ -8,8 +9,9 @@ import { initialState, restoreState, toggleToolRoute } from "./state.ts";
 import { handoffHudVariants, handoffStatus } from "./status.ts";
 import { registerHudItem, type HudItemHandle } from "../00-hud/api.ts";
 import { materializeSession } from "./session-materializer.ts";
+import { ensureRemoteHelper } from "./installer.ts";
 import { sshExec, sshGetConfig } from "./transport.ts";
-import { synchronize } from "./sync.ts";
+import { requestGate, synchronize } from "./sync.ts";
 import type { HandoffState, RemoteTarget } from "./types.ts";
 
 function select<T>(ctx: any, title: string, items: Array<{ label: string; value: T }>): Promise<T | undefined> { return ctx.ui.select(title, items as any); }
@@ -35,6 +37,12 @@ export default function (pi: ExtensionAPI) {
     else { // ssh -G happens only after the user explicitly selected the alias; retain alias for execution.
       const resolved = await sshGetConfig(pick); target = { alias: pick, host: resolved.hostname ?? pick, user: resolved.user, port: resolved.port ? Number(resolved.port) : undefined };
     }
+    try {
+      await ensureRemoteHelper(target, ctx.hasUI !== false && Boolean(ctx.ui?.confirm), (message) => ctx.ui.confirm("Install Handoff helper?", message));
+    } catch (error) {
+      ctx.ui?.notify?.(`Handoff helper is not ready: ${error instanceof Error ? error.message : String(error)}`, "error");
+      return;
+    }
     const selected = await chooseWorkspace(ctx, target); if (!selected) return;
     setState({ ...state, connection: "connected", target: selected, syncState: "clean" });
     const action = await select(ctx, "SSH session", [
@@ -48,22 +56,23 @@ export default function (pi: ExtensionAPI) {
       if (!file) return;
       setState({ ...candidate, syncState: "syncing" });
       const materialized = await materializeSession(file, cacheRoot).catch(() => file);
-      const synced = await synchronize(candidate, materialized);
+      const synced = await synchronize(candidate, materialized, { confirmRecovery: (message) => ctx.ui.confirm("Recover stale Handoff lock?", message) });
       setState(synced.syncState === "clean" ? synced : { ...state, syncState: synced.syncState });
       return;
     }
     if (action === "resume") {
       try {
-        const sessionsOutput = await sshExec(state.target!, `python3 \${HOME}/.local/libexec/pi-handoff-gate.py list-sessions`);
-        const sessionsResult = JSON.parse(sessionsOutput.stdout.toString()) as { ok: boolean; sessions?: string[]; error?: string };
+        const sessionsResult = await requestGate(selected, "list-sessions") as { ok: boolean; sessions?: string[]; error?: string };
         if (sessionsResult.ok && sessionsResult.sessions && sessionsResult.sessions.length > 0) {
           const sessionChoice = await select(ctx, "Resume session", sessionsResult.sessions.map((sid) => ({ label: sid, value: sid })));
           if (sessionChoice) {
             setState({ ...state, sessionId: sessionChoice, sessionAuthority: "remote", toolRoute: "remote", syncState: "clean" });
-            return;
           }
+          // Cancellation is not consent to create a new remote session.
+          return;
         }
-      } catch { /* fall through to new session */ }
+      } catch { return ctx.ui?.notify?.("Could not list remote sessions", "warning"); }
+      return ctx.ui?.notify?.("No remote sessions available to resume", "info");
     }
     setState({ ...state, sessionId: ctx.sessionManager.getSessionId?.() ?? `remote-${Date.now()}`, sessionAuthority: "remote", toolRoute: "remote", syncState: "clean" });
   };
@@ -72,14 +81,14 @@ export default function (pi: ExtensionAPI) {
     const sub = args.trim();
     if (sub === "status") return ctx.ui.notify(handoffStatus(state), "info");
     if (sub === "disconnect") { setRemoteBashBackend(undefined); setState(initialState()); return; }
-    if (sub === "sync") { if (state.connection !== "connected") return ctx.ui.notify("Not connected", "warning"); if (state.sessionAuthority !== "remote" || !state.sessionId || !ctx.sessionManager.getSessionFile?.()) return ctx.ui.notify("Tools are connected; no remote session to synchronize", "info"); setState({ ...state, syncState: "syncing" }); setState(await synchronize(state, ctx.sessionManager.getSessionFile())); return; }
+    if (sub === "sync") { if (state.connection !== "connected") return ctx.ui.notify("Not connected", "warning"); if (state.sessionAuthority !== "remote" || !state.sessionId || !ctx.sessionManager.getSessionFile?.()) return ctx.ui.notify("Tools are connected; no remote session to synchronize", "info"); setState({ ...state, syncState: "syncing" }); setState(await synchronize(state, ctx.sessionManager.getSessionFile(), { confirmRecovery: (message) => ctx.ui.confirm("Recover stale Handoff lock?", message) })); return; }
     if (sub === "toggle") { await ctx.waitForIdle?.(); setState(toggleToolRoute(state)); return; }
     if (state.connection === "disconnected") return connect(ctx);
     const action = await select(ctx, "SSH connection", [{ label: "Show current connection", value: "status" }, { label: "Resume another remote session", value: "resume" }, { label: "Start new session in this workspace", value: "new" }, { label: "Change workspace", value: "workspace" }, { label: "Synchronize now", value: "sync" }, { label: "Disconnect", value: "disconnect" }]);
     if (action) await command(action === "workspace" ? "" : action, ctx);
   };
   pi.registerCommand("ssh", { description: "Connect, synchronize, or route tools through SSH", handler: command as any });
-  pi.registerShortcut?.(DEFAULT_SHORTCUT, { description: "Toggle SSH tool routing", handler: async (ctx: any) => command("toggle", ctx) });
+  void getHandoffSettings().then((settings) => pi.registerShortcut?.(settings.handoffShortcut, { description: "Toggle SSH tool routing", handler: async (ctx: any) => command("toggle", ctx) })).catch(() => pi.registerShortcut?.(DEFAULT_SHORTCUT, { description: "Toggle SSH tool routing", handler: async (ctx: any) => command("toggle", ctx) }));
   pi.on("session_start", (_event: any, ctx: any) => { activeCtx = ctx; state = restored(ctx.sessionManager.getBranch?.() ?? []); hud?.dispose(); hud = registerHudItem({ owner: "handoff", id: "route", zone: "workspaceRight", order: 100, importance: "normal", variants: handoffHudVariants(state) }); setRemoteBashBackend(() => remote()?.bash, () => state.target && state.connection === "connected" && state.toolRoute === "remote" ? `${state.target.alias}:${state.target.workspace}` : undefined, () => state.target && state.connection === "connected" && state.toolRoute === "remote" ? activeCtx?.cwd : undefined, () => state.target && state.connection === "connected" && state.toolRoute === "remote" ? `${state.target.alias}\0${state.target.host ?? state.target.alias}\0${state.target.user ?? ""}\0${state.target.port ?? ""}\0${state.target.workspace}` : undefined); });
   pi.on("session_shutdown", () => { hud?.dispose(); hud = undefined; setRemoteBashBackend(undefined); });
   pi.on("agent_settled", async (_event: any, ctx: any) => { if (state.sessionAuthority === "remote" && state.syncState === "dirty" && ctx.isIdle?.()) await command("sync", ctx); });

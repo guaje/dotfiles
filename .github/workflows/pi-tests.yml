@@ -113,6 +113,17 @@ jobs:
                 "models": [
                   {"id": "test-image-chat", "name": "Test Image Provider Chat", "reasoning": false}
                 ]
+              },
+              "reallms-dev": {
+                "baseUrl": "http://test-stats-provider.invalid/v1",
+                "apiKey": "TEST_PLACEHOLDER_STATS_API_KEY",
+                "models": [
+                  {
+                    "id": "Laguna-S-2.1-FP8",
+                    "name": "Test Stats Model",
+                    "cost": {"input": 0.1, "output": 0.2, "cacheRead": 0.01, "cacheWrite": 0.1}
+                  }
+                ]
               }
             }
           }

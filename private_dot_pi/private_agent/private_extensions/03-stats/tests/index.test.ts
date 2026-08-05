@@ -1,7 +1,8 @@
 // Run with: npx -y tsx --test agent/extensions/03-stats/tests/index.test.ts
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -9,6 +10,22 @@ const EXTENSION_PATH = resolve("agent/extensions/03-stats/index.ts");
 const STUB_PACKAGE_DIR = resolve("agent/extensions/node_modules");
 const PI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@earendil-works/pi-coding-agent");
 const PI_TUI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@earendil-works/pi-tui");
+
+function createModelsFixture() {
+  const root = mkdtempSync(resolve(tmpdir(), "pi-stats-models-"));
+  const modelsPath = resolve(root, "models.json");
+  writeFileSync(modelsPath, JSON.stringify({
+    providers: {
+      "test-stats-provider": {
+        models: [{
+          id: "test-chat",
+          cost: { input: 0.1, output: 0.2, cacheRead: 0.01, cacheWrite: 0.1 },
+        }],
+      },
+    },
+  }));
+  return { modelsPath, dispose: () => rmSync(root, { recursive: true, force: true }) };
+}
 
 async function loadExtension() {
   mkdirSync(PI_PACKAGE_DIR, { recursive: true });
@@ -55,41 +72,46 @@ test("calculateUsageCost uses Pi's USD-per-1M-token formula including 1h cache w
 
 test("loadModelCostRates applies stats-only auth model overrides with nonzero component costs", async () => {
   const mod = await loadExtension();
-  const rates = await mod.loadModelCostRates();
-  assert.deepEqual(rates.get("openai-codex/gpt-5.5"), {
-    input: 5,
-    output: 30,
-    cacheRead: 0.5,
-    cacheWrite: 6.25,
-  });
-  const lagunaRates = rates.get("reallms-dev/Laguna-S-2.1-FP8");
-  assert.deepEqual(lagunaRates, {
-    input: 0.1,
-    output: 0.2,
-    cacheRead: 0.01,
-    cacheWrite: 0.1,
-  });
-  assert.equal(Number(mod.calculateUsageCost({ input: 1_000_000, output: 1_000_000, cacheRead: 1_000_000, cacheWrite: 1_000_000 }, lagunaRates).toFixed(2)), 0.41);
+  const fixture = createModelsFixture();
+  try {
+    const rates = await mod.loadModelCostRates(fixture.modelsPath);
+    assert.deepEqual(rates.get("openai-codex/gpt-5.5"), {
+      input: 5,
+      output: 30,
+      cacheRead: 0.5,
+      cacheWrite: 6.25,
+    });
+    const configuredRates = rates.get("test-stats-provider/test-chat");
+    assert.deepEqual(configuredRates, {
+      input: 0.1,
+      output: 0.2,
+      cacheRead: 0.01,
+      cacheWrite: 0.1,
+    });
+    assert.equal(Number(mod.calculateUsageCost({ input: 1_000_000, output: 1_000_000, cacheRead: 1_000_000, cacheWrite: 1_000_000 }, configuredRates).toFixed(2)), 0.41);
 
-  const summary = mod.extractStats([
-    { type: "message", message: { role: "assistant", provider: "openai-codex", model: "gpt-5.5", usage: { input: 1_000_000, output: 1_000_000, cacheRead: 1_000_000, cacheWrite: 1_000_000 } } },
-    { type: "message", message: { role: "toolResult", toolName: "subagent", details: { results: [
-      { agent: "researcher", task: "research", model: "gpt-5.5", modelSelector: "heuristic", exitCode: 0, usage: { input: 1_000_000, output: 1_000_000, cacheRead: 1_000_000, cacheWrite: 1_000_000, turns: 1, cost: 3.45 } },
-    ] } } },
-  ], rates);
-  const bucket = summary.main[0];
-  assert.ok(bucket.inputCost > 0, "auth model input cost should be repriced from the override");
-  assert.ok(bucket.outputCost > 0, "auth model output cost should be repriced from the override");
-  assert.ok(bucket.cacheCost > 0, "auth model cache cost should be repriced from the override");
-  const subagent = summary.subagents[0];
-  assert.equal(subagent.model, "openai-codex/gpt-5.5");
-  assert.ok(subagent.inputCost > 0, "bare auth subagent model names should resolve to an unambiguous provider override");
-  assert.ok(subagent.outputCost > 0, "bare auth subagent model output cost should be repriced from the override");
-  assert.ok(subagent.cacheCost > 0, "bare auth subagent model cache cost should be repriced from the override");
+    const summary = mod.extractStats([
+      { type: "message", message: { role: "assistant", provider: "openai-codex", model: "gpt-5.5", usage: { input: 1_000_000, output: 1_000_000, cacheRead: 1_000_000, cacheWrite: 1_000_000 } } },
+      { type: "message", message: { role: "toolResult", toolName: "subagent", details: { results: [
+        { agent: "researcher", task: "research", model: "gpt-5.5", modelSelector: "heuristic", exitCode: 0, usage: { input: 1_000_000, output: 1_000_000, cacheRead: 1_000_000, cacheWrite: 1_000_000, turns: 1, cost: 3.45 } },
+      ] } } },
+    ], rates);
+    const bucket = summary.main[0];
+    assert.ok(bucket.inputCost > 0, "auth model input cost should be repriced from the override");
+    assert.ok(bucket.outputCost > 0, "auth model output cost should be repriced from the override");
+    assert.ok(bucket.cacheCost > 0, "auth model cache cost should be repriced from the override");
+    const subagent = summary.subagents[0];
+    assert.equal(subagent.model, "openai-codex/gpt-5.5");
+    assert.ok(subagent.inputCost > 0, "bare auth subagent model names should resolve to an unambiguous provider override");
+    assert.ok(subagent.outputCost > 0, "bare auth subagent model output cost should be repriced from the override");
+    assert.ok(subagent.cacheCost > 0, "bare auth subagent model cache cost should be repriced from the override");
 
-  const table = mod.formatStatsTable(summary, { fg: (_c: string, t: string) => t, bold: (t: string) => t }).join("\n");
-  assert.match(table, /\$5\.00\(1\.0M\)\s+\$30\.00\(1\.0M\)/, "input and output component costs are rendered in separate columns next to token counts");
-  assert.match(table, /\$6\.75\(2\.0M\)/, "cache component cost is rendered next to combined cache tokens");
+    const table = mod.formatStatsTable(summary, { fg: (_c: string, t: string) => t, bold: (t: string) => t }).join("\n");
+    assert.match(table, /\$5\.00\(1\.0M\)\s+\$30\.00\(1\.0M\)/, "input and output component costs are rendered in separate columns next to token counts");
+    assert.match(table, /\$6\.75\(2\.0M\)/, "cache component cost is rendered next to combined cache tokens");
+  } finally {
+    fixture.dispose();
+  }
 });
 
 test("extractStats buckets assistant messages and recomputes notional cost from current model rates", async () => {

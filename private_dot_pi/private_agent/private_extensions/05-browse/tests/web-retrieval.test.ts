@@ -162,7 +162,9 @@ async function loadExtension() {
 		fallbackProviders: ["tavily"],
 		limits: config.limits,
 	}));
-	return (await import(`${pathToFileURL(resolve(extensionFixture, "index.ts")).href}?${Date.now()}`)).default;
+	const module = await import(`${pathToFileURL(resolve(extensionFixture, "index.ts")).href}?${Date.now()}`);
+	const exported = module.default;
+	return typeof exported === "function" ? exported : (exported as { default?: unknown })?.default;
 }
 
 test("extension registers one constrained tool and emits preview plus final content", async () => {

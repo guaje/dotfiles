@@ -153,13 +153,14 @@ async function loadExtension() {
 		}));
 		writeFileSync(resolve(typeboxPackageDir, "index.js"), "export const Type={Object:p=>({p}),Union:v=>({v}),Literal:v=>v,Optional:v=>v,String:()=>({}),Integer:()=>({}),Array:()=>({}),Boolean:()=>({}),Any:()=>({})};");
 	}
-	return (await import(`${pathToFileURL(extensionPath).href}?${Date.now()}`)).webRetrievalExtension;
+	return (await import(pathToFileURL(extensionPath).href)).webRetrievalExtension;
 }
 
 test("extension registers one constrained tool and emits preview plus final content", async () => {
 	const previousKey = process.env.LINKUP_API_KEY;
 	process.env.LINKUP_API_KEY = "synthetic-extension-key";
 	const extension = await loadExtension(); let tool: any;
+	assert.equal(typeof extension, "function", "the Browse entry point must expose its named extension function");
 	extension({ registerTool(value: any) { tool = value; } });
 	assert.equal(tool.name, "web_retrieval");
 	const originalFetch = globalThis.fetch;

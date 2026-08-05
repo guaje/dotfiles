@@ -13,7 +13,7 @@ const search = Type.Object({ operation: Type.Literal("search"), query: Type.Stri
 const fetchInput = Type.Object({ operation: Type.Literal("fetch"), url: Type.String(), renderJs: Type.Optional(Type.Boolean()), extractImages: Type.Optional(Type.Boolean()), provider });
 const research = Type.Object({ operation: Type.Literal("research"), query: Type.String(), mode: Type.Optional(Type.Union([Type.Literal("answer"), Type.Literal("auto"), Type.Literal("investigate"), Type.Literal("research")])), reasoningDepth: Type.Optional(Type.Union([Type.Literal("S"), Type.Literal("M"), Type.Literal("L"), Type.Literal("XL")])), includeDomains: domains, excludeDomains: domains, fromDate: Type.Optional(Type.String()), toDate: Type.Optional(Type.String()), outputType: Type.Optional(Type.Union([Type.Literal("sourcedAnswer"), Type.Literal("structured")])), structuredOutputSchema: schema, provider });
 
-export default function webRetrievalExtension(pi: ExtensionAPI) {
+export function webRetrievalExtension(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "web_retrieval",
 		label: "Web retrieval",
@@ -32,3 +32,5 @@ export default function webRetrievalExtension(pi: ExtensionAPI) {
 		},
 	});
 }
+
+export default webRetrievalExtension;

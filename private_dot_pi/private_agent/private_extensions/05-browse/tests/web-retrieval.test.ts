@@ -1,8 +1,7 @@
 // Run with: npx -y tsx --test agent/extensions/05-browse/tests/web-retrieval.test.ts
 import assert from "node:assert/strict";
 import test from "node:test";
-import { cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { mkdtempSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -140,31 +139,21 @@ test("URL security rejects host-side SSRF targets and injected web text remains 
 });
 
 const extensionPath = resolve("agent/extensions/05-browse/index.ts");
-const extensionFixtures: string[] = [];
+const typeboxPackageDir = resolve("agent/extensions/node_modules/@sinclair/typebox");
+let createdTypeboxStub = false;
+
 async function loadExtension() {
-	const root = mkdtempSync(resolve(tmpdir(), "pi-browse-stubs-"));
-	extensionFixtures.push(root);
-	const stubs = resolve(root, "node_modules");
-		for (const [name, source] of Object.entries({
-			"@earendil-works/pi-coding-agent": "",
-			"@sinclair/typebox": "export const Type={Object:p=>({p}),Union:v=>({v}),Literal:v=>v,Optional:v=>v,String:()=>({}),Integer:()=>({}),Array:()=>({}),Boolean:()=>({}),Any:()=>({})};",
-		})) {
-			const dir = resolve(stubs, name);
-			mkdirSync(dir, { recursive: true });
-			writeFileSync(resolve(dir, "package.json"), JSON.stringify({ name, type: "module", exports: "./index.js" }));
-			writeFileSync(resolve(dir, "index.js"), source);
-		}
-	const extensionFixture = resolve(root, "05-browse");
-	cpSync(resolve(extensionPath, ".."), extensionFixture, { recursive: true, filter: (source) => !source.endsWith("assets/web-retrieval.json") });
-	mkdirSync(resolve(extensionFixture, "assets"), { recursive: true });
-	writeFileSync(resolve(extensionFixture, "assets/web-retrieval.json"), JSON.stringify({
-		providers: { linkup: { apiKey: "$LINKUP_API_KEY", baseUrl: "https://linkup.test" }, tavily: { apiKey: "synthetic-tavily", baseUrl: "https://tavily.test" } },
-		fallbackProviders: ["tavily"],
-		limits: config.limits,
-	}));
-	const module = await import(`${pathToFileURL(resolve(extensionFixture, "index.ts")).href}?${Date.now()}`);
-	const exported = module.default;
-	return typeof exported === "function" ? exported : (exported as { default?: unknown })?.default;
+	if (!existsSync(typeboxPackageDir)) {
+		createdTypeboxStub = true;
+		mkdirSync(typeboxPackageDir, { recursive: true });
+		writeFileSync(resolve(typeboxPackageDir, "package.json"), JSON.stringify({
+			name: "@sinclair/typebox",
+			type: "module",
+			exports: "./index.js",
+		}));
+		writeFileSync(resolve(typeboxPackageDir, "index.js"), "export const Type={Object:p=>({p}),Union:v=>({v}),Literal:v=>v,Optional:v=>v,String:()=>({}),Integer:()=>({}),Array:()=>({}),Boolean:()=>({}),Any:()=>({})};");
+	}
+	return (await import(`${pathToFileURL(extensionPath).href}?${Date.now()}`)).webRetrievalExtension;
 }
 
 test("extension registers one constrained tool and emits preview plus final content", async () => {
@@ -188,4 +177,6 @@ test("extension registers one constrained tool and emits preview plus final cont
 	}
 });
 
-test.after(() => { for (const root of extensionFixtures) rmSync(root, { recursive: true, force: true }); });
+test.after(() => {
+	if (createdTypeboxStub) rmSync(typeboxPackageDir, { recursive: true, force: true });
+});

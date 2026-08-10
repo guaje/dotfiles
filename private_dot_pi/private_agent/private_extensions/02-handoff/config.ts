@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 
 export const HANDOFF_PROTOCOL_VERSION = 2;
 export const DEFAULT_REMOTE_ROOT = "~/.local/state/pi/remote-sessions";
-export const DEFAULT_SHORTCUT = "ctrl+alt+s";
+export const DEFAULT_HOTKEY = "ctrl+alt+s";
 export const MAX_SSH_CONFIG_DEPTH = 12;
 export const MAX_SSH_CONFIG_FILES = 64;
 export const MAX_SSH_CONFIG_BYTES = 1024 * 1024;

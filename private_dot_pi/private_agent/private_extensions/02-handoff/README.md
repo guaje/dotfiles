@@ -2,6 +2,15 @@
 
 `/ssh` connects Pi tools and optional session authority to a selected SSH workspace. It discovers concrete aliases from `~/.ssh/config`, waits for explicit selection before `ssh -G`, and never enables agent forwarding or changes SSH host-key policy.
 
-Commands: `/ssh`, `/ssh toggle`, `/ssh status`, `/ssh sync`, and `/ssh disconnect`. The shortcut and remote root resolve source-first from settings. Sync uses protocol v2: one bounded JSON request and one response over SSH stdin, with no local fallback. Expired locks require explicit, state-checked recovery.
+Commands: `/ssh`, `/ssh toggle`, `/ssh status`, `/ssh sync`, and `/ssh disconnect`. The shortcut and remote root resolve nested-first from settings, with legacy flat-key fallback:
+
+```json
+"handoff": {
+  "remoteRoot": "~/.local/state/pi/remote-sessions",
+  "hotkey": "ctrl+alt+s"
+}
+```
+
+The hotkey must be a documented Pi keybinding and cannot replace protected built-ins; invalid values safely use `ctrl+alt+s`. The resolved binding appears in `/hotkeys`. Custom `keybindings.json` remaps can still create runtime conflicts; Pi reports those conflicts and skips protected collisions. Sync uses protocol v2: one bounded JSON request and one response over SSH stdin, with no local fallback. Expired locks require explicit, state-checked recovery.
 
 The local Pi SessionManager stays local. Remote JSONL snapshots are cached only under `agent/handoff-cache/`, which must not be tracked. The remote helper stores snapshots under `~/.local/state/pi/remote-sessions`; installation or update of the helper is an explicit confirmed operation only; headless installation is denied.

@@ -25,6 +25,37 @@
     "extensions/07-native-notify.ts",
     "extensions/08-settings/index.ts"
   ],
+  "browse": {
+    "providers": {
+      "linkup": {
+        "baseUrl": "https://api.linkup.so"
+      },
+      "tavily": {
+        "baseUrl": "https://api.tavily.com"
+      }
+    },
+    "fallbackProviders": [
+      "tavily"
+    ],
+    "limits": {
+      "maxResults": 8,
+      "maxResponseBytes": 1000000,
+      "maxFetchChars": 30000,
+      "maxCalls": 8,
+      "timeoutMs": 30000,
+      "retries": 1,
+      "pollIntervalMs": 1000,
+      "pollTimeoutMs": 120000
+    }
+  },
+  "handoff": {
+    "remoteRoot": "~/.local/state/pi/remote-sessions",
+    "hotkey": "ctrl+alt+s"
+  },
+  "health": {
+    "cacheTtlMs": 900000,
+    "probeConcurrency": 3
+  },
   "imageGenerationProviders": {
     "reallms-dev": {
       "models": [
@@ -35,18 +66,20 @@
       ]
     }
   },
-  "managingStyle": "Empowerment",
-  "empowermentDisposableRoots": [
-    "@user-temp"
-  ],
-  "permissionsSessionApprovalMaxRules": 100,
-  "subagentRosterCap": 10,
-  "subagentRosterScope": "user",
-  "subagentMaxParallelTasks": 8,
-  "subagentMaxConcurrency": 4,
-  "modelHealthCacheTtlMs": 900000,
-  "modelHealthProbeConcurrency": 3,
-  "handoffRemoteRoot": "~/.local/state/pi/remote-sessions",
-  "handoffShortcut": "ctrl+alt+s",
+  "permissions": {
+    "managingStyle": "Empowerment",
+    "empowermentDisposableRoots": [
+      "@user-temp"
+    ],
+    "sessionApprovalMaxRules": 100,
+    "managementStyleForwardHotkey": "ctrl+;",
+    "managementStyleBackwardHotkey": "shift+ctrl+;"
+  },
+  "subagents": {
+    "rosterCap": 10,
+    "rosterScope": "user",
+    "maxParallelTasks": 8,
+    "maxConcurrency": 4
+  },
   "theme": "catppuccin-mocha"
 }

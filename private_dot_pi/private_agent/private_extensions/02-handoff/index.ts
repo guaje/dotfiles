@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createEditTool, createFindTool, createGrepTool, createLsTool, createReadTool, createWriteTool } from "@earendil-works/pi-coding-agent";
-import { cacheRoot, DEFAULT_SHORTCUT } from "./config.ts";
-import { getHandoffSettings } from "./settings.ts";
+import { cacheRoot } from "./config.ts";
+import { getHandoffSettings, registerHandoffShortcut } from "./settings.ts";
 import { setRemoteBashBackend } from "./backend-registry.ts";
 import { createRemoteOperations } from "./operations.ts";
 import { discoverSshHosts, validateManualTarget } from "./ssh-config.ts";
@@ -18,7 +18,8 @@ function select<T>(ctx: any, title: string, items: Array<{ label: string; value:
 function appendContext(pi: any, state: HandoffState) { pi.appendEntry?.({ type: "custom", customType: "handoff-context", data: { state } }); }
 function restored(branch: any[]): HandoffState { for (let i = branch.length - 1; i >= 0; i--) { const entry = branch[i]; if (entry?.type === "custom" && entry.customType === "handoff-context") return restoreState(entry.data?.state); } return initialState(); }
 
-export default function (pi: ExtensionAPI) {
+export default async function handoff(pi: ExtensionAPI) {
+  const settings = await getHandoffSettings();
   let state = initialState(); let activeCtx: any; let hud: HudItemHandle | undefined;
   const setState = (next: HandoffState, persist = true) => { state = next; hud?.update({ variants: handoffHudVariants(state), visible: true }); if (persist) appendContext(pi, state); };
   const remote = () => state.target && state.connection === "connected" && state.toolRoute === "remote" ? createRemoteOperations({ alias: state.target.alias, user: state.target.user, port: state.target.port, workspace: state.target.workspace, localCwd: activeCtx?.cwd ?? process.cwd() }) : undefined;
@@ -88,7 +89,7 @@ export default function (pi: ExtensionAPI) {
     if (action) await command(action === "workspace" ? "" : action, ctx);
   };
   pi.registerCommand("ssh", { description: "Connect, synchronize, or route tools through SSH", handler: command as any });
-  void getHandoffSettings().then((settings) => pi.registerShortcut?.(settings.handoffShortcut, { description: "Toggle SSH tool routing", handler: async (ctx: any) => command("toggle", ctx) })).catch(() => pi.registerShortcut?.(DEFAULT_SHORTCUT, { description: "Toggle SSH tool routing", handler: async (ctx: any) => command("toggle", ctx) }));
+  registerHandoffShortcut(pi, settings, async (ctx: any) => command("toggle", ctx));
   pi.on("session_start", (_event: any, ctx: any) => { activeCtx = ctx; state = restored(ctx.sessionManager.getBranch?.() ?? []); hud?.dispose(); hud = registerHudItem({ owner: "handoff", id: "route", zone: "workspaceRight", order: 100, importance: "normal", variants: handoffHudVariants(state) }); setRemoteBashBackend(() => remote()?.bash, () => state.target && state.connection === "connected" && state.toolRoute === "remote" ? `${state.target.alias}:${state.target.workspace}` : undefined, () => state.target && state.connection === "connected" && state.toolRoute === "remote" ? activeCtx?.cwd : undefined, () => state.target && state.connection === "connected" && state.toolRoute === "remote" ? `${state.target.alias}\0${state.target.host ?? state.target.alias}\0${state.target.user ?? ""}\0${state.target.port ?? ""}\0${state.target.workspace}` : undefined); });
   pi.on("session_shutdown", () => { hud?.dispose(); hud = undefined; setRemoteBashBackend(undefined); });
   pi.on("agent_settled", async (_event: any, ctx: any) => { if (state.sessionAuthority === "remote" && state.syncState === "dirty" && ctx.isIdle?.()) await command("sync", ctx); });

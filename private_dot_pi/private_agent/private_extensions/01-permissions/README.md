@@ -7,7 +7,16 @@ Permissions is Pi's approval-policy extension and the sole owner of the built-in
 - **Micromanagement** asks before every Bash, write, and edit call.
 - **Empowerment** runs completely classified read-only Bash locally or remotely, asks before mutations and unknown commands, and returns mixed read/mutation calls to the model for separation.
 
-Legacy `Guidance` settings normalize to Empowerment. Session shortcuts (`ctrl+;` and `shift+ctrl+;`) do not persist; `/settings` changes are written atomically to `agent/settings.config.json`.
+Legacy `Guidance` settings normalize to Empowerment. Session shortcuts do not persist; `/settings` changes are written atomically to `agent/settings.config.json`. Configure the forward/backward pair under `permissions`; nested values take precedence over legacy flat keys:
+
+```json
+"permissions": {
+  "managementStyleForwardHotkey": "ctrl+;",
+  "managementStyleBackwardHotkey": "shift+ctrl+;"
+}
+```
+
+Both bindings must be distinct documented Pi keybindings and cannot replace protected built-ins. Invalid values safely fall back to the defaults. `shift+ctrl+:` is recognized only as the terminal fallback for the default backward binding; configured bindings are used in `/hotkeys`. Custom `keybindings.json` remaps can still create runtime conflicts; Pi reports those conflicts and skips protected collisions.
 
 ## Writable roots in Empowerment
 
@@ -16,7 +25,9 @@ Built-in `write` and `edit` are allowed under the canonical current directory, r
 Configure portable disposable roots in `agent/settings.config.json`:
 
 ```json
-"empowermentDisposableRoots": ["@user-temp"]
+"permissions": {
+  "empowermentDisposableRoots": ["@user-temp"]
+}
 ```
 
 `@user-temp` is a private, owner-only directory below the OS temporary directory. Absolute paths and `~/...` paths are also accepted when they already exist and canonicalize safely. Shared `/tmp` itself is never trusted automatically.
@@ -30,7 +41,9 @@ A data-driven signature registry provides audited templates for Git staging/comm
 The in-memory bound is configured in `agent/settings.config.json`:
 
 ```json
-"permissionsSessionApprovalMaxRules": 100
+"permissions": {
+  "sessionApprovalMaxRules": 100
+}
 ```
 
 At capacity, existing rules continue and a new remember choice allows only the current invocation. Rules survive `/reload`; they are cleared on quit, new/resumed/forked sessions, startup, and management-style changes. The template-schema upgrade invalidates older exact/special-case rules once while preserving the active session identity.

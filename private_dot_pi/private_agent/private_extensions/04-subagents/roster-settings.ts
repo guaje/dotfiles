@@ -25,19 +25,30 @@ export async function getRosterSettings(): Promise<RosterSettings> {
   return rosterSettingsCache ?? refreshRosterSettingsCache();
 }
 
+export function applyRosterSetting(
+  settings: Record<string, unknown>,
+  key: "rosterScope" | "rosterCap",
+  value: RosterScope | number,
+): void {
+  if (!settings.subagents || typeof settings.subagents !== "object" || Array.isArray(settings.subagents)) {
+    settings.subagents = {};
+  }
+  (settings.subagents as Record<string, unknown>)[key] = value;
+}
+
 async function setRosterSetting(
-  key: "subagentRosterScope" | "subagentRosterCap",
+  key: "rosterScope" | "rosterCap",
   value: RosterScope | number,
 ): Promise<void> {
-  rosterSettingsCache = parseRosterSettings(await store.update({ [key]: value }));
+  rosterSettingsCache = parseRosterSettings(await store.update((settings) => applyRosterSetting(settings, key, value)));
 }
 
 export async function setRosterScope(scope: RosterScope): Promise<void> {
-  await setRosterSetting("subagentRosterScope", scope);
+  await setRosterSetting("rosterScope", scope);
 }
 
 export async function setRosterCap(cap: number): Promise<void> {
-  await setRosterSetting("subagentRosterCap", cap);
+  await setRosterSetting("rosterCap", cap);
 }
 
 export function patchSettingsMenuForRoster(): Promise<void> {

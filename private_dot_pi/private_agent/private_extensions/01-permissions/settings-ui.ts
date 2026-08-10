@@ -2,7 +2,7 @@ import { Container, matchesKey, SelectList, Spacer, Text } from "@earendil-works
 import { importPiModule } from "../packages/pi-package.ts";
 import { MANAGING_STYLE_LABELS, MANAGING_STYLE_VALUES, normalizeManagingStyle } from "./management-style.ts";
 import type { ManagingStyle } from "./types.ts";
-import { MANAGEMENT_STYLE_BACKWARD_SHORTCUT, MANAGEMENT_STYLE_FORWARD_SHORTCUT, MANAGEMENT_STYLE_HOTKEY_DISPLAY, isManagementStyleBackwardInput } from "./shortcuts.ts";
+import { getCachedBackwardHotkey, getCachedForwardHotkey, isManagementStyleBackwardInput } from "./shortcuts.ts";
 
 type List = { items: any[]; filteredItems: any[]; onChange: (id: string, value: string) => void; updateValue?: (id: string, value: string) => void };
 type ThemeModule = { theme: { fg: (color: string, text: string) => string; bold: (text: string) => string }; getSelectListTheme: () => unknown };
@@ -137,12 +137,14 @@ export function patchBuiltInSettingsMenu(
         if (!runner || !getShortcuts) return original.apply(this, args);
         runner.getShortcuts = function (config: unknown) {
           const shortcuts = new Map(getShortcuts.call(this, config));
-          const forward = shortcuts.get(MANAGEMENT_STYLE_FORWARD_SHORTCUT);
-          const backward = shortcuts.get(MANAGEMENT_STYLE_BACKWARD_SHORTCUT);
+          const forwardKey = getCachedForwardHotkey();
+          const backwardKey = getCachedBackwardHotkey();
+          const forward = shortcuts.get(forwardKey);
+          const backward = shortcuts.get(backwardKey);
           if (forward && backward) {
-            shortcuts.delete(MANAGEMENT_STYLE_FORWARD_SHORTCUT);
-            shortcuts.delete(MANAGEMENT_STYLE_BACKWARD_SHORTCUT);
-            shortcuts.set(MANAGEMENT_STYLE_HOTKEY_DISPLAY, { ...(forward as Record<string, unknown>), description: "Cycle management style" });
+            shortcuts.delete(forwardKey);
+            shortcuts.delete(backwardKey);
+            shortcuts.set(`${forwardKey} / ${backwardKey}`, { ...(forward as Record<string, unknown>), description: "Cycle management style" });
           }
           return shortcuts;
         };

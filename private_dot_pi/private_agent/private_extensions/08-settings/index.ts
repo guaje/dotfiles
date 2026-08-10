@@ -4,6 +4,9 @@ export * from "./types.ts";
 export * from "./readers.ts";
 export * from "./schema.ts";
 export * from "./store.ts";
+export * from "./nested.ts";
+export * from "./hotkeys.ts";
+export * from "./hotkeys.ts";
 
 export interface SettingsExtensionDependencies {
   configPath?: string;

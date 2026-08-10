@@ -14,6 +14,7 @@
  * This module is pure: no I/O, no pi internals. Fully unit-testable.
  */
 
+import { getNested } from "../08-settings/nested.ts";
 import type { AgentConfig } from "./agents.ts";
 
 export type RosterScope = "user" | "both";
@@ -43,20 +44,27 @@ export const DELEGATE_GUIDELINES = [
 	"Prefer a chain (scout → planner → worker → reviewer) for multi-step work, and parallel tasks for independent investigation. Only delegate when the specialist's isolation is worth the spawn cost; don't delegate trivial one-liners.",
 ].join(" ");
 
+function rosterCap(value: unknown): number | undefined {
+	if (typeof value === "number" && Number.isFinite(value) && value >= 1) return Math.floor(value);
+	if (typeof value === "string") {
+		const parsed = Number.parseInt(value, 10);
+		if (Number.isFinite(parsed) && parsed >= 1) return parsed;
+	}
+	return undefined;
+}
+
 /** Parse + validate roster settings from a settings object, with defaults. */
 export function parseRosterSettings(settings: Record<string, unknown> | null | undefined): RosterSettings {
-	const rawScope = settings?.subagentRosterScope;
-	const scope: RosterScope = rawScope === "both" ? "both" : "user";
+	const source = settings ?? {};
+	const nestedScope = getNested<unknown>(source, "subagents.rosterScope");
+	const flatScope = source.subagentRosterScope;
+	const scope: RosterScope = nestedScope === "both" || nestedScope === "user"
+		? nestedScope
+		: flatScope === "both" || flatScope === "user" ? flatScope : DEFAULT_ROSTER_SCOPE;
 
-	const rawCap = settings?.subagentRosterCap;
-	let cap = DEFAULT_ROSTER_CAP;
-	if (typeof rawCap === "number" && Number.isFinite(rawCap) && rawCap >= 1) {
-		cap = Math.floor(rawCap);
-	} else if (typeof rawCap === "string") {
-		const parsed = Number.parseInt(rawCap, 10);
-		if (Number.isFinite(parsed) && parsed >= 1) cap = parsed;
-	}
-
+	const cap = rosterCap(getNested(source, "subagents.rosterCap"))
+		?? rosterCap(source.subagentRosterCap)
+		?? DEFAULT_ROSTER_CAP;
 	return { scope, cap };
 }
 

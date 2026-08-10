@@ -20,13 +20,38 @@ test("legacy Guidance reads as Empowerment without rewriting the source", async 
   finally { await rm(root, { recursive: true, force: true }); }
 });
 
-test("approval cap reads the configured value and accepts only non-negative integers", async () => {
+test("nested permission settings take precedence over flat", async () => {
+  const root = await mkdtemp(join(tmpdir(), "permissions-settings-"));
+  const path = join(root, "settings.config.json");
+  try {
+    const source = '{"permissions":{"managingStyle":"Empowerment"},"managingStyle":"Micromanagement","other":true}\n';
+    await writeFile(path, source);
+    assert.equal(await readConfiguredManagingStyle(path), "Empowerment");
+  }
+  finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("invalid nested management style falls back to the legacy flat value", async () => {
+  const root = await mkdtemp(join(tmpdir(), "permissions-settings-"));
+  const path = join(root, "settings.config.json");
+  try {
+    await writeFile(path, '{"permissions":{"managingStyle":"invalid"},"managingStyle":"Guidance"}\n');
+    assert.equal(await readConfiguredManagingStyle(path), "Empowerment");
+  }
+  finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("approval cap reads the configured value, nested first, then flat, accepts only non-negative integers", async () => {
   assert.equal(await permissionsSessionApprovalMaxRules(), 100);
   const root = await mkdtemp(join(tmpdir(), "permissions-settings-"));
   const path = join(root, "settings.config.json");
   try {
-    await writeFile(path, '{"permissionsSessionApprovalMaxRules":7}\n');
+    await writeFile(path, '{"permissions":{"sessionApprovalMaxRules":7}}\n');
     assert.equal(await permissionsSessionApprovalMaxRules(path), 7);
+    await writeFile(path, '{"permissionsSessionApprovalMaxRules":8}\n');
+    assert.equal(await permissionsSessionApprovalMaxRules(path), 8);
+    await writeFile(path, '{"permissions":{"sessionApprovalMaxRules":"invalid"},"permissionsSessionApprovalMaxRules":9}\n');
+    assert.equal(await permissionsSessionApprovalMaxRules(path), 9);
     await writeFile(path, '{"permissionsSessionApprovalMaxRules":"7"}\n');
     assert.equal(await permissionsSessionApprovalMaxRules(path), 0);
     await writeFile(path, '{"permissionsSessionApprovalMaxRules":-1}\n');
@@ -39,19 +64,22 @@ test("approval cap reads the configured value and accepts only non-negative inte
   finally { await rm(root, { recursive: true, force: true }); }
 });
 
-test("explicit settings saves are atomic, preserve other keys, and serialize", async () => {
+test("explicit settings saves are atomic, preserve other keys and siblings, and serialize into nested", async () => {
   const root = await mkdtemp(join(tmpdir(), "permissions-settings-"));
   const path = join(root, "settings.config.json");
   try {
-    await writeFile(path, '{"managingStyle":"Micromanagement","other":true}\n');
+    await writeFile(path, '{"managingStyle":"Empowerment","permissions":{"managingStyle":"Micromanagement","other":true,"sessionApprovalMaxRules":100},"theme":"catppuccin-mocha"}\n');
     const order: string[] = [];
     const first = setManagingStyle("Empowerment", async () => { order.push("first"); }, path);
     const second = setManagingStyle("Micromanagement", async () => { order.push("second"); }, path);
     await Promise.all([first, second]);
     assert.deepEqual(order, ["first", "second"]);
     const saved = JSON.parse(await readFile(path, "utf8"));
-    assert.equal(saved.managingStyle, "Micromanagement");
-    assert.equal(saved.other, true);
+    assert.equal(saved.permissions.managingStyle, "Micromanagement");
+    assert.equal(saved.managingStyle, "Empowerment");
+    assert.equal(saved.permissions.other, true);
+    assert.equal(saved.permissions.sessionApprovalMaxRules, 100);
+    assert.equal(saved.theme, "catppuccin-mocha");
   }
   finally { await rm(root, { recursive: true, force: true }); }
 });
@@ -60,7 +88,7 @@ test("merge failure restores the exact settings source", async () => {
   const root = await mkdtemp(join(tmpdir(), "permissions-settings-"));
   const path = join(root, "settings.config.json");
   try {
-    const source = '{\n  "managingStyle": "Micromanagement",\n  "other": true\n}\n';
+    const source = '{\n  "permissions": {\n    "managingStyle": "Micromanagement",\n    "other": true\n  }\n}\n';
     await writeFile(path, source);
     await assert.rejects(setManagingStyle("Empowerment", async () => { throw new Error("merge failed"); }, path), /merge failed/);
     assert.equal(await readFile(path, "utf8"), source);

@@ -10,15 +10,13 @@ import { MANAGING_STYLE_LABELS, nextManagingStyle } from "./management-style.ts"
 import { clearSessionManagingStyle, currentManagingStyle, empowermentDisposableRoots, permissionsSessionApprovalMaxRules, refreshManagingStyleCache, setManagingStyle, setSessionManagingStyle } from "./management-settings.ts";
 import { injectPromptGuidance, BASH_PROMPT_GUIDANCE } from "./prompt-guidance.ts";
 import { patchBuiltInSettingsMenu } from "./settings-ui.ts";
-import { MANAGEMENT_STYLE_BACKWARD_SHORTCUT, MANAGEMENT_STYLE_FORWARD_SHORTCUT } from "./shortcuts.ts";
+import { getCachedBackwardHotkey, getCachedForwardHotkey } from "./shortcuts.ts";
 import { decideAnalysis, inspectBash } from "./shell/policy.ts";
 import { approvalCandidate } from "./shell/session-approval-candidate.ts";
 import { approvalFingerprint, bindSessionApprovalsToStyle, clearSessionApprovals, findSessionApproval, listSessionApprovals, rememberSessionApproval, revokeSessionApproval, withPendingApproval } from "./session-command-approvals.ts";
 import { renderShell } from "./shell/render.ts";
 import type { ManagingStyle, ShellContext } from "./types.ts";
 
-export const MANAGEMENT_STYLE_CYCLE_SHORTCUT = MANAGEMENT_STYLE_FORWARD_SHORTCUT;
-export const MANAGEMENT_STYLE_CYCLE_BACKWARD_SHORTCUT = MANAGEMENT_STYLE_BACKWARD_SHORTCUT;
 let hud: HudItemHandle | undefined;
 let hudStyle: ManagingStyle = "Micromanagement";
 function segments(style: ManagingStyle): { full: HudSegment[]; compact: HudSegment[]; icon: HudSegment[] } {
@@ -35,8 +33,8 @@ function hasConfirmUi(ctx: any) { return Boolean(ctx?.hasUI !== false && ctx?.ui
 function preservesApprovals(event: any) { return event?.reason === "reload"; }
 
 /** The only extension that registers Bash. Backend selection happens at execution time. */
-export default function permissions(pi: ExtensionAPI) {
-  void refreshManagingStyleCache();
+export default async function permissions(pi: ExtensionAPI) {
+  await refreshManagingStyleCache();
   void patchBuiltInSettingsMenu(() => hudStyle, (style) => saveStyle(style), (ui) => cycleStyle({ ui }));
   pi.on("before_agent_start", (event: { systemPrompt?: string }) => ({ systemPrompt: injectPromptGuidance(event.systemPrompt) }));
   pi.on("session_start", async (event: any, ctx: any) => {
@@ -46,8 +44,10 @@ export default function permissions(pi: ExtensionAPI) {
     void patchBuiltInSettingsMenu(() => hudStyle, (value) => saveStyle(value, ctx.ui), (ui) => cycleStyle({ ui: ui ?? ctx.ui }));
   });
   pi.on("session_shutdown", (event: any) => { hud?.dispose(); hud = undefined; if (!preservesApprovals(event)) clearSessionApprovals(); clearSessionManagingStyle(); invalidateAccessPolicyCache(); });
-  pi.registerShortcut?.(MANAGEMENT_STYLE_CYCLE_SHORTCUT, { description: "Cycle management style for this session", handler: cycleStyle as any });
-  pi.registerShortcut?.(MANAGEMENT_STYLE_CYCLE_BACKWARD_SHORTCUT, { description: "Cycle management style backward for this session", handler: cycleStyle as any });
+  const forward = getCachedForwardHotkey();
+  const backward = getCachedBackwardHotkey();
+  pi.registerShortcut?.(forward, { description: "Cycle management style for this session", handler: cycleStyle as any });
+  pi.registerShortcut?.(backward, { description: "Cycle management style backward for this session", handler: cycleStyle as any });
   pi.registerCommand?.("session-approvals", {
     description: "Manage remembered command approvals for this session",
     handler: (async (_args: string, ctx: any) => {

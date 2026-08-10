@@ -45,18 +45,50 @@ test("parseRosterSettings applies defaults for missing/invalid values", async ()
 	try {
 		assert.deepEqual(mod.parseRosterSettings(null), { scope: "user", cap: 10 });
 		assert.deepEqual(mod.parseRosterSettings({}), { scope: "user", cap: 10 });
-		// invalid scope falls back to user
+		// invalid scope falls back to default (not flat)
 		assert.equal(mod.parseRosterSettings({ subagentRosterScope: "bogus" }).scope, "user");
 		// invalid cap falls back to default
 		assert.equal(mod.parseRosterSettings({ subagentRosterCap: -5 }).cap, 10);
 		assert.equal(mod.parseRosterSettings({ subagentRosterCap: "NaN" }).cap, 10);
-		// valid values pass through
+		// valid flat values pass through
 		assert.deepEqual(mod.parseRosterSettings({ subagentRosterScope: "both", subagentRosterCap: 15 }), {
 			scope: "both",
 			cap: 15,
 		});
 		// string cap is parsed
 		assert.equal(mod.parseRosterSettings({ subagentRosterCap: "8" }).cap, 8);
+	} finally {
+		cleanup();
+	}
+});
+
+test("parseRosterSettings prefers nested subagents.* over flat legacy keys", async () => {
+	const mod = await loadModule();
+	try {
+		assert.deepEqual(
+			mod.parseRosterSettings({ subagents: { rosterScope: "both", rosterCap: 7 }, subagentRosterScope: "user", subagentRosterCap: 3 }),
+			{ scope: "both", cap: 7 },
+		);
+		assert.deepEqual(
+			mod.parseRosterSettings({ subagents: { rosterScope: "both" }, subagentRosterScope: "user" }),
+			{ scope: "both", cap: 10 },
+		);
+		assert.deepEqual(
+			mod.parseRosterSettings({ subagents: { rosterCap: 7 }, subagentRosterCap: 3 }),
+			{ scope: "user", cap: 7 },
+		);
+	} finally {
+		cleanup();
+	}
+});
+
+test("parseRosterSettings falls back to flat legacy when nested value is invalid", async () => {
+	const mod = await loadModule();
+	try {
+		assert.deepEqual(
+			mod.parseRosterSettings({ subagents: { rosterScope: "bogus", rosterCap: "NaN" }, subagentRosterScope: "both", subagentRosterCap: 12 }),
+			{ scope: "both", cap: 12 },
+		);
 	} finally {
 		cleanup();
 	}

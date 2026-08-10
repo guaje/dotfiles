@@ -44,8 +44,29 @@ test("emptyUsage returns a zeroed usage record with all fields", async () => {
 
 test("execution settings enforce validity, hard bounds, and concurrency ordering", async () => {
 	const { resolveSubagentExecutionSettings } = await import("../settings.ts");
+	// flat legacy keys still work
 	assert.deepEqual(resolveSubagentExecutionSettings({ subagentMaxParallelTasks: 6, subagentMaxConcurrency: 3 }), { maxParallelTasks: 6, maxConcurrency: 3 });
 	assert.deepEqual(resolveSubagentExecutionSettings({ subagentMaxParallelTasks: 2, subagentMaxConcurrency: 8 }), { maxParallelTasks: 2, maxConcurrency: 2 });
 	assert.deepEqual(resolveSubagentExecutionSettings({ subagentMaxParallelTasks: -1, subagentMaxConcurrency: "many" }), { maxParallelTasks: 8, maxConcurrency: 4 });
 	assert.deepEqual(resolveSubagentExecutionSettings({ subagentMaxParallelTasks: 10_000, subagentMaxConcurrency: 10_000 }), { maxParallelTasks: 8, maxConcurrency: 4 });
+
+	// nested keys take precedence over flat legacy keys
+	assert.deepEqual(
+		resolveSubagentExecutionSettings({
+			subagents: { maxParallelTasks: 5, maxConcurrency: 2 },
+			subagentMaxParallelTasks: 99,
+			subagentMaxConcurrency: 99,
+		}),
+		{ maxParallelTasks: 5, maxConcurrency: 2 },
+	);
+
+	// invalid nested falls back to flat legacy
+	assert.deepEqual(
+		resolveSubagentExecutionSettings({
+			subagents: { maxParallelTasks: "many", maxConcurrency: "many" },
+			subagentMaxParallelTasks: 6,
+			subagentMaxConcurrency: 3,
+		}),
+		{ maxParallelTasks: 6, maxConcurrency: 3 },
+	);
 });

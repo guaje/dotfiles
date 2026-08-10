@@ -6,6 +6,8 @@ import { join, resolve } from "node:path";
 import test, { after } from "node:test";
 import { setRemoteBashBackend } from "../../02-handoff/backend-registry.ts";
 import { setSessionManagingStyle } from "../management-settings.ts";
+import { cacheHotkeys } from "../shortcuts.ts";
+import { importPiModule } from "../../packages/pi-package.ts";
 import { approvalFingerprint, findSessionApproval, listSessionApprovals, rememberSessionApproval, resetSessionApprovalsForTests } from "../session-command-approvals.ts";
 
 const packageDir = resolve("agent/extensions/node_modules/@earendil-works/pi-coding-agent");
@@ -37,7 +39,7 @@ for (const path of ["dist/modes/interactive/components", "dist/modes/interactive
 writeFileSync(resolve(fakePiRoot, "package.json"), JSON.stringify({ name: "@earendil-works/pi-coding-agent", type: "module" }));
 writeFileSync(resolve(fakePiRoot, "dist/modes/interactive/components/settings-selector.js"), "export class SettingsSelectorComponent { getSettingsList() { return { items: [], filteredItems: [], onChange() {} }; } }\n");
 writeFileSync(resolve(fakePiRoot, "dist/modes/interactive/theme/theme.js"), "export const theme = { fg: (_c, t) => t, bold: t => t }; export const getSelectListTheme = () => ({});\n");
-writeFileSync(resolve(fakePiRoot, "dist/modes/interactive/interactive-mode.js"), "export class InteractiveMode { showSettingsSelector() {} setupExtensionShortcuts() {} handleHotkeysCommand() {} }\n");
+writeFileSync(resolve(fakePiRoot, "dist/modes/interactive/interactive-mode.js"), "export class InteractiveMode { showSettingsSelector() {} setupExtensionShortcuts() {} handleHotkeysCommand() { return this.session.extensionRunner.getShortcuts(); } }\n");
 process.env.PI_CODING_AGENT_PACKAGE_ROOT = fakePiRoot;
 
 after(() => {
@@ -89,12 +91,30 @@ test("settings decoration exposes two modes and migrates legacy Guidance", async
   assert.equal(isShiftCtrlSemicolonFallbackInput("shift+ctrl+:"), true);
 });
 
+test("/hotkeys combines the currently configured management-style bindings", async () => {
+  const { patchBuiltInSettingsMenu } = await import("../settings-ui.ts");
+  cacheHotkeys("ctrl+1", "shift+ctrl+2");
+  await patchBuiltInSettingsMenu(() => "Micromanagement", async () => {});
+  const { InteractiveMode } = await importPiModule("dist/modes/interactive/interactive-mode.js") as any;
+  const mode = new InteractiveMode();
+  mode.session = { extensionRunner: { getShortcuts: () => new Map([
+    ["ctrl+1", { description: "forward" }],
+    ["shift+ctrl+2", { description: "backward" }],
+  ]) } };
+  const shortcuts = mode.handleHotkeysCommand();
+  assert.equal(shortcuts.has("ctrl+1"), false);
+  assert.equal(shortcuts.has("shift+ctrl+2"), false);
+  assert.equal(shortcuts.get("ctrl+1 / shift+ctrl+2").description, "Cycle management style");
+});
+
 test("entry registers one Bash owner and injects split guidance once", async () => {
   const extension = (await import("../index.ts")).default;
   const app = harness();
-  extension(app.pi as any);
+  await extension(app.pi as any);
   const tool = app.bashTool();
   assert.ok(tool);
+  assert.ok(app.shortcuts.has("ctrl+;"));
+  assert.ok(app.shortcuts.has("shift+ctrl+;"));
   assert.deepEqual(tool.promptGuidelines.slice(0, 1), ["original guideline"]);
   assert.match(tool.promptGuidelines.at(-1), /one Bash call per top-level side-effect class/);
   const first = await app.handler("before_agent_start")({ systemPrompt: "base" });
@@ -105,7 +125,7 @@ test("entry registers one Bash owner and injects split guidance once", async () 
 test("Empowerment allows read-only remote Bash, splits mixed calls, and gates mutations headlessly", async () => {
   const extension = (await import("../index.ts")).default;
   const app = harness();
-  extension(app.pi as any);
+  await extension(app.pi as any);
   await app.handler("session_start")({}, { cwd: process.cwd(), ui: {} });
   const call = app.handler("tool_call");
   assert.equal(await call({ toolName: "bash", input: { command: "ssh -o BatchMode=yes host 'git status'" } }, { cwd: process.cwd(), hasUI: false, ui: {} }), undefined);
@@ -128,7 +148,7 @@ test("Empowerment allows read-only remote Bash, splits mixed calls, and gates mu
 test("Micromanagement gates every Bash call and current-directory writes are allowed only in Empowerment", async () => {
   const extension = (await import("../index.ts")).default;
   const app = harness();
-  extension(app.pi as any);
+  await extension(app.pi as any);
   const cwd = mkdtempSync(join(tmpdir(), "permissions-index-"));
   try {
     await app.handler("session_start")({}, { cwd, ui: {} });
@@ -147,7 +167,7 @@ test("Micromanagement gates every Bash call and current-directory writes are all
 
 test("session-approvals command revokes safe remembered rules and lifecycle preserves only reloads", async () => {
   const extension = (await import("../index.ts")).default;
-  const app = harness(); extension(app.pi as any);
+  const app = harness(); await extension(app.pi as any);
   const identity = approvalFingerprint("command-rule");
   const rule = approvalRule(identity, "command");
   rememberSessionApproval(rule, 2);
@@ -200,7 +220,7 @@ test("session-approvals command revokes safe remembered rules and lifecycle pres
 test("Empowerment remembers a semantic git-add rule while Micromanagement still prompts", async () => {
   resetSessionApprovalsForTests();
   const extension = (await import("../index.ts")).default;
-  const app = harness(); extension(app.pi as any);
+  const app = harness(); await extension(app.pi as any);
   const cwd = mkdtempSync(join(tmpdir(), "permissions-remember-"));
   try {
     const { execFileSync } = await import("node:child_process");
@@ -235,7 +255,7 @@ test("Empowerment remembers a semantic git-add rule while Micromanagement still 
 test("Empowerment remembers similar npx tsx workspace test commands", async () => {
   resetSessionApprovalsForTests();
   const extension = (await import("../index.ts")).default;
-  const app = harness(); extension(app.pi as any);
+  const app = harness(); await extension(app.pi as any);
   const cwd = mkdtempSync(join(tmpdir(), "permissions-npx-template-"));
   try {
     mkdirSync(join(cwd, "tests"));
@@ -263,7 +283,7 @@ test("Empowerment remembers similar npx tsx workspace test commands", async () =
 test("Empowerment remembers conservative unknown and context-isolated remote commands", async () => {
   resetSessionApprovalsForTests();
   const extension = (await import("../index.ts")).default;
-  const app = harness(); extension(app.pi as any);
+  const app = harness(); await extension(app.pi as any);
   const cwd = mkdtempSync(join(tmpdir(), "permissions-conservative-"));
   try {
     await app.handler("session_start")({ reason: "startup" }, { cwd, ui: {} });
@@ -312,7 +332,7 @@ test("Empowerment remembers conservative unknown and context-isolated remote com
 test("a full configured store keeps existing rules and degrades a new remember choice to allow once", async () => {
   resetSessionApprovalsForTests();
   const extension = (await import("../index.ts")).default;
-  const app = harness(); extension(app.pi as any);
+  const app = harness(); await extension(app.pi as any);
   const cwd = mkdtempSync(join(tmpdir(), "permissions-cap-"));
   try {
     await app.handler("session_start")({ reason: "startup" }, { cwd, ui: {} });
@@ -346,7 +366,7 @@ test("a full configured store keeps existing rules and degrades a new remember c
 test("Bash execution chooses the Handoff backend at execution time", async () => {
   const extension = (await import("../index.ts")).default;
   const app = harness();
-  extension(app.pi as any);
+  await extension(app.pi as any);
   const tool = app.bashTool();
   const local = await tool.execute("id", { command: "pwd" }, undefined, undefined, { cwd: "/local" });
   assert.equal(local.details.remote, false);

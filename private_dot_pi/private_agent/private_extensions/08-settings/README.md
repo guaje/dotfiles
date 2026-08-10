@@ -5,3 +5,9 @@
 serializes updates, writes owner-only temporary files, runs the merge script, and
 restores the exact source bytes if the merge fails. Paths and merge execution are
 injectable for hermetic tests.
+
+Extension-owned preferences are grouped by extension at the root of the settings
+object (`permissions`, `handoff`, `subagents`, `browse`, and `health`). Pi core
+settings such as models, extension paths, themes, and image-generation providers
+remain top-level. Migrated readers accept legacy flat keys, but extension writers
+update only nested fields and preserve sibling values.

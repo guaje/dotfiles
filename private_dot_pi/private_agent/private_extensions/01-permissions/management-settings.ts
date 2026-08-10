@@ -1,5 +1,7 @@
 import { createSettingsStore } from "../08-settings/index.ts";
+import { getNested } from "../08-settings/nested.ts";
 import { normalizeManagingStyle } from "./management-style.ts";
+import { cacheHotkeys, resolveHotkeys } from "./shortcuts.ts";
 import type { ManagingStyle } from "./types.ts";
 
 const store = createSettingsStore();
@@ -14,13 +16,34 @@ async function readConfig(configPath = SETTINGS_CONFIG_PATH) {
     : createSettingsStore({ paths: { configPath } }).read();
 }
 
+function managingStyleValue(settings: Record<string, unknown>): unknown {
+  const nested = getNested(settings, "permissions.managingStyle");
+  if (nested === "Micromanagement" || nested === "Empowerment" || nested === "Guidance") return nested;
+  return settings.managingStyle;
+}
+
+function disposableRootsValue(settings: Record<string, unknown>): unknown {
+  const nested = getNested(settings, "permissions.empowermentDisposableRoots");
+  if (Array.isArray(nested) && nested.every((root) => typeof root === "string")) return nested;
+  return settings.empowermentDisposableRoots;
+}
+
+function approvalCapValue(settings: Record<string, unknown>): unknown {
+  const nested = getNested(settings, "permissions.sessionApprovalMaxRules");
+  if (Number.isSafeInteger(nested) && (nested as number) >= 0) return nested;
+  return settings.permissionsSessionApprovalMaxRules;
+}
+
 export async function refreshManagingStyleCache() {
-  cache = normalizeManagingStyle((await readConfig()).managingStyle);
+  const settings = await readConfig();
+  cache = normalizeManagingStyle(managingStyleValue(settings));
+  const hotkeys = resolveHotkeys(settings);
+  cacheHotkeys(hotkeys.forward, hotkeys.backward);
   return cache;
 }
 
 export async function readConfiguredManagingStyle(configPath: string) {
-  return normalizeManagingStyle((await readConfig(configPath)).managingStyle);
+  return normalizeManagingStyle(managingStyleValue(await readConfig(configPath)));
 }
 
 export async function currentManagingStyle() {
@@ -36,14 +59,14 @@ export function clearSessionManagingStyle() {
 }
 
 export async function empowermentDisposableRoots() {
-  const roots = (await readConfig()).empowermentDisposableRoots;
+  const roots = disposableRootsValue(await readConfig());
   return Array.isArray(roots) && roots.every((root) => typeof root === "string")
     ? roots
     : ["@user-temp"];
 }
 
 export async function permissionsSessionApprovalMaxRules(configPath = SETTINGS_CONFIG_PATH) {
-  const value = (await readConfig(configPath)).permissionsSessionApprovalMaxRules;
+  const value = approvalCapValue(await readConfig(configPath));
   return Number.isSafeInteger(value) && (value as number) >= 0 ? value as number : 0;
 }
 
@@ -58,9 +81,16 @@ export async function setManagingStyle(
     const target = runMerge || configPath !== SETTINGS_CONFIG_PATH
       ? createSettingsStore({ paths: { configPath }, runMerge })
       : store;
-    await target.update({ managingStyle: style });
+    const result = await target.update((settings) => {
+      if (!settings.permissions || typeof settings.permissions !== "object" || Array.isArray(settings.permissions)) {
+        settings.permissions = {};
+      }
+      (settings.permissions as Record<string, unknown>).managingStyle = style;
+    });
     cache = style;
     sessionStyle = undefined;
+    const hotkeys = resolveHotkeys(result);
+    cacheHotkeys(hotkeys.forward, hotkeys.backward);
   }
   catch (error) {
     cache = previous;

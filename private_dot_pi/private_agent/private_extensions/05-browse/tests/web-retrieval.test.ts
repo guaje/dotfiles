@@ -65,7 +65,7 @@ test("loadConfig uses baseUrl from settings browse.providers and falls back to d
 	}));
 
 	try {
-		const loaded = await loadConfig({ credentialsPath: credentialsFile, settingsPaths: { configPath: settingsPath } });
+		const loaded = await loadConfig({ credentialsPath: credentialsFile, settingsPaths: { configPath: settingsPath }, env: {} });
 		assert.equal(loaded.providers.linkup?.baseUrl, "https://custom.linkup.test");
 		assert.equal(loaded.providers.tavily?.baseUrl, "https://api.tavily.com");
 	} finally { rmSync(root, { recursive: true, force: true }); }
@@ -80,7 +80,7 @@ test("loadConfig redacts credentials from errors", async () => {
 	writeFileSync(settingsPath, JSON.stringify({ browse: { fallbackProviders: [] } }));
 
 	try {
-		const loaded = await loadConfig({ credentialsPath: credentialsFile, settingsPaths: { configPath: settingsPath } });
+		const loaded = await loadConfig({ credentialsPath: credentialsFile, settingsPaths: { configPath: settingsPath }, env: {} });
 		const error = new Error("Network error with secret-api-key-12345 token secret-api-key-12345");
 		const { redact } = await import("../errors.ts");
 		const secrets = Object.values(loaded.providers).map((item) => item?.apiKey || "");

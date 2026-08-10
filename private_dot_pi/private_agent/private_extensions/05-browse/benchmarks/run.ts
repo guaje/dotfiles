@@ -7,7 +7,7 @@ async function main(): Promise<void> {
 
 	const config = await loadConfig();
 	if (!config.providers.linkup?.apiKey || !config.providers.tavily?.apiKey) {
-		throw new Error("Configure resolved Linkup and Tavily API keys in assets/web-retrieval.json or environment overrides to run the benchmark.");
+		throw new Error("Configure Linkup and Tavily API keys in agent/browsers.json or environment overrides to run the benchmark.");
 	}
 	const cases = [
 		{ operation: "search" as const, query: "current official Node.js release", mode: "standard" as const },

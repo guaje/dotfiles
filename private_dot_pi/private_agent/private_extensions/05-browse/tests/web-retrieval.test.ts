@@ -22,17 +22,71 @@ const config: WebRetrievalConfig = {
 
 function response(body: unknown, status = 200) { return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } }); }
 
-test("web retrieval resolves synthetic config with environment precedence", async () => {
+test("web retrieval resolves synthetic config with credentials and settings precedence", async () => {
 	const root = mkdtempSync(resolve(tmpdir(), "pi-browse-"));
-	const fixture = resolve(root, "web-retrieval.json");
-	writeFileSync(fixture, JSON.stringify({ providers: { linkup: { apiKey: "$TEST_LINKUP", baseUrl: "https://linkup.test/" }, tavily: { apiKey: "!secret-command" } }, fallbackProviders: ["tavily", "invalid"], limits: { maxResults: 999 } }));
+	const credentialsFile = resolve(root, "browsers.json");
+	const settingsPath = resolve(root, "settings.config.json");
+
+	writeFileSync(credentialsFile, JSON.stringify({
+		providers: { linkup: { apiKey: "$TEST_LINKUP" }, tavily: { apiKey: "!secret-command" } },
+	}));
+
+	writeFileSync(settingsPath, JSON.stringify({
+		browse: {
+			providers: { linkup: { baseUrl: "https://linkup.test/" }, tavily: { baseUrl: "https://tavily.test/" } },
+			fallbackProviders: ["tavily", "invalid"],
+			limits: { maxResults: 999 },
+		},
+	}));
+
 	try {
-		const loaded = await loadConfig({ configPath: fixture, env: { LINKUP_API_KEY: "environment-key", TEST_LINKUP: "fixture-key" }, secretCommand: async () => "synthetic-secret\n" });
+		const loaded = await loadConfig({
+			credentialsPath: credentialsFile,
+			settingsPaths: { configPath: settingsPath },
+			env: { LINKUP_API_KEY: "environment-key", TEST_LINKUP: "fixture-key" },
+			secretCommand: async () => "synthetic-secret\n",
+		});
 		assert.equal(loaded.providers.linkup?.apiKey, "environment-key");
 		assert.equal(loaded.providers.linkup?.baseUrl, "https://linkup.test");
 		assert.equal(loaded.providers.tavily?.apiKey, "synthetic-secret");
 		assert.deepEqual(loaded.fallbackProviders, ["tavily"]);
 		assert.equal(loaded.limits.maxResults, 20);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("loadConfig uses baseUrl from settings browse.providers and falls back to defaults", async () => {
+	const root = mkdtempSync(resolve(tmpdir(), "pi-browse-"));
+	const credentialsFile = resolve(root, "browsers.json");
+	const settingsPath = resolve(root, "settings.config.json");
+
+	writeFileSync(credentialsFile, JSON.stringify({ providers: { linkup: { apiKey: "k1" }, tavily: { apiKey: "k2" } } }));
+	writeFileSync(settingsPath, JSON.stringify({
+		browse: { providers: { linkup: { baseUrl: "https://custom.linkup.test" } } },
+	}));
+
+	try {
+		const loaded = await loadConfig({ credentialsPath: credentialsFile, settingsPaths: { configPath: settingsPath } });
+		assert.equal(loaded.providers.linkup?.baseUrl, "https://custom.linkup.test");
+		assert.equal(loaded.providers.tavily?.baseUrl, "https://api.tavily.com");
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("loadConfig redacts credentials from errors", async () => {
+	const root = mkdtempSync(resolve(tmpdir(), "pi-browse-"));
+	const credentialsFile = resolve(root, "browsers.json");
+	const settingsPath = resolve(root, "settings.config.json");
+
+	writeFileSync(credentialsFile, JSON.stringify({ providers: { linkup: { apiKey: "secret-api-key-12345" } } }));
+	writeFileSync(settingsPath, JSON.stringify({ browse: { fallbackProviders: [] } }));
+
+	try {
+		const loaded = await loadConfig({ credentialsPath: credentialsFile, settingsPaths: { configPath: settingsPath } });
+		const error = new Error("Network error with secret-api-key-12345 token secret-api-key-12345");
+		const { redact } = await import("../errors.ts");
+		const secrets = Object.values(loaded.providers).map((item) => item?.apiKey || "");
+		const sanitized = redact(error.message, secrets);
+		assert.doesNotMatch(sanitized, /secret-api-key-12345/);
+		assert.match(sanitized, /\[REDACTED\]/);
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -157,11 +211,17 @@ async function loadExtension() {
 }
 
 test("extension registers one constrained tool and emits preview plus final content", async () => {
-	const previousKey = process.env.LINKUP_API_KEY;
-	process.env.LINKUP_API_KEY = "synthetic-extension-key";
+	const root = mkdtempSync(resolve(tmpdir(), "pi-browse-extension-"));
+	const credentialsPath = resolve(root, "browsers.json");
+	const settingsPath = resolve(root, "settings.config.json");
+	writeFileSync(credentialsPath, JSON.stringify({ providers: { linkup: { apiKey: "synthetic-extension-key" } } }));
+	writeFileSync(settingsPath, JSON.stringify({ browse: { fallbackProviders: [], limits: config.limits } }));
 	const extension = await loadExtension(); let tool: any;
 	assert.equal(typeof extension, "function", "the Browse entry point must expose its named extension function");
-	extension({ registerTool(value: any) { tool = value; } });
+	extension(
+		{ registerTool(value: any) { tool = value; } },
+		{ credentialsPath, settingsPaths: { configPath: settingsPath }, env: {} },
+	);
 	assert.equal(tool.name, "web_retrieval");
 	const originalFetch = globalThis.fetch;
 	globalThis.fetch = (async () => response({ results: [{ title: "Result", url: "https://example.com", content: "safe" }] })) as typeof fetch;
@@ -171,10 +231,15 @@ test("extension registers one constrained tool and emits preview plus final cont
 		assert.ok(updates.length >= 2);
 		assert.match(value.content[0].text, /Provider: linkup/);
 		assert.equal(value.details.untrustedWebContent, true);
+
+		globalThis.fetch = (async () => response({ error: { message: "synthetic-extension-key must stay secret" } }, 500)) as typeof fetch;
+		await assert.rejects(
+			tool.execute("id-error", { operation: "search", query: "test", provider: "linkup" }),
+			(error: Error) => !error.message.includes("synthetic-extension-key") && error.message.includes("[REDACTED]"),
+		);
 	} finally {
 		globalThis.fetch = originalFetch;
-		if (previousKey === undefined) delete process.env.LINKUP_API_KEY;
-		else process.env.LINKUP_API_KEY = previousKey;
+		rmSync(root, { recursive: true, force: true });
 	}
 });
 

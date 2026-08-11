@@ -36,6 +36,13 @@ export function matchesKey(data, key) { return key === "ctrl+:" ? data === "ctrl
 const originalPiRoot = process.env.PI_CODING_AGENT_PACKAGE_ROOT;
 const fakePiRoot = mkdtempSync(join(tmpdir(), "permissions-pi-"));
 for (const path of ["dist/modes/interactive/components", "dist/modes/interactive/theme", "dist/modes/interactive", "dist/utils"]) mkdirSync(resolve(fakePiRoot, path), { recursive: true });
+const identityBin = resolve(fakePiRoot, "identity-bin");
+mkdirSync(identityBin);
+for (const executable of ["cat", "chezmoi", "git", "jq", "ssh"]) {
+  const path = resolve(identityBin, executable);
+  writeFileSync(path, "#!/bin/sh\nexit 0\n");
+  chmodSync(path, 0o700);
+}
 writeFileSync(resolve(fakePiRoot, "package.json"), JSON.stringify({ name: "@earendil-works/pi-coding-agent", type: "module" }));
 writeFileSync(resolve(fakePiRoot, "dist/modes/interactive/components/settings-selector.js"), "export class SettingsSelectorComponent { getSettingsList() { return { items: [], filteredItems: [], onChange() {} }; } }\n");
 writeFileSync(resolve(fakePiRoot, "dist/modes/interactive/theme/theme.js"), "export const theme = { fg: (_c, t) => t, bold: t => t }; export const getSelectListTheme = () => ({});\n");
@@ -126,24 +133,29 @@ test("entry registers one Bash owner and injects split guidance once", async () 
 test("Empowerment allows read-only remote Bash, splits mixed calls, and gates mutations headlessly", async () => {
   const extension = (await import("../index.ts")).default;
   const app = harness();
-  await extension(app.pi as any);
-  await app.handler("session_start")({}, { cwd: process.cwd(), ui: {} });
-  const call = app.handler("tool_call");
-  assert.equal(await call({ toolName: "bash", input: { command: "ssh -o BatchMode=yes host 'git status'" } }, { cwd: process.cwd(), hasUI: false, ui: {} }), undefined);
-  assert.equal(await call({ toolName: "bash", input: { command: "chezmoi status --verbose" } }, { cwd: process.cwd(), hasUI: false, ui: {} }), undefined);
-  assert.equal(await call({ toolName: "bash", input: { command: "chezmoi diff -- install-pi-notification-icons.sh" } }, { cwd: process.cwd(), hasUI: false, ui: {} }), undefined);
-  const mixed = await call({ toolName: "bash", input: { command: "git status && git add file" } }, { cwd: process.cwd(), hasUI: false, ui: {} });
-  assert.match(mixed.reason, /Split read-only/);
-  assert.equal(await call({ toolName: "bash", input: { command: "cat file | jq ." } }, { cwd: process.cwd(), hasUI: false, ui: {} }), undefined);
-  for (const command of ["cat file | tee out", "glab issue create -d \"$(cat body)\""]) {
-    const coupled = await call({ toolName: "bash", input: { command } }, { cwd: process.cwd(), hasUI: false, ui: {} });
-    assert.match(coupled.reason, /no UI/, command);
-    assert.doesNotMatch(coupled.reason, /Split read-only/, command);
+  try {
+    process.env.PI_TEST_SHELL_PATH = identityBin;
+    await extension(app.pi as any);
+    await app.handler("session_start")({}, { cwd: process.cwd(), ui: {} });
+    const call = app.handler("tool_call");
+    assert.equal(await call({ toolName: "bash", input: { command: "ssh -o BatchMode=yes host 'git status'" } }, { cwd: process.cwd(), hasUI: false, ui: {} }), undefined);
+    assert.equal(await call({ toolName: "bash", input: { command: "chezmoi status --verbose" } }, { cwd: process.cwd(), hasUI: false, ui: {} }), undefined);
+    assert.equal(await call({ toolName: "bash", input: { command: "chezmoi diff -- install-pi-notification-icons.sh" } }, { cwd: process.cwd(), hasUI: false, ui: {} }), undefined);
+    const mixed = await call({ toolName: "bash", input: { command: "git status && git add file" } }, { cwd: process.cwd(), hasUI: false, ui: {} });
+    assert.match(mixed.reason, /Split read-only/);
+    assert.equal(await call({ toolName: "bash", input: { command: "cat file | jq ." } }, { cwd: process.cwd(), hasUI: false, ui: {} }), undefined);
+    for (const command of ["cat file | tee out", "glab issue create -d \"$(cat body)\""]) {
+      const coupled = await call({ toolName: "bash", input: { command } }, { cwd: process.cwd(), hasUI: false, ui: {} });
+      assert.match(coupled.reason, /no UI/, command);
+      assert.doesNotMatch(coupled.reason, /Split read-only/, command);
+    }
+    const mutation = await call({ toolName: "bash", input: { command: "rm file" } }, { cwd: process.cwd(), hasUI: false, ui: {} });
+    assert.match(mutation.reason, /no UI/);
+    assert.equal(listSessionApprovals().length, 0);
+    await app.handler("session_shutdown")();
+  } finally {
+    delete process.env.PI_TEST_SHELL_PATH;
   }
-  const mutation = await call({ toolName: "bash", input: { command: "rm file" } }, { cwd: process.cwd(), hasUI: false, ui: {} });
-  assert.match(mutation.reason, /no UI/);
-  assert.equal(listSessionApprovals().length, 0);
-  await app.handler("session_shutdown")();
 });
 
 test("Micromanagement gates every Bash call and current-directory writes are allowed only in Empowerment", async () => {

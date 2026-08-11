@@ -46,13 +46,17 @@ The in-memory bound is configured in `agent/settings.config.json`:
 }
 ```
 
-At capacity, existing rules continue and a new remember choice allows only the current invocation. Rules survive `/reload`; they are cleared on quit, new/resumed/forked sessions, startup, and management-style changes. The template-schema upgrade invalidates older exact/special-case rules once while preserving the active session identity.
+At capacity, existing rules continue and a new remember choice allows only the current invocation. Expired rules, invalid templates, invalid limit configuration, and a genuinely full store produce distinct warnings rather than all being reported as capacity failures. Rules survive `/reload`; they are cleared on quit, new/resumed/forked sessions, startup, and management-style changes. The template-schema upgrade invalidates older exact/special-case rules once while preserving the active session identity.
 
 ## Shell policy
 
 Shell parsing is intentionally conservative. Only completely consumed, reviewed syntax and executable/argument profiles can be read-only. Unsupported syntax, dynamic commands, programmable interpreters, ambiguous SSH payloads, and unreviewed curl options are unknown and require approval.
 
-Remote/network execution is metadata rather than an approval category: `ssh host ls` and a curl GET can be read-only, while remote mutations, HTTP writes, forwarding, uploads, and local output files are not.
+Remote/network execution is metadata rather than an approval category: `ssh host ls` and a curl GET can be read-only, while remote mutations, HTTP writes, forwarding, uploads, and local output files are not. Newly expanded `cd`, `nl`, `glab`, `gh`, and Git-query profiles are local-only because remote executable identity cannot be verified.
+
+Before any structurally read-only local command is auto-allowed, Permissions verifies every executable reached through commands, reviewed wrappers, pipelines, groups, and substitutions. Path-qualified or non-canonically cased executable tokens require approval. Bare external names must resolve through Pi's actual Bash execution PATH outside the canonical current workspace, with no shell startup-file or exported-function override; if that execution environment cannot be obtained, local auto-allow fails closed. Repository boundaries are discovered from canonical `.git` markers without executing PATH-resolved Git. Identity failure can only veto structural authorization and offers Allow once/Deny; it never rewrites the command or creates a remembered rule. The threat model protects against repository/CWD-controlled executable selection; same-user binary replacement and compromised user-managed binaries outside the workspace are out of scope.
+
+Reviewed local convenience profiles include non-persistent `cd` forms, `nl`, finite Git queries, and exact GitLab/GitHub inspection verbs. Forge API calls are read-only only for REST GET/HEAD semantics: field-driven implicit POSTs and explicit write methods are mutating, while GraphQL, request bodies, browser helpers, downloads, and unknown options require approval. Forced `bat` pagers, `tail` follow mode, compiled `file` magic output, `uniq` output operands, and `find` execution/output actions are not read-only.
 
 Reviewed chezmoi inspection commands such as `chezmoi status --verbose`, `chezmoi diff -- <target>`, `verify`, `managed`, and `cat` are read-only. Source/destination mutations, local output files, external refreshes, and explicit helper/configuration overrides require approval.
 

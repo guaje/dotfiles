@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 import { clearHudOwner, registerHudItem, type HudItemHandle, type HudSegment } from "../00-hud/api.ts";
 import { getBashApprovalScope, getBashBackend, getBashLocalBoundary, getBashTargetLabel } from "../02-handoff/backend-registry.ts";
+import { importPiModule } from "../packages/pi-package.ts";
 import { canAutoAllowHandoffFile, canAutoAllowLocalFile, invalidateAccessPolicyCache } from "./access-policy.ts";
 import { chooseBashApproval, confirmFileMutation, editPreview, writePreview } from "./approval-ui.ts";
 import { MANAGING_STYLE_LABELS, nextManagingStyle } from "./management-style.ts";
@@ -11,6 +12,7 @@ import { clearSessionManagingStyle, currentManagingStyle, empowermentDisposableR
 import { injectPromptGuidance, BASH_PROMPT_GUIDANCE } from "./prompt-guidance.ts";
 import { patchBuiltInSettingsMenu } from "./settings-ui.ts";
 import { getCachedBackwardHotkey, getCachedForwardHotkey } from "./shortcuts.ts";
+import { verifyAutoAllowIdentity } from "./shell/executable-identity.ts";
 import { decideAnalysis, inspectBash } from "./shell/policy.ts";
 import { approvalCandidate } from "./shell/session-approval-candidate.ts";
 import { approvalFingerprint, bindSessionApprovalsToStyle, clearSessionApprovals, findSessionApproval, listSessionApprovals, rememberSessionApproval, revokeSessionApproval, withPendingApproval } from "./session-command-approvals.ts";
@@ -35,6 +37,9 @@ function preservesApprovals(event: any) { return event?.reason === "reload"; }
 /** The only extension that registers Bash. Backend selection happens at execution time. */
 export default async function permissions(pi: ExtensionAPI) {
   await refreshManagingStyleCache();
+  const shellEnvironment = await importPiModule("dist/utils/shell.js")
+    .then((module) => typeof module.getShellEnv === "function" ? module.getShellEnv as () => NodeJS.ProcessEnv : undefined)
+    .catch(() => undefined);
   void patchBuiltInSettingsMenu(() => hudStyle, (style) => saveStyle(style), (ui) => cycleStyle({ ui }));
   pi.on("before_agent_start", (event: { systemPrompt?: string }) => ({ systemPrompt: injectPromptGuidance(event.systemPrompt) }));
   pi.on("session_start", async (event: any, ctx: any) => {
@@ -81,15 +86,28 @@ export default async function permissions(pi: ExtensionAPI) {
         : { location: "local", usesNetwork: false };
       const inspection = inspectBash(event.input.command, executionContext);
       const decision = decideAnalysis(inspection.analysis, style);
-      if (decision.allow) return undefined;
-      // Structural authorization is final: grants never override Micromanagement or split blocks.
-      if (!decision.needsApproval) return { block: true, reason: decision.reason };
+      const executionEnv = shellEnvironment?.();
+      const hasLocalExecutable = inspection.analysis.identityRequirements.some((requirement) => requirement.context.location === "local");
+      let approvalAnalysis = inspection.analysis;
+      let identityVeto = false;
+      if (decision.allow) {
+        const identity = hasLocalExecutable && !executionEnv
+          ? { ok: false as const, reason: "shell execution environment could not be verified" }
+          : await verifyAutoAllowIdentity(inspection.analysis, ctx.cwd, executionEnv ? { env: executionEnv } : {});
+        if (identity.ok) return undefined;
+        identityVeto = true;
+        approvalAnalysis = { ...inspection.analysis, reasons: [...new Set([...inspection.analysis.reasons, identity.reason])] };
+      }
+      // Structural authorization is final: identity checks can only veto; grants never override Micromanagement or split blocks.
+      if (!identityVeto && !decision.needsApproval) return { block: true, reason: decision.reason };
       if (style !== "Empowerment") {
         if (!hasBashUi(ctx)) return { block: true, reason: "Bash command blocked (no UI available for confirmation)" };
-        const choice = await chooseBashApproval(ctx, inspection.analysis, undefined, remoteLabel);
+        const choice = await chooseBashApproval(ctx, approvalAnalysis, undefined, remoteLabel);
         return choice === "once" ? undefined : { block: true, reason: "Bash command blocked by user" };
       }
-      const candidate = await approvalCandidate(inspection, ctx.cwd, getBashApprovalScope());
+      const candidate = identityVeto || (hasLocalExecutable && !executionEnv)
+        ? undefined
+        : await approvalCandidate(inspection, ctx.cwd, getBashApprovalScope(), executionEnv);
       if (candidate && findSessionApproval(candidate.rule)) return undefined;
       if (!hasBashUi(ctx)) return { block: true, reason: "Bash command blocked (no UI available for confirmation)" };
       const flowIdentity = candidate?.rule ?? approvalFingerprint("flow", inspection.analysis.source, executionContext.location, executionContext.transport ?? "");
@@ -97,13 +115,21 @@ export default async function permissions(pi: ExtensionAPI) {
         if (candidate && findSessionApproval(candidate.rule)) return "approved" as const;
         const choice = await chooseBashApproval(
           ctx,
-          inspection.analysis,
+          approvalAnalysis,
           candidate ? { optionLabel: candidate.rememberLabel, ruleDescription: candidate.ruleDescription, strength: candidate.rule.strength, slotCount: candidate.rule.slotCount } : undefined,
           remoteLabel,
         );
         if (choice !== "remember" || !candidate) return choice;
-        if (rememberSessionApproval(candidate.rule, await permissionsSessionApprovalMaxRules())) return "approved" as const;
-        ctx.ui?.notify?.("Session approval limit reached; allowed once without remembering", "warning");
+        const remembered = rememberSessionApproval(candidate.rule, await permissionsSessionApprovalMaxRules());
+        if (remembered.ok) return "approved" as const;
+        const warning = remembered.reason === "limit-reached"
+          ? "Session approval limit reached; allowed once without remembering"
+          : remembered.reason === "epoch-mismatch"
+            ? "Session approval expired; allowed once without remembering"
+            : remembered.reason === "invalid-rule"
+              ? "Session approval template is invalid; allowed once without remembering"
+              : "Session approval limit configuration is invalid; allowed once without remembering";
+        ctx.ui?.notify?.(warning, "warning");
         return "once" as const;
       });
       return outcome === "deny" ? { block: true, reason: "Bash command blocked by user" } : undefined;

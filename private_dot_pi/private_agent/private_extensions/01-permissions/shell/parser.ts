@@ -21,6 +21,7 @@ function failedAnalysis(source: string, context: ShellContext): ShellAnalysis {
     effect: "unknown",
     reasons: ["structural shell parser failed closed"],
     commands: [],
+    identityRequirements: [],
     context,
     executionUnits: [{ id: 0, effect: "unknown", span: { start: 0, end: source.length } }],
   };

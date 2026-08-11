@@ -22,9 +22,10 @@ function rule(identity: ReturnType<typeof approvalFingerprint>, executable = "co
 test("session rules are capped, revocable, and contain safe metadata only", () => {
   const identity = approvalFingerprint("exact", "local", "/workspace", "rm", "private.txt");
   const first = rule(identity, "rm");
-  assert.equal(rememberSessionApproval(first, 1), true);
+  assert.deepEqual(rememberSessionApproval(first, 1), { ok: true, status: "remembered" });
+  assert.deepEqual(rememberSessionApproval(first, 1), { ok: true, status: "duplicate" });
   const secondIdentity = approvalFingerprint("exact", "second");
-  assert.equal(rememberSessionApproval(rule(secondIdentity, "second"), 1), false);
+  assert.deepEqual(rememberSessionApproval(rule(secondIdentity, "second"), 1), { ok: false, reason: "limit-reached" });
   assert.ok(findSessionApproval(identity));
   const listed = listSessionApprovals();
   assert.equal(listed.length, 1);
@@ -36,11 +37,11 @@ test("session rules are capped, revocable, and contain safe metadata only", () =
 
 test("remember rejects sensitive metadata and re-HMACs every persisted identity", () => {
   const identity = approvalFingerprint("safe");
-  assert.equal(rememberSessionApproval({ ...rule(identity), label: "/private/payload · conservative · no variable slots" }, 2), false);
-  assert.equal(rememberSessionApproval({ ...rule(identity), fingerprint: "raw command text" }, 2), false);
-  assert.equal(rememberSessionApproval({ ...rule(identity), signatureId: "payload-encoded-as-an-id" }, 2), false);
+  assert.deepEqual(rememberSessionApproval({ ...rule(identity), label: "/private/payload · conservative · no variable slots" }, 2), { ok: false, reason: "invalid-rule" });
+  assert.deepEqual(rememberSessionApproval({ ...rule(identity), fingerprint: "raw command text" }, 2), { ok: false, reason: "invalid-rule" });
+  assert.deepEqual(rememberSessionApproval({ ...rule(identity), signatureId: "payload-encoded-as-an-id" }, 2), { ok: false, reason: "invalid-rule" });
   const callerValue = "a".repeat(43);
-  assert.equal(rememberSessionApproval({ ...rule(identity), fingerprint: callerValue }, 2), true);
+  assert.deepEqual(rememberSessionApproval({ ...rule(identity), fingerprint: callerValue }, 2), { ok: true, status: "remembered" });
   assert.notEqual(listSessionApprovals()[0]?.fingerprint, callerValue);
   assert.doesNotMatch(JSON.stringify(listSessionApprovals()), /private|payload|a{43}/);
 });
@@ -48,13 +49,19 @@ test("remember rejects sensitive metadata and re-HMACs every persisted identity"
 test("clearing rotates the session identity and rejects stale rules", () => {
   const before = approvalFingerprint("stable");
   const staleRule = rule(before);
-  assert.equal(rememberSessionApproval(staleRule, 2), true);
+  assert.deepEqual(rememberSessionApproval(staleRule, 2), { ok: true, status: "remembered" });
   clearSessionApprovals();
   const after = approvalFingerprint("stable");
   assert.notEqual(after.epoch, before.epoch);
   assert.notEqual(after.fingerprint, before.fingerprint);
   assert.equal(findSessionApproval(before), undefined);
-  assert.equal(rememberSessionApproval(staleRule, 2), false);
+  assert.deepEqual(rememberSessionApproval(staleRule, 2), { ok: false, reason: "epoch-mismatch" });
+});
+
+test("remember reports invalid limit configuration separately from capacity", () => {
+  const identity = approvalFingerprint("limit");
+  assert.deepEqual(rememberSessionApproval(rule(identity), 0), { ok: false, reason: "invalid-limit" });
+  assert.deepEqual(rememberSessionApproval(rule(identity), Number.NaN), { ok: false, reason: "invalid-limit" });
 });
 
 test("management-style binding preserves reloads only while the style is unchanged", () => {

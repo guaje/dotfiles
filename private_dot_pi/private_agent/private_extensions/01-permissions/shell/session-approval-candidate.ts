@@ -1,10 +1,10 @@
-import { constants } from "node:fs";
-import { access, realpath } from "node:fs/promises";
-import { basename, delimiter, isAbsolute, resolve } from "node:path";
+import { realpath } from "node:fs/promises";
+import { basename } from "node:path";
 import { canonicalExistingOrParent } from "../access-policy.ts";
 import { approvalFingerprint, type SessionApprovalRuleInput } from "../session-command-approvals.ts";
 import type { AstCommand, AstSsh, ShellGraph, ShellNode } from "./ast.ts";
 import { deriveSessionApprovalTemplate, structurallyStableWord, type ApprovalTransport } from "./session-approval-templates.ts";
+import { discoverWorkspaceBoundary, executableEnvironmentVeto, resolveStrictExecutable } from "./executable-identity.ts";
 import { hasRuntimeExecutionRisk, isProgrammableInterpreter } from "./profiles.ts";
 import type { ShellInspection } from "./policy.ts";
 
@@ -65,25 +65,16 @@ function eligibleDirectCandidate(inspection: ShellInspection) {
   return candidate;
 }
 
-async function resolveLocalExecutable(executable: string, cwd: string) {
-  const candidates = executable.includes("/")
-    ? [isAbsolute(executable) ? executable : resolve(cwd, executable)]
-    : (process.env.PATH ?? "").split(delimiter).map((entry) => {
-      const directory = !entry || entry === "." ? cwd : isAbsolute(entry) ? entry : resolve(cwd, entry);
-      return resolve(directory, executable);
-    });
-  for (const candidate of candidates) {
-    try {
-      await access(candidate, constants.X_OK);
-      return await realpath(candidate);
-    }
-    catch { /* try the next PATH entry */ }
-  }
-  return undefined;
+async function resolveLocalExecutable(executable: string, cwd: string, env: NodeJS.ProcessEnv) {
+  if (executableEnvironmentVeto(env, executable)) return undefined;
+  const workspace = await discoverWorkspaceBoundary(cwd);
+  if (!workspace.ok) return undefined;
+  const resolved = await resolveStrictExecutable(executable, workspace.cwd, workspace.boundary, { env });
+  return resolved.ok ? resolved.path : undefined;
 }
 
 /** Builds a non-authoritative session-consent template from the already inspected AST. */
-export async function approvalCandidate(inspection: ShellInspection, cwd: string, handoffScope?: string): Promise<ApprovalCandidate | undefined> {
+export async function approvalCandidate(inspection: ShellInspection, cwd: string, handoffScope?: string, executionEnv: NodeJS.ProcessEnv = process.env): Promise<ApprovalCandidate | undefined> {
   const direct = eligibleDirectCandidate(inspection);
   if (!direct) return undefined;
 
@@ -97,7 +88,7 @@ export async function approvalCandidate(inspection: ShellInspection, cwd: string
   const executable = direct.command.words[0]!.value;
   const executableIdentity = transport === "handoff"
     ? `remote:${executable}`
-    : await resolveLocalExecutable(executable, canonicalCwd!);
+    : await resolveLocalExecutable(executable, canonicalCwd!, executionEnv);
   if (!executableIdentity) return undefined;
 
   const scopeIdentity = transport === "handoff" ? handoffScope! : await canonicalExistingOrParent(canonicalCwd!).catch(() => undefined);

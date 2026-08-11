@@ -1,6 +1,6 @@
 // Run with: npx -y tsx --test agent/extensions/01-permissions/tests/index.test.ts
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test, { after } from "node:test";
@@ -8,7 +8,7 @@ import { setRemoteBashBackend } from "../../02-handoff/backend-registry.ts";
 import { setSessionManagingStyle } from "../management-settings.ts";
 import { cacheHotkeys } from "../shortcuts.ts";
 import { importPiModule } from "../../packages/pi-package.ts";
-import { approvalFingerprint, findSessionApproval, listSessionApprovals, rememberSessionApproval, resetSessionApprovalsForTests } from "../session-command-approvals.ts";
+import { approvalFingerprint, clearSessionApprovals, findSessionApproval, listSessionApprovals, rememberSessionApproval, resetSessionApprovalsForTests } from "../session-command-approvals.ts";
 
 const packageDir = resolve("agent/extensions/node_modules/@earendil-works/pi-coding-agent");
 const tuiDir = resolve("agent/extensions/node_modules/@earendil-works/pi-tui");
@@ -35,11 +35,12 @@ export function matchesKey(data, key) { return key === "ctrl+:" ? data === "ctrl
 
 const originalPiRoot = process.env.PI_CODING_AGENT_PACKAGE_ROOT;
 const fakePiRoot = mkdtempSync(join(tmpdir(), "permissions-pi-"));
-for (const path of ["dist/modes/interactive/components", "dist/modes/interactive/theme", "dist/modes/interactive"]) mkdirSync(resolve(fakePiRoot, path), { recursive: true });
+for (const path of ["dist/modes/interactive/components", "dist/modes/interactive/theme", "dist/modes/interactive", "dist/utils"]) mkdirSync(resolve(fakePiRoot, path), { recursive: true });
 writeFileSync(resolve(fakePiRoot, "package.json"), JSON.stringify({ name: "@earendil-works/pi-coding-agent", type: "module" }));
 writeFileSync(resolve(fakePiRoot, "dist/modes/interactive/components/settings-selector.js"), "export class SettingsSelectorComponent { getSettingsList() { return { items: [], filteredItems: [], onChange() {} }; } }\n");
 writeFileSync(resolve(fakePiRoot, "dist/modes/interactive/theme/theme.js"), "export const theme = { fg: (_c, t) => t, bold: t => t }; export const getSelectListTheme = () => ({});\n");
 writeFileSync(resolve(fakePiRoot, "dist/modes/interactive/interactive-mode.js"), "export class InteractiveMode { showSettingsSelector() {} setupExtensionShortcuts() {} handleHotkeysCommand() { return this.session.extensionRunner.getShortcuts(); } }\n");
+writeFileSync(resolve(fakePiRoot, "dist/utils/shell.js"), "export function getShellEnv() { if (process.env.PI_TEST_SHELL_ENV_MISSING) return undefined; const env = { ...process.env }; if (env.PI_TEST_SHELL_PATH) env.PATH = env.PI_TEST_SHELL_PATH; return env; }\n");
 process.env.PI_CODING_AGENT_PACKAGE_ROOT = fakePiRoot;
 
 after(() => {
@@ -340,7 +341,7 @@ test("a full configured store keeps existing rules and degrades a new remember c
     for (let index = 0; index < 100; index++) {
       const identity = approvalFingerprint("fixture", String(index));
       firstIdentity ??= identity;
-      assert.equal(rememberSessionApproval(approvalRule(identity, `fixture-${index}`), 100), true);
+      assert.equal(rememberSessionApproval(approvalRule(identity, `fixture-${index}`), 100).ok, true);
     }
     const notifications: string[] = [];
     const result = await app.handler("tool_call")(
@@ -358,6 +359,99 @@ test("a full configured store keeps existing rules and degrades a new remember c
     await app.handler("session_shutdown")({ reason: "quit" });
   }
   finally {
+    rmSync(cwd, { recursive: true, force: true });
+    resetSessionApprovalsForTests();
+  }
+});
+
+test("identity-vetoed read-only commands allow once without creating a session rule", async () => {
+  resetSessionApprovalsForTests();
+  const extension = (await import("../index.ts")).default;
+  const app = harness(); await extension(app.pi as any);
+  const cwd = mkdtempSync(join(tmpdir(), "permissions-identity-veto-"));
+  const originalPath = process.env.PATH;
+  try {
+    mkdirSync(join(cwd, ".git"));
+    const bin = join(cwd, "bin");
+    mkdirSync(bin);
+    const shadow = join(bin, "cat");
+    writeFileSync(shadow, "#!/bin/sh\nexit 0\n");
+    chmodSync(shadow, 0o700);
+    process.env.PATH = originalPath;
+    process.env.PI_TEST_SHELL_PATH = bin;
+    await app.handler("session_start")({ reason: "startup" }, { cwd, ui: {} });
+    const choices: string[][] = [];
+    const prompts: string[] = [];
+    const result = await app.handler("tool_call")(
+      { toolName: "bash", input: { command: "cat file" } },
+      { cwd, hasUI: true, ui: {
+        confirm: async () => true,
+        select: async (prompt: string, items: string[]) => { prompts.push(prompt); choices.push(items); return "Allow once"; },
+        notify() {},
+      } },
+    );
+    assert.equal(result, undefined);
+    assert.deepEqual(choices, [["Allow once", "Deny"]]);
+    assert.match(prompts[0]!, /resolves through the current workspace|resolves inside the current workspace/);
+    assert.deepEqual(listSessionApprovals(), []);
+    await app.handler("session_shutdown")({ reason: "quit" });
+  } finally {
+    if (originalPath === undefined) delete process.env.PATH; else process.env.PATH = originalPath;
+    delete process.env.PI_TEST_SHELL_PATH;
+    rmSync(cwd, { recursive: true, force: true });
+    resetSessionApprovalsForTests();
+  }
+});
+
+test("unavailable shell execution identity fails closed for local read-only commands", async () => {
+  resetSessionApprovalsForTests();
+  const extension = (await import("../index.ts")).default;
+  const app = harness(); await extension(app.pi as any);
+  const cwd = mkdtempSync(join(tmpdir(), "permissions-missing-shell-env-"));
+  try {
+    process.env.PI_TEST_SHELL_ENV_MISSING = "1";
+    await app.handler("session_start")({ reason: "startup" }, { cwd, ui: {} });
+    const prompts: string[] = [];
+    const result = await app.handler("tool_call")(
+      { toolName: "bash", input: { command: "cat file" } },
+      { cwd, hasUI: true, ui: {
+        confirm: async () => true,
+        select: async (prompt: string) => { prompts.push(prompt); return "Allow once"; },
+        notify() {},
+      } },
+    );
+    assert.equal(result, undefined);
+    assert.match(prompts[0]!, /shell execution environment could not be verified/);
+    assert.deepEqual(listSessionApprovals(), []);
+    await app.handler("session_shutdown")({ reason: "quit" });
+  } finally {
+    delete process.env.PI_TEST_SHELL_ENV_MISSING;
+    rmSync(cwd, { recursive: true, force: true });
+    resetSessionApprovalsForTests();
+  }
+});
+
+test("stale remember choices report expiration rather than a false cap warning", async () => {
+  resetSessionApprovalsForTests();
+  const extension = (await import("../index.ts")).default;
+  const app = harness(); await extension(app.pi as any);
+  const cwd = mkdtempSync(join(tmpdir(), "permissions-stale-remember-"));
+  try {
+    await app.handler("session_start")({ reason: "startup" }, { cwd, ui: {} });
+    const notifications: string[] = [];
+    const result = await app.handler("tool_call")(
+      { toolName: "bash", input: { command: "git frobnicate task.js" } },
+      { cwd, hasUI: true, ui: {
+        confirm: async () => true,
+        select: async () => { clearSessionApprovals(); return "Allow similar commands for this session"; },
+        notify: (message: string) => { notifications.push(message); },
+      } },
+    );
+    assert.equal(result, undefined);
+    assert.deepEqual(notifications, ["Session approval expired; allowed once without remembering"]);
+    assert.deepEqual(listSessionApprovals(), []);
+    await app.handler("session_shutdown")({ reason: "quit" });
+  } finally {
     rmSync(cwd, { recursive: true, force: true });
     resetSessionApprovalsForTests();
   }

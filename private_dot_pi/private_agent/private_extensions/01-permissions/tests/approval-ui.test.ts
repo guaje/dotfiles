@@ -33,13 +33,13 @@ test("approval formatters apply semantic Catppuccin theme roles", () => {
   assert.match(bash, /<syntaxFunction>agent\/scripts\/list-provider-models\.sh<\/syntaxFunction>/);
   assert.doesNotMatch(bash, /<b>agent\/scripts\/list-provider-models\.sh<\/b>/);
   assert.match(bash, /<toolTitle><b>Programs to run:<\/b><\/toolTitle>/);
-  assert.match(bash, /<warning>unreviewed executable: list-provider-models\.sh<\/warning>/);
+  assert.match(bash, /<warning>path-qualified executables require approval<\/warning>/);
   assert.match(bash, /<toolTitle><b>Remote target:<\/b><\/toolTitle> <toolOutput>host:\/repo<\/toolOutput>/);
   const gitCommit = formatBashApproval(ui, analyzeBash("git commit -m 'message'"));
   assert.match(gitCommit, /<warning>git commit<\/warning> <muted>creates a commit and updates repository history<\/muted>/);
   assert.doesNotMatch(gitCommit, /not a reviewed query/);
   const qualifiedGitCommit = formatBashApproval(ui, analyzeBash("/usr/bin/git -C repo commit -m message"));
-  assert.match(qualifiedGitCommit, /<warning>git commit<\/warning> <muted>creates a commit and updates repository history<\/muted>/);
+  assert.match(qualifiedGitCommit, /<warning>path-qualified executables require approval<\/warning>/);
 });
 
 test("file confirmation restores editor and working state after rejection", async () => {

@@ -129,40 +129,44 @@ test("conservative rules vary only high-confidence paths and fix operations", as
   finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
-test("relative PATH entries resolve from the command cwd", async () => {
+test("relative PATH, workspace executables, and path-qualified aliases cannot create remembered rules", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "approval-relative-path-"));
   const originalPath = process.env.PATH;
   try {
     await mkdir(join(cwd, "bin-a"));
-    await mkdir(join(cwd, "bin-b"));
-    for (const directory of ["bin-a", "bin-b"]) {
-      const executable = join(cwd, directory, "workspace-tool");
-      await writeFile(executable, "#!/bin/sh\nexit 0\n");
-      await chmod(executable, 0o700);
-    }
-    process.env.PATH = "bin-a";
-    const relative = await approvalCandidate(inspectBash("workspace-tool --mode=fixed"), cwd);
-    process.env.PATH = join(cwd, "bin-b");
-    const absolute = await approvalCandidate(inspectBash("workspace-tool --mode=fixed"), cwd);
-    assert.ok(relative);
-    assert.ok(absolute);
-    assert.notEqual(relative.rule.fingerprint, absolute.rule.fingerprint);
+    const executable = join(cwd, "bin-a", "workspace-tool");
+    await writeFile(executable, "#!/bin/sh\nexit 0\n");
+    await chmod(executable, 0o700);
 
-    const multicall = join(cwd, "multicall");
-    await writeFile(multicall, "#!/bin/sh\nexit 0\n");
-    await chmod(multicall, 0o700);
-    await symlink(multicall, join(cwd, "alias-a"));
-    await symlink(multicall, join(cwd, "alias-b"));
-    const aliasA = await approvalCandidate(inspectBash("./alias-a --mode=fixed"), cwd);
-    const aliasB = await approvalCandidate(inspectBash("./alias-b --mode=fixed"), cwd);
-    assert.ok(aliasA);
-    assert.ok(aliasB);
-    assert.notEqual(aliasA.rule.fingerprint, aliasB.rule.fingerprint);
+    process.env.PATH = "bin-a";
+    assert.equal(await approvalCandidate(inspectBash("workspace-tool --mode=fixed"), cwd), undefined);
+    process.env.PATH = join(cwd, "bin-a");
+    assert.equal(await approvalCandidate(inspectBash("workspace-tool --mode=fixed"), cwd), undefined);
+
+    await symlink(executable, join(cwd, "alias-a"));
+    assert.equal(await approvalCandidate(inspectBash("./alias-a --mode=fixed"), cwd), undefined);
   }
   finally {
     if (originalPath === undefined) delete process.env.PATH;
     else process.env.PATH = originalPath;
     await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test("remembered rules use the supplied execution PATH and reject startup/function overrides", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "approval-execution-env-cwd-"));
+  const bin = await mkdtemp(join(tmpdir(), "approval-execution-env-bin-"));
+  try {
+    const executable = join(bin, "fixture-tool");
+    await writeFile(executable, "#!/bin/sh\nexit 0\n");
+    await chmod(executable, 0o700);
+    const inspection = inspectBash("fixture-tool --mode=fixed");
+    assert.ok(await approvalCandidate(inspection, cwd, undefined, { PATH: bin }));
+    assert.equal(await approvalCandidate(inspection, cwd, undefined, { PATH: bin, BASH_ENV: "fixture" }), undefined);
+    assert.equal(await approvalCandidate(inspection, cwd, undefined, { PATH: bin, "BASH_FUNC_fixture-tool%%": "() { :; }" }), undefined);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+    await rm(bin, { recursive: true, force: true });
   }
 });
 

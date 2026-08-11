@@ -21,6 +21,10 @@ export interface SessionApprovalRuleInput {
   label: string;
 }
 
+export type RememberSessionApprovalResult =
+  | { ok: true; status: "remembered" | "duplicate" }
+  | { ok: false; reason: "epoch-mismatch" | "invalid-rule" | "invalid-limit" | "limit-reached" };
+
 export interface SessionApprovalRecord extends SessionApprovalRuleInput {
   id: string;
   createdAt: number;
@@ -164,15 +168,17 @@ export function findSessionApproval(rule: Pick<SessionApprovalRuleInput, "epoch"
   return { ...found, slotTypes: [...found.slotTypes] };
 }
 
-export function rememberSessionApproval(rule: SessionApprovalRuleInput, maxRules: number) {
+export function rememberSessionApproval(rule: SessionApprovalRuleInput, maxRules: number): RememberSessionApprovalResult {
   const current = store();
-  if (rule.epoch !== current.epoch || !validRuleInput(rule)) return false;
+  if (rule.epoch !== current.epoch) return { ok: false, reason: "epoch-mismatch" };
+  if (!validRuleInput(rule)) return { ok: false, reason: "invalid-rule" };
   const fingerprint = storedFingerprint(current, rule.fingerprint);
-  if (current.rules.has(fingerprint)) return true;
-  if (!Number.isSafeInteger(maxRules) || maxRules < 1 || current.rules.size >= maxRules) return false;
+  if (current.rules.has(fingerprint)) return { ok: true, status: "duplicate" };
+  if (!Number.isSafeInteger(maxRules) || maxRules < 1) return { ok: false, reason: "invalid-limit" };
+  if (current.rules.size >= maxRules) return { ok: false, reason: "limit-reached" };
   const now = Date.now();
   current.rules.set(fingerprint, { ...rule, fingerprint, slotTypes: [...rule.slotTypes], id: randomUUID(), createdAt: now, lastUsedAt: now });
-  return true;
+  return { ok: true, status: "remembered" };
 }
 
 export function listSessionApprovals(): SessionApprovalRecord[] {

@@ -1,15 +1,15 @@
 import { classifyCurl } from "./curl.ts";
 import { classifyProfile } from "./profiles.ts";
 import { SHELL_GRAPH_LIMITS, type AstCommand, type AstSsh, type ShellGraph, type ShellNode } from "./ast.ts";
-import type { ExecutionUnitSummary, ShellAnalysis, ShellCommand, ShellContext, ShellEffect } from "../types.ts";
+import type { ExecutableIdentityRequirement, ExecutionUnitSummary, ShellAnalysis, ShellCommand, ShellContext, ShellEffect } from "../types.ts";
 
 const LOCAL_CONTEXT: ShellContext = { location: "local", usesNetwork: false };
 const EFFECT_RANK: Record<ShellEffect, number> = { "read-only": 0, mutating: 1, unknown: 2 };
 function combine(left: ShellEffect, right: ShellEffect): ShellEffect { return EFFECT_RANK[left] >= EFFECT_RANK[right] ? left : right; }
 function unique(values: string[]) { return [...new Set(values)]; }
 
-type NodeResult = { effect: ShellEffect; complete: boolean; reasons: string[]; commands: ShellCommand[] };
-type Unwrapped = { index: number; reason?: string };
+type NodeResult = { effect: ShellEffect; complete: boolean; reasons: string[]; commands: ShellCommand[]; identityRequirements: ExecutableIdentityRequirement[] };
+type Unwrapped = { index: number; reason?: string; wrappers?: string[]; unverifiableReason?: string };
 
 function unwrap(argv: string[]): Unwrapped {
   let index = 0;
@@ -19,7 +19,7 @@ function unwrap(argv: string[]): Unwrapped {
     if (argv[index + 1] === "-v" && argv.length === index + 3) return { index };
     index++;
     if (argv[index] === "--") index++;
-    return argv[index] ? { index } : { index: 0, reason: "command wrapper has no executable" };
+    return argv[index] ? { index, wrappers: ["command"] } : { index: 0, reason: "command wrapper has no executable" };
   }
   if (wrapperName === "timeout") {
     index++;
@@ -31,7 +31,7 @@ function unwrap(argv: string[]): Unwrapped {
     }
     if (!/^\d+(?:\.\d+)?[smhd]?$/.test(argv[index] ?? "")) return { index: 0, reason: "timeout duration is missing or dynamic" };
     index++;
-    return argv[index] ? { index } : { index: 0, reason: "timeout wrapper has no executable" };
+    return argv[index] ? { index, wrappers: ["timeout"] } : { index: 0, reason: "timeout wrapper has no executable" };
   }
   if (wrapperName === "env") {
     index++;
@@ -46,7 +46,9 @@ function unwrap(argv: string[]): Unwrapped {
       break;
     }
     if (index >= argv.length) return isolated ? { index: 0, reason: "env wrapper has no executable" } : { index: 0 };
-    return isolated ? { index } : { index: 0, reason: "env command inheritance is not reviewed; use env -i" };
+    return isolated
+      ? { index, wrappers: ["env"], unverifiableReason: "env -i executable identity is not modeled for auto-allow" }
+      : { index: 0, reason: "env command inheritance is not reviewed; use env -i" };
   }
   return { index };
 }
@@ -60,6 +62,7 @@ type PreparedCommand = {
   complete: boolean;
   reasons: string[];
   nestedCommands: ShellCommand[];
+  identityRequirements: ExecutableIdentityRequirement[];
 };
 
 function prepareCommand(node: AstCommand, inheritedContext: ShellContext, depth: number): PreparedCommand | NodeResult {
@@ -67,22 +70,24 @@ function prepareCommand(node: AstCommand, inheritedContext: ShellContext, depth:
   const unwrapped = unwrap(argv);
   const executableWord = node.words[unwrapped.index];
   if (!executableWord || !executableWord.literal || executableWord.substitutions.length > 0 || /^(?:function|alias|eval|source|\.|if|then|else|elif|fi|for|while|until|do|done|case|esac|select|coproc|\{|\})$/.test(executableWord.value)) {
-    return { effect: "unknown", complete: false, reasons: ["dynamic or unsupported executable"], commands: [] };
+    return { effect: "unknown", complete: false, reasons: ["dynamic or unsupported executable"], commands: [], identityRequirements: [] };
   }
   if (node.words.some((word) => !word.literal && word.substitutions.length === 0)) {
-    return { effect: "unknown", complete: false, reasons: ["unsupported dynamic shell expansion"], commands: [] };
+    return { effect: "unknown", complete: false, reasons: ["unsupported dynamic shell expansion"], commands: [], identityRequirements: [] };
   }
 
   let dependencyEffect: ShellEffect = "read-only";
   let complete = true;
   const reasons: string[] = [];
   const nestedCommands: ShellCommand[] = [];
+  const nestedIdentityRequirements: ExecutableIdentityRequirement[] = [];
   for (const word of node.words) {
     for (const substitution of word.substitutions) {
       const nested = analyzeShellGraph(substitution, inheritedContext, depth + 1);
       dependencyEffect = combine(dependencyEffect, nested.effect);
       reasons.push(...nested.reasons);
       nestedCommands.push(...nested.commands);
+      nestedIdentityRequirements.push(...nested.identityRequirements);
       complete &&= nested.complete;
     }
   }
@@ -92,6 +97,7 @@ function prepareCommand(node: AstCommand, inheritedContext: ShellContext, depth:
       dependencyEffect = combine(dependencyEffect, nested.effect);
       reasons.push(...nested.reasons);
       nestedCommands.push(...nested.commands);
+      nestedIdentityRequirements.push(...nested.identityRequirements);
       complete &&= nested.complete;
     }
     if (!redirection.supported || !redirection.target?.literal) {
@@ -105,15 +111,35 @@ function prepareCommand(node: AstCommand, inheritedContext: ShellContext, depth:
       reasons.push("output redirection writes a file");
     }
   }
+  const executableName = executableWord.value.replace(/^.*[\\/]/, "").toLowerCase();
+  const wrapperRequirements: ExecutableIdentityRequirement[] = (unwrapped.wrappers ?? []).map((wrapper, index) => ({
+    name: wrapper.toLowerCase(),
+    rawName: wrapper,
+    argv: argv.slice(1),
+    context: inheritedContext,
+    role: "wrapper",
+    ...(index === 0 && unwrapped.unverifiableReason ? { unverifiableReason: unwrapped.unverifiableReason } : {}),
+  }));
   return {
     argv,
     unwrapped,
     executableWord,
-    executableName: executableWord.value.replace(/^.*[\\/]/, "").toLowerCase(),
+    executableName,
     dependencyEffect,
     complete,
     reasons,
     nestedCommands,
+    identityRequirements: [
+      ...nestedIdentityRequirements,
+      ...wrapperRequirements,
+      {
+        name: executableName,
+        rawName: executableWord.value,
+        argv: argv.slice(unwrapped.index + 1),
+        context: inheritedContext,
+        role: "command",
+      },
+    ],
   };
 }
 
@@ -124,11 +150,11 @@ function analyzeCommand(node: AstCommand, inheritedContext: ShellContext, depth:
   let context = inheritedContext;
   let verdict = unwrapped.reason
     ? { effect: "unknown" as ShellEffect, reason: unwrapped.reason }
-    : classifyProfile(executableWord.value, argv.slice(unwrapped.index + 1));
+    : classifyProfile(executableWord.value, argv.slice(unwrapped.index + 1), inheritedContext);
   if (executableName === "glab" || executableName === "gh" || executableName === "curl") {
     context = { ...inheritedContext, usesNetwork: true };
   }
-  if (executableName === "curl") verdict = classifyCurl(argv.slice(unwrapped.index + 1));
+  if (executableName === "curl" && !/[\\/]/.test(executableWord.value)) verdict = classifyCurl(argv.slice(unwrapped.index + 1));
   verdict.effect = combine(verdict.effect, prepared.dependencyEffect);
   const command: ShellCommand = {
     name: executableWord.value,
@@ -143,6 +169,7 @@ function analyzeCommand(node: AstCommand, inheritedContext: ShellContext, depth:
     complete: prepared.complete,
     reasons: unique([...prepared.reasons, ...(verdict.reason ? [verdict.reason] : [])]),
     commands: [...prepared.nestedCommands, command],
+    identityRequirements: prepared.identityRequirements.map((requirement) => requirement.name === executableName ? { ...requirement, context } : requirement),
   };
 }
 
@@ -162,14 +189,17 @@ function analyzeSsh(node: AstSsh, inheritedContext: ShellContext, depth: number)
         : { effect: node.invocationEffect };
   const payloadCommands: ShellCommand[] = [];
   const payloadReasons: string[] = [];
+  const payloadIdentityRequirements: ExecutableIdentityRequirement[] = [];
   let complete = prepared.complete;
   if (!dynamicArguments && node.payload && node.target && verdict.effect === "read-only") {
     const payload = analyzeShellGraph(node.payload, context, depth + 1);
     verdict = { effect: payload.effect, reason: payload.reasons[0] };
     payloadReasons.push(...payload.reasons);
     payloadCommands.push(...payload.commands);
+    payloadIdentityRequirements.push(...payload.identityRequirements);
     complete &&= payload.complete;
   }
+  if (/[\\/]/.test(prepared.executableWord.value)) verdict = { effect: "unknown", reason: "path-qualified executables require approval" };
   verdict.effect = combine(verdict.effect, prepared.dependencyEffect);
   const command: ShellCommand = {
     name: prepared.executableWord.value,
@@ -184,11 +214,12 @@ function analyzeSsh(node: AstSsh, inheritedContext: ShellContext, depth: number)
     complete,
     reasons: unique([...prepared.reasons, ...payloadReasons, ...(verdict.reason ? [verdict.reason] : [])]),
     commands: [...prepared.nestedCommands, ...payloadCommands, command],
+    identityRequirements: [...prepared.identityRequirements, ...payloadIdentityRequirements],
   };
 }
 
 function analyzeNode(node: ShellNode, context: ShellContext, depth: number): NodeResult {
-  if (node.kind === "unsupported") return { effect: "unknown", complete: false, reasons: [node.reason], commands: [] };
+  if (node.kind === "unsupported") return { effect: "unknown", complete: false, reasons: [node.reason], commands: [], identityRequirements: [] };
   if (node.kind === "command") return analyzeCommand(node, context, depth);
   if (node.kind === "wrapper") return analyzeCommand(node.command, context, depth);
   if (node.kind === "ssh") return analyzeSsh(node, context, depth);
@@ -200,13 +231,14 @@ function analyzeNode(node: ShellNode, context: ShellContext, depth: number): Nod
     complete: results.every((result) => result.complete),
     reasons: unique(results.flatMap((result) => result.reasons)),
     commands: results.flatMap((result) => result.commands),
+    identityRequirements: results.flatMap((result) => result.identityRequirements),
   };
 }
 
 export function analyzeShellGraph(graph: ShellGraph, context: ShellContext = LOCAL_CONTEXT, depth = 0): ShellAnalysis {
   const roots = graph.root.kind === "sequence" ? graph.root.units : [{ node: graph.root, operatorAfter: undefined }];
   const unitResults = roots.map((unit) => depth > SHELL_GRAPH_LIMITS.maxDepth
-    ? { effect: "unknown" as ShellEffect, complete: false, reasons: ["shell analysis depth limit exceeded"], commands: [] }
+    ? { effect: "unknown" as ShellEffect, complete: false, reasons: ["shell analysis depth limit exceeded"], commands: [], identityRequirements: [] }
     : analyzeNode(unit.node, context, depth));
   const executionUnits: ExecutionUnitSummary[] = unitResults.map((result, index) => ({
     id: index,
@@ -225,6 +257,7 @@ export function analyzeShellGraph(graph: ShellGraph, context: ShellContext = LOC
     effect,
     reasons,
     commands: unitResults.flatMap((result) => result.commands),
+    identityRequirements: unitResults.flatMap((result) => result.identityRequirements),
     context,
     executionUnits,
   };

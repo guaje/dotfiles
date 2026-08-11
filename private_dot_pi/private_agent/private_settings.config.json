@@ -5,10 +5,10 @@
   "enabledModels": [
     "openai-codex/gpt-5.6-sol",
     "openai-codex/gpt-5.6-terra",
-    "reallms-dev/GLM-5.2",
+    "reallms/glm-5.2",
     "kelley/Kimi-K2.6",
     "openai-codex/gpt-5.6-luna",
-    "reallms-dev/solar-open2-250B-API",
+    "reallms-dev/DeepSeek-V4-Flash-API",
     "reallms-dev/Laguna-S-2.1-FP8",
     "reallms/gemma-4-31B-it",
     "reallms/Qwen3-Coder-Next"

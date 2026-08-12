@@ -21,7 +21,7 @@ export function decideAnalysis(analysis: ShellAnalysis, style: "Micromanagement"
   }
   const hasReadOnlyUnit = analysis.executionUnits.some((unit) => unit.effect === "read-only");
   const hasNonReadOnlyUnit = analysis.executionUnits.some((unit) => unit.effect !== "read-only");
-  if (hasReadOnlyUnit && hasNonReadOnlyUnit) {
+  if (analysis.complete && hasReadOnlyUnit && hasNonReadOnlyUnit) {
     return {
       allow: false,
       needsApproval: false,

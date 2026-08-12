@@ -37,6 +37,32 @@ test("cd and nl are local-only finite read profiles", () => {
   assert.equal(effect("nl -ba file", remote), "unknown");
 });
 
+test("adb allows only exact local device listings", () => {
+  for (const command of ["adb devices", "adb devices -l"]) {
+    const analysis = parseShell(command);
+    assert.equal(analysis.effect, "read-only", command);
+    assert.equal(analysis.commands[0]?.context.usesNetwork, false, command);
+  }
+  for (const command of [
+    "adb", "adb devices --", "adb devices -L", "adb devices --anything", "adb devices -l extra",
+    "adb -s serial devices", "adb -d devices", "adb -e devices", "adb -t 1 devices", "adb -H host devices", "adb -P 5037 devices",
+    "adb shell true", "adb track-devices", "adb get-state", "adb push source target", "adb pull source target", "adb install app.apk",
+    "adb root", "adb reboot", "adb forward tcp:1 tcp:2", "adb connect host", "adb start-server", "adb kill-server",
+    "/usr/bin/adb devices", "ADB devices",
+  ]) assert.equal(effect(command), "unknown", command);
+  assert.equal(effect("adb devices", remote), "unknown");
+});
+
+test("adb listings compose with other classified top-level units", () => {
+  const readOnly = parseShell("git status; adb devices");
+  assert.equal(readOnly.complete, true);
+  assert.deepEqual(readOnly.executionUnits.map((unit) => unit.effect), ["read-only", "read-only"]);
+
+  const mixed = parseShell("git status; git add file; adb devices");
+  assert.equal(mixed.complete, true);
+  assert.deepEqual(mixed.executionUnits.map((unit) => unit.effect), ["read-only", "mutating", "read-only"]);
+});
+
 test("glab exact queries and REST GET forms are read-only only in local context", () => {
   for (const command of [
     "glab mr view 1", "glab mr list", "glab mr diff 1", "glab mr pipelines 1",
@@ -64,7 +90,7 @@ test("new Git query profiles are guarded and local-only while existing remote qu
 });
 
 test("direct classifier keeps all additive profiles out of remote contexts", () => {
-  for (const [name, argv] of [["cd", ["src"]], ["nl", ["file"]], ["glab", ["mr", "view", "1"]], ["gh", ["run", "list"]], ["git", ["ls-tree", "HEAD"]]] as const) {
+  for (const [name, argv] of [["adb", ["devices"]], ["cd", ["src"]], ["nl", ["file"]], ["glab", ["mr", "view", "1"]], ["gh", ["run", "list"]], ["git", ["ls-tree", "HEAD"]]] as const) {
     assert.equal(classifyProfile(name, [...argv], remote).effect, "unknown", name);
   }
 });

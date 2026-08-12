@@ -38,7 +38,7 @@ const fakePiRoot = mkdtempSync(join(tmpdir(), "permissions-pi-"));
 for (const path of ["dist/modes/interactive/components", "dist/modes/interactive/theme", "dist/modes/interactive", "dist/utils"]) mkdirSync(resolve(fakePiRoot, path), { recursive: true });
 const identityBin = resolve(fakePiRoot, "identity-bin");
 mkdirSync(identityBin);
-for (const executable of ["cat", "chezmoi", "git", "jq", "ssh"]) {
+for (const executable of ["adb", "cat", "chezmoi", "git", "jq", "ssh"]) {
   const path = resolve(identityBin, executable);
   writeFileSync(path, "#!/bin/sh\nexit 0\n");
   chmodSync(path, 0o700);
@@ -130,7 +130,7 @@ test("entry registers one Bash owner and injects split guidance once", async () 
   assert.equal(second.systemPrompt, first.systemPrompt);
 });
 
-test("Empowerment allows read-only remote Bash, splits mixed calls, and gates mutations headlessly", async () => {
+test("Empowerment auto-allows complete reads, splits complete mixed units, and keeps compound syntax whole", async () => {
   const extension = (await import("../index.ts")).default;
   const app = harness();
   try {
@@ -138,19 +138,36 @@ test("Empowerment allows read-only remote Bash, splits mixed calls, and gates mu
     await extension(app.pi as any);
     await app.handler("session_start")({}, { cwd: process.cwd(), ui: {} });
     const call = app.handler("tool_call");
-    assert.equal(await call({ toolName: "bash", input: { command: "ssh -o BatchMode=yes host 'git status'" } }, { cwd: process.cwd(), hasUI: false, ui: {} }), undefined);
-    assert.equal(await call({ toolName: "bash", input: { command: "chezmoi status --verbose" } }, { cwd: process.cwd(), hasUI: false, ui: {} }), undefined);
-    assert.equal(await call({ toolName: "bash", input: { command: "chezmoi diff -- install-pi-notification-icons.sh" } }, { cwd: process.cwd(), hasUI: false, ui: {} }), undefined);
-    const mixed = await call({ toolName: "bash", input: { command: "git status && git add file" } }, { cwd: process.cwd(), hasUI: false, ui: {} });
-    assert.match(mixed.reason, /Split read-only/);
-    assert.equal(await call({ toolName: "bash", input: { command: "cat file | jq ." } }, { cwd: process.cwd(), hasUI: false, ui: {} }), undefined);
-    for (const command of ["cat file | tee out", "glab issue create -d \"$(cat body)\""]) {
-      const coupled = await call({ toolName: "bash", input: { command } }, { cwd: process.cwd(), hasUI: false, ui: {} });
+    const invoke = async (command: string) => {
+      const event = { toolName: "bash", input: { command } };
+      const result = await call(event, { cwd: process.cwd(), hasUI: false, ui: {} });
+      assert.equal(event.input.command, command);
+      return result;
+    };
+
+    assert.equal(await invoke("ssh -o BatchMode=yes host 'git status'"), undefined);
+    assert.equal(await invoke("chezmoi status --verbose"), undefined);
+    assert.equal(await invoke("chezmoi diff -- install-pi-notification-icons.sh"), undefined);
+    assert.equal(await invoke("git status; adb devices"), undefined);
+    assert.equal(await invoke("cat file | jq ."), undefined);
+
+    for (const command of [
+      "git status && git add file",
+      "git status; git add file; adb devices",
+      "git status; adb shell true",
+      "git status; git add file; adb shell true",
+      "ls; rm file",
+    ]) {
+      const mixed = await invoke(command);
+      assert.match(mixed.reason, /Split read-only/, command);
+    }
+
+    const reportedLoop = "for pid in 13653 13755 13810; do printf '%s ' \"$pid\"; adb shell cat /proc/$pid/cmdline 2>/dev/null | tr '\\0' ' '; echo; done";
+    for (const command of [reportedLoop, "cat file | tee out", "glab issue create -d \"$(cat body)\"", "rm file"]) {
+      const coupled = await invoke(command);
       assert.match(coupled.reason, /no UI/, command);
       assert.doesNotMatch(coupled.reason, /Split read-only/, command);
     }
-    const mutation = await call({ toolName: "bash", input: { command: "rm file" } }, { cwd: process.cwd(), hasUI: false, ui: {} });
-    assert.match(mutation.reason, /no UI/);
     assert.equal(listSessionApprovals().length, 0);
     await app.handler("session_shutdown")();
   } finally {
@@ -376,26 +393,26 @@ test("a full configured store keeps existing rules and degrades a new remember c
   }
 });
 
-test("identity-vetoed read-only commands allow once without creating a session rule", async () => {
+test("workspace-shadowed adb identity allows once without creating a session rule", async () => {
   resetSessionApprovalsForTests();
   const extension = (await import("../index.ts")).default;
   const app = harness(); await extension(app.pi as any);
   const cwd = mkdtempSync(join(tmpdir(), "permissions-identity-veto-"));
-  const originalPath = process.env.PATH;
   try {
     mkdirSync(join(cwd, ".git"));
     const bin = join(cwd, "bin");
     mkdirSync(bin);
-    const shadow = join(bin, "cat");
+    const shadow = join(bin, "adb");
     writeFileSync(shadow, "#!/bin/sh\nexit 0\n");
     chmodSync(shadow, 0o700);
-    process.env.PATH = originalPath;
     process.env.PI_TEST_SHELL_PATH = bin;
     await app.handler("session_start")({ reason: "startup" }, { cwd, ui: {} });
     const choices: string[][] = [];
     const prompts: string[] = [];
+    const command = "adb devices";
+    const event = { toolName: "bash", input: { command } };
     const result = await app.handler("tool_call")(
-      { toolName: "bash", input: { command: "cat file" } },
+      event,
       { cwd, hasUI: true, ui: {
         confirm: async () => true,
         select: async (prompt: string, items: string[]) => { prompts.push(prompt); choices.push(items); return "Allow once"; },
@@ -403,12 +420,12 @@ test("identity-vetoed read-only commands allow once without creating a session r
       } },
     );
     assert.equal(result, undefined);
+    assert.equal(event.input.command, command);
     assert.deepEqual(choices, [["Allow once", "Deny"]]);
     assert.match(prompts[0]!, /resolves through the current workspace|resolves inside the current workspace/);
     assert.deepEqual(listSessionApprovals(), []);
     await app.handler("session_shutdown")({ reason: "quit" });
   } finally {
-    if (originalPath === undefined) delete process.env.PATH; else process.env.PATH = originalPath;
     delete process.env.PI_TEST_SHELL_PATH;
     rmSync(cwd, { recursive: true, force: true });
     resetSessionApprovalsForTests();

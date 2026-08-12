@@ -8,12 +8,67 @@ import type { ShellAnalysis } from "../types.ts";
 
 const unknownUnit = (source: string) => ({ id: 0, effect: "unknown" as const, span: { start: 0, end: source.length } });
 
-test("only direct outer sequence children receive split guidance for every sequence operator", () => {
+test("complete direct outer read/non-read sequences receive split guidance with operator metadata", () => {
   for (const operator of [";", "\n", "&&", "||"] as const) {
-    const decision = decideBash(`git status ${operator} git add file`, "Empowerment");
+    const command = `git status ${operator} git add file`;
+    const analysis = analyzeBash(command);
+    const decision = decideAnalysis(analysis, "Empowerment");
+    assert.equal(analysis.complete, true, operator);
+    assert.deepEqual(analysis.executionUnits.map((unit) => unit.effect), ["read-only", "mutating"], operator);
+    assert.equal(analysis.executionUnits[0]?.operatorAfter, operator, operator);
     assert.equal(decision.allow, false, operator);
     assert.equal(decision.needsApproval, false, operator);
     assert.match(decision.reason ?? "", /Split read-only/, operator);
+  }
+});
+
+test("split eligibility is generic and includes complete unknown top-level siblings", () => {
+  const cases: Array<[string, Array<"read-only" | "mutating" | "unknown">]> = [
+    ["ls; rm file", ["read-only", "mutating"]],
+    ["chezmoi status; chezmoi add file", ["read-only", "mutating"]],
+    ["curl -I https://example.test; curl -X POST https://example.test", ["read-only", "mutating"]],
+    ["git status; adb shell true", ["read-only", "unknown"]],
+    ["git status; git add file; adb shell true", ["read-only", "mutating", "unknown"]],
+    ["git status; git add file; adb devices", ["read-only", "mutating", "read-only"]],
+  ];
+  for (const [command, effects] of cases) {
+    const analysis = analyzeBash(command);
+    const decision = decideAnalysis(analysis, "Empowerment");
+    assert.equal(analysis.complete, true, command);
+    assert.deepEqual(analysis.executionUnits.map((unit) => unit.effect), effects, command);
+    assert.equal(decision.needsApproval, false, command);
+    assert.match(decision.reason ?? "", /Split read-only/, command);
+  }
+});
+
+test("incomplete compound syntax remains one whole-command approval even when apparent units are mixed", () => {
+  const reportedLoop = "for pid in 13653 13755 13810; do printf '%s ' \"$pid\"; adb shell cat /proc/$pid/cmdline 2>/dev/null | tr '\\0' ' '; echo; done";
+  for (const command of [
+    reportedLoop,
+    "for i in x\ndo\ngit status\ndone",
+    "git status; while true; do echo ok; done",
+    "git status; if true; then echo ok; fi",
+    "git status; case x in x) echo ok;; esac",
+    "git status; f() { echo ok; }; f",
+    "git status; echo \"$value\"",
+  ]) {
+    const analysis = analyzeBash(command);
+    const decision = decideAnalysis(analysis, "Empowerment");
+    assert.equal(analysis.complete, false, command);
+    assert.equal(decision.allow, false, command);
+    assert.equal(decision.needsApproval, true, command);
+    assert.doesNotMatch(decision.reason ?? "", /Split read-only/, command);
+  }
+});
+
+test("complete non-read-only sequences without a read-only sibling remain whole-command approvals", () => {
+  for (const command of ["git add file; rm file", "adb shell true; unknown-tool", "git add file; adb shell true"]) {
+    const analysis = analyzeBash(command);
+    const decision = decideAnalysis(analysis, "Empowerment");
+    assert.equal(analysis.complete, true, command);
+    assert.equal(analysis.executionUnits.some((unit) => unit.effect === "read-only"), false, command);
+    assert.equal(decision.needsApproval, true, command);
+    assert.doesNotMatch(decision.reason ?? "", /Split read-only/, command);
   }
 });
 

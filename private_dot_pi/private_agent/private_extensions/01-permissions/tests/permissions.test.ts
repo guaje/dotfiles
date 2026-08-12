@@ -134,7 +134,18 @@ test("Empowerment blocks mixed commands immediately and Micromanagement approves
   const micro = decideBash("git status", "Micromanagement"); assert.equal(micro.needsApproval, true);
   assert.equal(decideBash("ssh host 'git status'", "Empowerment").allow, true);
 });
-test("prompt guidance is injected exactly once", () => { const once = injectPromptGuidance("base"); assert.equal(injectPromptGuidance(once), once); });
+test("prompt guidance limits splitting to complete direct units and protects compound control flow", () => {
+  const once = injectPromptGuidance("base");
+  assert.equal(injectPromptGuidance(once), once);
+  assert.match(once, /independently parsed direct top-level commands/);
+  assert.match(once, /read-only inspections from mutating or unknown commands/);
+  assert.match(once, /only when structural analysis is complete/);
+  assert.match(once, /Unsupported compound control flow/);
+  assert.match(once, /do not restructure it merely to avoid approval/);
+  assert.match(once, /never automatically rewrites or splits shell text/);
+  assert.match(once, /&&.*\|\|.*preserved/);
+  assert.doesNotMatch(once, /read-only\/non-read-only/);
+});
 test("canonical local roots reject prefix and symlink escapes", async () => {
   const root = await mkdtemp(join(tmpdir(), "permissions-test-"));
   try {

@@ -74,6 +74,12 @@ export function classifyProfile(rawName: string, argv: string[], context: ShellC
   if (name === "git") return classifyGit(argv, context);
   if (name === "chezmoi") return classifyChezmoi(argv);
   if (name === "glab" || name === "gh") return classifyForgeCli(name, argv, context);
+  if (name === "adb") {
+    const remote = localOnly(name, context); if (remote) return remote;
+    return (argv.length === 1 && argv[0] === "devices") || (argv.length === 2 && argv[0] === "devices" && argv[1] === "-l")
+      ? { effect: "read-only" }
+      : { effect: "unknown", reason: "only adb devices and adb devices -l are reviewed inspections" };
+  }
   if (name === "cd") {
     const remote = localOnly(name, context); if (remote) return remote;
     return argv.length <= 1 && argv[0] !== "-" && !argv[0]?.startsWith("-")

@@ -74,6 +74,19 @@ test("management-style binding preserves reloads only while the style is unchang
   assert.equal(findSessionApproval(identity), undefined);
 });
 
+test("YOLO boundaries always rotate approvals while only undefined-to-Empowerment preserves them", () => {
+  const initial = approvalFingerprint("unbound");
+  rememberSessionApproval(rule(initial), 2);
+  bindSessionApprovalsToStyle("Empowerment");
+  assert.ok(findSessionApproval(initial));
+  bindSessionApprovalsToStyle("YOLO");
+  assert.equal(findSessionApproval(initial), undefined);
+  const yolo = approvalFingerprint("yolo");
+  rememberSessionApproval(rule(yolo), 2);
+  bindSessionApprovalsToStyle("Empowerment");
+  assert.equal(findSessionApproval(yolo), undefined);
+});
+
 test("an older schema migrates in place while clearing unsafe state", () => {
   const root = globalThis as typeof globalThis & { [key: symbol]: unknown };
   const key = Symbol.for("pi.permissions.session-command-approvals");

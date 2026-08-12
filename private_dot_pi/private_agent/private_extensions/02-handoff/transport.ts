@@ -3,7 +3,7 @@ import { MAX_OUTPUT_BYTES, MAX_STDIN_BYTES, SSH_TIMEOUT_MS } from "./config.ts";
 import { TransportError } from "./errors.ts";
 import type { TransportResult } from "./types.ts";
 
-export interface SshTransportOptions { alias: string; user?: string; port?: number; timeoutMs?: number; signal?: AbortSignal; spawn?: typeof nodeSpawn; stdin?: Buffer | string; maxOutputBytes?: number; }
+export interface SshTransportOptions { alias: string; user?: string; port?: number; timeoutMs?: number; signal?: AbortSignal; spawn?: typeof nodeSpawn; stdin?: Buffer | string; maxOutputBytes?: number; /** Exact remote exit codes accepted by a framed protocol caller; ordinary SSH remains zero-only. */ acceptedExitCodes?: readonly number[]; /** Opt-in isolated-test transport hardening; production keeps the user's SSH config. */ knownHostsPath?: string; identityFile?: string; }
 function bounded(chunks: Buffer[], chunk: Buffer, maximum: number) { const used = chunks.reduce((n, item) => n + item.length, 0); if (used < maximum) chunks.push(chunk.subarray(0, maximum - used)); }
 /** Executes SSH through argv only, with bounded piped stdin and concurrent output collection. */
 export function sshExec(options: SshTransportOptions, script: string): Promise<TransportResult> {
@@ -13,6 +13,10 @@ export function sshExec(options: SshTransportOptions, script: string): Promise<T
     const destination = options.user ? `${options.user}@${options.alias}` : options.alias;
     const args = ["-T", "-o", "BatchMode=yes", "-o", `ConnectTimeout=${Math.max(1, Math.ceil((options.timeoutMs ?? SSH_TIMEOUT_MS) / 1000))}`, "-o", "ConnectionAttempts=1", "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=2"];
     if (options.port) args.push("-p", String(options.port));
+    if (options.knownHostsPath) {
+      args.push("-o", `UserKnownHostsFile=${options.knownHostsPath}`, "-o", "StrictHostKeyChecking=yes", "-o", "IdentitiesOnly=yes", "-o", "ForwardAgent=no", "-o", "ForwardX11=no", "-o", "ClearAllForwardings=yes", "-o", "PermitLocalCommand=no");
+      if (options.identityFile) args.push("-i", options.identityFile);
+    }
     // OpenSSH executes one remote command string through the remote login shell.
     // Every dynamic token in callers must therefore be fixed or shell-quoted.
     args.push(destination, script);
@@ -27,7 +31,7 @@ export function sshExec(options: SshTransportOptions, script: string): Promise<T
     child.stdout?.on("data", (data: Buffer) => bounded(stdout, Buffer.from(data), maxOutputBytes)); child.stderr?.on("data", (data: Buffer) => bounded(stderr, Buffer.from(data), maxOutputBytes));
     child.stdin?.once("error", (error) => { stop(); finish(new TransportError(`SSH input failed: ${error.message}`)); });
     child.once("error", (error) => finish(new TransportError(`SSH could not start: ${error.message}`)));
-    child.once("close", (code) => { if (timedOut) finish(new TransportError("SSH operation timed out")); else if (code !== 0) finish(new TransportError(`SSH failed (${code ?? "signal"}): ${Buffer.concat(stderr).toString("utf8").trim()}`)); else finish(undefined, { stdout: Buffer.concat(stdout), stderr: Buffer.concat(stderr), code: code ?? 0 }); });
+    child.once("close", (code) => { const exitCode = code ?? -1; const accepted = options.acceptedExitCodes ?? [0]; if (timedOut) finish(new TransportError("SSH operation timed out")); else if (!accepted.includes(exitCode)) finish(new TransportError(`SSH failed (${code ?? "signal"}): ${Buffer.concat(stderr).toString("utf8").trim()}`)); else finish(undefined, { stdout: Buffer.concat(stdout), stderr: Buffer.concat(stderr), code: exitCode }); });
     if (input) child.stdin?.end(input);
   });
 }

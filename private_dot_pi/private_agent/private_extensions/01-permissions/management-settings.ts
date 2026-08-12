@@ -1,14 +1,15 @@
 import { createSettingsStore } from "../08-settings/index.ts";
 import { getNested } from "../08-settings/nested.ts";
-import { normalizeManagingStyle } from "./management-style.ts";
+import { DEFAULT_MANAGING_STYLE, normalizeManagingStyle } from "./management-style.ts";
 import { cacheHotkeys, resolveHotkeys } from "./shortcuts.ts";
-import type { ManagingStyle } from "./types.ts";
+import type { ManagingStyle, PersistedManagingStyle } from "./types.ts";
 
 const store = createSettingsStore();
 export const SETTINGS_CONFIG_PATH = store.paths.configPath;
 
-let cache: ManagingStyle | undefined;
+let cache: PersistedManagingStyle | undefined;
 let sessionStyle: ManagingStyle | undefined;
+let styleBeforeYolo: PersistedManagingStyle | undefined;
 
 async function readConfig(configPath = SETTINGS_CONFIG_PATH) {
   return configPath === SETTINGS_CONFIG_PATH
@@ -18,7 +19,7 @@ async function readConfig(configPath = SETTINGS_CONFIG_PATH) {
 
 function managingStyleValue(settings: Record<string, unknown>): unknown {
   const nested = getNested(settings, "permissions.managingStyle");
-  if (nested === "Micromanagement" || nested === "Empowerment" || nested === "Guidance") return nested;
+  if (nested === "Micromanagement" || nested === "Empowerment") return nested;
   return settings.managingStyle;
 }
 
@@ -46,16 +47,35 @@ export async function readConfiguredManagingStyle(configPath: string) {
   return normalizeManagingStyle(managingStyleValue(await readConfig(configPath)));
 }
 
-export async function currentManagingStyle() {
+export async function currentManagingStyle(): Promise<ManagingStyle> {
   return sessionStyle ?? cache ?? refreshManagingStyleCache();
 }
 
+/** Runtime selection only. Entering YOLO remembers a safe non-YOLO restoration target. */
 export function setSessionManagingStyle(style: ManagingStyle | undefined) {
+  if (style === "YOLO") {
+    styleBeforeYolo = sessionStyle && sessionStyle !== "YOLO" ? sessionStyle : cache ?? DEFAULT_MANAGING_STYLE;
+  }
+  else if (style) {
+    styleBeforeYolo = undefined;
+  }
+  else {
+    styleBeforeYolo = undefined;
+  }
   sessionStyle = style;
+}
+
+/** Route loss is fail-closed: YOLO never survives without Handoff's active remote route. */
+export function restoreManagingStyleAfterYolo(): PersistedManagingStyle {
+  const restored = styleBeforeYolo ?? cache ?? DEFAULT_MANAGING_STYLE;
+  if (sessionStyle === "YOLO") sessionStyle = restored;
+  styleBeforeYolo = undefined;
+  return restored;
 }
 
 export function clearSessionManagingStyle() {
   sessionStyle = undefined;
+  styleBeforeYolo = undefined;
 }
 
 export async function empowermentDisposableRoots() {
@@ -72,11 +92,12 @@ export async function permissionsSessionApprovalMaxRules(configPath = SETTINGS_C
 
 /** Uses the shared serialized atomic update and adopts cache only after merge success. */
 export async function setManagingStyle(
-  style: ManagingStyle,
+  style: PersistedManagingStyle,
   runMerge?: () => Promise<void>,
   configPath = SETTINGS_CONFIG_PATH,
 ): Promise<void> {
   const previous = cache;
+  const persisted = normalizeManagingStyle(style);
   try {
     const target = runMerge || configPath !== SETTINGS_CONFIG_PATH
       ? createSettingsStore({ paths: { configPath }, runMerge })
@@ -85,10 +106,11 @@ export async function setManagingStyle(
       if (!settings.permissions || typeof settings.permissions !== "object" || Array.isArray(settings.permissions)) {
         settings.permissions = {};
       }
-      (settings.permissions as Record<string, unknown>).managingStyle = style;
+      (settings.permissions as Record<string, unknown>).managingStyle = persisted;
     });
-    cache = style;
+    cache = persisted;
     sessionStyle = undefined;
+    styleBeforeYolo = undefined;
     const hotkeys = resolveHotkeys(result);
     cacheHotkeys(hotkeys.forward, hotkeys.backward);
   }
@@ -101,4 +123,5 @@ export async function setManagingStyle(
 export function resetManagementSettingsForTests() {
   cache = undefined;
   sessionStyle = undefined;
+  styleBeforeYolo = undefined;
 }

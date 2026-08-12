@@ -4,7 +4,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test, { after } from "node:test";
-import { setRemoteBashBackend } from "../../02-handoff/backend-registry.ts";
+import { hasActiveRemoteRoute, setRemoteBashBackend } from "../../02-handoff/backend-registry.ts";
 import { setSessionManagingStyle } from "../management-settings.ts";
 import { cacheHotkeys } from "../shortcuts.ts";
 import { importPiModule } from "../../packages/pi-package.ts";
@@ -82,19 +82,35 @@ function harness() {
   };
 }
 
-test("settings decoration exposes two modes and migrates legacy Guidance", async () => {
+test("settings choices are dynamic and YOLO selection defers route validation to its handler", async () => {
   const { decorateSettingsList, isShiftCtrlSemicolonFallbackInput } = await import("../settings-ui.ts");
   const saved: string[] = [];
-  const list: any = { items: [{ id: "thinking" }], filteredItems: [], onChange() {} };
+  const warnings: string[] = [];
+  const save = async (style: string) => {
+    if (style === "YOLO" && !hasActiveRemoteRoute()) warnings.push("YOLO requires an active Handoff remote tool route");
+    else saved.push(style);
+  };
   const theme: any = { theme: { fg: (_color: string, text: string) => text, bold: (text: string) => text }, getSelectListTheme: () => ({}) };
-  decorateSettingsList(list, "Empowerment", async (style) => { saved.push(style); }, theme);
-  assert.equal(list.items[1].currentValue, "Empowering");
-  const menu = list.items[1].submenu("Empowering", () => {});
-  const select = menu.children.find((child: any) => Array.isArray(child.options));
+  const local: any = { items: [{ id: "thinking" }], filteredItems: [], onChange() {} };
+  decorateSettingsList(local, "Empowerment", save, theme, false);
+  assert.equal(local.items[1].currentValue, "Empowering");
+  let menu = local.items[1].submenu("Empowering", () => {});
+  let select = menu.children.find((child: any) => Array.isArray(child.options));
   assert.deepEqual(select.options.map((choice: any) => choice.value), ["Micromanagement", "Empowerment"]);
-  list.onChange("managing-style", "Guidance");
+  local.onChange("managing-style", "invalid");
+  const remote: any = { items: [{ id: "thinking" }], filteredItems: [], onChange() {} };
+  setRemoteBashBackend(() => ({}) as any, () => "remote:/repo");
+  decorateSettingsList(remote, "YOLO", save, theme, true);
+  menu = remote.items[1].submenu("YOLO", () => {});
+  select = menu.children.find((child: any) => Array.isArray(child.options));
+  assert.deepEqual(select.options.map((choice: any) => choice.value), ["Micromanagement", "Empowerment", "YOLO"]);
+  remote.onChange("managing-style", "YOLO");
   await Promise.resolve();
-  assert.deepEqual(saved, ["Empowerment"]);
+  setRemoteBashBackend(undefined);
+  remote.onChange("managing-style", "YOLO");
+  await Promise.resolve();
+  assert.deepEqual(saved, ["Micromanagement", "YOLO"]);
+  assert.deepEqual(warnings, ["YOLO requires an active Handoff remote tool route"]);
   assert.equal(isShiftCtrlSemicolonFallbackInput("ctrl+:"), false);
   assert.equal(isShiftCtrlSemicolonFallbackInput("shift+ctrl+:"), true);
 });
@@ -193,6 +209,54 @@ test("Micromanagement gates every Bash call and current-directory writes are all
     await app.handler("session_shutdown")();
   }
   finally { rmSync(cwd, { recursive: true, force: true }); }
+});
+
+test("YOLO is remote-only, skips every Permissions approval path, and fails closed on route loss", async () => {
+  resetSessionApprovalsForTests();
+  const extension = (await import("../index.ts")).default;
+  const app = harness(); await extension(app.pi as any);
+  const cwd = mkdtempSync(join(tmpdir(), "permissions-yolo-"));
+  try {
+    await app.handler("session_start")({ reason: "startup" }, { cwd, ui: {} });
+    setSessionManagingStyle("Empowerment");
+    const remoteOps = { exec: async () => ({ stdout: Buffer.from(""), stderr: Buffer.from(""), code: 0 }) } as any;
+    setRemoteBashBackend(() => remoteOps, () => "remote:/repo", () => cwd, () => "remote\0/repo");
+    const before = approvalFingerprint("before-yolo");
+    rememberSessionApproval(approvalRule(before), 2);
+    await app.shortcuts.get("ctrl+;").handler({ ui: { notify() {} } });
+    const calls = { select: 0, confirm: 0 };
+    const ctx = { cwd, hasUI: true, ui: {
+      select: async () => { calls.select++; return "Deny"; },
+      confirm: async () => { calls.confirm++; return false; },
+      notify() {},
+    } };
+    const bash = "git status && rm remote-file";
+    const remoteEvent = { toolName: "bash", input: { command: bash } };
+    assert.equal(await app.handler("tool_call")(remoteEvent, ctx), undefined);
+    assert.equal(remoteEvent.input.command, bash, "YOLO must never rewrite routed remote commands");
+    assert.equal(await app.handler("tool_call")({ toolName: "write", input: { path: "remote.txt", content: "x" } }, ctx), undefined);
+    assert.equal(calls.select, 0);
+    assert.equal(calls.confirm, 0);
+    assert.equal(listSessionApprovals().length, 0, "YOLO must rotate approvals before it can run");
+    setRemoteBashBackend(undefined);
+    const local = await app.handler("tool_call")({ toolName: "bash", input: { command: "rm local-file" } }, { cwd, hasUI: false, ui: {} });
+    assert.match(local.reason, /no UI/, "stale YOLO must restore full previous policy locally");
+    assert.equal(await app.handler("tool_call")({ toolName: "write", input: { path: "../local.txt", content: "x" } }, { cwd, hasUI: false, ui: {} }).then((value: any) => value?.block), true);
+    assert.equal(calls.select, 0);
+    assert.equal(calls.confirm, 0);
+    await app.handler("session_shutdown")({ reason: "quit" });
+  } finally {
+    setRemoteBashBackend(undefined);
+    rmSync(cwd, { recursive: true, force: true });
+    resetSessionApprovalsForTests();
+  }
+});
+
+test("HUD semantics are exact for all three runtime styles", async () => {
+  const { getManagingStyleSegments } = await import("../index.ts");
+  assert.deepEqual(getManagingStyleSegments("Micromanagement").full, [{ text: "■", tone: "error" }, { text: " Micromanaging", tone: "muted" }]);
+  assert.deepEqual(getManagingStyleSegments("Empowerment").full, [{ text: "▲", tone: "warning" }, { text: " Empowering", tone: "muted" }]);
+  assert.deepEqual(getManagingStyleSegments("YOLO").full, [{ text: "●", tone: "success" }, { text: " YOLO", tone: "muted" }]);
 });
 
 test("session-approvals command revokes safe remembered rules and lifecycle preserves only reloads", async () => {

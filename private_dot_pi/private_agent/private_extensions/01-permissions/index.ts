@@ -3,12 +3,12 @@ import { Text } from "@earendil-works/pi-tui";
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 import { clearHudOwner, registerHudItem, type HudItemHandle, type HudSegment } from "../00-hud/api.ts";
-import { getBashApprovalScope, getBashBackend, getBashLocalBoundary, getBashTargetLabel } from "../02-handoff/backend-registry.ts";
+import { getBashApprovalScope, getBashBackend, getBashLocalBoundary, getBashTargetLabel, hasActiveRemoteRoute, subscribeRemoteRoute } from "../02-handoff/backend-registry.ts";
 import { importPiModule } from "../packages/pi-package.ts";
 import { canAutoAllowHandoffFile, canAutoAllowLocalFile, invalidateAccessPolicyCache } from "./access-policy.ts";
 import { chooseBashApproval, confirmFileMutation, editPreview, writePreview } from "./approval-ui.ts";
 import { MANAGING_STYLE_LABELS, nextManagingStyle } from "./management-style.ts";
-import { clearSessionManagingStyle, currentManagingStyle, empowermentDisposableRoots, permissionsSessionApprovalMaxRules, refreshManagingStyleCache, setManagingStyle, setSessionManagingStyle } from "./management-settings.ts";
+import { clearSessionManagingStyle, currentManagingStyle, empowermentDisposableRoots, permissionsSessionApprovalMaxRules, refreshManagingStyleCache, restoreManagingStyleAfterYolo, setManagingStyle, setSessionManagingStyle } from "./management-settings.ts";
 import { injectPromptGuidance, BASH_PROMPT_GUIDANCE } from "./prompt-guidance.ts";
 import { patchBuiltInSettingsMenu } from "./settings-ui.ts";
 import { getCachedBackwardHotkey, getCachedForwardHotkey } from "./shortcuts.ts";
@@ -17,19 +17,54 @@ import { decideAnalysis, inspectBash } from "./shell/policy.ts";
 import { approvalCandidate } from "./shell/session-approval-candidate.ts";
 import { approvalFingerprint, bindSessionApprovalsToStyle, clearSessionApprovals, findSessionApproval, listSessionApprovals, rememberSessionApproval, revokeSessionApproval, withPendingApproval } from "./session-command-approvals.ts";
 import { renderShell } from "./shell/render.ts";
-import type { ManagingStyle, ShellContext } from "./types.ts";
+import type { ManagingStyle, PersistedManagingStyle, ShellContext } from "./types.ts";
 
 let hud: HudItemHandle | undefined;
 let hudStyle: ManagingStyle = "Micromanagement";
 function segments(style: ManagingStyle): { full: HudSegment[]; compact: HudSegment[]; icon: HudSegment[] } {
-  const empowering = style === "Empowerment"; const icon = empowering ? "▲" : "●"; const tone = empowering ? "success" : "error";
-  return { full: [{ text: icon, tone }, { text: ` ${MANAGING_STYLE_LABELS[style]}`, tone: "muted" }], compact: [{ text: icon, tone }], icon: [{ text: icon, tone }] };
+  const presentation = style === "Micromanagement"
+    ? { icon: "■", tone: "error" as const }
+    : style === "Empowerment"
+      ? { icon: "▲", tone: "warning" as const }
+      : { icon: "●", tone: "success" as const };
+  return { full: [{ text: presentation.icon, tone: presentation.tone }, { text: ` ${MANAGING_STYLE_LABELS[style]}`, tone: "muted" }], compact: [{ text: presentation.icon, tone: presentation.tone }], icon: [{ text: presentation.icon, tone: presentation.tone }] };
 }
 export function getManagingStyleSegments(style: ManagingStyle) { return segments(style); }
 function updateHud(style: ManagingStyle) { hudStyle = style; hud?.update({ variants: segments(style), visible: true }); }
 function mergeSettings() { return new Promise<void>((resolvePromise, reject) => { const child = spawn("sh", [resolve(import.meta.dirname, "../../scripts/merge-settings.sh")], { stdio: "ignore" }); child.once("error", reject); child.once("exit", (code) => code === 0 ? resolvePromise() : reject(new Error(`settings merge exited ${code}`))); }); }
-async function saveStyle(style: ManagingStyle, ui?: { notify?: (message: string, level?: "info" | "warning" | "error" | "success") => void }) { try { await setManagingStyle(style, mergeSettings); clearSessionApprovals(); bindSessionApprovalsToStyle(style); updateHud(style); ui?.notify?.(`Management style saved: ${MANAGING_STYLE_LABELS[style]}`, "success"); } catch (error) { updateHud(await currentManagingStyle()); ui?.notify?.(`Could not save management style: ${error instanceof Error ? error.message : String(error)}`, "error"); } }
-async function cycleStyle(ctx: { ui?: { notify?: (message: string, level?: "info" | "warning" | "error" | "success") => void } }) { const next = nextManagingStyle(await currentManagingStyle()); setSessionManagingStyle(next); clearSessionApprovals(); bindSessionApprovalsToStyle(next); updateHud(next); ctx.ui?.notify?.(`Management style: ${MANAGING_STYLE_LABELS[next]} (session only)`, "info"); }
+type NotifyUi = { notify?: (message: string, level?: "info" | "warning" | "error" | "success") => void };
+function bindRuntimeStyle(style: ManagingStyle) { clearSessionApprovals(); bindSessionApprovalsToStyle(style); updateHud(style); }
+async function activeStyle(): Promise<ManagingStyle> {
+  const style = await currentManagingStyle();
+  if (style === "YOLO" && !hasActiveRemoteRoute()) {
+    const restored = restoreManagingStyleAfterYolo();
+    bindRuntimeStyle(restored);
+    return restored;
+  }
+  return style;
+}
+async function selectStyle(style: ManagingStyle, ui?: NotifyUi) {
+  if (style === "YOLO") {
+    if (!hasActiveRemoteRoute()) return ui?.notify?.("YOLO requires an active Handoff remote tool route", "warning");
+    setSessionManagingStyle("YOLO");
+    bindRuntimeStyle("YOLO");
+    return ui?.notify?.("Management style: YOLO (remote Handoff tools only; session only)", "info");
+  }
+  try {
+    await setManagingStyle(style as PersistedManagingStyle, mergeSettings);
+    bindRuntimeStyle(style);
+    ui?.notify?.(`Management style saved: ${MANAGING_STYLE_LABELS[style]}`, "success");
+  } catch (error) {
+    updateHud(await activeStyle());
+    ui?.notify?.(`Could not save management style: ${error instanceof Error ? error.message : String(error)}`, "error");
+  }
+}
+async function cycleStyle(ctx: { ui?: NotifyUi }, direction: 1 | -1 = 1) {
+  const next = nextManagingStyle(await activeStyle(), hasActiveRemoteRoute(), direction);
+  setSessionManagingStyle(next);
+  bindRuntimeStyle(next);
+  ctx.ui?.notify?.(`Management style: ${MANAGING_STYLE_LABELS[next]} (session only)`, "info");
+}
 function hasBashUi(ctx: any) { return Boolean(ctx?.hasUI !== false && (ctx?.ui?.select || ctx?.ui?.confirm)); }
 function hasConfirmUi(ctx: any) { return Boolean(ctx?.hasUI !== false && ctx?.ui?.confirm); }
 function preservesApprovals(event: any) { return event?.reason === "reload"; }
@@ -40,19 +75,29 @@ export default async function permissions(pi: ExtensionAPI) {
   const shellEnvironment = await importPiModule("dist/utils/shell.js")
     .then((module) => typeof module.getShellEnv === "function" ? module.getShellEnv as () => NodeJS.ProcessEnv : undefined)
     .catch(() => undefined);
-  void patchBuiltInSettingsMenu(() => hudStyle, (style) => saveStyle(style), (ui) => cycleStyle({ ui }));
+  void patchBuiltInSettingsMenu(() => hudStyle, (style) => selectStyle(style), (ui) => cycleStyle({ ui }, -1));
+  let unsubscribeRemoteRoute: (() => void) | undefined;
+  const watchRemoteRoute = () => {
+    if (unsubscribeRemoteRoute) return;
+    unsubscribeRemoteRoute = subscribeRemoteRoute((active) => {
+      if (active) return;
+      void activeStyle();
+    });
+  };
+  watchRemoteRoute();
   pi.on("before_agent_start", (event: { systemPrompt?: string }) => ({ systemPrompt: injectPromptGuidance(event.systemPrompt) }));
   pi.on("session_start", async (event: any, ctx: any) => {
+    watchRemoteRoute();
     if (!preservesApprovals(event)) clearSessionApprovals();
     clearSessionManagingStyle(); invalidateAccessPolicyCache(); clearHudOwner("confirm-before-actions"); clearHudOwner("permissions");
     const style = await refreshManagingStyleCache(); bindSessionApprovalsToStyle(style); hudStyle = style; hud?.dispose(); hud = registerHudItem({ owner: "permissions", id: "management-style", zone: "modeRight", order: 100, importance: "required", variants: segments(style) });
-    void patchBuiltInSettingsMenu(() => hudStyle, (value) => saveStyle(value, ctx.ui), (ui) => cycleStyle({ ui: ui ?? ctx.ui }));
+    void patchBuiltInSettingsMenu(() => hudStyle, (value) => selectStyle(value, ctx.ui), (ui) => cycleStyle({ ui: ui ?? ctx.ui }, -1));
   });
-  pi.on("session_shutdown", (event: any) => { hud?.dispose(); hud = undefined; if (!preservesApprovals(event)) clearSessionApprovals(); clearSessionManagingStyle(); invalidateAccessPolicyCache(); });
+  pi.on("session_shutdown", (event: any) => { unsubscribeRemoteRoute?.(); unsubscribeRemoteRoute = undefined; hud?.dispose(); hud = undefined; if (!preservesApprovals(event)) clearSessionApprovals(); clearSessionManagingStyle(); invalidateAccessPolicyCache(); });
   const forward = getCachedForwardHotkey();
   const backward = getCachedBackwardHotkey();
   pi.registerShortcut?.(forward, { description: "Cycle management style for this session", handler: cycleStyle as any });
-  pi.registerShortcut?.(backward, { description: "Cycle management style backward for this session", handler: cycleStyle as any });
+  pi.registerShortcut?.(backward, { description: "Cycle management style backward for this session", handler: ((ctx: any) => cycleStyle(ctx, -1)) as any });
   pi.registerCommand?.("session-approvals", {
     description: "Manage remembered command approvals for this session",
     handler: (async (_args: string, ctx: any) => {
@@ -78,14 +123,18 @@ export default async function permissions(pi: ExtensionAPI) {
   const originalGuidelines = Array.isArray((originalBash as any).promptGuidelines) ? (originalBash as any).promptGuidelines : [];
   pi.registerTool({ ...originalBash, promptGuidelines: [...originalGuidelines, BASH_PROMPT_GUIDANCE], async execute(toolCallId: any, params: any, signal: any, onUpdate: any, ctx: any) { const operations = getBashBackend(); return createBashTool(ctx.cwd, operations ? { operations } : undefined).execute(toolCallId, params, signal, onUpdate, ctx); }, renderCall(args: { command?: string }, theme: any) { return new Text(renderShell(args.command, theme), 0, 0); } });
   pi.on("tool_call", async (event: any, ctx: any) => {
-    const style = await currentManagingStyle(); updateHud(style);
+    const style = await activeStyle(); updateHud(style);
+    const remotelyRouted = hasActiveRemoteRoute();
+    // YOLO is a Handoff capability, not a local permission mode. This precedes parsing,
+    // identity, access, session-approval, chooser, and confirmation checks.
+    if (style === "YOLO" && remotelyRouted && (isToolCallEventType("bash", event) || isToolCallEventType("write", event) || isToolCallEventType("edit", event))) return undefined;
     if (isToolCallEventType("bash", event)) {
       const remoteLabel = getBashTargetLabel();
       const executionContext: ShellContext = remoteLabel
         ? { location: "remote", transport: "handoff", target: remoteLabel, usesNetwork: true }
         : { location: "local", usesNetwork: false };
       const inspection = inspectBash(event.input.command, executionContext);
-      const decision = decideAnalysis(inspection.analysis, style);
+      const decision = decideAnalysis(inspection.analysis, style as PersistedManagingStyle);
       const executionEnv = shellEnvironment?.();
       const hasLocalExecutable = inspection.analysis.identityRequirements.some((requirement) => requirement.context.location === "local");
       let approvalAnalysis = inspection.analysis;

@@ -8,14 +8,16 @@ import { permissionsSessionApprovalMaxRules, readConfiguredManagingStyle, resetM
 
 afterEach(() => resetManagementSettingsForTests());
 
-test("legacy Guidance reads as Empowerment without rewriting the source", async () => {
+test("invalid and runtime-only YOLO configuration fail closed without rewriting the source", async () => {
   const root = await mkdtemp(join(tmpdir(), "permissions-settings-"));
   const path = join(root, "settings.config.json");
   try {
-    const source = '{"managingStyle":"Guidance","other":true}\n';
-    await writeFile(path, source);
-    assert.equal(await readConfiguredManagingStyle(path), "Empowerment");
-    assert.equal(await readFile(path, "utf8"), source);
+    for (const invalid of ["invalid", "YOLO"]) {
+      const source = `{"managingStyle":"${invalid}","other":true}\n`;
+      await writeFile(path, source);
+      assert.equal(await readConfiguredManagingStyle(path), "Micromanagement");
+      assert.equal(await readFile(path, "utf8"), source);
+    }
   }
   finally { await rm(root, { recursive: true, force: true }); }
 });
@@ -31,12 +33,25 @@ test("nested permission settings take precedence over flat", async () => {
   finally { await rm(root, { recursive: true, force: true }); }
 });
 
-test("invalid nested management style falls back to the legacy flat value", async () => {
+test("invalid nested management style falls back to a valid flat value, otherwise Micromanagement", async () => {
   const root = await mkdtemp(join(tmpdir(), "permissions-settings-"));
   const path = join(root, "settings.config.json");
   try {
-    await writeFile(path, '{"permissions":{"managingStyle":"invalid"},"managingStyle":"Guidance"}\n');
+    await writeFile(path, '{"permissions":{"managingStyle":"invalid"},"managingStyle":"Empowerment"}\n');
     assert.equal(await readConfiguredManagingStyle(path), "Empowerment");
+    await writeFile(path, '{"permissions":{"managingStyle":"YOLO"},"managingStyle":"invalid"}\n');
+    assert.equal(await readConfiguredManagingStyle(path), "Micromanagement");
+  }
+  finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("attempting to persist runtime YOLO writes the fail-closed persisted style", async () => {
+  const root = await mkdtemp(join(tmpdir(), "permissions-settings-"));
+  const path = join(root, "settings.config.json");
+  try {
+    await writeFile(path, '{"permissions":{"managingStyle":"Empowerment"}}\n');
+    await setManagingStyle("YOLO" as never, async () => {}, path);
+    assert.equal(JSON.parse(await readFile(path, "utf8")).permissions.managingStyle, "Micromanagement");
   }
   finally { await rm(root, { recursive: true, force: true }); }
 });

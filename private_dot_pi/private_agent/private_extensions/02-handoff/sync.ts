@@ -19,7 +19,7 @@ export async function requestGate(target: Pick<RemoteTarget, "alias" | "user" | 
   const request = encodeGateRequest({ version: HANDOFF_PROTOCOL_VERSION, command, args, ...(data ? { dataBase64: data.toString("base64") } : {}) });
   const settings = await getHandoffSettings();
   const output = await sshExec(
-    { ...target, stdin: request, maxOutputBytes: MAX_PROTOCOL_BYTES },
+    { ...target, stdin: request, maxOutputBytes: MAX_PROTOCOL_BYTES, acceptedExitCodes: [0, 2] },
     `PI_HANDOFF_ROOT=${shellLiteral(settings.handoffRemoteRoot)} python3 ${helperRemotePath} --stdio`,
   );
   const value = decodeGateResponse(output.stdout);

@@ -2,7 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createEditTool, createFindTool, createGrepTool, createLsTool, createReadTool, createWriteTool } from "@earendil-works/pi-coding-agent";
 import { cacheRoot } from "./config.ts";
 import { getHandoffSettings, registerHandoffShortcut } from "./settings.ts";
-import { setRemoteBashBackend } from "./backend-registry.ts";
+import { notifyRemoteRouteChanged, setRemoteBashBackend } from "./backend-registry.ts";
 import { createRemoteOperations } from "./operations.ts";
 import { discoverSshHosts, validateManualTarget } from "./ssh-config.ts";
 import { initialState, restoreState, toggleToolRoute } from "./state.ts";
@@ -21,7 +21,7 @@ function restored(branch: any[]): HandoffState { for (let i = branch.length - 1;
 export default async function handoff(pi: ExtensionAPI) {
   const settings = await getHandoffSettings();
   let state = initialState(); let activeCtx: any; let hud: HudItemHandle | undefined;
-  const setState = (next: HandoffState, persist = true) => { state = next; hud?.update({ variants: handoffHudVariants(state), visible: true }); if (persist) appendContext(pi, state); };
+  const setState = (next: HandoffState, persist = true) => { state = next; notifyRemoteRouteChanged(); hud?.update({ variants: handoffHudVariants(state), visible: true }); if (persist) appendContext(pi, state); };
   const remote = () => state.target && state.connection === "connected" && state.toolRoute === "remote" ? createRemoteOperations({ alias: state.target.alias, user: state.target.user, port: state.target.port, workspace: state.target.workspace, localCwd: activeCtx?.cwd ?? process.cwd() }) : undefined;
   const chooseWorkspace = async (ctx: any, target: Omit<RemoteTarget, "workspace">) => {
     const home = (await sshExec(target, "printf %s \"$HOME\"")).stdout.toString().trim();

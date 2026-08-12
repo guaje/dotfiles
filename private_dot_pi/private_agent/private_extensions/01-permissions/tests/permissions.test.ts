@@ -15,10 +15,14 @@ import { renderShell } from "../shell/render.ts";
 
 const execFile = promisify(execFileCallback);
 
-test("two management styles normalize legacy Guidance without a third mode", () => {
-  assert.equal(normalizeManagingStyle("Guidance"), "Empowerment");
+test("only persisted modes normalize; YOLO is remote runtime-only and cycles in both directions", () => {
+  assert.equal(normalizeManagingStyle("invalid"), "Micromanagement");
+  assert.equal(normalizeManagingStyle("YOLO"), "Micromanagement");
   assert.equal(nextManagingStyle("Micromanagement"), "Empowerment");
   assert.equal(nextManagingStyle("Empowerment"), "Micromanagement");
+  assert.equal(nextManagingStyle("Empowerment", true), "YOLO");
+  assert.equal(nextManagingStyle("YOLO", true), "Micromanagement");
+  assert.equal(nextManagingStyle("Micromanagement", true, -1), "YOLO");
 });
 test("parser authorizes fully classified read-only lists, pipelines, substitutions, and narrow wrappers", () => {
   const analysis = parseShell("git status --short && rg todo . | sort && cat $(realpath README.md)");

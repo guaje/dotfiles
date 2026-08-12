@@ -1,4 +1,6 @@
-export type ManagingStyle = "Micromanagement" | "Empowerment";
+export type PersistedManagingStyle = "Micromanagement" | "Empowerment";
+/** YOLO is runtime-only and can exist only while Handoff routes tools remotely. */
+export type ManagingStyle = PersistedManagingStyle | "YOLO";
 export type ShellEffect = "read-only" | "mutating" | "unknown";
 export type ShellLocation = "local" | "remote";
 export type ShellTransport = "ssh" | "handoff" | undefined;

@@ -37,7 +37,7 @@ type SessionApprovalStore = {
   key: string;
   rules: Map<string, SessionApprovalRecord>;
   pending: Map<string, Promise<unknown>>;
-  managingStyle?: "Micromanagement" | "Empowerment";
+  managingStyle?: "Micromanagement" | "Empowerment" | "YOLO";
 };
 
 type StoreRoot = typeof globalThis & { [key: symbol]: unknown };
@@ -187,9 +187,11 @@ export function listSessionApprovals(): SessionApprovalRecord[] {
     .map((rule) => ({ ...rule, slotTypes: [...rule.slotTypes] }));
 }
 
-export function bindSessionApprovalsToStyle(style: "Micromanagement" | "Empowerment") {
+export function bindSessionApprovalsToStyle(style: "Micromanagement" | "Empowerment" | "YOLO") {
   const current = store();
   if (current.managingStyle === style && !(style === "Micromanagement" && current.rules.size)) return;
+  // Only an initial Empowerment bind preserves an otherwise unbound store. Entering
+  // YOLO always rotates it, so YOLO neither reads nor creates remembered approvals.
   if (current.managingStyle === undefined && style === "Empowerment") {
     current.managingStyle = style;
     return;

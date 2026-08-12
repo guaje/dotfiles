@@ -1,6 +1,7 @@
 import { Container, matchesKey, SelectList, Spacer, Text } from "@earendil-works/pi-tui";
 import { importPiModule } from "../packages/pi-package.ts";
-import { MANAGING_STYLE_LABELS, MANAGING_STYLE_VALUES, normalizeManagingStyle } from "./management-style.ts";
+import { hasActiveRemoteRoute } from "../02-handoff/backend-registry.ts";
+import { MANAGING_STYLE_LABELS, availableManagingStyles, normalizeManagingStyle } from "./management-style.ts";
 import type { ManagingStyle } from "./types.ts";
 import { getCachedBackwardHotkey, getCachedForwardHotkey, isManagementStyleBackwardInput } from "./shortcuts.ts";
 
@@ -30,13 +31,13 @@ export function isShiftCtrlSemicolonFallbackInput(data: string) {
   return isManagementStyleBackwardInput(data, matchesKey);
 }
 
-export function decorateSettingsList(list: List, style: ManagingStyle, save: (style: ManagingStyle) => Promise<void>, theme?: ThemeModule) {
+export function decorateSettingsList(list: List, style: ManagingStyle, save: (style: ManagingStyle) => Promise<void>, theme?: ThemeModule, remoteRouteActive = hasActiveRemoteRoute()) {
   const item = {
     id: "managing-style",
     label: "Management style",
     description: "Choose how much approval Pi needs before acting",
-    currentValue: style === "Empowerment" ? "Empowering" : style,
-    submenu: theme ? submenu(theme, style, save) : undefined,
+    currentValue: MANAGING_STYLE_LABELS[style],
+    submenu: theme ? submenu(theme, style, save, remoteRouteActive) : undefined,
   };
   const existing = list.items.find((candidate) => candidate.id === item.id);
   if (existing) Object.assign(existing, item);
@@ -49,23 +50,26 @@ export function decorateSettingsList(list: List, style: ManagingStyle, save: (st
   if (!(list as any)[LIST_PATCH]) {
     const original = list.onChange;
     (list as any)[LIST_PATCH] = true;
-    list.onChange = (id, value) => id === item.id ? void save(normalizeManagingStyle(value)) : original(id, value);
+    // selectStyle validates YOLO against the live Handoff route when the value is selected.
+    list.onChange = (id, value) => id === item.id ? void save(value === "YOLO" ? "YOLO" : normalizeManagingStyle(value)) : original(id, value);
   }
 }
 
-function submenu(theme: ThemeModule, current: ManagingStyle, save: (style: ManagingStyle) => Promise<void>) {
+function submenu(theme: ThemeModule, current: ManagingStyle, save: (style: ManagingStyle) => Promise<void>, remoteRouteActive: boolean) {
   return (_value: string, done: (value?: string) => void) => {
     const box = new Container();
     box.addChild(new Text(theme.theme.bold(theme.theme.fg("accent", "Management style")), 0, 0));
     box.addChild(new Spacer(1));
     box.addChild(new Text(theme.theme.fg("muted", "Select how much approval Pi needs before acting"), 0, 0));
     box.addChild(new Spacer(1));
-    const choices = MANAGING_STYLE_VALUES.map((value) => ({
+    const choices = availableManagingStyles(remoteRouteActive).map((value) => ({
       value,
-      label: value === "Empowerment" ? "Empowering" : value,
-      description: value === "Empowerment"
-        ? "Allow classified read-only commands and permitted file changes"
-        : "Ask before every bash command, write, and edit",
+      label: MANAGING_STYLE_LABELS[value],
+      description: value === "YOLO"
+        ? "Remote Handoff tools only; never saved and unavailable in local mode"
+        : value === "Empowerment"
+          ? "Allow classified read-only commands and permitted file changes"
+          : "Ask before every bash command, write, and edit",
     }));
     const select = new SelectList(choices, choices.length, theme.getSelectListTheme(), { minPrimaryColumnWidth: 16, maxPrimaryColumnWidth: 24 }) as any;
     select.setSelectedIndex?.(choices.findIndex((choice) => choice.value === current));
@@ -157,7 +161,7 @@ export function patchBuiltInSettingsMenu(
       settingsPrototype[SETTINGS_PATCH] = true;
       settingsPrototype.getSettingsList = function () {
         const list = original.call(this);
-        try { const runtime = runtimeState(); decorateSettingsList(list, runtime.getStyle(), runtime.save, theme as ThemeModule); }
+        try { const runtime = runtimeState(); decorateSettingsList(list, runtime.getStyle(), runtime.save, theme as ThemeModule, hasActiveRemoteRoute()); }
         catch (error) { console.error("Permissions settings decoration failed:", error); }
         return list;
       };

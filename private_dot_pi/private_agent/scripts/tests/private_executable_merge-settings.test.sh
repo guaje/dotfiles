@@ -60,7 +60,7 @@ rm -f "$FIXTURE_AGENT/settings.json"
 cat > "$FIXTURE_AGENT/settings.config.json" <<'JSON'
 {
   "theme": "catppuccin-mocha",
-  "extensions": ["-extensions/google-search.ts"]
+  "extensions": ["-extensions/test-extension.ts"]
 }
 JSON
 cd "$TMP_ROOT" && "$FIXTURE_SCRIPTS/merge-settings.sh" >/dev/null
@@ -68,7 +68,7 @@ cd "$TMP_ROOT" && "$FIXTURE_SCRIPTS/merge-settings.sh" >/dev/null
 CREATED_THEME=$(jq -r '.theme' "$FIXTURE_AGENT/settings.json")
 CREATED_EXTENSION=$(jq -r '.extensions[0]' "$FIXTURE_AGENT/settings.json")
 [ "$CREATED_THEME" = "catppuccin-mocha" ] || fail "created settings.json should include theme"
-[ "$CREATED_EXTENSION" = "-extensions/google-search.ts" ] || fail "created settings.json should include extensions"
+[ "$CREATED_EXTENSION" = "-extensions/test-extension.ts" ] || fail "created settings.json should include extensions"
 pass "merge-settings.sh creates settings.json from settings.config.json"
 
 # falls back to node when jq is unavailable

@@ -14,7 +14,6 @@
     "reallms/Qwen3-Coder-Next"
   ],
   "extensions": [
-    "-extensions/google-search.ts",
     "extensions/00-hud/index.ts",
     "extensions/01-permissions/index.ts",
     "extensions/02-handoff/index.ts",

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import test, { afterEach } from "node:test";
 import { consumeRemoteRouteForToolCall, getBashApprovalScope, getBashBackend, getBashLocalBoundary, getBashTargetLabel, hasActiveRemoteRoute, notifyRemoteRouteChanged, requireRemoteRouteForToolCall, resetBackendRegistryForTests, setRemoteBashBackend, subscribeRemoteRoute } from "../backend-registry.ts";
 
@@ -45,31 +46,40 @@ test("authoritative availability subscription follows mutable Handoff routing", 
 
 test("registry state is shared across isolated extension module instances", async () => {
   type RegistryModule = typeof import("../backend-registry.ts");
-  const loadCopy = async (query: string): Promise<RegistryModule> => {
-    let candidate: any = await import(new URL(`../backend-registry.ts?${query}`, import.meta.url).href);
+  const writerUrl = new URL("../.backend-registry.writer.testable.ts", import.meta.url);
+  const readerUrl = new URL("../.backend-registry.reader.testable.ts", import.meta.url);
+  const source = await readFile(new URL("../backend-registry.ts", import.meta.url), "utf8");
+  const loadCopy = async (url: URL): Promise<RegistryModule> => {
+    let candidate: any = await import(url.href);
     for (let depth = 0; depth < 4; depth++) {
       if (typeof candidate?.resetBackendRegistryForTests === "function") return candidate as RegistryModule;
       candidate = candidate?.default;
     }
-    throw new Error(`Could not unwrap backend-registry module for ${query}`);
+    throw new Error(`Could not unwrap backend-registry module at ${url.pathname}`);
   };
-  const writer = await loadCopy("writer");
-  const reader = await loadCopy("reader");
-  writer.resetBackendRegistryForTests();
 
-  const availability: boolean[] = [];
-  const unsubscribe = reader.subscribeRemoteRoute((active) => availability.push(active));
-  const backend = { exec: async () => ({ exitCode: 0 }) } as any;
-  writer.setRemoteBashBackend(() => backend, () => "host:/repo", () => "/local/repo", () => "host\0/repo");
+  await Promise.all([writeFile(writerUrl, source), writeFile(readerUrl, source)]);
+  try {
+    const writer = await loadCopy(writerUrl);
+    const reader = await loadCopy(readerUrl);
+    writer.resetBackendRegistryForTests();
 
-  assert.equal(reader.hasActiveRemoteRoute(), true);
-  assert.equal(reader.getBashBackend(), backend);
-  assert.equal(reader.getBashTargetLabel(), "host:/repo");
-  assert.deepEqual(availability, [false, true]);
+    const availability: boolean[] = [];
+    const unsubscribe = reader.subscribeRemoteRoute((active) => availability.push(active));
+    const backend = { exec: async () => ({ exitCode: 0 }) } as any;
+    writer.setRemoteBashBackend(() => backend, () => "host:/repo", () => "/local/repo", () => "host\0/repo");
 
-  writer.setRemoteBashBackend(undefined);
-  assert.deepEqual(availability, [false, true, false]);
-  unsubscribe();
+    assert.equal(reader.hasActiveRemoteRoute(), true);
+    assert.equal(reader.getBashBackend(), backend);
+    assert.equal(reader.getBashTargetLabel(), "host:/repo");
+    assert.deepEqual(availability, [false, true]);
+
+    writer.setRemoteBashBackend(undefined);
+    assert.deepEqual(availability, [false, true, false]);
+    unsubscribe();
+  } finally {
+    await Promise.all([rm(writerUrl, { force: true }), rm(readerUrl, { force: true })]);
+  }
 });
 
 test("every successful SSH session action exposes an active remote tool route", () => {

@@ -3,7 +3,7 @@ import { Text } from "@earendil-works/pi-tui";
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 import { clearHudOwner, registerHudItem, type HudItemHandle, type HudSegment } from "../00-hud/api.ts";
-import { getBashApprovalScope, getBashBackend, getBashLocalBoundary, getBashTargetLabel, hasActiveRemoteRoute, subscribeRemoteRoute } from "../02-handoff/backend-registry.ts";
+import { clearRemoteRouteForToolCall, consumeRemoteRouteForToolCall, getBashApprovalScope, getBashBackend, getBashLocalBoundary, getBashTargetLabel, getRemoteRoute, hasActiveRemoteRoute, requireRemoteRouteForToolCall, subscribeRemoteRoute } from "../02-handoff/backend-registry.ts";
 import { importPiModule } from "../packages/pi-package.ts";
 import { canAutoAllowHandoffFile, canAutoAllowLocalFile, invalidateAccessPolicyCache } from "./access-policy.ts";
 import { chooseBashApproval, confirmFileMutation, editPreview, writePreview } from "./approval-ui.ts";
@@ -121,13 +121,17 @@ export default async function permissions(pi: ExtensionAPI) {
   });
   const originalBash = createBashTool(process.cwd());
   const originalGuidelines = Array.isArray((originalBash as any).promptGuidelines) ? (originalBash as any).promptGuidelines : [];
-  pi.registerTool({ ...originalBash, promptGuidelines: [...originalGuidelines, BASH_PROMPT_GUIDANCE], async execute(toolCallId: any, params: any, signal: any, onUpdate: any, ctx: any) { const operations = getBashBackend(); return createBashTool(ctx.cwd, operations ? { operations } : undefined).execute(toolCallId, params, signal, onUpdate, ctx); }, renderCall(args: { command?: string }, theme: any) { return new Text(renderShell(args.command, theme), 0, 0); } });
+  pi.registerTool({ ...originalBash, promptGuidelines: [...originalGuidelines, BASH_PROMPT_GUIDANCE], async execute(toolCallId: any, params: any, signal: any, onUpdate: any, ctx: any) { const authorization = consumeRemoteRouteForToolCall(toolCallId); if (authorization.required && !authorization.route) throw new Error("Remote Handoff route changed after YOLO authorization"); const operations = authorization.route?.backend ?? getBashBackend(); return createBashTool(ctx.cwd, operations ? { operations } : undefined).execute(toolCallId, params, signal, onUpdate, ctx); }, renderCall(args: { command?: string }, theme: any) { return new Text(renderShell(args.command, theme), 0, 0); } });
+  pi.on("tool_execution_end", (event: any) => { if (typeof event.toolCallId === "string") clearRemoteRouteForToolCall(event.toolCallId); });
   pi.on("tool_call", async (event: any, ctx: any) => {
     const style = await activeStyle(); updateHud(style);
-    const remotelyRouted = hasActiveRemoteRoute();
+    const remoteRoute = getRemoteRoute();
     // YOLO is a Handoff capability, not a local permission mode. This precedes parsing,
     // identity, access, session-approval, chooser, and confirmation checks.
-    if (style === "YOLO" && remotelyRouted && (isToolCallEventType("bash", event) || isToolCallEventType("write", event) || isToolCallEventType("edit", event))) return undefined;
+    if (style === "YOLO" && remoteRoute && (isToolCallEventType("bash", event) || isToolCallEventType("write", event) || isToolCallEventType("edit", event))) {
+      if (typeof event.toolCallId !== "string" || !requireRemoteRouteForToolCall(event.toolCallId, remoteRoute)) return { block: true, reason: "Remote Handoff route is unavailable for YOLO authorization" };
+      return undefined;
+    }
     if (isToolCallEventType("bash", event)) {
       const remoteLabel = getBashTargetLabel();
       const executionContext: ShellContext = remoteLabel

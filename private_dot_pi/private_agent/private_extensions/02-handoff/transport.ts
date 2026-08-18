@@ -36,6 +36,7 @@ export function sshExec(options: SshTransportOptions, script: string): Promise<T
   });
 }
 export function shellLiteral(value: string) { return `'${value.replace(/'/g, "'\\''")}'`; }
+export function shellTest(operator: "-d" | "-e" | "-r", value: string) { return `test ${operator} ${shellLiteral(value)}`; }
 /** Resolve OpenSSH aliases only after an explicit user selection. The alias remains the execution target. */
 export function sshGetConfig(alias: string, spawn: typeof nodeSpawn = nodeSpawn, timeoutMs = SSH_TIMEOUT_MS): Promise<Record<string, string>> {
   return new Promise((resolve, reject) => {

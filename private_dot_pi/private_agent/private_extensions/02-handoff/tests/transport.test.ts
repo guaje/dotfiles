@@ -1,9 +1,35 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { EventEmitter } from "node:events";
-import { sshExec, sshGetConfig } from "../transport.ts";
+import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { shellTest, sshExec, sshGetConfig } from "../transport.ts";
 
 class Child extends EventEmitter { stdout = new EventEmitter(); stderr = new EventEmitter(); killed: string[] = []; kill(signal?: string) { this.killed.push(signal ?? ""); return true; } }
+test("remote test expressions use POSIX-compatible operands and quote paths", () => {
+  assert.equal(shellTest("-d", "/srv/project"), "test -d '/srv/project'");
+  assert.equal(shellTest("-e", "/srv/it's safe"), "test -e '/srv/it'\\''s safe'");
+  assert.ok(!shellTest("-r", "/srv/project").includes(" -- "));
+});
+test("remote test expressions execute safely in sh and Bash", async () => {
+  const root = await mkdtemp(join(tmpdir(), "handoff-shell-test-"));
+  const directory = join(root, "dir ' $(touch INJECTED)");
+  await mkdir(directory);
+  try {
+    for (const shell of ["sh", "bash"]) {
+      for (const operator of ["-d", "-e", "-r"] as const) {
+        const result = spawnSync(shell, ["-c", shellTest(operator, directory)], { cwd: root });
+        assert.equal(result.status, 0, `${shell} rejected ${operator}: ${result.stderr.toString()}`);
+        assert.equal(existsSync(join(root, "INJECTED")), false);
+      }
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 test("SSH transport uses argv security options and no shell", async () => {
   let args: string[] = []; let options: any; const child = new Child();
   const result = sshExec({ alias: "work", user: "me", port: 2222, spawn: ((_cmd: string, values: string[], opts: any) => { args = values; options = opts; queueMicrotask(() => { child.stdout.emit("data", Buffer.from("ok")); child.emit("close", 0); }); return child as any; }) as any }, "pwd");

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { discoverSshHosts, validateManualTarget } from "../ssh-config.ts";
 import { handoffHudVariants, handoffStatus } from "../status.ts";
-import { initialState, restoreState, toggleToolRoute } from "../state.ts";
+import { applyRemoteSessionAction, canRouteRemote, initialState, restoreState, toggleToolRoute } from "../state.ts";
 import { remotePath } from "../operations.ts";
 import { PathBoundaryError } from "../errors.ts";
 
@@ -27,6 +27,16 @@ test("toggle changes only tool route and status matrix stays literal", () => {
   assert.equal(handoffStatus({ ...base, toolRoute: "remote" }), "⇄ tools→host:/repo • history local");
   assert.equal(handoffStatus({ ...base, sessionAuthority: "remote", toolRoute: "local" }), "⌂ tools→local • history→host");
   assert.deepEqual(restoreState({ connection: "bad" }), initialState());
+});
+
+test("all successful SSH session actions activate the remote tool route", () => {
+  const base = { ...initialState(), connection: "connected" as const, target: { alias: "host", workspace: "/repo" } };
+  for (const action of ["resume", "new", "move", "tools"] as const) {
+    const state = applyRemoteSessionAction(base, action, action === "tools" ? undefined : `${action}-session`);
+    assert.equal(canRouteRemote(state), true, action);
+    assert.equal(state.toolRoute, "remote", action);
+    assert.equal(state.sessionAuthority, action === "tools" ? "local" : "remote", action);
+  }
 });
 
 test("HUD variants split the icon from muted detail and preserve the local label", () => {

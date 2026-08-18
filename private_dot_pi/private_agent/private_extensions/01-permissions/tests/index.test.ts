@@ -231,10 +231,13 @@ test("YOLO is remote-only, skips every Permissions approval path, and fails clos
       notify() {},
     } };
     const bash = "git status && rm remote-file";
-    const remoteEvent = { toolName: "bash", input: { command: bash } };
+    const remoteEvent = { toolCallId: "yolo-bash", toolName: "bash", input: { command: bash } };
     assert.equal(await app.handler("tool_call")(remoteEvent, ctx), undefined);
     assert.equal(remoteEvent.input.command, bash, "YOLO must never rewrite routed remote commands");
-    assert.equal(await app.handler("tool_call")({ toolName: "write", input: { path: "remote.txt", content: "x" } }, ctx), undefined);
+    const executed = await app.bashTool().execute("yolo-bash", { command: bash }, undefined, undefined, ctx);
+    assert.equal(executed.details.remote, true);
+    assert.equal(await app.handler("tool_call")({ toolCallId: "yolo-write", toolName: "write", input: { path: "remote.txt", content: "x" } }, ctx), undefined);
+    app.handler("tool_execution_end")({ toolCallId: "yolo-write" });
     assert.equal(calls.select, 0);
     assert.equal(calls.confirm, 0);
     assert.equal(listSessionApprovals().length, 0, "YOLO must rotate approvals before it can run");
@@ -249,6 +252,30 @@ test("YOLO is remote-only, skips every Permissions approval path, and fails clos
     setRemoteBashBackend(undefined);
     rmSync(cwd, { recursive: true, force: true });
     resetSessionApprovalsForTests();
+  }
+});
+
+test("YOLO-authorized Bash fails closed instead of falling back locally when its route disappears", async () => {
+  const extension = (await import("../index.ts")).default;
+  const app = harness(); await extension(app.pi as any);
+  const cwd = mkdtempSync(join(tmpdir(), "permissions-yolo-route-loss-"));
+  try {
+    await app.handler("session_start")({ reason: "startup" }, { cwd, ui: {} });
+    const remoteOps = { exec: async () => ({ stdout: Buffer.alloc(0), stderr: Buffer.alloc(0), code: 0 }) } as any;
+    setRemoteBashBackend(() => remoteOps, () => "remote:/repo", () => cwd, () => "remote\0/repo");
+    setSessionManagingStyle("YOLO");
+    const event = { toolCallId: "route-loss", toolName: "bash", input: { command: "rm remote-file" } };
+    assert.equal(await app.handler("tool_call")(event, { cwd, hasUI: false, ui: {} }), undefined);
+
+    setRemoteBashBackend(undefined);
+    await assert.rejects(
+      app.bashTool().execute("route-loss", event.input, undefined, undefined, { cwd }),
+      /route changed after YOLO authorization/,
+    );
+    await app.handler("session_shutdown")({ reason: "quit" });
+  } finally {
+    setRemoteBashBackend(undefined);
+    rmSync(cwd, { recursive: true, force: true });
   }
 });
 

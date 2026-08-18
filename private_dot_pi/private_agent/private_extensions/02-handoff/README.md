@@ -1,6 +1,6 @@
 # SSH Handoff
 
-`/ssh` connects Pi tools and optional session authority to a selected SSH workspace. It discovers concrete aliases from `~/.ssh/config`, waits for explicit selection before `ssh -G`, and never enables agent forwarding or changes SSH host-key policy.
+`/ssh` connects Pi tools and optional session authority to a selected SSH workspace. It discovers concrete aliases from `~/.ssh/config`, waits for explicit selection before `ssh -G`, and never enables agent forwarding or changes SSH host-key policy. Workspace selection opens a remote directory browser rooted at `$HOME`; it lists directories (including hidden ones), supports parent navigation and manual absolute paths, and validates the final directory remotely.
 
 Commands: `/ssh`, `/ssh toggle`, `/ssh status`, `/ssh sync`, and `/ssh disconnect`. The shortcut and remote root resolve nested-first from settings, with legacy flat-key fallback:
 

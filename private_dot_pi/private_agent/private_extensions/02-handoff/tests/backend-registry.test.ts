@@ -46,8 +46,12 @@ test("authoritative availability subscription follows mutable Handoff routing", 
 test("registry state is shared across isolated extension module instances", async () => {
   type RegistryModule = typeof import("../backend-registry.ts");
   const loadCopy = async (query: string): Promise<RegistryModule> => {
-    const loaded = await import(new URL(`../backend-registry.ts?${query}`, import.meta.url).href) as RegistryModule & { default?: RegistryModule };
-    return loaded.default && typeof loaded.default.resetBackendRegistryForTests === "function" ? loaded.default : loaded;
+    let candidate: any = await import(new URL(`../backend-registry.ts?${query}`, import.meta.url).href);
+    for (let depth = 0; depth < 4; depth++) {
+      if (typeof candidate?.resetBackendRegistryForTests === "function") return candidate as RegistryModule;
+      candidate = candidate?.default;
+    }
+    throw new Error(`Could not unwrap backend-registry module for ${query}`);
   };
   const writer = await loadCopy("writer");
   const reader = await loadCopy("reader");

@@ -13,6 +13,10 @@ Run from `~/.pi` unless noted.
 - Shell tests: `sh agent/scripts/tests/merge-settings.test.sh`
 - Extension load check: `pi --no-session --no-extensions -e <ext-path> --no-tools -p "reply: ok"`
 - Regenerate `settings.json`: `sh agent/scripts/merge-settings.sh`
+- Check Artificial Analysis snapshots: `sh agent/scripts/refresh-artificial-analysis.sh --check`
+- List snapshots needing reviewed Artificial Analysis mappings: `sh agent/scripts/refresh-artificial-analysis.sh --missing`
+- Refresh reviewed Artificial Analysis mappings: `sh agent/scripts/refresh-artificial-analysis.sh --refresh-all`
+- Add a model snapshot: run `--discover <provider/model>`, then `--add <provider/model> --aa-model-id <reviewed-id>`
 - Chezmoi status: `chezmoi status`
 - Failed CI run: `gh run view <run-id> --repo guaje/dotfiles --log-failed`
 

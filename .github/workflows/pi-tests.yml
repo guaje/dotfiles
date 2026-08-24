@@ -68,6 +68,22 @@ jobs:
             return 1
           }
 
+          is_private_source_path() {
+            local rel="$1"
+            local component
+            IFS=/ read -ra components <<< "$rel"
+            for component in "${components[@]}"; do
+              while :; do
+                case "$component" in
+                  private_*) return 0 ;;
+                  executable_*) component="${component#executable_}" ;;
+                  *) break ;;
+                esac
+              done
+            done
+            return 1
+          }
+
           materialize_path() {
             local rel="$1"
             local target="$dst"
@@ -83,11 +99,21 @@ jobs:
             target="$(materialize_path "$rel")"
             if [ -d "$src/$rel" ]; then
               mkdir -p "$target"
+              if is_private_source_path "$rel"; then
+                chmod 700 "$target"
+              fi
             else
               mkdir -p "$(dirname "$target")"
               cp -p "$src/$rel" "$target"
+              if is_private_source_path "$rel"; then
+                chmod 600 "$target"
+              fi
               if is_executable_source_path "$rel"; then
-                chmod +x "$target"
+                if is_private_source_path "$rel"; then
+                  chmod 700 "$target"
+                else
+                  chmod +x "$target"
+                fi
               fi
             fi
           done < <(find "$src" -mindepth 1 -print | sort | sed "s#^$src/##")

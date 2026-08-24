@@ -335,13 +335,17 @@ function subagentGroupHeader(model: string, theme: StatsTheme): string {
 }
 
 function displayThinking(value: string | undefined): string {
+  if (value === "minimal") return "min";
+  if (value === "xhigh") return "xhigh";
   return value ? truncate(value, 6) : "—";
 }
 
 function displayRoute(value: string | undefined): string {
   switch ((value ?? "").toLowerCase()) {
-    case "heuristic": return "auto";
+    case "benchmark": return "bench";
     case "explicit": return "set";
+    case "default": return "default";
+    case "heuristic": return "auto";
     case "llm": return "llm";
     default: return value ? truncate(value, 5) : "—";
   }
@@ -350,7 +354,7 @@ function displayRoute(value: string | undefined): string {
 function subagentRow(row: SubagentRow, theme: StatsTheme, hasCost: boolean): string {
   const agent = truncate(row.agent, 12).padEnd(12);
   const thinking = displayThinking(row.thinkingLevel).padEnd(6);
-  const selector = displayRoute(row.modelSelector).padEnd(5);
+  const selector = displayRoute(row.modelSelector).padEnd(7);
   const left = row.failed
     ? theme.fg("error", [agent, thinking, selector].join("  "))
     : [
@@ -385,7 +389,7 @@ function subagentSummaryRow(
   emphasis: "subtotal" | "total" | "summary" = "subtotal",
   costTotal?: number,
 ): string {
-  const left = truncate(emphasis === "total" ? label : `${label} subtotal`, 29).padEnd(29);
+  const left = truncate(emphasis === "total" ? label : `${label} subtotal`, 31).padEnd(31);
   const values = subagentValues(total, hasCost, costTotal);
   if (emphasis === "total") {
     return `  ${theme.fg("accent", theme.bold(left))}  ${theme.fg("accent", theme.bold(values))}`;
@@ -442,7 +446,7 @@ export function formatStatsTable(summary: StatsSummary, theme: StatsTheme = PASS
   }
 
   if (summary.subagents.length > 0) {
-    const header = `  ${"Agent".padEnd(12)}  ${"Think".padEnd(6)}  ${"Route".padEnd(5)}  ${usageHeader(summary.hasCost)}`;
+    const header = `  ${"Agent".padEnd(12)}  ${"Think".padEnd(6)}  ${"Route".padEnd(7)}  ${usageHeader(summary.hasCost)}`;
     lines.push("");
     lines.push(theme.fg("mdHeading", theme.bold("Subagents")));
     lines.push(`  ${theme.fg("dim", header)}`);

@@ -178,8 +178,13 @@ test("formatStatsTable renders cost columns, notional footnote, and failed subag
   assert.match(table, /Cost\s+In\s+Out\s+Cache\s+Turns/, "usage columns are ordered as Cost, In, Out, Cache, Turns");
   assert.match(table, /Agent\s+Think\s+Route\s+Cost/, "subagent table omits the Model column and uses a short full-word route header");
   assert.doesNotMatch(table, /Model\s+Agent\s+Think\s+Selector/, "subagent table no longer puts Model in each row");
-  assert.match(table, /planner\s+medium\s+auto/, "heuristic routes render as auto while thinking values remain readable");
+  assert.match(table, /planner\s+medium\s+auto/, "historical heuristic routes render as auto while thinking values remain readable");
   assert.match(table, /scout\s+low\s+set/, "explicit routes render as set");
+  const benchmarkLines = mod.formatStatsTable({ ...{
+    main: [], subagents: [{ agent: "worker", task: "x", model: "p/m", modelSelector: "benchmark", thinkingLevel: "minimal", input: 0, output: 0, cacheRead: 0, cacheWrite: 0, turns: 0, cost: 0, inputCost: 0, outputCost: 0, cacheCost: 0, failed: false }, { agent: "planner", task: "x", model: "p/m", modelSelector: "default", thinkingLevel: "xhigh", input: 0, output: 0, cacheRead: 0, cacheWrite: 0, turns: 0, cost: 0, inputCost: 0, outputCost: 0, cacheCost: 0, failed: false }], modelChanges: [], hasCost: false, hasNotionalCost: false,
+  } }, { fg: (_c: string, t: string) => t, bold: (t: string) => t }).join("\\n");
+  assert.match(benchmarkLines, /worker\s+min\s+bench/, "benchmark routes render as bench and minimal remains readable");
+  assert.match(benchmarkLines, /planner\s+xhigh\s+default/, "default routes and xhigh remain readable");
   assert.match(table, /prov\/model-a\s+\$0\.01\(100%\)/, "main session model rows show cost share percentages");
   assert.match(table, /\$0\.01\(12\.4K\)\s+\$0\(2\.1K\)/, "input and output costs are shown in separate columns and rounded to cents");
   assert.match(table, /\$0\(400\)/, "cache cost is shown next to combined cache tokens and zeroes render as $0");

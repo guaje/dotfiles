@@ -1,40 +1,8 @@
 // Run with: npx -y tsx --test agent/extensions/00-hud/tests/adapter.test.ts
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import test, { after } from "node:test";
-
-const originalPiPackageRoot = process.env.PI_CODING_AGENT_PACKAGE_ROOT;
-const fakePiPackageRoot = mkdtempSync(join(tmpdir(), "hud-pi-package-"));
-const fakeThemeDir = resolve(fakePiPackageRoot, "dist/modes/interactive/theme");
-const fakeComponentDir = resolve(fakePiPackageRoot, "dist/modes/interactive/components");
-mkdirSync(fakeThemeDir, { recursive: true });
-mkdirSync(fakeComponentDir, { recursive: true });
-writeFileSync(resolve(fakePiPackageRoot, "package.json"), JSON.stringify({ name: "@earendil-works/pi-coding-agent", type: "module" }));
-writeFileSync(resolve(fakeThemeDir, "theme.js"), `
-export const theme = {
-  fg(tone, text) {
-    const code = tone === "success" ? 32 : tone === "warning" ? 33 : tone === "error" ? 31 : tone === "dim" ? 2 : 36;
-    return "\\x1b[" + code + "m" + text + "\\x1b[0m";
-  },
-};
-export function initTheme() {}
-`);
-writeFileSync(resolve(fakeComponentDir, "footer.js"), `
-export class FooterComponent {
-  constructor(session, footerData) { this.session = session; this.footerData = footerData; }
-  render(_width) {
-    const lines = [this.session.sessionManager.getCwd(), "10.0%/1.0k test-model • high"];
-    const statuses = [...this.footerData.getExtensionStatuses().entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([, value]) => value);
-    if (statuses.length) lines.push(statuses.join(" "));
-    return lines;
-  }
-}
-`);
-process.env.PI_CODING_AGENT_PACKAGE_ROOT = fakePiPackageRoot;
 
 const stubDir = resolve("agent/extensions/node_modules/@earendil-works/pi-tui");
 mkdirSync(stubDir, { recursive: true });
@@ -43,91 +11,225 @@ writeFileSync(resolve(stubDir, "index.js"), `
 const strip = (value) => String(value).replace(/\\x1b\\[[0-?]*[ -\\/]*[@-~]/g, "");
 export function visibleWidth(value) { return [...strip(value)].length; }
 export function truncateToWidth(value, width, marker = "") {
-  if (visibleWidth(value) <= width) return String(value);
-  return [...strip(value)].slice(0, Math.max(0, width - visibleWidth(marker))).join("") + marker;
+  const text = String(value);
+  if (visibleWidth(text) <= width) return text;
+  return [...strip(text)].slice(0, Math.max(0, width - visibleWidth(marker))).join("") + marker;
 }
 `);
 
-after(() => {
-  rmSync(stubDir, { recursive: true, force: true });
-  rmSync(fakePiPackageRoot, { recursive: true, force: true });
-  if (originalPiPackageRoot === undefined) delete process.env.PI_CODING_AGENT_PACKAGE_ROOT;
-  else process.env.PI_CODING_AGENT_PACKAGE_ROOT = originalPiPackageRoot;
-});
+after(() => rmSync(stubDir, { recursive: true, force: true }));
 
-const stripAnsi = (value: string) => value.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
+const variants = (text: string) => ({ full: [{ text }] });
 
-test("Pi adapter patches once, composes semantic rows, and preserves metrics bytes without a gutter", async () => {
-  const [{ importPiModule }, { PiFooterAdapter }, registry] = await Promise.all([
-    import("../../packages/pi-package.ts"),
-    import("../adapters/pi-footer.ts"),
+test("status adapter remains the semantic fallback and clears cleanly", async () => {
+  const [{ LegacyStatusAdapter }, registry] = await Promise.all([
+    import("../adapters/legacy-status.ts"),
     import("../registry.ts"),
   ]);
-  const themeModule = await importPiModule("dist/modes/interactive/theme/theme.js");
-  themeModule.initTheme("dark");
-  const footerModule = await importPiModule("dist/modes/interactive/components/footer.js");
-  const FooterComponent = footerModule.FooterComponent as new (session: any, footerData: any) => { render(width: number): string[] };
-  const session = {
-    state: {
-      model: { id: "test-model", provider: "test-provider", contextWindow: 1000, reasoning: true },
-      thinkingLevel: "high",
-    },
-    sessionManager: {
-      getEntries: () => [],
-      getCwd: () => "/tmp/project",
-      getSessionName: () => undefined,
-    },
-    modelRegistry: { isUsingOAuth: () => false },
-    getContextUsage: () => ({ contextWindow: 1000, percent: 10 }),
-  };
-  const footerData = {
-    getGitBranch: () => undefined,
-    getAvailableProviderCount: () => 1,
-    getExtensionStatuses: () => new Map([["legacy", "legacy ready"]]),
-  };
-  const footer = new FooterComponent(session, footerData);
-  const originalInner = footer.render(80);
-
-  const mode = registry.registerHudItem({ owner: "adapter-test", id: "mode", zone: "modeRight", importance: "required", variants: { full: [{ text: "▲", tone: "success" }, { text: " Empowering", tone: "muted" }] } });
-  const route = registry.registerHudItem({ owner: "adapter-test", id: "route", zone: "workspaceRight", importance: "normal", variants: { full: [{ text: "⌂", tone: "accent" }, { text: " tools→local • history local", tone: "muted" }] } });
-  const extension = registry.registerHudItem({ owner: "adapter-test", id: "extension", zone: "extensionLine", importance: "optional", variants: { full: [{ text: "background ready", tone: "muted" }] } });
-
-  const adapter = new PiFooterAdapter();
+  const statuses: Array<{ id: string; value: string | undefined }> = [];
+  const adapter = new LegacyStatusAdapter();
+  adapter.capture({
+    setStatus: (id, value) => statuses.push({ id, value }),
+    theme: { fg: (tone, text) => `<${tone}>${text}</${tone}>` },
+  });
   assert.equal(await adapter.activate(), true);
-  const patchedRender = (FooterComponent as any).prototype.render;
   assert.equal(await adapter.activate(), true);
-  assert.equal((FooterComponent as any).prototype.render, patchedRender);
 
-  const lines = footer.render(80);
-  assert.equal(stripAnsi(lines[0] ?? "").endsWith("▲ Empowering"), true);
-  assert.equal(stripAnsi(lines[1] ?? "").startsWith("/tmp/project"), true);
-  assert.equal(stripAnsi(lines[1] ?? "").endsWith("⌂ tools→local • history local"), true);
-  assert.equal(lines[2], originalInner[1]);
-  assert.equal(stripAnsi(lines[3] ?? ""), "legacy ready");
-  assert.equal(stripAnsi(lines[4] ?? ""), "background ready");
+  const mode = registry.registerHudItem({ owner: "status-test", id: "mode", zone: "modeRight", importance: "required", variants: { full: [{ text: "▲", tone: "success" }, { text: " Empowering", tone: "muted" }] } });
+  const route = registry.registerHudItem({ owner: "status-test", id: "route", zone: "workspaceRight", importance: "normal", variants: { full: [{ text: "⌂", tone: "accent" }, { text: " local", tone: "muted" }] } });
+  const extension = registry.registerHudItem({ owner: "status-test", id: "extension", zone: "extensionLine", importance: "optional", variants: { full: [{ text: "!", tone: "warning" }] } });
+
+  assert.deepEqual(statuses.at(-1), {
+    id: "hud",
+    value: "<success>▲</success><dim> Empowering</dim> │ <accent>⌂</accent><dim> local</dim> │ <warning>!</warning>",
+  });
+
+  const beforeUpdate = statuses.length;
+  mode.update({ variants: { full: [{ text: "■", tone: "error" }] } });
+  assert.equal(statuses.length, beforeUpdate + 1);
+  assert.match(statuses.at(-1)?.value ?? "", /<error>■<\/error>/);
+
+  adapter.dispose();
+  assert.deepEqual(statuses.at(-1), { id: "hud", value: undefined });
+  const afterDispose = statuses.length;
+  route.update({ visible: false });
+  assert.equal(statuses.length, afterDispose);
 
   mode.dispose();
   route.dispose();
   extension.dispose();
 });
 
-test("legacy adapter captures UI, refreshes one status, warns once, and clears on dispose", async () => {
-  const [{ LegacyStatusAdapter }, registry] = await Promise.all([
-    import("../adapters/legacy-status.ts"),
+test("TUI entrypoint registers a public footer with native rows and exact HUD placement", async () => {
+  const [{ default: hud }, registry, render] = await Promise.all([
+    import("../index.ts"),
     import("../registry.ts"),
+    import("../render.ts"),
   ]);
-  const statuses: Array<string | undefined> = [];
-  const warnings: string[] = [];
-  const adapter = new LegacyStatusAdapter();
-  adapter.capture({
-    setStatus: (_id, value) => statuses.push(value),
-    notify: (message) => warnings.push(message),
+  type Handler = (event: unknown, ctx: any) => unknown;
+  const handlers = new Map<string, Handler>();
+  hud({ on: (event: string, handler: Handler) => handlers.set(event, handler) } as any);
+
+  const mode = registry.registerHudItem({ owner: "footer-test", id: "mode", zone: "modeRight", importance: "required", variants: variants("▲ Empowering") });
+  const workspace = registry.registerHudItem({ owner: "footer-test", id: "workspace", zone: "workspaceRight", importance: "normal", variants: variants("⌂ local") });
+  const extension = registry.registerHudItem({ owner: "footer-test", id: "extension", zone: "extensionLine", importance: "optional", variants: variants("logs ready") });
+
+  let branchCallback: (() => void) | undefined;
+  let renderRequests = 0;
+  let component: any;
+  const footerCalls: unknown[] = [];
+  const footerData = {
+    getGitBranch: () => "main",
+    getAvailableProviderCount: () => 2,
+    getExtensionStatuses: () => new Map([
+      ["z-status", "z\nstatus"],
+      ["hud", "must not be duplicated"],
+      ["alpha", "alpha"],
+    ]),
+    onBranchChange: (callback: () => void) => {
+      branchCallback = callback;
+      return () => { if (branchCallback === callback) branchCallback = undefined; };
+    },
+  };
+  const tui = { requestRender: () => { renderRequests++; } };
+  let ansiStyling = false;
+  const theme = { fg: (_tone: string, text: string) => ansiStyling ? `\u001b[32m${text}\u001b[0m` : text };
+  const ui = {
+    setFooter(factory: any) {
+      footerCalls.push(factory);
+      if (factory === undefined) {
+        component?.dispose?.();
+        component = undefined;
+      } else {
+        component = factory(tui, theme, footerData);
+      }
+    },
+    setStatus() { assert.fail("TUI HUD must not use setStatus"); },
+  };
+  const ctx = {
+    mode: "tui",
+    ui,
+    sessionManager: {
+      getCwd: () => resolve(process.env.HOME ?? "/tmp", "project"),
+      getSessionName: () => "demo",
+      getEntries: () => [
+        { type: "message", message: { role: "assistant", usage: { input: 1200, output: 345, cacheRead: 800, cacheWrite: 200, cost: { total: 0.01234 } } } },
+        { type: "message", message: { role: "toolResult", usage: { input: 10, output: 20, cacheRead: 0, cacheWrite: 0, cost: { total: 0.001 } } } },
+        { type: "compaction", usage: { input: 0, output: 5, cacheRead: 0, cacheWrite: 0, cost: { total: 0.0004 } } },
+      ],
+    },
+    getContextUsage: () => ({ tokens: 100000, contextWindow: 200000, percent: 50 }),
+    model: { id: "test-model", provider: "test-provider", reasoning: true, contextWindow: 200000 },
+    thinkingLevel: "high",
+  };
+
+  await handlers.get("session_start")?.({}, ctx);
+  assert.equal(typeof footerCalls.at(-1), "function");
+  assert.ok(component, "setFooter factory should create a real TUI component");
+
+  const width = 100;
+  const statsLeft = "↑1.2k ↓370 R800 W200 CH36.4% $0.014 50.0%/200k";
+  const statsRight = "(test-provider) test-model • high";
+  assert.deepEqual(component.render(width), [
+    `${" ".repeat(width - "▲ Empowering".length)}▲ Empowering`,
+    `~/project (main) • demo${" ".repeat(width - "~/project (main) • demo".length - "⌂ local".length)}⌂ local`,
+    `${statsLeft}${" ".repeat(width - statsLeft.length - statsRight.length)}${statsRight}`,
+    "alpha z status",
+    "logs ready",
+  ]);
+
+  const beforeHudChange = renderRequests;
+  ansiStyling = true;
+  component.invalidate();
+  mode.update({ variants: { full: [{ text: "■ Reviewing", tone: "success" }] } });
+  assert.equal(renderRequests, beforeHudChange + 1);
+  assert.match(render.renderZone("modeRight", width), /\u001b\[32m■ Reviewing\u001b\[0m/);
+  branchCallback?.();
+  assert.equal(renderRequests, beforeHudChange + 2);
+
+  handlers.get("session_shutdown")?.({}, ctx);
+  assert.equal(footerCalls.at(-1), undefined);
+  assert.equal(render.renderZone("modeRight", width), "■ Reviewing");
+  const afterShutdown = renderRequests;
+  workspace.update({ variants: variants("stale") });
+  branchCallback?.();
+  assert.equal(renderRequests, afterShutdown);
+
+  mode.dispose();
+  workspace.dispose();
+  extension.dispose();
+});
+
+test("footer lifecycle re-registers per session and stale contexts render safely", async () => {
+  const { default: hud } = await import("../index.ts");
+  type Handler = (event: unknown, ctx: any) => unknown;
+  const handlers = new Map<string, Handler>();
+  hud({ on: (event: string, handler: Handler) => handlers.set(event, handler) } as any);
+
+  const registrations: unknown[] = [];
+  const components: any[] = [];
+  const makeCtx = (stale = false) => ({
+    mode: "tui",
+    ui: {
+      setFooter(factory: any) {
+        registrations.push(factory);
+        if (factory) components.push(factory(
+          { requestRender() {} },
+          { fg: (_tone: string, text: string) => text },
+          {
+            getGitBranch: () => null,
+            getAvailableProviderCount: () => 1,
+            getExtensionStatuses: () => new Map(),
+            onBranchChange: () => () => {},
+          },
+        ));
+      },
+      setStatus() {},
+    },
+    sessionManager: {
+      getEntries: () => { if (stale) throw new Error("stale session"); return []; },
+      getCwd: () => "/tmp",
+      getSessionName: () => undefined,
+    },
+    getContextUsage: () => undefined,
+    model: undefined,
   });
-  await adapter.activate();
-  const handle = registry.registerHudItem({ owner: "legacy-test", id: "item", zone: "modeRight", importance: "required", variants: { full: [{ text: "▲ Empowering", tone: "success" }] } });
-  assert.equal(stripAnsi(statuses.at(-1) ?? ""), "▲ Empowering");
-  assert.equal(warnings.length <= 1, true);
-  adapter.dispose();
-  assert.equal(statuses.at(-1), undefined);
-  handle.dispose();
+
+  const firstCtx = makeCtx();
+  const staleCtx = makeCtx(true);
+  await handlers.get("session_start")?.({}, firstCtx);
+  await handlers.get("session_start")?.({}, staleCtx);
+  assert.equal(registrations.filter((value) => typeof value === "function").length, 2);
+  assert.ok(registrations.includes(undefined), "replacement should restore the prior default footer first");
+  assert.deepEqual(components.at(-1).render(80), []);
+
+  handlers.get("session_shutdown")?.({}, staleCtx);
+  assert.equal(registrations.at(-1), undefined);
+});
+
+test("RPC and unavailable-TUI footer paths use LegacyStatusAdapter fallback", async () => {
+  const [{ default: hud }, registry] = await Promise.all([import("../index.ts"), import("../registry.ts")]);
+  type Handler = (event: unknown, ctx: any) => unknown;
+  const handlers = new Map<string, Handler>();
+  hud({ on: (event: string, handler: Handler) => handlers.set(event, handler) } as any);
+
+  const item = registry.registerHudItem({ owner: "fallback-test", id: "mode", zone: "modeRight", importance: "required", variants: variants("fallback") });
+  const statuses: Array<{ id: string; value: string | undefined }> = [];
+  const makeCtx = (mode: string) => ({
+    mode,
+    ui: {
+      setStatus: (id: string, value?: string) => statuses.push({ id, value }),
+      theme: { fg: (_tone: string, text: string) => text },
+    },
+  });
+
+  await handlers.get("session_start")?.({}, makeCtx("rpc"));
+  assert.deepEqual(statuses.at(-1), { id: "hud", value: "fallback" });
+  handlers.get("session_shutdown")?.({}, makeCtx("rpc"));
+  assert.deepEqual(statuses.at(-1), { id: "hud", value: undefined });
+
+  await handlers.get("session_start")?.({}, makeCtx("tui"));
+  assert.deepEqual(statuses.at(-1), { id: "hud", value: "fallback" });
+  handlers.get("session_shutdown")?.({}, makeCtx("tui"));
+  item.dispose();
 });

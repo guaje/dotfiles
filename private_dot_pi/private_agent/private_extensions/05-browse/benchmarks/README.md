@@ -6,6 +6,6 @@ Run only with explicit credentials and real network access:
 LINKUP_API_KEY=... TAVILY_API_KEY=... npx -y tsx agent/extensions/05-browse/benchmarks/run.ts
 ```
 
-API keys are read from `agent/browsers.json` or the environment. Non-secret config (limits, fallbackProviders, base URLs) comes from `agent/settings.config.json` under the `browse` key.
+API keys are read from `agent/credentials.json` (`browse.providers`) or the environment. Non-secret config (limits, fallbackProviders, base URLs) comes from `agent/settings.config.json` under the `browse` key.
 
 The runner records Linkup and Tavily results for fixed public queries, measuring latency, result size, source/citation count, freshness fields, failures, and rejection of unsafe URLs. It does not change settings or enable Tavily fallback. Review its JSON output before any manual configuration change.

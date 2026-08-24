@@ -24,11 +24,12 @@ function response(body: unknown, status = 200) { return new Response(JSON.string
 
 test("web retrieval resolves synthetic config with credentials and settings precedence", async () => {
 	const root = mkdtempSync(resolve(tmpdir(), "pi-browse-"));
-	const credentialsFile = resolve(root, "browsers.json");
+	const credentialsFile = resolve(root, "credentials.json");
 	const settingsPath = resolve(root, "settings.config.json");
 
 	writeFileSync(credentialsFile, JSON.stringify({
-		providers: { linkup: { apiKey: "$TEST_LINKUP" }, tavily: { apiKey: "!secret-command" } },
+		browse: { providers: { linkup: { apiKey: "$TEST_LINKUP" }, tavily: { apiKey: "!secret-command" } } },
+		artificialAnalysis: { apiKey: "unrelated-aa-secret" },
 	}));
 
 	writeFileSync(settingsPath, JSON.stringify({
@@ -56,10 +57,10 @@ test("web retrieval resolves synthetic config with credentials and settings prec
 
 test("loadConfig uses baseUrl from settings browse.providers and falls back to defaults", async () => {
 	const root = mkdtempSync(resolve(tmpdir(), "pi-browse-"));
-	const credentialsFile = resolve(root, "browsers.json");
+	const credentialsFile = resolve(root, "credentials.json");
 	const settingsPath = resolve(root, "settings.config.json");
 
-	writeFileSync(credentialsFile, JSON.stringify({ providers: { linkup: { apiKey: "k1" }, tavily: { apiKey: "k2" } } }));
+	writeFileSync(credentialsFile, JSON.stringify({ browse: { providers: { linkup: { apiKey: "k1" }, tavily: { apiKey: "k2" } } } }));
 	writeFileSync(settingsPath, JSON.stringify({
 		browse: { providers: { linkup: { baseUrl: "https://custom.linkup.test" } } },
 	}));
@@ -73,10 +74,10 @@ test("loadConfig uses baseUrl from settings browse.providers and falls back to d
 
 test("loadConfig redacts credentials from errors", async () => {
 	const root = mkdtempSync(resolve(tmpdir(), "pi-browse-"));
-	const credentialsFile = resolve(root, "browsers.json");
+	const credentialsFile = resolve(root, "credentials.json");
 	const settingsPath = resolve(root, "settings.config.json");
 
-	writeFileSync(credentialsFile, JSON.stringify({ providers: { linkup: { apiKey: "secret-api-key-12345" } } }));
+	writeFileSync(credentialsFile, JSON.stringify({ browse: { providers: { linkup: { apiKey: "secret-api-key-12345" } } } }));
 	writeFileSync(settingsPath, JSON.stringify({ browse: { fallbackProviders: [] } }));
 
 	try {
@@ -212,9 +213,9 @@ async function loadExtension() {
 
 test("extension registers one constrained tool and emits preview plus final content", async () => {
 	const root = mkdtempSync(resolve(tmpdir(), "pi-browse-extension-"));
-	const credentialsPath = resolve(root, "browsers.json");
+	const credentialsPath = resolve(root, "credentials.json");
 	const settingsPath = resolve(root, "settings.config.json");
-	writeFileSync(credentialsPath, JSON.stringify({ providers: { linkup: { apiKey: "synthetic-extension-key" } } }));
+	writeFileSync(credentialsPath, JSON.stringify({ browse: { providers: { linkup: { apiKey: "synthetic-extension-key" } } } }));
 	writeFileSync(settingsPath, JSON.stringify({ browse: { fallbackProviders: [], limits: config.limits } }));
 	const extension = await loadExtension(); let tool: any;
 	assert.equal(typeof extension, "function", "the Browse entry point must expose its named extension function");

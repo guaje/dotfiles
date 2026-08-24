@@ -10,7 +10,7 @@ import type { RetrievalLimits, WebRetrievalConfig } from "./types.ts";
 const execFileAsync = promisify(execFile);
 const extensionDir = dirname(fileURLToPath(import.meta.url));
 
-export const defaultCredentialsPath = resolve(extensionDir, "../../browsers.json");
+export const defaultCredentialsPath = resolve(extensionDir, "../../credentials.json");
 
 const defaults: RetrievalLimits = {
   maxResults: 8,
@@ -103,7 +103,11 @@ export async function loadConfig(dependencies: BrowseConfigDependencies = {}): P
   const tavilyBaseUrl = String(settingsTavily.baseUrl || "https://api.tavily.com").replace(/\/$/, "");
 
   const credentials = await readCredentialsFile(dependencies);
-  const credProviders = credentials.providers;
+  const browseCredentials =
+    credentials.browse !== null && typeof credentials.browse === "object" && !Array.isArray(credentials.browse)
+      ? (credentials.browse as Record<string, unknown>)
+      : credentials; // Legacy flat credential schema compatibility for injected paths.
+  const credProviders = browseCredentials.providers;
   const credLinkup =
     credProviders !== null && typeof credProviders === "object" && !Array.isArray(credProviders)
       ? ((credProviders as Record<string, unknown>).linkup as Record<string, unknown> | undefined) || {}

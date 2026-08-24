@@ -1,0 +1,81 @@
+{
+  "modelId": "050c61cd-cddc-463a-a30a-a82aaa37be59",
+  "capturedAt": 1787350448000,
+  "coverage": 0.8888888888888888,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1787329677000,
+    "status": "mapped",
+    "thinkingLevel": "low"
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.1"
+  },
+  "model": "gpt-5.6-luna",
+  "outputTokens": {},
+  "provider": "openai-codex",
+  "publicPage": {
+    "contentSha256": "174557b6b5af0fc95d7066945329853f75b0bf8f237e21bff67d27f4f473f4bc",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.1.1",
+    "recordSha256": "5c59cd41fcce313efb1a2230d3314972d874707d9548f0baa1c9c1a1d84ca26a",
+    "retrievedAt": 1787350447000,
+    "url": "https://artificialanalysis.ai/models/gpt-5-6-luna-low"
+  },
+  "scores": {
+    "agentic": 25.7,
+    "coding": 44.2,
+    "faithfulness": 10.129726745790776,
+    "instructionFollowing": null,
+    "intelligence": 33.9,
+    "knowledge": 39.61666666666667,
+    "longContext": 65.3333333333333,
+    "scientificReasoning": 35.31332032536849,
+    "toolUse": 22.782502577319605
+  },
+  "source": {
+    "name": "GPT-5.6 Luna (low)",
+    "openrouterApiId": null,
+    "slug": "gpt-5-6-luna-low"
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": "low",
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 32.78150000000001,
+        "retrievedAt": 1787350447000,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "5c59cd41fcce313efb1a2230d3314972d874707d9548f0baa1c9c1a1d84ca26a",
+        "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-luna-low"
+      },
+      "tau2Telecom": null,
+      "tau3Banking": {
+        "benchmark": {
+          "id": "tau3-banking",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "tauBanking",
+        "normalizedScore": 12.7835051546392,
+        "retrievedAt": 1787350447000,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "5c59cd41fcce313efb1a2230d3314972d874707d9548f0baa1c9c1a1d84ca26a",
+        "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-luna-low"
+      }
+    },
+    "derivation": {
+      "rule": "tau3-banking+gdpval-aa",
+      "score": 22.782502577319605,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

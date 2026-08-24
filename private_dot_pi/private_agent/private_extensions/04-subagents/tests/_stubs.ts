@@ -52,7 +52,6 @@ export function writePackageStubs(): void {
 	writePkg(
 		"@earendil-works/pi-ai",
 		[
-			"export async function completeSimple(model, context, options) { if (typeof globalThis.__subagentCompleteSimple === 'function') return globalThis.__subagentCompleteSimple(model, context, options); throw new Error('completeSimple not mocked'); }",
 			"export function StringEnum(values, options = {}) { return { type: 'string', enum: [...values], ...options }; }",
 		].join("\n"),
 	);

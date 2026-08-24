@@ -6,12 +6,14 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { getAgentDir, parseFrontmatter } from "@earendil-works/pi-coding-agent";
 import type { ThinkingLevel } from "./model-selection.ts";
+import { parseRoutingProfile } from "./task-profile.ts";
+import type { RoutingProfile } from "./benchmark-types.ts";
 
 export type AgentScope = "user" | "project" | "both";
 
 /** Valid pi thinking levels. Matches pi's --thinking flag values. */
 const VALID_THINKING_LEVELS = new Set<ThinkingLevel>([
-    "off", "minimal", "low", "medium", "high", "xhigh",
+    "off", "minimal", "low", "medium", "high", "xhigh", "max",
 ]);
 
 export interface AgentConfig {
@@ -23,6 +25,8 @@ export interface AgentConfig {
     thinking?: ThinkingLevel;
     /** When false, the child skips AGENTS.md/CLAUDE.md discovery (--no-context-files). Default true. */
     contextFiles?: boolean;
+    /** Closed benchmark routing profile; absent or invalid custom agents use balanced. */
+    routingProfile?: RoutingProfile;
     systemPrompt: string;
     source: "user" | "project";
     filePath: string;
@@ -57,6 +61,7 @@ function loadAgentsFromDir(dir: string, source: "user" | "project"): AgentConfig
             ? (rawThinking as ThinkingLevel)
             : undefined;
         const rawContextFiles = frontmatter.contextFiles;
+        const routingProfile = parseRoutingProfile(frontmatter.routingProfile);
         const contextFiles = rawContextFiles === undefined ? undefined
             : rawContextFiles === false || coerceStr(rawContextFiles)?.toLowerCase() === "false" ? false
             : rawContextFiles === true || coerceStr(rawContextFiles)?.toLowerCase() === "true" ? true
@@ -68,6 +73,7 @@ function loadAgentsFromDir(dir: string, source: "user" | "project"): AgentConfig
             model: frontmatter.model,
             thinking,
             contextFiles,
+            routingProfile,
             systemPrompt: body,
             source,
             filePath,

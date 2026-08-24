@@ -21,6 +21,7 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import { type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { type AgentConfig, type AgentScope, discoverAgents } from "./agents.ts";
+import { DEFAULT_SNAPSHOT_ROOT, loadBenchmarkAssets } from "./benchmark-assets.ts";
 import {
 	DELEGATE_GUIDELINES,
 	buildRosterInjection,
@@ -48,6 +49,7 @@ import { detailsToWidgetState, renderSubagentWidget, type SubagentWidgetState } 
 // --- BelowEditor subagent status widget (live aggregate state) ---
 let widgetState: SubagentWidgetState | null = null;
 let widgetTui: { requestRender: () => void } | null = null;
+let benchmarkSnapshotWarningShown = false;
 
 function updateSubagentWidget(details: SubagentDetails): void {
 	widgetState = detailsToWidgetState(details);
@@ -59,23 +61,16 @@ function clearSubagentWidget(): void {
 	widgetTui?.requestRender();
 }
 
-const LLM_SELECTOR_DESC =
-	"Use the LLM-based model selector instead of the keyword heuristic (default false). " +
-	"Set true for rare/ambiguous tasks where keyword matching may pick the wrong model. " +
-	"Adds one short LLM call per spawn. Per-item values override the top-level default.";
-
 const TaskItem = Type.Object({
 	agent: Type.String({ description: "Name of the agent to invoke" }),
 	task: Type.String({ description: "Task to delegate to the agent" }),
 	cwd: Type.Optional(Type.String({ description: "Working directory for the agent process" })),
-	useLlmSelector: Type.Optional(Type.Boolean({ description: LLM_SELECTOR_DESC, default: false })),
 });
 
 const ChainItem = Type.Object({
 	agent: Type.String({ description: "Name of the agent to invoke" }),
 	task: Type.String({ description: "Task with optional {previous} placeholder for prior output" }),
 	cwd: Type.Optional(Type.String({ description: "Working directory for the agent process" })),
-	useLlmSelector: Type.Optional(Type.Boolean({ description: LLM_SELECTOR_DESC, default: false })),
 });
 
 const AgentScopeSchema = StringEnum(["user", "project", "both"] as const, {
@@ -93,7 +88,6 @@ const SubagentParams = Type.Object({
 		Type.Boolean({ description: "Prompt before running project-local agents. Default: true.", default: true }),
 	),
 	cwd: Type.Optional(Type.String({ description: "Working directory for the agent process (single mode)" })),
-	useLlmSelector: Type.Optional(Type.Boolean({ description: LLM_SELECTOR_DESC, default: false })),
 });
 
 export default function (pi: ExtensionAPI) {
@@ -104,6 +98,20 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_start", async (_event, ctx) => {
 		await refreshRosterSettingsCache();
 		if (!ctx.hasUI) return;
+		if (!benchmarkSnapshotWarningShown) {
+			const executionSettings = await getSubagentExecutionSettings();
+			const benchmarkAssets = await loadBenchmarkAssets(
+				process.env.PI_AA_SNAPSHOT_ROOT || DEFAULT_SNAPSHOT_ROOT,
+				executionSettings.benchmarkSnapshotMaxAgeMs,
+			);
+			if (!benchmarkAssets) {
+				benchmarkSnapshotWarningShown = true;
+				ctx.ui.notify?.(
+					"Artificial Analysis snapshots are absent, invalid, or stale; automatic subagents will use Pi's default model. Start with: sh agent/scripts/refresh-artificial-analysis.sh --missing",
+					"warning",
+				);
+			}
+		}
 		ctx.ui.setWidget(
 			"subagent",
 			(tui, theme) => {
@@ -153,7 +161,6 @@ export default function (pi: ExtensionAPI) {
 			const discovery = discoverAgents(ctx.cwd, agentScope);
 			const agents = discovery.agents;
 			const confirmProjectAgents = params.confirmProjectAgents ?? true;
-			const defaultUseLlmSelector = params.useLlmSelector ?? false;
 
 			const hasChain = (params.chain?.length ?? 0) > 0;
 			const hasTasks = (params.tasks?.length ?? 0) > 0;
@@ -249,8 +256,6 @@ export default function (pi: ExtensionAPI) {
 						signal,
 						chainUpdate,
 						makeDetails("chain"),
-						ctx.modelRegistry,
-						step.useLlmSelector ?? defaultUseLlmSelector,
 					);
 					results.push(result);
 
@@ -328,8 +333,6 @@ export default function (pi: ExtensionAPI) {
 							}
 						},
 						makeDetails("parallel"),
-						ctx.modelRegistry,
-						t.useLlmSelector ?? defaultUseLlmSelector,
 					);
 					allResults[index] = result;
 					emitParallelUpdate();
@@ -366,8 +369,6 @@ export default function (pi: ExtensionAPI) {
 					signal,
 					widgetOnUpdate,
 					makeDetails("single"),
-					ctx.modelRegistry,
-					defaultUseLlmSelector,
 				);
 				const isError = isFailedResult(result);
 				if (isError) {

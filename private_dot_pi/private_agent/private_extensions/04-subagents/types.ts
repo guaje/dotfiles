@@ -9,6 +9,7 @@ import type { AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { Message } from "@earendil-works/pi-ai";
 import type { AgentScope } from "./agents.ts";
 import type { ThinkingLevel } from "./model-selection.ts";
+import type { BenchmarkRouteDiagnostics } from "./benchmark-types.ts";
 
 /** User-configurable workload defaults and non-configurable safety ceilings. */
 export const DEFAULT_MAX_PARALLEL_TASKS = 8;
@@ -40,12 +41,12 @@ export interface SingleResult {
 	stopReason?: string;
 	errorMessage?: string;
 	step?: number;
-	/** How the model was chosen: "explicit" (agent frontmatter), "heuristic", or "llm". */
-	modelSelector?: "explicit" | "heuristic" | "llm";
+	/** How the model was chosen. heuristic/llm remain for historical session rendering only. */
+	modelSelector?: "explicit" | "benchmark" | "default" | "heuristic" | "llm";
 	/** Thinking level passed to the child (reasoning models only). */
 	thinkingLevel?: ThinkingLevel;
-	/** Rationale from the LLM selector, when present. */
-	selectorReason?: string;
+	/** Bounded benchmark decision metadata, when automatic routing succeeded. */
+	benchmarkRoute?: BenchmarkRouteDiagnostics;
 }
 
 export interface SubagentDetails {
@@ -76,7 +77,6 @@ export interface SubagentCallArgs {
 	tasks?: Array<{ agent: string; task: string }>;
 	chain?: Array<{ agent: string; task: string }>;
 	agentScope?: AgentScope;
-	useLlmSelector?: boolean;
 }
 
 export function emptyUsage(): UsageStats {

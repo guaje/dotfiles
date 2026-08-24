@@ -80,7 +80,7 @@ test("discoverAgents parses thinking and contextFiles frontmatter fields", async
 		writeAgent(
 			join(userDir, "agents"),
 			"planner.md",
-			AGENT_MD("planner", "Planning", "thinking: xhigh"),
+			AGENT_MD("planner", "Planning", "thinking: max"),
 		);
 		// Invalid thinking level is dropped (falls back to undefined).
 		writeAgent(
@@ -93,7 +93,7 @@ test("discoverAgents parses thinking and contextFiles frontmatter fields", async
 		const byName = new Map(result.agents.map((a: any) => [a.name, a]));
 		assert.equal(byName.get("scout").thinking, "high");
 		assert.equal(byName.get("scout").contextFiles, false);
-		assert.equal(byName.get("planner").thinking, "xhigh");
+		assert.equal(byName.get("planner").thinking, "max");
 		// contextFiles defaults to undefined when omitted.
 		assert.equal(byName.get("planner").contextFiles, undefined);
 		// Invalid thinking value is rejected.
@@ -101,6 +101,19 @@ test("discoverAgents parses thinking and contextFiles frontmatter fields", async
 	} finally {
 		cleanup();
 	}
+});
+
+test("discoverAgents parses closed routingProfile frontmatter", async () => {
+	const mod = await loadModule();
+	const { userDir } = makeTree();
+	(globalThis as any).__subagentAgentDir = userDir;
+	try {
+		writeAgent(join(userDir, "agents"), "worker.md", AGENT_MD("worker", "Work", "routingProfile: coding"));
+		writeAgent(join(userDir, "agents"), "custom.md", AGENT_MD("custom", "Custom", "routingProfile: untrusted"));
+		const byName = new Map(mod.discoverAgents(userDir, "user").agents.map((agent: any) => [agent.name, agent]));
+		assert.equal(byName.get("worker").routingProfile, "coding");
+		assert.equal(byName.get("custom").routingProfile, "balanced");
+	} finally { cleanup(); }
 });
 
 test("discoverAgents (project scope) walks up to find .pi/agents", async () => {

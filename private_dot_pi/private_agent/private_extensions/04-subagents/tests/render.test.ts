@@ -99,13 +99,11 @@ test("renderSubagentCall single mode shows agent + task preview", async () => {
 	}
 });
 
-test("renderSubagentCall tags the llm selector when requested", async () => {
+test("renderSubagentCall does not expose removed selector controls", async () => {
 	const mod = await loadModule();
 	try {
-		const plain = flatten(mod.renderSubagentCall({ agent: "scout", task: "x" }, theme));
-		assert.doesNotMatch(plain, /\bllm\b/);
-		const llm = flatten(mod.renderSubagentCall({ agent: "scout", task: "x", useLlmSelector: true }, theme));
-		assert.match(llm, /\bllm\b/);
+		const text = flatten(mod.renderSubagentCall({ agent: "scout", task: "x" }, theme));
+		assert.doesNotMatch(text, /\bllm\b/);
 	} finally {
 		cleanup();
 	}

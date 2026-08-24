@@ -78,7 +78,10 @@
     "rosterCap": 10,
     "rosterScope": "user",
     "maxParallelTasks": 8,
-    "maxConcurrency": 4
+    "maxConcurrency": 4,
+    "autoModelSelection": {
+      "benchmarkSnapshotMaxAgeMs": 2592000000
+    }
   },
   "theme": "catppuccin-mocha"
 }

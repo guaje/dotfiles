@@ -1,0 +1,93 @@
+{
+  "modelId": "f7a4ea75-e548-4069-80d4-9be8bc7c009b",
+  "capturedAt": 1787350503000,
+  "coverage": 1,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1787327097000,
+    "status": "mapped",
+    "thinkingLevel": null
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.1"
+  },
+  "model": "glm-5.2",
+  "outputTokens": {},
+  "provider": "reallms",
+  "publicPage": {
+    "contentSha256": "454e9cfb9485c190cc2537001a2db8ee921aac68baa617aa35b611d78b442202",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.1.1",
+    "recordSha256": "a38b013c1a5b7636fb56e5493c848ac1b32955ea9ee42001829e509270ec4e85",
+    "retrievedAt": 1787350502000,
+    "url": "https://artificialanalysis.ai/models/glm-5-2"
+  },
+  "scores": {
+    "agentic": 45.7,
+    "coding": 68.8,
+    "faithfulness": 73.70044052863436,
+    "instructionFollowing": 73.3333333333333,
+    "intelligence": 52.6,
+    "knowledge": 24.333333333333336,
+    "longContext": 76.6666666666667,
+    "scientificReasoning": 50.50043486188067,
+    "toolUse": 42.457587628865994
+  },
+  "source": {
+    "name": "GLM-5.2 (max)",
+    "openrouterApiId": null,
+    "slug": "glm-5-2"
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": null,
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 50.275999999999996,
+        "retrievedAt": 1787350502000,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "a38b013c1a5b7636fb56e5493c848ac1b32955ea9ee42001829e509270ec4e85",
+        "sourceUrl": "https://artificialanalysis.ai/models/glm-5-2"
+      },
+      "tau2Telecom": {
+        "benchmark": {
+          "id": "tau2-telecom",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "tau2",
+        "normalizedScore": 99.1228070175439,
+        "retrievedAt": 1787350502000,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "a38b013c1a5b7636fb56e5493c848ac1b32955ea9ee42001829e509270ec4e85",
+        "sourceUrl": "https://artificialanalysis.ai/models/glm-5-2"
+      },
+      "tau3Banking": {
+        "benchmark": {
+          "id": "tau3-banking",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "tauBanking",
+        "normalizedScore": 34.639175257732,
+        "retrievedAt": 1787350502000,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "a38b013c1a5b7636fb56e5493c848ac1b32955ea9ee42001829e509270ec4e85",
+        "sourceUrl": "https://artificialanalysis.ai/models/glm-5-2"
+      }
+    },
+    "derivation": {
+      "rule": "tau3-banking+gdpval-aa",
+      "score": 42.457587628865994,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

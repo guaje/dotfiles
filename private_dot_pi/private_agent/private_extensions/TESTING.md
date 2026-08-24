@@ -9,7 +9,7 @@
 | Permissions | local/remote Micromanagement and Empowerment, YOLO availability/cycling/route-loss fail-closed behavior |
 | Fixtures | temp roots and precise cleanup; no shared `node_modules` deletion |
 | Browse | synthetic config and secret-command injection only |
-| Subagents | caps, observed concurrency, truncation/rendering |
+| Subagents | caps, observed concurrency, truncation/rendering, deterministic benchmark snapshot/profile/routing and refresh-script checks |
 | Health | freshness and policy bounds |
 | Pi internals | retain structural/AST tests where patch layout is contractual |
 

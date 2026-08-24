@@ -46,7 +46,8 @@ async function loadModule() {
 	writeFileSync(
 		MODELSEL_STUB,
 		[
-			"export async function selectModelForSubagent(_task, _registry, _opts) {",
+			"export async function selectModelForSubagent(_options) {",
+			"  globalThis.__subagentModelSelectionOptions = _options;",
 			"  return globalThis.__subagentModelDecision || {};",
 			"}",
 		].join("\n"),
@@ -69,6 +70,7 @@ function cleanup() {
 	delete (globalThis as any).__subagentSpawnCalls;
 	delete (globalThis as any).__subagentSpawnController;
 	delete (globalThis as any).__subagentModelDecision;
+	delete (globalThis as any).__subagentModelSelectionOptions;
 }
 
 const makeDetails = (results: any) => ({ mode: "single", agentScope: "user", projectAgentsDir: null, results });
@@ -99,8 +101,6 @@ test("runSingleAgent returns a failed result for an unknown agent without spawni
 			undefined,
 			undefined,
 			makeDetails,
-			{},
-			false,
 		);
 		assert.equal(result.exitCode, 1);
 		assert.match(result.stderr, /Unknown agent: "missing"/);
@@ -115,7 +115,7 @@ test("runSingleAgent passes selected --model/--thinking to the child and streams
 	(globalThis as any).__subagentModelDecision = {
 		modelId: "prov/reasoning-pro",
 		thinkingLevel: "high",
-		selector: "heuristic",
+		selector: "benchmark",
 	};
 	(globalThis as any).__subagentSpawnController = ({ args }: { args: string[] }) => {
 		// Verify the child was invoked with the selected model + thinking level.
@@ -151,12 +151,10 @@ test("runSingleAgent passes selected --model/--thinking to the child and streams
 			undefined,
 			undefined,
 			makeDetails,
-			{},
-			false,
 		);
 		assert.equal(result.exitCode, 0);
 		assert.equal(result.model, "prov/reasoning-pro");
-		assert.equal(result.modelSelector, "heuristic");
+		assert.equal(result.modelSelector, "benchmark");
 		assert.equal(result.thinkingLevel, "high");
 		assert.equal(result.usage.turns, 1);
 		assert.equal(result.usage.input, 10);
@@ -199,8 +197,6 @@ test("runSingleAgent uses an explicit agent.model as a hard override and skips s
 			undefined,
 			undefined,
 			makeDetails,
-			{},
-			false,
 		);
 		assert.equal(result.exitCode, 0);
 		assert.equal(result.model, "explicit-prov/explicit-model");
@@ -210,23 +206,23 @@ test("runSingleAgent uses an explicit agent.model as a hard override and skips s
 	}
 });
 
-test("runSingleAgent lets an explicit thinking: frontmatter override the auto-estimated level", async () => {
+test("runSingleAgent keeps explicit minimal thinking while routing may normalize its benchmark variant to low", async () => {
 	const mod = await loadModule();
-	// Auto-selection would pick "high", but the agent's thinking: xhigh must win.
 	(globalThis as any).__subagentModelDecision = {
 		modelId: "prov/reasoning-pro",
-		thinkingLevel: "high",
-		selector: "heuristic",
+		thinkingLevel: "low",
+		selector: "benchmark",
+		benchmarkRoute: { benchmarkThinkingLevel: "low" },
 	};
 	(globalThis as any).__subagentSpawnController = ({ args }: { args: string[] }) => {
 		assert.ok(args.includes("--thinking"));
-		assert.equal(args[args.indexOf("--thinking") + 1], "xhigh");
+		assert.equal(args[args.indexOf("--thinking") + 1], "minimal");
 		return { lines: [], code: 0 };
 	};
 	try {
 		const result = await mod.runSingleAgent(
 			"/cwd",
-			[{ name: "scout", description: "d", thinking: "xhigh", systemPrompt: "", source: "user", filePath: "/x" }],
+			[{ name: "scout", description: "d", thinking: "minimal", systemPrompt: "", source: "user", filePath: "/x" }],
 			"scout",
 			"deep analysis",
 			undefined,
@@ -234,11 +230,11 @@ test("runSingleAgent lets an explicit thinking: frontmatter override the auto-es
 			undefined,
 			undefined,
 			makeDetails,
-			{},
-			false,
 		);
 		assert.equal(result.exitCode, 0);
-		assert.equal(result.thinkingLevel, "xhigh");
+		assert.equal(result.thinkingLevel, "minimal");
+		assert.equal(result.benchmarkRoute?.benchmarkThinkingLevel, "low");
+		assert.equal((globalThis as any).__subagentModelSelectionOptions.thinking, "minimal");
 	} finally {
 		cleanup();
 	}
@@ -246,7 +242,7 @@ test("runSingleAgent lets an explicit thinking: frontmatter override the auto-es
 
 test("runSingleAgent passes --no-context-files when agent.contextFiles is false", async () => {
 	const mod = await loadModule();
-	(globalThis as any).__subagentModelDecision = { modelId: "prov/x", selector: "heuristic" };
+	(globalThis as any).__subagentModelDecision = { modelId: "prov/x", selector: "benchmark" };
 	(globalThis as any).__subagentSpawnController = ({ args }: { args: string[] }) => {
 		assert.ok(args.includes("--no-context-files"), "child should receive --no-context-files");
 		return { lines: [], code: 0 };
@@ -262,8 +258,6 @@ test("runSingleAgent passes --no-context-files when agent.contextFiles is false"
 			undefined,
 			undefined,
 			makeDetails,
-			{},
-			false,
 		);
 		assert.equal(result.exitCode, 0);
 	} finally {
@@ -273,7 +267,7 @@ test("runSingleAgent passes --no-context-files when agent.contextFiles is false"
 
 test("runSingleAgent omits --no-context-files by default", async () => {
 	const mod = await loadModule();
-	(globalThis as any).__subagentModelDecision = { modelId: "prov/x", selector: "heuristic" };
+	(globalThis as any).__subagentModelDecision = { modelId: "prov/x", selector: "benchmark" };
 	(globalThis as any).__subagentSpawnController = ({ args }: { args: string[] }) => {
 		assert.ok(!args.includes("--no-context-files"), "should not pass --no-context-files by default");
 		return { lines: [], code: 0 };
@@ -289,8 +283,6 @@ test("runSingleAgent omits --no-context-files by default", async () => {
 			undefined,
 			undefined,
 			makeDetails,
-			{},
-			false,
 		);
 	} finally {
 		cleanup();

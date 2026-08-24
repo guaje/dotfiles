@@ -1,0 +1,81 @@
+{
+  "modelId": "7c4d1e30-6ecb-46cf-880c-41446d7b51f1",
+  "capturedAt": 1787350476000,
+  "coverage": 0.8888888888888888,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1787329676000,
+    "status": "mapped",
+    "thinkingLevel": "off"
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.1"
+  },
+  "model": "gpt-5.6-sol",
+  "outputTokens": {},
+  "provider": "openai-codex",
+  "publicPage": {
+    "contentSha256": "ac25759885f0ef1405aaad24c4507d0c57cbb18767b0392eba83ca089b584c36",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.1.1",
+    "recordSha256": "cbcdf3e34692625098f7c6ab8130759723b9da06244599ac0805f4112d99ff30",
+    "retrievedAt": 1787350475000,
+    "url": "https://artificialanalysis.ai/models/gpt-5-6-sol-non-reasoning"
+  },
+  "scores": {
+    "agentic": 36,
+    "coding": 65.1,
+    "faithfulness": 7.212475633528271,
+    "instructionFollowing": null,
+    "intelligence": 41.9,
+    "knowledge": 48.699999999999996,
+    "longContext": 56.99999999999999,
+    "scientificReasoning": 33.60495640013711,
+    "toolUse": 31.7660644329897
+  },
+  "source": {
+    "name": "GPT-5.6 Sol (Non-reasoning)",
+    "openrouterApiId": null,
+    "slug": "gpt-5-6-sol-non-reasoning"
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": "off",
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 43.944500000000005,
+        "retrievedAt": 1787350475000,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "cbcdf3e34692625098f7c6ab8130759723b9da06244599ac0805f4112d99ff30",
+        "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol-non-reasoning"
+      },
+      "tau2Telecom": null,
+      "tau3Banking": {
+        "benchmark": {
+          "id": "tau3-banking",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "tauBanking",
+        "normalizedScore": 19.5876288659794,
+        "retrievedAt": 1787350475000,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "cbcdf3e34692625098f7c6ab8130759723b9da06244599ac0805f4112d99ff30",
+        "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol-non-reasoning"
+      }
+    },
+    "derivation": {
+      "rule": "tau3-banking+gdpval-aa",
+      "score": 31.7660644329897,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

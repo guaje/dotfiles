@@ -7,7 +7,10 @@ import {
   HARD_MAX_PARALLEL_TASKS,
 } from "./types.ts";
 
-export interface SubagentExecutionSettings { maxParallelTasks: number; maxConcurrency: number }
+export interface SubagentExecutionSettings { maxParallelTasks: number; maxConcurrency: number; benchmarkSnapshotMaxAgeMs: number }
+export const DEFAULT_BENCHMARK_SNAPSHOT_MAX_AGE_MS = 2_592_000_000;
+const MIN_BENCHMARK_SNAPSHOT_MAX_AGE_MS = 60_000;
+const MAX_BENCHMARK_SNAPSHOT_MAX_AGE_MS = 31_536_000_000;
 
 function nestedOrFlatInteger(settings: Record<string, unknown>, path: string, flatKey: string, minimum: number, maximum: number): unknown {
   const nested = getNested(settings, path);
@@ -28,7 +31,13 @@ export function resolveSubagentExecutionSettings(settings: Record<string, unknow
     1,
     HARD_MAX_CONCURRENCY,
   );
-  return { maxParallelTasks, maxConcurrency: Math.min(maxParallelTasks, configuredConcurrency) };
+  const benchmarkSnapshotMaxAgeMs = boundedSafeInteger(
+    getNested(settings, "subagents.autoModelSelection.benchmarkSnapshotMaxAgeMs"),
+    DEFAULT_BENCHMARK_SNAPSHOT_MAX_AGE_MS,
+    MIN_BENCHMARK_SNAPSHOT_MAX_AGE_MS,
+    MAX_BENCHMARK_SNAPSHOT_MAX_AGE_MS,
+  );
+  return { maxParallelTasks, maxConcurrency: Math.min(maxParallelTasks, configuredConcurrency), benchmarkSnapshotMaxAgeMs };
 }
 
 export async function getSubagentExecutionSettings(): Promise<SubagentExecutionSettings> {

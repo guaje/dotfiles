@@ -18,7 +18,7 @@ import * as path from "node:path";
 import type { Message } from "@earendil-works/pi-ai";
 import { withFileMutationQueue } from "@earendil-works/pi-coding-agent";
 import type { AgentConfig } from "./agents.ts";
-import { selectModelForSubagent, type ModelSelectionRegistry, type ThinkingLevel } from "./model-selection.ts";
+import { selectModelForSubagent, type ThinkingLevel } from "./model-selection.ts";
 import { getFinalOutput } from "./result.ts";
 import { emptyUsage, type OnUpdateCallback, type SingleResult, type SubagentDetails } from "./types.ts";
 
@@ -59,8 +59,6 @@ export async function runSingleAgent(
 	signal: AbortSignal | undefined,
 	onUpdate: OnUpdateCallback | undefined,
 	makeDetails: (results: SingleResult[]) => SubagentDetails,
-	modelRegistry: ModelSelectionRegistry,
-	useLlmSelector: boolean,
 ): Promise<SingleResult> {
 	const agent = agents.find((a) => a.name === agentName);
 
@@ -83,15 +81,17 @@ export async function runSingleAgent(
 	let selectedModel = agent.model;
 	let modelSelector: SingleResult["modelSelector"];
 	let thinkingLevel: ThinkingLevel | undefined;
-	let selectorReason: string | undefined;
+	let benchmarkRoute: SingleResult["benchmarkRoute"];
 
 	if (!selectedModel) {
-		const decision = await selectModelForSubagent(task, modelRegistry, { useLlmSelector });
+		const decision = await selectModelForSubagent({ task, routingProfile: agent.routingProfile, thinking: agent.thinking });
+		benchmarkRoute = decision.benchmarkRoute;
 		if (decision.modelId) {
 			selectedModel = decision.modelId;
 			modelSelector = decision.selector;
 			thinkingLevel = decision.thinkingLevel;
-			selectorReason = decision.reason;
+		} else {
+			modelSelector = "default";
 		}
 	} else {
 		modelSelector = "explicit";
@@ -123,7 +123,7 @@ export async function runSingleAgent(
 		model: selectedModel,
 		modelSelector,
 		thinkingLevel,
-		selectorReason,
+		benchmarkRoute,
 		step,
 	};
 

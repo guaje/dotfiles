@@ -1,0 +1,81 @@
+{
+  "modelId": "9b97a35e-6ac7-44d9-91c6-422fa678963e",
+  "capturedAt": 1787350492000,
+  "coverage": 0.8888888888888888,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1787329676000,
+    "status": "mapped",
+    "thinkingLevel": "off"
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.1"
+  },
+  "model": "gpt-5.6-terra",
+  "outputTokens": {},
+  "provider": "openai-codex",
+  "publicPage": {
+    "contentSha256": "1ab8412f5d89d6652a3305628f2e3069823a387c988cb0c1103a582a0ec66744",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.1.1",
+    "recordSha256": "45263dd85fe5662a188ef65614eaedee1dcfea4b546549465187847b3694e77c",
+    "retrievedAt": 1787350491000,
+    "url": "https://artificialanalysis.ai/models/gpt-5-6-terra-non-reasoning"
+  },
+  "scores": {
+    "agentic": 30.1,
+    "coding": 52.3,
+    "faithfulness": 4.985491954629381,
+    "instructionFollowing": null,
+    "intelligence": 34.6,
+    "knowledge": 36.81666666666666,
+    "longContext": 55.00000000000001,
+    "scientificReasoning": 29.348636192009668,
+    "toolUse": 26.44880154639175
+  },
+  "source": {
+    "name": "GPT-5.6 Terra (Non-reasoning)",
+    "openrouterApiId": null,
+    "slug": "gpt-5-6-terra-non-reasoning"
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": "off",
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 37.2275,
+        "retrievedAt": 1787350491000,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "45263dd85fe5662a188ef65614eaedee1dcfea4b546549465187847b3694e77c",
+        "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-terra-non-reasoning"
+      },
+      "tau2Telecom": null,
+      "tau3Banking": {
+        "benchmark": {
+          "id": "tau3-banking",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "tauBanking",
+        "normalizedScore": 15.6701030927835,
+        "retrievedAt": 1787350491000,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "45263dd85fe5662a188ef65614eaedee1dcfea4b546549465187847b3694e77c",
+        "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-terra-non-reasoning"
+      }
+    },
+    "derivation": {
+      "rule": "tau3-banking+gdpval-aa",
+      "score": 26.44880154639175,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

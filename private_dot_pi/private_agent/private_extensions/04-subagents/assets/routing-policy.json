@@ -1,0 +1,242 @@
+{
+  "version": "4",
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.1"
+  },
+  "anchors": {
+    "intelligence": {
+      "minimum": 0,
+      "maximum": 100
+    },
+    "coding": {
+      "minimum": 0,
+      "maximum": 100
+    },
+    "agentic": {
+      "minimum": 0,
+      "maximum": 100
+    },
+    "toolUse": {
+      "minimum": 0,
+      "maximum": 100
+    },
+    "scientificReasoning": {
+      "minimum": 0,
+      "maximum": 100
+    },
+    "longContext": {
+      "minimum": 0,
+      "maximum": 100
+    },
+    "instructionFollowing": {
+      "minimum": 0,
+      "maximum": 100
+    },
+    "knowledge": {
+      "minimum": 0,
+      "maximum": 100
+    },
+    "faithfulness": {
+      "minimum": 0,
+      "maximum": 100
+    }
+  },
+  "faithfulnessPolicy": {
+    "metric": "AA Omniscience non-hallucination rate × 100",
+    "floor": 7.5,
+    "appliesTo": ["research", "review"],
+    "exemptions": []
+  },
+  "profiles": {
+    "balanced": {
+      "weights": {
+        "intelligence": 0.3,
+        "coding": 0.1,
+        "agentic": 0.1,
+        "toolUse": 0.1,
+        "scientificReasoning": 0.1,
+        "longContext": 0.075,
+        "instructionFollowing": 0.075,
+        "knowledge": 0.075,
+        "faithfulness": 0.075
+      },
+      "requiredDimensions": ["intelligence", "coding"],
+      "minimumCoverage": 0.70,
+      "mandatoryFloors": {},
+      "outputTokensMetric": "balanced",
+      "expectedOutputTokens": 900,
+      "qualityTolerance": 0.03,
+      "defaultThinking": "medium",
+      "constraints": {
+        "requiredInput": "text",
+        "minimumContextWindow": 0,
+        "minimumMaxTokens": 0
+      }
+    },
+    "coding": {
+      "weights": {
+        "intelligence": 0.15,
+        "coding": 0.4,
+        "agentic": 0.1,
+        "toolUse": 0.1,
+        "scientificReasoning": 0.05,
+        "longContext": 0.05,
+        "instructionFollowing": 0.05,
+        "knowledge": 0.05,
+        "faithfulness": 0.05
+      },
+      "requiredDimensions": ["intelligence", "coding"],
+      "minimumCoverage": 0.70,
+      "mandatoryFloors": {
+        "coding": 35
+      },
+      "outputTokensMetric": "coding",
+      "expectedOutputTokens": 1400,
+      "qualityTolerance": 0.03,
+      "defaultThinking": "high",
+      "constraints": {
+        "requiredInput": "text",
+        "minimumContextWindow": 0,
+        "minimumMaxTokens": 0
+      }
+    },
+    "agentic": {
+      "weights": {
+        "intelligence": 0.15,
+        "coding": 0.05,
+        "agentic": 0.35,
+        "toolUse": 0.25,
+        "scientificReasoning": 0.05,
+        "longContext": 0.05,
+        "instructionFollowing": 0.05,
+        "knowledge": 0.025,
+        "faithfulness": 0.025
+      },
+      "requiredDimensions": ["agentic", "toolUse"],
+      "minimumCoverage": 0.75,
+      "mandatoryFloors": {
+        "agentic": 30,
+        "toolUse": 30
+      },
+      "outputTokensMetric": "agentic",
+      "expectedOutputTokens": 1100,
+      "qualityTolerance": 0.03,
+      "defaultThinking": "high",
+      "constraints": {
+        "requiredInput": "text",
+        "minimumContextWindow": 0,
+        "minimumMaxTokens": 0
+      }
+    },
+    "research": {
+      "weights": {
+        "intelligence": 0.15,
+        "coding": 0.025,
+        "agentic": 0.05,
+        "toolUse": 0.025,
+        "scientificReasoning": 0.1,
+        "longContext": 0.15,
+        "instructionFollowing": 0.1,
+        "knowledge": 0.25,
+        "faithfulness": 0.15
+      },
+      "requiredDimensions": ["intelligence", "scientificReasoning", "longContext", "knowledge", "faithfulness"],
+      "minimumCoverage": 0.70,
+      "mandatoryFloors": {
+        "knowledge": 30
+      },
+      "outputTokensMetric": "research",
+      "expectedOutputTokens": 1200,
+      "qualityTolerance": 0.03,
+      "defaultThinking": "medium",
+      "constraints": {
+        "requiredInput": "text",
+        "minimumContextWindow": 0,
+        "minimumMaxTokens": 0
+      }
+    },
+    "planning": {
+      "weights": {
+        "intelligence": 0.25,
+        "coding": 0.05,
+        "agentic": 0.1,
+        "toolUse": 0.05,
+        "scientificReasoning": 0.25,
+        "longContext": 0.1,
+        "instructionFollowing": 0.15,
+        "knowledge": 0.025,
+        "faithfulness": 0.025
+      },
+      "requiredDimensions": ["scientificReasoning", "instructionFollowing"],
+      "minimumCoverage": 0.75,
+      "mandatoryFloors": {
+        "scientificReasoning": 30,
+        "instructionFollowing": 30
+      },
+      "outputTokensMetric": "planning",
+      "expectedOutputTokens": 900,
+      "qualityTolerance": 0.025,
+      "defaultThinking": "high",
+      "constraints": {
+        "requiredInput": "text",
+        "minimumContextWindow": 0,
+        "minimumMaxTokens": 0
+      }
+    },
+    "review": {
+      "weights": {
+        "intelligence": 0.15,
+        "coding": 0.15,
+        "agentic": 0.025,
+        "toolUse": 0.025,
+        "scientificReasoning": 0.1,
+        "longContext": 0.1,
+        "instructionFollowing": 0.2,
+        "knowledge": 0.05,
+        "faithfulness": 0.2
+      },
+      "requiredDimensions": ["instructionFollowing", "faithfulness"],
+      "minimumCoverage": 0.85,
+      "mandatoryFloors": {
+        "instructionFollowing": 30
+      },
+      "outputTokensMetric": "review",
+      "expectedOutputTokens": 750,
+      "qualityTolerance": 0.025,
+      "defaultThinking": "high",
+      "constraints": {
+        "requiredInput": "text",
+        "minimumContextWindow": 0,
+        "minimumMaxTokens": 0
+      }
+    },
+    "long-context": {
+      "weights": {
+        "intelligence": 0.15,
+        "coding": 0.025,
+        "agentic": 0.05,
+        "toolUse": 0.025,
+        "scientificReasoning": 0.05,
+        "longContext": 0.4,
+        "instructionFollowing": 0.1,
+        "knowledge": 0.1,
+        "faithfulness": 0.1
+      },
+      "requiredDimensions": ["intelligence", "longContext"],
+      "minimumCoverage": 0.75,
+      "mandatoryFloors": {
+        "longContext": 30
+      },
+      "outputTokensMetric": "long-context",
+      "expectedOutputTokens": 1800,
+      "qualityTolerance": 0.03,
+      "defaultThinking": "high",
+      "constraints": {
+        "requiredInput": "text",
+        "minimumContextWindow": 131072,
+        "minimumMaxTokens": 0
+      }
+    }
+  }
+}

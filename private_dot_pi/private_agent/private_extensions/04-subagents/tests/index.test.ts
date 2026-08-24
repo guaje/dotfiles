@@ -36,9 +36,9 @@ async function loadModule() {
 	writeFileSync(
 		SPAWN_STUB,
 		[
-			"export async function runSingleAgent(defaultCwd, agents, agentName, task, cwd, step, signal, onUpdate, makeDetails, modelRegistry, useLlmSelector) {",
+			"export async function runSingleAgent(defaultCwd, agents, agentName, task, cwd, step, signal, onUpdate, makeDetails) {",
 			"  const h = globalThis.__subagentRunHandler;",
-			"  if (h) return h({ defaultCwd, agents, agentName, task, cwd, step, signal, onUpdate, makeDetails, modelRegistry, useLlmSelector });",
+			"  if (h) return h({ defaultCwd, agents, agentName, task, cwd, step, signal, onUpdate, makeDetails });",
 			"  return { agent: agentName, agentSource: 'user', task, exitCode: 0, stopReason: 'end', messages: [], stderr: '', usage: { input:0,output:0,cacheRead:0,cacheWrite:0,cost:0,contextTokens:0,turns:0 } };",
 			"}",
 		].join("\n"),
@@ -111,8 +111,38 @@ test("registers the subagent tool with name, label, and the expected parameters"
 		assert.equal(tool.name, "subagent");
 		assert.equal(tool.label, "Subagent");
 		const props = tool.parameters.properties;
-		assert.ok(props.agent && props.task && props.tasks && props.chain && props.useLlmSelector && props.agentScope);
+		assert.ok(props.agent && props.task && props.tasks && props.chain && props.agentScope);
+		assert.equal(props.useLlmSelector, undefined);
 	} finally {
+		cleanup();
+	}
+});
+
+test("session start warns once when local benchmark snapshots are unavailable", async () => {
+	const previousRoot = process.env.PI_AA_SNAPSHOT_ROOT;
+	process.env.PI_AA_SNAPSHOT_ROOT = resolve("agent/extensions/04-subagents/tests/.missing-benchmark-root");
+	const mod = await loadModule();
+	const handlers: Record<string, Function> = {};
+	const notifications: string[] = [];
+	try {
+		mod.default({
+			on: (name: string, handler: Function) => { handlers[name] = handler; },
+			registerTool: () => {},
+		});
+		const ctx = {
+			hasUI: true,
+			ui: {
+				notify: (message: string) => notifications.push(message),
+				setWidget: () => {},
+			},
+		};
+		await handlers.session_start?.({}, ctx);
+		await handlers.session_start?.({}, ctx);
+		assert.equal(notifications.length, 1);
+		assert.match(notifications[0], /--missing/);
+	} finally {
+		if (previousRoot === undefined) delete process.env.PI_AA_SNAPSHOT_ROOT;
+		else process.env.PI_AA_SNAPSHOT_ROOT = previousRoot;
 		cleanup();
 	}
 });
@@ -153,7 +183,6 @@ test("execute single mode returns the agent's final output", async () => {
 	try {
 		const out = await tool.execute("id", { agent: "scout", task: "find" }, undefined, undefined, {
 			cwd: "/cwd",
-			modelRegistry: {},
 			hasUI: false,
 			ui: {},
 		});
@@ -184,7 +213,7 @@ test("execute chain mode substitutes {previous} and returns the last step's outp
 			},
 			undefined,
 			undefined,
-			{ cwd: "/cwd", modelRegistry: {}, hasUI: false, ui: {} },
+			{ cwd: "/cwd", hasUI: false, ui: {} },
 		);
 		assert.equal(out.content[0].text, "the plan");
 		assert.equal(out.details.mode, "chain");
@@ -211,7 +240,7 @@ test("execute chain stops and reports when a step fails", async () => {
 			{ chain: [{ agent: "scout", task: "look" }, { agent: "planner", task: "plan" }] },
 			undefined,
 			undefined,
-			{ cwd: "/cwd", modelRegistry: {}, hasUI: false, ui: {} },
+			{ cwd: "/cwd", hasUI: false, ui: {} },
 		);
 		assert.equal(out.isError, true);
 		assert.match(out.content[0].text, /Chain stopped at step 1/);
@@ -232,7 +261,7 @@ test("execute parallel mode summarizes task outcomes", async () => {
 			{ tasks: [{ agent: "a", task: "t1" }, { agent: "b", task: "t2" }] },
 			undefined,
 			undefined,
-			{ cwd: "/cwd", modelRegistry: {}, hasUI: false, ui: {} },
+			{ cwd: "/cwd", hasUI: false, ui: {} },
 		);
 		assert.match(out.content[0].text, /Parallel: 2\/2 succeeded/);
 		assert.equal(out.details.mode, "parallel");
@@ -254,7 +283,6 @@ test("execute with no mode returns an invalid-parameters error", async () => {
 	try {
 		const out = await tool.execute("id", { agent: "scout" }, undefined, undefined, {
 			cwd: "/cwd",
-			modelRegistry: {},
 			hasUI: false,
 			ui: {},
 		});

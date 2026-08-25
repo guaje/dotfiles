@@ -151,19 +151,22 @@ async function getEnabledModelsMetadata(): Promise<ModelMetadata[]> {
 
     const modelsFile = JSON.parse(modelsData) as ModelsFile;
     const enabledModelIds = settingsFile.enabledModels || [];
+    const configuredModels = new Map<string, ModelMetadata>();
     const allMetadata: ModelMetadata[] = [];
 
     for (const [providerId, provider] of Object.entries(modelsFile.providers)) {
       for (const model of provider.models) {
         const fullId = `${providerId}/${model.id}`;
-        if (enabledModelIds.includes(fullId)) {
-          allMetadata.push({ ...model, id: fullId, service: "chat", source: "user" });
-        }
+        configuredModels.set(fullId, model);
       }
     }
 
     for (const enabledId of enabledModelIds) {
-      if (allMetadata.find((model) => model.id === enabledId)) continue;
+      const configuredModel = configuredModels.get(enabledId);
+      if (configuredModel) {
+        allMetadata.push({ ...configuredModel, id: enabledId, service: "chat", source: "user" });
+        continue;
+      }
 
       const parts = splitModelId(enabledId);
       if (!parts) continue;
@@ -489,19 +492,19 @@ export async function checkModelHealth(ctx: ProbeContext, options: ModelHealthOp
   if (!options.forceRefresh) {
     const cached = await getFreshCachedResults(cacheTtlMs);
     if (cached) {
-      const currentIds = new Set(models.map((model) => model.id));
       const cachedIds = new Set(cached.map((result) => result.id));
       const hasAllCurrentModels = models.every((model) => cachedIds.has(model.id));
       if (hasAllCurrentModels) {
-        const metadataById = new Map(models.map((model) => [model.id, model]));
-        const currentCached = cached
-          .filter((result) => currentIds.has(result.id))
-          .map((result) => {
-            const metadata = metadataById.get(result.id);
-            return metadata
-              ? { ...result, name: result.name ?? metadata.name, service: result.service ?? metadata.service, source: result.source ?? metadata.source }
-              : result;
-          });
+        const cachedById = new Map(cached.map((result) => [result.id, result]));
+        const currentCached = models.map((metadata) => {
+          const result = cachedById.get(metadata.id)!;
+          return {
+            ...result,
+            name: result.name ?? metadata.name,
+            service: result.service ?? metadata.service,
+            source: result.source ?? metadata.source,
+          };
+        });
         if (options.notify) notifyProbeSummary(currentCached, ctx, true);
         return currentCached;
       }

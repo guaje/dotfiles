@@ -198,6 +198,77 @@ test("checks model health with a concurrency limit and caches results", async ()
   assert.match(notifications[0]!.message, /Model health \(cached\)/);
 });
 
+test("orders healthy user chat models by enabledModels order", async () => {
+  const mod = await loadExtension();
+  const checkModelHealth = mod.checkModelHealth;
+  const authModel = "test-auth/auth-model";
+  const userModelIds = ["test-provider/fast-model", "openai-codex/test-built-in", "reallms/test-scoped"];
+  const enabledModels = [authModel, ...userModelIds];
+
+  writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({
+    enabledModels,
+    imageGenerationProviders: {},
+  }, null, 2)}\n`);
+
+  (globalThis as any).__completeSimpleMock = async () => {
+    return { stopReason: "stop", content: [{ type: "text", text: "OK" }] };
+  };
+
+  const results = await checkModelHealth({
+    modelRegistry: {
+      find(provider: string, modelId: string) {
+        return { provider, id: modelId };
+      },
+      async getApiKeyAndHeaders(model: any) {
+        return { ok: true, apiKey: `key-${model.id}` };
+      },
+    },
+  }, { forceRefresh: true });
+
+  assert.deepEqual(results.map((result: any) => result.id), enabledModels);
+  assert.deepEqual(
+    results.filter((result: any) => result.source === "user").map((result: any) => result.id),
+    userModelIds,
+  );
+
+  const table = mod.formatHealthTable(results).join("\n");
+  assert.ok(table.indexOf("  auth") < table.indexOf("  user"));
+  assert.ok(table.indexOf("Fast") < table.indexOf("Built In"));
+  assert.ok(table.indexOf("Built In") < table.indexOf("Scoped"));
+});
+
+test("orders cached user chat models by current enabledModels order", async () => {
+  const mod = await loadExtension();
+  const checkModelHealth = mod.checkModelHealth;
+  const initialOrder = ["reallms/test-scoped", "openai-codex/test-built-in", "test-provider/fast-model"];
+  const reorderedModels = [...initialOrder].reverse();
+
+  (globalThis as any).__completeSimpleMock = async () => {
+    return { stopReason: "stop", content: [{ type: "text", text: "OK" }] };
+  };
+  const ctx = {
+    modelRegistry: {
+      find(provider: string, modelId: string) {
+        return { provider, id: modelId };
+      },
+      async getApiKeyAndHeaders(model: any) {
+        return { ok: true, apiKey: `key-${model.id}` };
+      },
+    },
+  };
+
+  writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({ enabledModels: initialOrder, imageGenerationProviders: {} }, null, 2)}\n`);
+  await checkModelHealth(ctx, { forceRefresh: true, cacheTtlMs: 60_000 });
+
+  writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({ enabledModels: reorderedModels, imageGenerationProviders: {} }, null, 2)}\n`);
+  const cachedResults = await checkModelHealth(ctx, { cacheTtlMs: 60_000 });
+
+  assert.deepEqual(cachedResults.map((result: any) => result.id), reorderedModels);
+  const table = mod.formatHealthTable(cachedResults).join("\n");
+  assert.ok(table.indexOf("Fast") < table.indexOf("Built In"));
+  assert.ok(table.indexOf("Built In") < table.indexOf("Scoped"));
+});
+
 test("uses settings.config enabled models and skips stale scoped-provider models", async () => {
   const mod = await loadExtension();
   const checkModelHealth = mod.checkModelHealth;

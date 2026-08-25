@@ -27,6 +27,22 @@ for (const model of ["gpt-5.6-sol", "gpt-5.6-terra"]) {
 	}
 }
 
+test("Kimi-K2.7-Code is benchmark-selectable for its eligible profiles", async () => {
+	const assets = await realSnapshots();
+	const id = "reallms-dev/Kimi-K2.7-Code";
+	const snapshot = assets.snapshots.find((entry) => entry.provider === "reallms-dev" && entry.model === "Kimi-K2.7-Code" && entry.thinkingLevel === null);
+	assert.ok(snapshot, `${id} artifact is required`);
+	assert.equal(snapshot.scores.coding, 60.8);
+	const kimi = [{ id, reasoning: true, input: ["text", "image"], contextWindow: 131_072, maxTokens: 163_840, supportsReasoningEffort: false }];
+	for (const profile of ["balanced", "coding", "research", "planning", "review", "long-context"] as const) {
+		const route = routeBenchmarkModel(profile, kimi, [snapshot], health(id), assets.manifest.digest);
+		assert.equal(route.modelId, id, `${profile} should route ${id}`);
+	}
+	const agentic = routeBenchmarkModel("agentic", kimi, [snapshot], health(id), assets.manifest.digest);
+	assert.equal(agentic.modelId, undefined);
+	assert.deepEqual(agentic.diagnostics.candidates[0]?.rejectionReasons, ["mandatoryFloor"]);
+});
+
 for (const [id, thinking] of [["openai-codex/gpt-5.6-luna", "high"], ["reallms-dev/DeepSeek-V4-Flash-API", undefined]] as const) {
 	test(`${id} remains research-eligible but review rejects missing instruction following`, async () => {
 		const assets = await realSnapshots();

@@ -1,6 +1,6 @@
 {
-  "digest": "f9fe94926da0bae1b3b170f37f004720625a319749b0c0fa35280011cae93121",
-  "generatedAt": 1787350507000,
+  "digest": "42490f985ad3b641f983d8e55a28ed3d6868f70b33d807fcfe822b84a806b9d7",
+  "generatedAt": 1787667909000,
   "methodology": {
     "id": "artificial-analysis-intelligence-index",
     "version": "4.1"
@@ -212,6 +212,15 @@
       "model": "DeepSeek-V4-Flash-API",
       "provider": "reallms-dev",
       "thinkingLevel": null
+    },
+    {
+      "provider": "reallms-dev",
+      "model": "Kimi-K2.7-Code",
+      "thinkingLevel": null,
+      "modelId": "8d0cb231-7303-452c-9923-a9620b948475",
+      "file": "fc0264dcb85b0d7d-cb9c3cb149cbcf72.json",
+      "capturedAt": 1787665793755,
+      "contentDigest": "8af5e5b4a35b7dfdbe8296cce257f1423a7fdeb3f3f1d5537eab5d098891c18b"
     }
   ],
   "version": 4

@@ -1,6 +1,35 @@
 import assert from "node:assert/strict";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import test from "node:test";
-import { calculateUsageCostBreakdown, extractStats, mergeCatalogCostRates } from "../index.ts";
+
+const EXTENSION_PATH = resolve("agent/extensions/03-stats/index.ts");
+const STUB_PACKAGE_DIR = resolve("agent/extensions/node_modules");
+const PI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@earendil-works/pi-coding-agent");
+const PI_TUI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@earendil-works/pi-tui");
+let calculateUsageCostBreakdown: typeof import("../index.ts").calculateUsageCostBreakdown;
+let extractStats: typeof import("../index.ts").extractStats;
+let mergeCatalogCostRates: typeof import("../index.ts").mergeCatalogCostRates;
+
+test.before(async () => {
+  mkdirSync(PI_PACKAGE_DIR, { recursive: true });
+  writeFileSync(resolve(PI_PACKAGE_DIR, "package.json"), JSON.stringify({ name: "@earendil-works/pi-coding-agent", type: "module", exports: "./index.js" }));
+  writeFileSync(resolve(PI_PACKAGE_DIR, "index.js"), "");
+  mkdirSync(PI_TUI_PACKAGE_DIR, { recursive: true });
+  writeFileSync(resolve(PI_TUI_PACKAGE_DIR, "package.json"), JSON.stringify({ name: "@earendil-works/pi-tui", type: "module", exports: "./index.js" }));
+  writeFileSync(resolve(PI_TUI_PACKAGE_DIR, "index.js"), [
+    "const keyMap = { escape: 'escape', up: 'up', down: 'down', pageUp: 'pageUp', pageDown: 'pageDown', home: 'home', end: 'end', space: 'space', ctrl: (key) => `ctrl+${key}` }; export { keyMap as Key };",
+    "export function matchesKey(data, key) { return data === key; }",
+    "export function truncateToWidth(text, width) { return String(text).slice(0, Math.max(0, width)); }",
+  ].join("\n"));
+  ({ calculateUsageCostBreakdown, extractStats, mergeCatalogCostRates } = await import(`${pathToFileURL(EXTENSION_PATH).href}?catalog-costs-test`));
+});
+
+test.after(() => {
+  rmSync(PI_PACKAGE_DIR, { recursive: true, force: true });
+  rmSync(PI_TUI_PACKAGE_DIR, { recursive: true, force: true });
+});
 
 test("recorded provider charges are retained over later catalog rates", () => {
   const cost = calculateUsageCostBreakdown({ input: 100, output: 20, cost: { total: 7.5 } }, { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 });

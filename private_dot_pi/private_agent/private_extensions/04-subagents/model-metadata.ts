@@ -2,19 +2,22 @@ import type { ThinkingLevel } from "./benchmark-types.ts";
 
 export interface ModelMetadata {
 	id: string;
+	/** Stable upstream identity used only to join reviewed benchmark metadata. */
+	canonicalId?: string;
 	reasoning?: boolean;
 	supportsReasoningEffort?: boolean;
 	input?: string[];
 	contextWindow?: number;
 	maxTokens?: number;
-	thinkingLevelMap?: Partial<Record<ThinkingLevel, ThinkingLevel>>;
+	thinkingLevelMap?: Partial<Record<ThinkingLevel, string | null>>;
 }
 
 /** Normalize a verified Pi model-registry record into functional routing metadata. */
-export function normalizeModelMetadata(provider: string, model: Record<string, unknown>, supportsReasoningEffort?: boolean): ModelMetadata | null {
+export function normalizeModelMetadata(provider: string, model: Record<string, unknown>, supportsReasoningEffort?: boolean, canonicalId?: string): ModelMetadata | null {
 	if (typeof model.id !== "string" || !model.id) return null;
 	return {
 		id: `${provider}/${model.id}`,
+		...(canonicalId ? { canonicalId } : {}),
 		...(typeof model.reasoning === "boolean" ? { reasoning: model.reasoning } : {}),
 		...(typeof supportsReasoningEffort === "boolean" ? { supportsReasoningEffort } : (model.thinkingLevelMap && typeof model.thinkingLevelMap === "object" ? { supportsReasoningEffort: true } : {})),
 		...(Array.isArray(model.input) && model.input.every((item) => typeof item === "string")
@@ -22,6 +25,6 @@ export function normalizeModelMetadata(provider: string, model: Record<string, u
 			: model.input === undefined ? { input: ["text"] } : {}),
 		...(typeof model.contextWindow === "number" ? { contextWindow: model.contextWindow } : {}),
 		...(typeof model.maxTokens === "number" ? { maxTokens: model.maxTokens } : {}),
-		...(model.thinkingLevelMap && typeof model.thinkingLevelMap === "object" && !Array.isArray(model.thinkingLevelMap) ? { thinkingLevelMap: model.thinkingLevelMap as Partial<Record<ThinkingLevel, ThinkingLevel>> } : {}),
+		...(model.thinkingLevelMap && typeof model.thinkingLevelMap === "object" && !Array.isArray(model.thinkingLevelMap) ? { thinkingLevelMap: model.thinkingLevelMap as Partial<Record<ThinkingLevel, string | null>> } : {}),
 	};
 }

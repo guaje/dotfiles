@@ -1,0 +1,93 @@
+{
+  "capturedAt": 1787977685197,
+  "coverage": 1,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1787665793755,
+    "status": "mapped",
+    "thinkingLevel": null
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.1"
+  },
+  "model": "Kimi-K2.7-Code",
+  "modelId": "8d0cb231-7303-452c-9923-a9620b948475",
+  "outputTokens": {},
+  "provider": "reallms-dev",
+  "publicPage": {
+    "contentSha256": "c6319baad78adcb702563a215cf4a0621d5113cc0aa8c66edf1d954b79af96c9",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.1.1",
+    "recordSha256": "41d2bcdce39df7501f07538da21d6a34b9ce405ab32a9c1cf51f65d257d4b331",
+    "retrievedAt": 1787977684192,
+    "url": "https://artificialanalysis.ai/models/kimi-k2-7-code"
+  },
+  "scores": {
+    "agentic": 30.3,
+    "coding": 60.8,
+    "faithfulness": 17.622724765581907,
+    "instructionFollowing": 63.1292517006803,
+    "intelligence": 43,
+    "knowledge": 39.56666666666667,
+    "longContext": 75,
+    "scientificReasoning": 44.876132346011865,
+    "toolUse": 27.26734278350515
+  },
+  "source": {
+    "name": "Kimi K2.7 Code",
+    "openrouterApiId": null,
+    "slug": "kimi-k2-7-code"
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": null,
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 34.3285,
+        "retrievedAt": 1787977684192,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "41d2bcdce39df7501f07538da21d6a34b9ce405ab32a9c1cf51f65d257d4b331",
+        "sourceUrl": "https://artificialanalysis.ai/models/kimi-k2-7-code"
+      },
+      "tau2Telecom": {
+        "benchmark": {
+          "id": "tau2-telecom",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "tau2",
+        "normalizedScore": 90.0584795321637,
+        "retrievedAt": 1787977684192,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "41d2bcdce39df7501f07538da21d6a34b9ce405ab32a9c1cf51f65d257d4b331",
+        "sourceUrl": "https://artificialanalysis.ai/models/kimi-k2-7-code"
+      },
+      "tau3Banking": {
+        "benchmark": {
+          "id": "tau3-banking",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "tauBanking",
+        "normalizedScore": 20.2061855670103,
+        "retrievedAt": 1787977684192,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "41d2bcdce39df7501f07538da21d6a34b9ce405ab32a9c1cf51f65d257d4b331",
+        "sourceUrl": "https://artificialanalysis.ai/models/kimi-k2-7-code"
+      }
+    },
+    "derivation": {
+      "rule": "tau3-banking+gdpval-aa",
+      "score": 27.26734278350515,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

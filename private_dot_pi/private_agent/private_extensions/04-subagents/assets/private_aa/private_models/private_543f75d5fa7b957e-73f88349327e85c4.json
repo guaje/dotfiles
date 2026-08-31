@@ -1,0 +1,93 @@
+{
+  "capturedAt": 1787977673234,
+  "coverage": 1,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1787329676000,
+    "status": "mapped",
+    "thinkingLevel": "xhigh"
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.1"
+  },
+  "model": "gpt-5.6-terra",
+  "modelId": "9e30696f-16fa-4b4f-ba53-161895a85fed",
+  "outputTokens": {},
+  "provider": "openai-codex",
+  "publicPage": {
+    "contentSha256": "61e32206168d6e1f116fa9fab63bc39bc43f906990e390fc848973ccc468f107",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.1.1",
+    "recordSha256": "efa732db16ccd30ffe347cccdb9a279519898335929448449560fe23cfcc678d",
+    "retrievedAt": 1787977672228,
+    "url": "https://artificialanalysis.ai/models/gpt-5-6-terra-xhigh"
+  },
+  "scores": {
+    "agentic": 46.5,
+    "coding": 70.6,
+    "faithfulness": 10.981951667176503,
+    "instructionFollowing": 66.2585034013605,
+    "intelligence": 52.8,
+    "knowledge": 45.516666666666666,
+    "longContext": 75,
+    "scientificReasoning": 53.280525810646274,
+    "toolUse": 41.42011082474225
+  },
+  "source": {
+    "name": "GPT-5.6 Terra (xhigh)",
+    "openrouterApiId": null,
+    "slug": "gpt-5-6-terra-xhigh"
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": "xhigh",
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 53.1495,
+        "retrievedAt": 1787977672228,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "efa732db16ccd30ffe347cccdb9a279519898335929448449560fe23cfcc678d",
+        "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-terra-xhigh"
+      },
+      "tau2Telecom": {
+        "benchmark": {
+          "id": "tau2-telecom",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "tau2",
+        "normalizedScore": 80.4093567251462,
+        "retrievedAt": 1787977672228,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "efa732db16ccd30ffe347cccdb9a279519898335929448449560fe23cfcc678d",
+        "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-terra-xhigh"
+      },
+      "tau3Banking": {
+        "benchmark": {
+          "id": "tau3-banking",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "tauBanking",
+        "normalizedScore": 29.6907216494845,
+        "retrievedAt": 1787977672228,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "efa732db16ccd30ffe347cccdb9a279519898335929448449560fe23cfcc678d",
+        "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-terra-xhigh"
+      }
+    },
+    "derivation": {
+      "rule": "tau3-banking+gdpval-aa",
+      "score": 41.42011082474225,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

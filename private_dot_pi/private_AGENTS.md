@@ -10,12 +10,14 @@
 Run from `~/.pi` unless noted.
 
 - TypeScript tests: `npx -y tsx --test <path>` (CI auto-discovers every `*.test.ts` via `find agent -name '*.test.ts'`)
+- Native AA TypeScript tests: `node --test agent/extensions/09-catalog/tests/aa.test.ts`
+- Direct AA CLI: `node agent/extensions/09-catalog/aa/cli.ts --check`
 - Shell tests: `sh agent/scripts/tests/merge-settings.test.sh`
 - Extension load check: `pi --no-session --no-extensions -e <ext-path> --no-tools -p "reply: ok"`
 - Regenerate `settings.json`: `sh agent/scripts/merge-settings.sh`
-- Check Artificial Analysis snapshots: `sh agent/scripts/refresh-artificial-analysis.sh --check`
-- List snapshots needing reviewed Artificial Analysis mappings: `sh agent/scripts/refresh-artificial-analysis.sh --missing`
-- Refresh reviewed Artificial Analysis mappings: `sh agent/scripts/refresh-artificial-analysis.sh --refresh-all`
+- Check Artificial Analysis snapshots: `node agent/extensions/09-catalog/aa/cli.ts --check`
+- List snapshots needing reviewed Artificial Analysis mappings: `node agent/extensions/09-catalog/aa/cli.ts --missing`
+- Refresh reviewed Artificial Analysis mappings: `node agent/extensions/09-catalog/aa/cli.ts --refresh-all`
 - Add a model snapshot: run `--discover <provider/model>`, then `--add <provider/model> --aa-model-id <reviewed-id>`
 - Chezmoi status: `chezmoi status`
 - Failed CI run: `gh run view <run-id> --repo guaje/dotfiles --log-failed`

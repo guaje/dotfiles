@@ -1,0 +1,81 @@
+{
+  "capturedAt": 1787977677605,
+  "coverage": 0.8888888888888888,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1787977677605,
+    "status": "mapped",
+    "thinkingLevel": "off"
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.1"
+  },
+  "model": "qwen3.8-27b",
+  "modelId": "353c92f3-2148-4c2d-9231-aa7e1322a1fd",
+  "outputTokens": {},
+  "provider": "qwen",
+  "publicPage": {
+    "contentSha256": "636830a9dec9664597dd6c6450dd135d14ee2bd45abb2c8b4fd0215560b08e65",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.1.1",
+    "recordSha256": "82aa8a3156ccceefb66b73ee4ab42a1698dd6f2f7f804abf8a7ca4f280180836",
+    "retrievedAt": 1787977676602,
+    "url": "https://artificialanalysis.ai/models/qwen3-8-27b-non-reasoning"
+  },
+  "scores": {
+    "agentic": 30.4,
+    "coding": 44.6,
+    "faithfulness": 81.91431175934366,
+    "instructionFollowing": null,
+    "intelligence": 34.7,
+    "knowledge": 8.583333333333334,
+    "longContext": 63,
+    "scientificReasoning": 31.41492242697063,
+    "toolUse": 27.72875
+  },
+  "source": {
+    "name": "Qwen3.8 27B (Non-reasoning)",
+    "openrouterApiId": null,
+    "slug": "qwen3-8-27b-non-reasoning"
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": "off",
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 35.4575,
+        "retrievedAt": 1787977676602,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "82aa8a3156ccceefb66b73ee4ab42a1698dd6f2f7f804abf8a7ca4f280180836",
+        "sourceUrl": "https://artificialanalysis.ai/models/qwen3-8-27b-non-reasoning"
+      },
+      "tau2Telecom": null,
+      "tau3Banking": {
+        "benchmark": {
+          "id": "tau3-banking",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "tauBanking",
+        "normalizedScore": 20,
+        "retrievedAt": 1787977676602,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "82aa8a3156ccceefb66b73ee4ab42a1698dd6f2f7f804abf8a7ca4f280180836",
+        "sourceUrl": "https://artificialanalysis.ai/models/qwen3-8-27b-non-reasoning"
+      }
+    },
+    "derivation": {
+      "rule": "tau3-banking+gdpval-aa",
+      "score": 27.72875,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

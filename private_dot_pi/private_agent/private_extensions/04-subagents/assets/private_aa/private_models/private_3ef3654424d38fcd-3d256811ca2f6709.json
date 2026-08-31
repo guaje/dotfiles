@@ -1,0 +1,93 @@
+{
+  "capturedAt": 1787977680007,
+  "coverage": 1,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1787327100000,
+    "status": "mapped",
+    "thinkingLevel": null
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.1"
+  },
+  "model": "Qwen3-Coder-Next",
+  "modelId": "fc92f822-04b7-420d-9c07-a21af5e9aac7",
+  "outputTokens": {},
+  "provider": "reallms",
+  "publicPage": {
+    "contentSha256": "c00d01129b15627fef3aa74e4b4c79a9120c4ebf8c8412ba6552a165a5aeb331",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.1.1",
+    "recordSha256": "2a76bed11990449cd93fdea8629cb81df7dd4893706163274f6b5bc5c6de3868",
+    "retrievedAt": 1787977679002,
+    "url": "https://artificialanalysis.ai/models/qwen3-coder-next"
+  },
+  "scores": {
+    "agentic": 8.9,
+    "coding": 36.2,
+    "faithfulness": 6.320810971973771,
+    "instructionFollowing": 35.2380952380952,
+    "intelligence": 21.3,
+    "knowledge": 16.150000000000002,
+    "longContext": 42.3333333333333,
+    "scientificReasoning": 27.961886395621335,
+    "toolUse": 8.21116237113402
+  },
+  "source": {
+    "name": "Qwen3 Coder Next",
+    "openrouterApiId": null,
+    "slug": "qwen3-coder-next"
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": null,
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 11.0615,
+        "retrievedAt": 1787977679002,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "2a76bed11990449cd93fdea8629cb81df7dd4893706163274f6b5bc5c6de3868",
+        "sourceUrl": "https://artificialanalysis.ai/models/qwen3-coder-next"
+      },
+      "tau2Telecom": {
+        "benchmark": {
+          "id": "tau2-telecom",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "tau2",
+        "normalizedScore": 79.5321637426901,
+        "retrievedAt": 1787977679002,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "2a76bed11990449cd93fdea8629cb81df7dd4893706163274f6b5bc5c6de3868",
+        "sourceUrl": "https://artificialanalysis.ai/models/qwen3-coder-next"
+      },
+      "tau3Banking": {
+        "benchmark": {
+          "id": "tau3-banking",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "tauBanking",
+        "normalizedScore": 5.36082474226804,
+        "retrievedAt": 1787977679002,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "2a76bed11990449cd93fdea8629cb81df7dd4893706163274f6b5bc5c6de3868",
+        "sourceUrl": "https://artificialanalysis.ai/models/qwen3-coder-next"
+      }
+    },
+    "derivation": {
+      "rule": "tau3-banking+gdpval-aa",
+      "score": 8.21116237113402,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

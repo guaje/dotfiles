@@ -1,0 +1,81 @@
+{
+  "capturedAt": 1787977683587,
+  "coverage": 0.8888888888888888,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1787329677000,
+    "status": "mapped",
+    "thinkingLevel": null
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.1"
+  },
+  "model": "DeepSeek-V4-Flash-API",
+  "modelId": "fe4c0848-e284-4e52-a79d-cdc28392f1a9",
+  "outputTokens": {},
+  "provider": "reallms-dev",
+  "publicPage": {
+    "contentSha256": "be503e5624aed0ca1a40029cf5e6c4eea8618e0ca194f68848bb347c94dd9c7b",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.1.1",
+    "recordSha256": "98ab0015ffef68568e186f2ffbc9aebac1a2ec229b925ad8c8a8b5aa8ecc8935",
+    "retrievedAt": 1787977682583,
+    "url": "https://artificialanalysis.ai/models/deepseek-v4-flash"
+  },
+  "scores": {
+    "agentic": 48.4,
+    "coding": 69.1,
+    "faithfulness": 8.303047246295776,
+    "instructionFollowing": null,
+    "intelligence": 51.8,
+    "knowledge": 40.38333333333333,
+    "longContext": 74.3333333333333,
+    "scientificReasoning": 48.64457541565977,
+    "toolUse": 45.872721649484546
+  },
+  "source": {
+    "name": "DeepSeek V4 Flash 0731 (Reasoning, Max Effort)",
+    "openrouterApiId": null,
+    "slug": "deepseek-v4-flash"
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": null,
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 52.364,
+        "retrievedAt": 1787977682583,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "98ab0015ffef68568e186f2ffbc9aebac1a2ec229b925ad8c8a8b5aa8ecc8935",
+        "sourceUrl": "https://artificialanalysis.ai/models/deepseek-v4-flash"
+      },
+      "tau2Telecom": null,
+      "tau3Banking": {
+        "benchmark": {
+          "id": "tau3-banking",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "tauBanking",
+        "normalizedScore": 39.381443298969096,
+        "retrievedAt": 1787977682583,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "98ab0015ffef68568e186f2ffbc9aebac1a2ec229b925ad8c8a8b5aa8ecc8935",
+        "sourceUrl": "https://artificialanalysis.ai/models/deepseek-v4-flash"
+      }
+    },
+    "derivation": {
+      "rule": "tau3-banking+gdpval-aa",
+      "score": 45.872721649484546,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

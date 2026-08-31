@@ -15,9 +15,16 @@ export interface SettingsDependencies {
   runMerge?: () => Promise<void>;
 }
 
+export interface GeneratedEnabledModelsSync {
+  changed: boolean;
+  enabledModels?: string[];
+}
+
 export interface SettingsStore {
   read(): Promise<Record<string, unknown>>;
   update(update: Record<string, unknown> | ((settings: Record<string, unknown>) => Record<string, unknown> | void)): Promise<Record<string, unknown>>;
+  merge(): Promise<void>;
+  syncEnabledModelsFromGenerated(): Promise<GeneratedEnabledModelsSync>;
 }
 
 export type SettingsWatcher = FSWatcher;

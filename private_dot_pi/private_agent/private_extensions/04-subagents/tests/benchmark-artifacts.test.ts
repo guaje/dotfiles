@@ -4,7 +4,7 @@ import { DEFAULT_SNAPSHOT_ROOT, loadBenchmarkAssets } from "../benchmark-assets.
 import { routeBenchmarkModel } from "../benchmark-routing.ts";
 
 const health = (id: string) => [{ id, status: "ok", service: "chat", latencyMs: 1, tokensPerSecond: 1_000 }];
-const candidate = (id: string) => [{ id, reasoning: true, input: ["text"], contextWindow: 262_144, maxTokens: 262_144 }];
+const candidate = (id: string) => [{ id, reasoning: true, thinkingLevelMap: { xhigh: "xhigh", max: "max" }, input: ["text"], contextWindow: 262_144, maxTokens: 262_144 }];
 
 async function realSnapshots() {
 	const assets = await loadBenchmarkAssets(DEFAULT_SNAPSHOT_ROOT, 31_536_000_000);
@@ -41,6 +41,16 @@ test("Kimi-K2.7-Code is benchmark-selectable for its eligible profiles", async (
 	const agentic = routeBenchmarkModel("agentic", kimi, [snapshot], health(id), assets.manifest.digest);
 	assert.equal(agentic.modelId, undefined);
 	assert.deepEqual(agentic.diagnostics.candidates[0]?.rejectionReasons, ["mandatoryFloor"]);
+});
+
+test("reviewed canonical AA UUID routing is independent of the snapshot's legacy provider alias", async () => {
+	const assets = await realSnapshots();
+	const id = "reallms-dev/Kimi-K2.7-Code";
+	const snapshot = assets.snapshots.find((entry) => entry.provider === "reallms-dev" && entry.model === "Kimi-K2.7-Code" && entry.thinkingLevel === null);
+	assert.ok(snapshot);
+	const detached = { ...snapshot, provider: "legacy-provider", model: "legacy-alias" };
+	const route = routeBenchmarkModel("coding", candidate(id), [detached], health(id), assets.manifest.digest);
+	assert.equal(route.modelId, id);
 });
 
 for (const [id, thinking] of [["openai-codex/gpt-5.6-luna", "high"], ["reallms-dev/DeepSeek-V4-Flash-API", undefined]] as const) {

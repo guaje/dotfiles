@@ -6,10 +6,10 @@
     "openai-codex/gpt-5.6-sol",
     "openai-codex/gpt-5.6-terra",
     "reallms/glm-5.2",
+    "openai-codex/gpt-5.6-luna",
     "kelley/Kimi-K2.6",
     "reallms-dev/Kimi-K2.7-Code",
-    "openai-codex/gpt-5.6-luna",
-    "reallms-dev/DeepSeek-V4-Flash-API",
+    "pi/qwen3.8-27b",
     "reallms-dev/Laguna-S-2.1-FP8",
     "reallms/gemma-4-31B-it",
     "reallms/Qwen3-Coder-Next"
@@ -23,7 +23,8 @@
     "extensions/05-browse/index.ts",
     "extensions/06-health/index.ts",
     "extensions/07-native-notify.ts",
-    "extensions/08-settings/index.ts"
+    "extensions/08-settings/index.ts",
+    "extensions/09-catalog/index.ts"
   ],
   "browse": {
     "providers": {
@@ -47,6 +48,10 @@
       "pollIntervalMs": 1000,
       "pollTimeoutMs": 120000
     }
+  },
+  "catalog": {
+    "refreshTtlMs": 14400000,
+    "requestTimeoutMs": 10000
   },
   "handoff": {
     "remoteRoot": "~/.local/state/pi/remote-sessions",

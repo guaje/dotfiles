@@ -109,6 +109,17 @@ test("AA per-task output tokens override the profile fallback when present", () 
 	assert.equal(result.diagnostics.predictedCompletionMs, 11_000);
 });
 
+test("routes provider-discovered canonical aliases without a separate static mapping", () => {
+	const result = routeBenchmarkModel(
+		"coding",
+		[{ id: "alias/endpoint", canonicalId: "p/a", input: ["text"] }],
+		[snapshot("a")],
+		[{ id: "alias/endpoint", status: "ok", service: "chat", latencyMs: 1, tokensPerSecond: 100 }],
+		"digest",
+	);
+	assert.equal(result.modelId, "alias/endpoint");
+});
+
 test("routes exact normalized thinking variants and returns the child argument", () => {
 	const result = routeBenchmarkModel(
 		"coding",
@@ -122,7 +133,7 @@ test("routes exact normalized thinking variants and returns the child argument",
 	assert.equal(result.diagnostics.benchmarkThinkingLevel, "low");
 	const maximum = routeBenchmarkModel(
 		"coding",
-		[{ id: "p/a", reasoning: true, input: ["text"] }],
+		[{ id: "p/a", reasoning: true, input: ["text"], thinkingLevelMap: { max: "max" } }],
 		[snapshot("a", { coding: 95 }, undefined, 100, "max")],
 		[health[0]],
 		"digest",
@@ -130,6 +141,28 @@ test("routes exact normalized thinking variants and returns the child argument",
 	)!;
 	assert.equal(maximum.thinkingLevel, "max");
 	assert.equal(maximum.diagnostics.benchmarkThinkingLevel, "max");
+});
+
+test("null provider mappings preserve the child request while using Pi's clamped AA variant", () => {
+	const result = routeBenchmarkModel(
+		"coding",
+		[{ id: "p/a", reasoning: true, input: ["text"], thinkingLevelMap: { off: null, minimal: "low" } }],
+		[snapshot("a", { coding: 95 }, undefined, 100, "low")],
+		[health[0]],
+		"digest",
+		"off",
+	)!;
+	assert.equal(result.thinkingLevel, "off");
+	assert.equal(result.diagnostics.benchmarkThinkingLevel, "low");
+	const nonCanonical = routeBenchmarkModel(
+		"coding",
+		[{ id: "p/a", reasoning: true, input: ["text"], thinkingLevelMap: { high: "provider-high" } }],
+		[snapshot("a", { coding: 95 }, undefined, 100, "high")],
+		[health[0]],
+		"digest",
+		"high",
+	)!;
+	assert.equal(nonCanonical.diagnostics.benchmarkThinkingLevel, "high");
 });
 
 test("generic snapshots work at every requested thinking level, but absent variants fail closed", () => {

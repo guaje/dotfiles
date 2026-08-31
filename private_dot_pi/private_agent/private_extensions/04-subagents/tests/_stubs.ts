@@ -53,6 +53,7 @@ export function writePackageStubs(): void {
 		"@earendil-works/pi-ai",
 		[
 			"export function StringEnum(values, options = {}) { return { type: 'string', enum: [...values], ...options }; }",
+			"export async function completeSimple() { return { role: 'assistant', content: [], usage: {} }; }",
 		].join("\n"),
 	);
 

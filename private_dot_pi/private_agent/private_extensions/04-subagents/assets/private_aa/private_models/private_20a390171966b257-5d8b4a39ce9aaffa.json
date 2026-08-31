@@ -1,0 +1,93 @@
+{
+  "capturedAt": 1787977681209,
+  "coverage": 1,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1787327099000,
+    "status": "mapped",
+    "thinkingLevel": null
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.1"
+  },
+  "model": "gemma-4-31B-it",
+  "modelId": "cd26a386-4873-46ff-b853-d239050025a2",
+  "outputTokens": {},
+  "provider": "reallms",
+  "publicPage": {
+    "contentSha256": "828859c47c39ce245a3d86d6c48c7ba36e9fb44e194f55057e9837da83172382",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.1.1",
+    "recordSha256": "26729baecacfb8e5a1e1d691065c6cb2500dbea5fba168ec7360696ebb475199",
+    "retrievedAt": 1787977680205,
+    "url": "https://artificialanalysis.ai/models/gemma-4-31b"
+  },
+  "scores": {
+    "agentic": 14.4,
+    "coding": 43.4,
+    "faithfulness": 15.006252605252186,
+    "instructionFollowing": 75.57823129251699,
+    "intelligence": 29.7,
+    "knowledge": 20.033333333333335,
+    "longContext": 68.3333333333333,
+    "scientificReasoning": 36.90604353254958,
+    "toolUse": 15.26618041237115
+  },
+  "source": {
+    "name": "Gemma 4 31B (Reasoning)",
+    "openrouterApiId": null,
+    "slug": "gemma-4-31b"
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": null,
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 15.687000000000001,
+        "retrievedAt": 1787977680205,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "26729baecacfb8e5a1e1d691065c6cb2500dbea5fba168ec7360696ebb475199",
+        "sourceUrl": "https://artificialanalysis.ai/models/gemma-4-31b"
+      },
+      "tau2Telecom": {
+        "benchmark": {
+          "id": "tau2-telecom",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "tau2",
+        "normalizedScore": 59.9415204678363,
+        "retrievedAt": 1787977680205,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "26729baecacfb8e5a1e1d691065c6cb2500dbea5fba168ec7360696ebb475199",
+        "sourceUrl": "https://artificialanalysis.ai/models/gemma-4-31b"
+      },
+      "tau3Banking": {
+        "benchmark": {
+          "id": "tau3-banking",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "tauBanking",
+        "normalizedScore": 14.8453608247423,
+        "retrievedAt": 1787977680205,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "26729baecacfb8e5a1e1d691065c6cb2500dbea5fba168ec7360696ebb475199",
+        "sourceUrl": "https://artificialanalysis.ai/models/gemma-4-31b"
+      }
+    },
+    "derivation": {
+      "rule": "tau3-banking+gdpval-aa",
+      "score": 15.26618041237115,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

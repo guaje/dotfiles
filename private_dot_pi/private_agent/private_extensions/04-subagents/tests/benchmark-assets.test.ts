@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -8,6 +8,7 @@ import { loadBenchmarkAssets, ROUTING_POLICY, validateRoutingPolicy } from "../b
 import { BENCHMARK_DIMENSIONS } from "../benchmark-types.ts";
 
 const methodology = { id: "artificial-analysis-intelligence-index", version: "4.1" };
+const AA_MODEL_ID = "11111111-1111-4111-8111-111111111111";
 const scores = Object.fromEntries(BENCHMARK_DIMENSIONS.map((dimension) => [dimension, 50]));
 const canonical = (value: any): any => Array.isArray(value)
 	? value.map(canonical)
@@ -25,7 +26,7 @@ function fixture(mutator?: (manifest: any, snapshot: any) => void) {
 		provider: "p",
 		model: "m",
 		thinkingLevel: null,
-		modelId: "opaque",
+		modelId: AA_MODEL_ID,
 		capturedAt: 1000,
 		methodology: { ...methodology },
 		mapping: { status: "mapped", matchBasis: "manual", reviewedAt: 900, thinkingLevel: null },
@@ -42,7 +43,7 @@ function fixture(mutator?: (manifest: any, snapshot: any) => void) {
 		generatedAt: 1000,
 		digest: "",
 		methodology: { ...methodology },
-		models: [{ provider: "p", model: "m", thinkingLevel: null, modelId: "opaque", file: "a9_z.json", capturedAt: 1000, contentDigest: "" }],
+		models: [{ provider: "p", model: "m", thinkingLevel: null, modelId: AA_MODEL_ID, file: "a9_z.json", capturedAt: 1000, contentDigest: "" }],
 	};
 	mutator?.(manifest, snapshot);
 	const contentDigest = digest(snapshot);
@@ -74,6 +75,44 @@ test("loads opaque exact snapshots in stable order", async () => {
 	}
 });
 
+test("retries a missing snapshot only after an atomic manifest switch", async () => {
+	const f = fixture();
+	try {
+		const manifestPath = join(f.root, "manifest.json");
+		const oldManifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+		const oldFile = oldManifest.models[0].file;
+		const nextFile = "next.json";
+		const nextEntry = { ...oldManifest.models[0], file: nextFile };
+		const nextManifest = { ...oldManifest, models: [nextEntry], digest: digest([nextEntry]) };
+		writeFileSync(join(f.root, "models", nextFile), readFileSync(join(f.root, "models", oldFile)), { mode: 0o600 });
+		let switched = false; let snapshotReads = 0;
+		const loaded = await loadBenchmarkAssets(f.root, 2000, 2000, { beforeSnapshotRead() {
+			snapshotReads++;
+			if (switched) return;
+			switched = true;
+			const staged = join(f.root, "next-manifest.json");
+			writeFileSync(staged, JSON.stringify(nextManifest), { mode: 0o600 });
+			renameSync(staged, manifestPath);
+			rmSync(join(f.root, "models", oldFile));
+		} });
+		assert.equal(switched, true);
+		assert.equal(snapshotReads, 2);
+		assert.equal(loaded?.manifest.models[0]?.file, nextFile);
+	} finally {
+		f.dispose();
+	}
+});
+
+test("missing snapshots without a manifest switch remain unavailable", async () => {
+	const f = fixture();
+	try {
+		rmSync(join(f.root, "models", "a9_z.json"));
+		assert.equal(await loadBenchmarkAssets(f.root, 2000, 2000), null);
+	} finally {
+		f.dispose();
+	}
+});
+
 test("fails closed for stale manifests, duplicate identities/files, and methodology mismatches", async () => {
 	for (const mutate of [
 		(manifest: any) => { manifest.version = 3; },
@@ -97,7 +136,7 @@ test("the same AA model may map to distinct Pi providers", async () => {
 		const manifestPath = join(f.root, "manifest.json");
 		const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 		const other = { ...JSON.parse(readFileSync(join(f.root, "models", "a9_z.json"), "utf8")), provider: "other" };
-		manifest.models.push({ provider: "other", model: "m", thinkingLevel: null, modelId: "opaque", file: "other.json", capturedAt: 1000, contentDigest: digest(other) });
+		manifest.models.push({ provider: "other", model: "m", thinkingLevel: null, modelId: AA_MODEL_ID, file: "other.json", capturedAt: 1000, contentDigest: digest(other) });
 		manifest.digest = digest([...manifest.models].sort((a: any, b: any) => `${a.provider}/${a.model}/${a.thinkingLevel ?? ""}`.localeCompare(`${b.provider}/${b.model}/${b.thinkingLevel ?? ""}`)));
 		writeFileSync(manifestPath, JSON.stringify(manifest));
 		writeFileSync(join(f.root, "models", "other.json"), JSON.stringify(other), { mode: 0o600 });

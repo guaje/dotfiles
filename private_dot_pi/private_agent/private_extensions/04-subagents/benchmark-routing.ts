@@ -10,12 +10,14 @@ import {
 	type ThinkingLevel,
 } from "./benchmark-types.ts";
 import { ROUTING_POLICY, validateRoutingPolicy } from "./benchmark-assets.ts";
+import { aaModelIdForCanonical, canonicalIdForRuntime } from "./canonical-mappings.ts";
 
 export interface RouteCandidate {
 	id: string;
+	canonicalId?: string;
 	reasoning?: boolean;
 	supportsReasoningEffort?: boolean;
-	thinkingLevelMap?: Partial<Record<ThinkingLevel, ThinkingLevel>>;
+	thinkingLevelMap?: Partial<Record<ThinkingLevel, string | null>>;
 	contextWindow?: number;
 	maxTokens?: number;
 	input?: string[];
@@ -47,8 +49,25 @@ interface RankedCandidate {
 const snapshotKey = (id: string, level: BenchmarkThinkingLevel) => `${id}\u0000${level ?? ""}`;
 const codePointCompare = (left: string, right: string) => left < right ? -1 : left > right ? 1 : 0;
 
-function normalizedThinking(candidate: RouteCandidate, requested: ThinkingLevel): ThinkingLevel {
-	return !candidate.reasoning ? "off" : candidate.thinkingLevelMap?.[requested] ?? (requested === "minimal" ? "low" : requested);
+const PI_THINKING_LEVELS: readonly ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
+const AA_BENCHMARK_LEVELS = new Set<BenchmarkThinkingLevel>(["off", "low", "medium", "high", "xhigh", "max"]);
+
+/** Match Pi's effort clamp: standard levels are implicit, xhigh/max require mappings. */
+function clampPiThinking(candidate: RouteCandidate, requested: ThinkingLevel): ThinkingLevel {
+	const supported = (level: ThinkingLevel) => level === "xhigh" || level === "max"
+		? typeof candidate.thinkingLevelMap?.[level] === "string"
+		: candidate.thinkingLevelMap?.[level] !== null;
+	const at = PI_THINKING_LEVELS.indexOf(requested);
+	for (const level of PI_THINKING_LEVELS.slice(at)) if (supported(level)) return level;
+	for (const level of PI_THINKING_LEVELS.slice(0, at).reverse()) if (supported(level)) return level;
+	return "off";
+}
+
+/** Provider wire values identify AA variants only when they are canonical AA levels. */
+function benchmarkThinkingFor(candidate: RouteCandidate, clamped: ThinkingLevel): BenchmarkThinkingLevel {
+	const mapped = candidate.thinkingLevelMap?.[clamped];
+	if (typeof mapped === "string" && AA_BENCHMARK_LEVELS.has(mapped as BenchmarkThinkingLevel)) return mapped as BenchmarkThinkingLevel;
+	return clamped === "minimal" ? "low" : clamped;
 }
 
 function predictedCompletion(
@@ -165,6 +184,7 @@ export function routeBenchmarkModel(
 	if (!validateRoutingPolicy(ROUTING_POLICY)) return empty();
 
 	const bySnapshot = new Map(snapshots.map((snapshot) => [snapshotKey(`${snapshot.provider}/${snapshot.model}`, snapshot.thinkingLevel), snapshot]));
+	const byAaModelId = new Map(snapshots.map((snapshot) => [snapshot.modelId, snapshot]));
 	const variantsByModel = new Map<string, Set<BenchmarkThinkingLevel>>();
 	for (const snapshot of snapshots) {
 		const id = `${snapshot.provider}/${snapshot.model}`;
@@ -178,12 +198,19 @@ export function routeBenchmarkModel(
 	for (const candidate of candidates) {
 		const requestedLevel = requestedThinking ?? ROUTING_POLICY.profiles[profile].defaultThinking;
 		const childThinking: ThinkingLevel | undefined = candidate.supportsReasoningEffort === false ? undefined : (candidate.reasoning ? requestedLevel : "off");
-		const benchmarkThinking = normalizedThinking(candidate, childThinking ?? requestedLevel);
-		const variants = variantsByModel.get(candidate.id);
+		const benchmarkThinking = benchmarkThinkingFor(candidate, clampPiThinking(candidate, childThinking ?? requestedLevel));
+		const canonicalId = canonicalIdForRuntime(candidate.id, candidate.canonicalId);
+		const reviewedAaModelId = aaModelIdForCanonical(canonicalId, benchmarkThinking);
+		const directSnapshotId = variantsByModel.has(canonicalId) ? canonicalId : candidate.id;
+		const variants = variantsByModel.get(directSnapshotId);
 		const hasSpecificVariants = !!variants && [...variants].some((level) => level !== null);
-		const snapshot = hasSpecificVariants
-			? bySnapshot.get(snapshotKey(candidate.id, benchmarkThinking))
-			: bySnapshot.get(snapshotKey(candidate.id, null));
+		// Canonical mappings resolve to immutable AA UUIDs. Unmapped native models
+		// retain the exact v4 provider/model lookup for backward compatibility.
+		const snapshot = reviewedAaModelId !== undefined
+			? byAaModelId.get(reviewedAaModelId)
+			: hasSpecificVariants
+				? bySnapshot.get(snapshotKey(directSnapshotId, benchmarkThinking))
+				: bySnapshot.get(snapshotKey(directSnapshotId, null));
 		if (!snapshot) {
 			exclusions.noSnapshot++;
 			evaluations.push({ modelId: candidate.id, eligible: false, rejectionReasons: ["noSnapshot"] });

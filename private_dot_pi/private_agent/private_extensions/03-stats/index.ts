@@ -70,6 +70,7 @@ export interface StatsSummary {
   modelChanges: Array<{ provider: string; modelId: string; timestamp?: string }>;
   hasCost: boolean;
   hasNotionalCost: boolean;
+  unpricedModels?: string[];
 }
 
 interface StatsTheme {
@@ -104,6 +105,20 @@ function costRateFrom(raw: unknown, base?: CostRates): CostRates | undefined {
   };
 }
 
+export function mergeCatalogCostRates(rates: Map<string, CostRates>, catalog: { providers?: Array<{ id?: string; models?: Array<{ id?: string; canonicalId: string; cost?: CostRates }> }>; nativeModels?: Array<{ id: string; cost?: CostRates }> } | null): void {
+  for (const provider of catalog?.providers ?? []) for (const model of provider.models ?? []) {
+    const runtimeId = provider.id && model.id ? `${provider.id}/${model.id}` : model.canonicalId;
+    // The Pi registry requires a cost object, so catalog publication uses a
+    // zero-valued placeholder for unknown prices. Catalog state is the explicit
+    // source of truth: remove that placeholder until a reviewed rate exists.
+    if (model.cost && (model.cost.input > 0 || model.cost.output > 0)) rates.set(runtimeId, model.cost);
+    else rates.delete(runtimeId);
+  }
+  for (const model of catalog?.nativeModels ?? []) {
+    if (model.cost && (model.cost.input > 0 || model.cost.output > 0)) rates.set(model.id, model.cost);
+  }
+}
+
 async function mergeModelCostOverrides(rates: Map<string, CostRates>, overridesPath: string): Promise<void> {
   let parsed: ModelCostOverridesFile;
   try {
@@ -115,24 +130,31 @@ async function mergeModelCostOverrides(rates: Map<string, CostRates>, overridesP
 
   const overrides = isRecord(parsed.models) ? parsed.models : parsed;
   for (const [modelId, override] of Object.entries(overrides)) {
-    const cost = costRateFrom(override, rates.get(modelId));
-    if (cost) rates.set(modelId, cost);
+    const cost = costRateFrom(override);
+    if (cost && !rates.has(modelId)) rates.set(modelId, cost);
   }
 }
 
-export async function loadModelCostRates(modelsPath = MODELS_PATH, overridesPath = MODEL_COST_OVERRIDES_PATH): Promise<Map<string, CostRates>> {
+export async function loadModelCostRates(modelsPath = MODELS_PATH, overridesPath = MODEL_COST_OVERRIDES_PATH, registry?: { getAvailable(): Array<Record<string, unknown>> }): Promise<Map<string, CostRates>> {
   const rates = new Map<string, CostRates>();
-  const parsed = JSON.parse(await readFile(modelsPath, "utf8")) as ModelsFile;
-  for (const [providerId, provider] of Object.entries(parsed.providers ?? {})) {
-    for (const model of provider.models ?? []) {
-      if (!model.id || !model.cost) continue;
-      rates.set(`${providerId}/${model.id}`, {
-        input: num(model.cost.input),
-        output: num(model.cost.output),
-        cacheRead: num(model.cost.cacheRead),
-        cacheWrite: num(model.cost.cacheWrite),
-      });
-    }
+  // Current runtime registry is authoritative for active model prices.
+  for (const model of registry?.getAvailable() ?? []) {
+    const provider = typeof model.provider === "string" ? model.provider : "";
+    const id = typeof model.id === "string" ? model.id : "";
+    const cost = model.cost as Partial<CostRates> | undefined;
+    if (provider && id && cost) rates.set(`${provider}/${id}`, { input: num(cost.input), output: num(cost.output), cacheRead: num(cost.cacheRead), cacheWrite: num(cost.cacheWrite) });
+  }
+  // Catalog state retains inactive historical custom models for old sessions.
+  // Isolated fixture calls intentionally omit the registry and stay hermetic.
+  if (registry) {
+    const catalog = await import("../09-catalog/state.ts").then((module) => module.loadCatalogState()).catch(() => null);
+    mergeCatalogCostRates(rates, catalog);
+  }
+  // Compatibility fallback supports existing recorded sessions and isolated fixtures;
+  // production custom provider models are dynamically registered, not read from here.
+  if (!registry) {
+    const parsed = JSON.parse(await readFile(modelsPath, "utf8")) as ModelsFile;
+    for (const [providerId, provider] of Object.entries(parsed.providers ?? {})) for (const model of provider.models ?? []) if (model.id && model.cost) rates.set(`${providerId}/${model.id}`, { input: num(model.cost.input), output: num(model.cost.output), cacheRead: num(model.cost.cacheRead), cacheWrite: num(model.cost.cacheWrite) });
   }
   await mergeModelCostOverrides(rates, overridesPath);
   return rates;
@@ -147,10 +169,11 @@ export interface UsageCostBreakdown {
 
 export function calculateUsageCostBreakdown(usage: UsageLike | undefined, rates: CostRates | undefined): UsageCostBreakdown {
   if (!usage) return { input: 0, output: 0, cache: 0, total: 0 };
-  if (!rates) {
-    const total = typeof usage.cost === "number" ? usage.cost : num(usage.cost?.total);
-    return { input: 0, output: 0, cache: 0, total };
-  }
+  // A provider-recorded total is authoritative historical data. When rates are
+  // available, retain the useful notional component breakdown without replacing
+  // that recorded total.
+  const recorded = typeof usage.cost === "number" ? usage.cost : num(usage.cost?.total);
+  if (!rates) return { input: 0, output: 0, cache: 0, total: recorded };
 
   const input = (rates.input / 1_000_000) * num(usage.input);
   const output = (rates.output / 1_000_000) * num(usage.output);
@@ -159,7 +182,7 @@ export function calculateUsageCostBreakdown(usage: UsageLike | undefined, rates:
   const shortWrite = Math.max(0, num(usage.cacheWrite) - longWrite);
   const cacheWrite = ((rates.cacheWrite * shortWrite) + (rates.input * 2 * longWrite)) / 1_000_000;
   const cache = cacheRead + cacheWrite;
-  return { input, output, cache, total: input + output + cache };
+  return { input, output, cache, total: recorded > 0 ? recorded : input + output + cache };
 }
 
 export function calculateUsageCost(usage: UsageLike | undefined, rates: CostRates | undefined): number {
@@ -193,6 +216,7 @@ export function extractStats(entries: Array<any>, costRates: Map<string, CostRat
   const modelChanges: StatsSummary["modelChanges"] = [];
   let hasCost = false;
   let hasNotionalCost = false;
+  const unpricedModels = new Set<string>();
 
   for (const entry of entries ?? []) {
     if (entry?.type === "model_change") {
@@ -211,6 +235,7 @@ export function extractStats(entries: Array<any>, costRates: Map<string, CostRat
       const cost = calculateUsageCostBreakdown(usage, rates);
       if (cost.total > 0) hasCost = true;
       if (rates) hasNotionalCost = true;
+      else if (num(usage?.input) + num(usage?.output) + num(usage?.cacheRead) + num(usage?.cacheWrite) > 0 && cost.total === 0) unpricedModels.add(resolved.model);
       const bucket = mainByModel.get(resolved.model) ?? zeroBucket(resolved.model);
       addToBucket(bucket, usage ?? {}, cost);
       mainByModel.set(resolved.model, bucket);
@@ -226,6 +251,7 @@ export function extractStats(entries: Array<any>, costRates: Map<string, CostRat
         const cost = calculateUsageCostBreakdown(usage, rates);
         if (cost.total > 0) hasCost = true;
         if (rates) hasNotionalCost = true;
+        else if (num(usage?.input) + num(usage?.output) + num(usage?.cacheRead) + num(usage?.cacheWrite) > 0 && cost.total === 0) unpricedModels.add(resolved.model);
         subagents.push({
           agent: typeof result?.agent === "string" ? result.agent : "(unknown)",
           task: typeof result?.task === "string" ? result.task : "",
@@ -258,6 +284,7 @@ export function extractStats(entries: Array<any>, costRates: Map<string, CostRat
     modelChanges,
     hasCost,
     hasNotionalCost,
+    unpricedModels: [...unpricedModels].sort(),
   };
 }
 
@@ -509,7 +536,11 @@ export function formatStatsTable(summary: StatsSummary, theme: StatsTheme = PASS
 
   if (summary.hasNotionalCost) {
     lines.push("");
-    lines.push(theme.fg("muted", "Costs use notional commercial-equivalent rates from models.json and stats overrides."));
+    lines.push(theme.fg("muted", "Costs use notional commercial-equivalent runtime catalog rates and reviewed stats overrides."));
+  }
+  if (summary.unpricedModels?.length) {
+    lines.push("");
+    lines.push(theme.fg("warning", `Unknown cost (not treated as free): ${summary.unpricedModels.join(", ")}`));
   }
 
   return lines;
@@ -621,7 +652,7 @@ export default function statsExtension(pi: ExtensionAPI) {
     handler: async (_args, ctx) => {
       try {
         const entries = ctx.sessionManager.getBranch();
-        const costRates = await loadModelCostRates();
+        const costRates = await loadModelCostRates(MODELS_PATH, MODEL_COST_OVERRIDES_PATH, ctx.modelRegistry as never);
         const summary = extractStats(entries as Array<any>, costRates);
         await renderStatsTable(summary, ctx, pi);
       } catch (error) {

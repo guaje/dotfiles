@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "mappings": [
+    { "provider": "kelley", "model": "Kimi-K2.6", "canonicalId": "aa/kimi-k2-6", "thinkingLevel": null, "aaModelId": "0de67206-4d36-4d10-b8f6-cf37fa747a03" },
+    { "provider": "openai-codex", "model": "gpt-5.6-luna", "canonicalId": "openai-codex/gpt-5.6-luna", "thinkingLevel": "high", "aaModelId": "aa55297e-8fbf-4372-b4ab-9b068dc6396c" },
+    { "provider": "openai-codex", "model": "gpt-5.6-sol", "canonicalId": "openai-codex/gpt-5.6-sol", "thinkingLevel": "high", "aaModelId": "8afc250d-b538-45a2-812a-4605f4ffd87e" },
+    { "provider": "openai-codex", "model": "gpt-5.6-terra", "canonicalId": "openai-codex/gpt-5.6-terra", "thinkingLevel": "high", "aaModelId": "81972fba-1219-477e-bbfb-18c656a63ff7" },
+    { "provider": "reallms", "model": "Qwen3-Coder-Next", "canonicalId": "aa/qwen3-coder-next", "thinkingLevel": null, "aaModelId": "fc92f822-04b7-420d-9c07-a21af5e9aac7" },
+    { "provider": "reallms", "model": "gemma-4-31B-it", "canonicalId": "aa/gemma-4-31b", "thinkingLevel": null, "aaModelId": "cd26a386-4873-46ff-b853-d239050025a2" },
+    { "provider": "reallms", "model": "glm-5.2", "canonicalId": "aa/glm-5-2", "thinkingLevel": null, "aaModelId": "f7a4ea75-e548-4069-80d4-9be8bc7c009b" },
+    { "provider": "reallms-dev", "model": "DeepSeek-V4-Flash-API", "canonicalId": "aa/deepseek-v4-flash", "thinkingLevel": null, "aaModelId": "fe4c0848-e284-4e52-a79d-cdc28392f1a9" },
+    { "provider": "reallms-dev", "model": "Kimi-K2.7-Code", "canonicalId": "aa/kimi-k2-7-code", "thinkingLevel": null, "aaModelId": "8d0cb231-7303-452c-9923-a9620b948475" }
+  ]
+}

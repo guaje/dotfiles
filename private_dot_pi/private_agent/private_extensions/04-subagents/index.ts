@@ -37,6 +37,8 @@ import {
 } from "./result.ts";
 import { renderSubagentCall, renderSubagentResult } from "./render.ts";
 import { runSingleAgent } from "./spawn.ts";
+import { getEnabledModelsMetadata } from "./model-selection.ts";
+import { canonicalIdsFromState, loadCatalogState } from "../09-catalog/state.ts";
 import { getSubagentExecutionSettings } from "./settings.ts";
 import {
 	type OnUpdateCallback,
@@ -107,7 +109,7 @@ export default function (pi: ExtensionAPI) {
 			if (!benchmarkAssets) {
 				benchmarkSnapshotWarningShown = true;
 				ctx.ui.notify?.(
-					"Artificial Analysis snapshots are absent, invalid, or stale; automatic subagents will use Pi's default model. Start with: sh agent/scripts/refresh-artificial-analysis.sh --missing",
+					"Artificial Analysis snapshots are absent, invalid, or stale; automatic subagents will use Pi's default model. Review with /catalog sync or inspect with: node agent/extensions/09-catalog/aa/cli.ts --missing.",
 					"warning",
 				);
 			}
@@ -158,6 +160,16 @@ export default function (pi: ExtensionAPI) {
 
 		async execute(_toolCallId, params, signal, onUpdate, ctx) {
 			const agentScope: AgentScope = params.agentScope ?? "user";
+			const canonicalIds = canonicalIdsFromState(await loadCatalogState());
+			const runtime = ctx as typeof ctx & {
+				scopedModels?: readonly { model: Record<string, unknown> }[];
+				modelRegistry?: { getAvailable?: () => Record<string, unknown>[] };
+			};
+			const candidates = getEnabledModelsMetadata(
+				runtime.scopedModels ?? [],
+				runtime.modelRegistry?.getAvailable?.() ?? [],
+				canonicalIds,
+			);
 			const discovery = discoverAgents(ctx.cwd, agentScope);
 			const agents = discovery.agents;
 			const confirmProjectAgents = params.confirmProjectAgents ?? true;
@@ -256,6 +268,7 @@ export default function (pi: ExtensionAPI) {
 						signal,
 						chainUpdate,
 						makeDetails("chain"),
+						candidates,
 					);
 					results.push(result);
 
@@ -333,6 +346,7 @@ export default function (pi: ExtensionAPI) {
 							}
 						},
 						makeDetails("parallel"),
+						candidates,
 					);
 					allResults[index] = result;
 					emitParallelUpdate();
@@ -369,6 +383,7 @@ export default function (pi: ExtensionAPI) {
 					signal,
 					widgetOnUpdate,
 					makeDetails("single"),
+					candidates,
 				);
 				const isError = isFailedResult(result);
 				if (isError) {

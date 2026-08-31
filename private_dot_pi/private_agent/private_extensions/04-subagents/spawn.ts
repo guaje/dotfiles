@@ -18,7 +18,7 @@ import * as path from "node:path";
 import type { Message } from "@earendil-works/pi-ai";
 import { withFileMutationQueue } from "@earendil-works/pi-coding-agent";
 import type { AgentConfig } from "./agents.ts";
-import { selectModelForSubagent, type ThinkingLevel } from "./model-selection.ts";
+import { selectModelForSubagent, type ModelMetadata, type ThinkingLevel } from "./model-selection.ts";
 import { getFinalOutput } from "./result.ts";
 import { emptyUsage, type OnUpdateCallback, type SingleResult, type SubagentDetails } from "./types.ts";
 
@@ -59,6 +59,7 @@ export async function runSingleAgent(
 	signal: AbortSignal | undefined,
 	onUpdate: OnUpdateCallback | undefined,
 	makeDetails: (results: SingleResult[]) => SubagentDetails,
+	models: readonly ModelMetadata[] = [],
 ): Promise<SingleResult> {
 	const agent = agents.find((a) => a.name === agentName);
 
@@ -84,7 +85,7 @@ export async function runSingleAgent(
 	let benchmarkRoute: SingleResult["benchmarkRoute"];
 
 	if (!selectedModel) {
-		const decision = await selectModelForSubagent({ task, routingProfile: agent.routingProfile, thinking: agent.thinking });
+		const decision = await selectModelForSubagent({ task, routingProfile: agent.routingProfile, thinking: agent.thinking, models: [...models] });
 		benchmarkRoute = decision.benchmarkRoute;
 		if (decision.modelId) {
 			selectedModel = decision.modelId;

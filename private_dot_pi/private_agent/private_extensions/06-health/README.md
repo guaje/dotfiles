@@ -1,6 +1,6 @@
 # Model health
 
-The extension entrypoint is `index.ts`. Policy defaults and bounds are machine-readable in `assets/policy.json`; settings are resolved source-first through `08-settings`.
+The extension entrypoint is `index.ts`. Policy defaults and bounds are machine-readable in `assets/policy.json`; settings are resolved source-first through `08-settings`. Chat models are displayed by their stable registered `provider/model` identity, matching `/stats`; optional registry display names do not replace that identity.
 
 ## Settings
 

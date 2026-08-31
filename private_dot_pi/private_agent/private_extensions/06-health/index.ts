@@ -34,7 +34,7 @@ interface ModelMetadata {
 interface Provider {
   baseUrl?: string;
   apiKey?: string;
-  models: ModelMetadata[];
+  models?: ModelMetadata[];
   services?: {
     imageGeneration?: ModelMetadata[];
   };
@@ -75,8 +75,11 @@ export interface ModelHealthResult {
 interface ProbeContext {
   modelRegistry: {
     find: (provider: string, modelId: string) => unknown;
+    getAvailable?: () => Array<{ provider?: unknown; id?: unknown; name?: unknown }>;
     getApiKeyAndHeaders: (model: unknown) => Promise<{ ok: boolean; apiKey?: string; headers?: Record<string, string>; error?: string }>;
   };
+  /** Pi's effective session scope. An empty list means all registry models. */
+  scopedModels?: readonly { model: Record<string, unknown> }[];
   ui?: { notify: (message: string, level: "info" | "warning" | "error" | "success") => void };
 }
 
@@ -142,7 +145,36 @@ function getConfiguredImageGenerationModels(settingsFile: SettingsFile, modelsFi
   return models;
 }
 
-async function getEnabledModelsMetadata(): Promise<ModelMetadata[]> {
+async function getEnabledModelsMetadata(ctx?: ProbeContext): Promise<ModelMetadata[]> {
+  // Chat inventory comes from the active runtime, not configuration files. This
+  // exactly follows /scoped-models: an empty scope means every available model.
+  if (ctx?.modelRegistry?.getAvailable) {
+    let modelsFile: ModelsFile = { providers: {} };
+    let settingsFile: SettingsFile = {};
+    try {
+      const [modelsData, settings] = await Promise.all([readFile(MODELS_PATH, "utf8"), getSettings()]);
+      modelsFile = JSON.parse(modelsData) as ModelsFile;
+      settingsFile = settings;
+    } catch { /* Runtime chat inventory remains authoritative. */ }
+
+    const userProviders = new Set(Object.keys(modelsFile.providers || {}));
+    const scoped = ctx.scopedModels ?? [];
+    const runtime = scoped.length ? scoped.map((entry) => entry.model) : ctx.modelRegistry.getAvailable();
+    const chat = runtime.flatMap((model) => {
+      const provider = typeof model.provider === "string" ? model.provider : "";
+      const id = typeof model.id === "string" ? model.id : "";
+      if (!provider || !id) return [];
+      return [{
+        id: `${provider}/${id}`,
+        name: typeof model.name === "string" ? model.name : id,
+        service: "chat" as const,
+        source: userProviders.has(provider) ? "user" as const : "auth" as const,
+      }];
+    });
+    // Image-generation remains explicitly configured and is intentionally not
+    // inferred from chat registry records.
+    return [...chat, ...getConfiguredImageGenerationModels(settingsFile, modelsFile)];
+  }
   try {
     const [modelsData, settingsFile] = await Promise.all([
       readFile(MODELS_PATH, "utf8"),
@@ -155,7 +187,7 @@ async function getEnabledModelsMetadata(): Promise<ModelMetadata[]> {
     const allMetadata: ModelMetadata[] = [];
 
     for (const [providerId, provider] of Object.entries(modelsFile.providers)) {
-      for (const model of provider.models) {
+      for (const model of provider.models || []) {
         const fullId = `${providerId}/${model.id}`;
         configuredModels.set(fullId, model);
       }
@@ -171,11 +203,15 @@ async function getEnabledModelsMetadata(): Promise<ModelMetadata[]> {
       const parts = splitModelId(enabledId);
       if (!parts) continue;
 
-      // Built-in providers may not be listed in models.json, but if a provider is
-      // listed there, treat its model list as the scoped set for that provider.
-      // This avoids probing stale enabled entries for provider-scoped models that
-      // are no longer available to this account.
-      if (Object.hasOwn(modelsFile.providers, parts.provider)) continue;
+      const configuredProvider = modelsFile.providers[parts.provider];
+      if (configuredProvider) {
+        // Legacy static providers with model arrays still use that array as their
+        // exact scope. Dynamic catalog providers have no array, so enabledModels
+        // remains their exact synchronized eligibility list.
+        if (Array.isArray(configuredProvider.models)) continue;
+        allMetadata.push({ id: enabledId, name: parts.modelId, service: "chat", source: "user" });
+        continue;
+      }
 
       allMetadata.push({ id: enabledId, name: parts.modelId, service: "chat", source: "auth" });
     }
@@ -266,7 +302,7 @@ export async function probeModelHealth(
   modelId: string,
   ctx: ProbeContext,
 ): Promise<ModelHealthResult> {
-  const allModels = await getEnabledModelsMetadata();
+  const allModels = await getEnabledModelsMetadata(ctx);
   const metadata = allModels.find((m) => m.id === modelId);
   if (!metadata) {
     const result: ModelHealthResult = {
@@ -434,7 +470,9 @@ async function probeModel(metadata: ModelMetadata, ctx: ProbeContext): Promise<M
 }
 
 function resultDisplayName(result: ModelHealthResult): string {
-  return result.name || result.id.split("/")[1] || result.id;
+  if (result.service !== "imageGeneration") return result.id;
+  const name = result.name?.trim();
+  return name || splitModelId(result.id)?.modelId || result.id;
 }
 
 function serviceLabel(service: ModelHealthResult["service"], count: number): string {
@@ -487,7 +525,7 @@ export async function checkModelHealth(ctx: ProbeContext, options: ModelHealthOp
   const cacheTtlMs = options.cacheTtlMs ?? configured.cacheTtlMs;
   const concurrencyLimit = options.concurrencyLimit ?? configured.concurrency;
 
-  const models = await getEnabledModelsMetadata();
+  const models = await getEnabledModelsMetadata(ctx);
 
   if (!options.forceRefresh) {
     const cached = await getFreshCachedResults(cacheTtlMs);
@@ -502,7 +540,9 @@ export async function checkModelHealth(ctx: ProbeContext, options: ModelHealthOp
             ...result,
             name: result.name ?? metadata.name,
             service: result.service ?? metadata.service,
-            source: result.source ?? metadata.source,
+            // Source is current registry/configuration metadata, not probe data.
+            // Reclassify old caches immediately after provider ownership changes.
+            source: metadata.source ?? result.source,
           };
         });
         if (options.notify) notifyProbeSummary(currentCached, ctx, true);
@@ -573,7 +613,7 @@ export function formatHealthTable(
 
   const NAME_W = 30;
   const truncate = (t: string) => (t.length > NAME_W ? `${t.slice(0, NAME_W - 1)}…` : t);
-  const nameCol = (r: ModelHealthResult) => truncate(r.name || r.id.split("/")[1] || r.id).padEnd(NAME_W);
+  const nameCol = (r: ModelHealthResult) => truncate(resultDisplayName(r)).padEnd(NAME_W);
   const tpsCol = (r: ModelHealthResult) =>
     (r.tokensPerSecond !== undefined ? r.tokensPerSecond.toFixed(1) : "—").padStart(10);
   const latCol = (r: ModelHealthResult) =>

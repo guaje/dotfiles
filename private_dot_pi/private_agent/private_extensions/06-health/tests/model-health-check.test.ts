@@ -198,6 +198,26 @@ test("checks model health with a concurrency limit and caches results", async ()
   assert.match(notifications[0]!.message, /Model health \(cached\)/);
 });
 
+test("health probes the same scoped runtime models visible to /scoped-models", async () => {
+  const mod = await loadExtension();
+  const called: string[] = [];
+  (globalThis as any).__completeSimpleMock = async (model: any) => {
+    called.push(`${model.provider}/${model.id}`);
+    return { stopReason: "stop", content: [{ type: "text", text: "OK" }] };
+  };
+  const scoped = { provider: "reallms", id: "scoped", name: "Scoped" };
+  const results = await mod.checkModelHealth({
+    scopedModels: [{ model: scoped }],
+    modelRegistry: {
+      getAvailable: () => [scoped, { provider: "catalog", id: "outside-scope", name: "Outside" }],
+      find: (provider: string, id: string) => ({ provider, id }),
+      async getApiKeyAndHeaders() { return { ok: true, apiKey: "test-key" }; },
+    },
+  }, { forceRefresh: true });
+  assert.deepEqual(called, ["reallms/scoped"]);
+  assert.equal(results[0]?.source, "user");
+});
+
 test("orders healthy user chat models by enabledModels order", async () => {
   const mod = await loadExtension();
   const checkModelHealth = mod.checkModelHealth;
@@ -233,8 +253,8 @@ test("orders healthy user chat models by enabledModels order", async () => {
 
   const table = mod.formatHealthTable(results).join("\n");
   assert.ok(table.indexOf("  auth") < table.indexOf("  user"));
-  assert.ok(table.indexOf("Fast") < table.indexOf("Built In"));
-  assert.ok(table.indexOf("Built In") < table.indexOf("Scoped"));
+  assert.ok(table.indexOf("test-provider/fast-model") < table.indexOf("openai-codex/test-built-in"));
+  assert.ok(table.indexOf("openai-codex/test-built-in") < table.indexOf("reallms/test-scoped"));
 });
 
 test("orders cached user chat models by current enabledModels order", async () => {
@@ -259,14 +279,18 @@ test("orders cached user chat models by current enabledModels order", async () =
 
   writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({ enabledModels: initialOrder, imageGenerationProviders: {} }, null, 2)}\n`);
   await checkModelHealth(ctx, { forceRefresh: true, cacheTtlMs: 60_000 });
+  const staleSourceCache = JSON.parse(readFileSync(CACHE_PATH, "utf8"));
+  staleSourceCache.results = staleSourceCache.results.map((result: any) => ({ ...result, source: "auth" }));
+  writeFileSync(CACHE_PATH, JSON.stringify(staleSourceCache));
 
   writeFileSync(SETTINGS_CONFIG_PATH, `${JSON.stringify({ enabledModels: reorderedModels, imageGenerationProviders: {} }, null, 2)}\n`);
   const cachedResults = await checkModelHealth(ctx, { cacheTtlMs: 60_000 });
 
   assert.deepEqual(cachedResults.map((result: any) => result.id), reorderedModels);
+  assert.ok(cachedResults.every((result: any) => result.source === "user"));
   const table = mod.formatHealthTable(cachedResults).join("\n");
-  assert.ok(table.indexOf("Fast") < table.indexOf("Built In"));
-  assert.ok(table.indexOf("Built In") < table.indexOf("Scoped"));
+  assert.ok(table.indexOf("test-provider/fast-model") < table.indexOf("openai-codex/test-built-in"));
+  assert.ok(table.indexOf("openai-codex/test-built-in") < table.indexOf("reallms/test-scoped"));
 });
 
 test("uses settings.config enabled models and skips stale scoped-provider models", async () => {
@@ -442,7 +466,7 @@ test("notify summary groups healthy chat and image generation models", async () 
   assert.equal(notifications[0]?.level, "info");
   assert.equal(
     notifications[0]?.message,
-    `Model health (cached): 2 enabled models queryable. 1 chat model (${chatModel.name}), 1 image generation model (z-image-turbo)`,
+    `Model health (cached): 2 enabled models queryable. 1 chat model (${chatModel.id}), 1 image generation model (z-image-turbo)`,
   );
 });
 
@@ -705,10 +729,24 @@ test("formatHealthTable renders chat model table with throughput and latency", a
   assert.match(table, /\n  auth\n/);
   assert.match(table, /\n  user\n/);
   assert.match(table, /Model\s+Est\. tok\/s\s+E2E latency/);
-  assert.match(table, /Alpha\s+4\.2\s+1\.93s/);
-  assert.match(table, /Beta\s+—\s+0\.50s/);
+  assert.match(table, /p\/a\s+4\.2\s+1\.93s/);
+  assert.match(table, /p\/b\s+—\s+0\.50s/);
   assert.match(table, /1 image generation model \(img\)/);
   assert.match(table, /Unavailable: p\/bad \(offline\)/);
+});
+
+test("formatHealthTable always renders registered provider/model identities for chat", async () => {
+  const mod = await loadExtension();
+  const table = mod.formatHealthTable([
+    { id: "test-provider/mapped", status: "ok", name: "Synthetic Lab: Mapped", service: "chat" },
+    { id: "test-provider/team/unmapped", status: "ok", name: "team/unmapped", service: "chat" },
+    { id: "other-provider/plain", status: "ok", service: "chat" },
+  ]).join("\n");
+
+  assert.match(table, /test-provider\/mapped/);
+  assert.match(table, /test-provider\/team\/unmapped/);
+  assert.match(table, /other-provider\/plain/);
+  assert.doesNotMatch(table, /Synthetic Lab: Mapped/);
 });
 
 test("formatHealthTable omits the chat table when only image models are healthy", async () => {
@@ -742,7 +780,8 @@ test("healthMessageRenderer builds a themed Container from message.details", asy
   // Flatten the Container's Text children back to lines.
   const table = comp.children.map((c: any) => c.text ?? "").join("\n");
   assert.match(table, /\[Models\]/);
-  assert.match(table, /Alpha/);
+  assert.match(table, /p\/a/);
+  assert.doesNotMatch(table, /Alpha/);
   assert.match(table, /1 image generation model \(img\)/);
 });
 
@@ -781,7 +820,8 @@ test("renderHealthTable notifies joined lines in non-tui mode", async () => {
   assert.equal(notifications.length, 1);
   assert.match(notifications[0]!, /\[Models\]/);
   assert.match(notifications[0]!, /\n/);
-  assert.match(notifications[0]!, /Alpha/);
+  assert.match(notifications[0]!, /p\/a/);
+  assert.doesNotMatch(notifications[0]!, /Alpha/);
 });
 
 test("renderHealthTable uses a transient widget in tui mode", async () => {
@@ -807,7 +847,8 @@ test("renderHealthTable uses a transient widget in tui mode", async () => {
   assert.equal(widget!.options?.placement, "aboveEditor");
   const rendered = widget!.factory({}, { fg: (_c: string, t: string) => t, bold: (t: string) => t }).render();
   assert.match(rendered, /\[Models\]/);
-  assert.match(rendered, /Alpha/);
+  assert.match(rendered, /p\/a/);
+  assert.doesNotMatch(rendered, /Alpha/);
 });
 
 test("session_start renders startup immediately and reload after Pi's reload status", async () => {

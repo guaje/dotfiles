@@ -172,18 +172,39 @@ test("sync propagates the caller abort signal to catalog and authoritative disco
   assert.equal(catalogSignal, controller.signal); assert.equal(authoritativeSignal, controller.signal);
 });
 
-test("AA net artifact changes coalesce metadata, manifest additions, accumulated deletions, and warnings", () => {
-  const before = { manifest: { path: "manifest.json", fingerprint: "before" }, canonicalMappings: { path: "canonical-mappings.json", fingerprint: "same" }, manifestSnapshotFiles: ["old.json"], generatedSnapshotFiles: ["old.json", "orphan.json"] };
-  const after = { manifest: { path: "manifest.json", fingerprint: "after" }, canonicalMappings: { path: "canonical-mappings.json", fingerprint: "changed-map" }, manifestSnapshotFiles: ["new.json"], generatedSnapshotFiles: ["new.json"] };
+test("AA net artifact changes coalesce metadata, propagate an external mapping target, additions, deletions, and warnings", () => {
+  const before = {
+    snapshotRoot: "/synthetic-before",
+    manifest: { path: "manifest.json", targetPath: "/synthetic-before/manifest.json", fingerprint: "before" },
+    canonicalMappings: { path: "/reviewed config/canonical-mappings.json", targetPath: "/reviewed config/canonical-mappings.json", fingerprint: "same" },
+    manifestSnapshotFiles: ["old.json"], generatedSnapshotFiles: ["old.json", "orphan.json"],
+  };
+  const after = {
+    snapshotRoot: "/synthetic-after",
+    manifest: { path: "manifest.json", targetPath: "/synthetic-after/manifest.json", fingerprint: "after" },
+    canonicalMappings: { path: "/reviewed config/canonical-mappings.json", targetPath: "/reviewed config/canonical-mappings.json", fingerprint: "changed-map" },
+    manifestSnapshotFiles: ["new.json"], generatedSnapshotFiles: ["new.json"],
+  };
   assert.deepEqual(netAaArtifactChanges(before, after, ["z warning", "a warning", "z warning"]), {
-    changes: [{ kind: "M", path: "manifest.json" }, { kind: "M", path: "canonical-mappings.json" }, { kind: "A", path: "models/new.json" }, { kind: "D", path: "models/old.json" }, { kind: "D", path: "models/orphan.json" }],
+    changes: [
+      { kind: "M", path: "manifest.json", targetPath: "/synthetic-after/manifest.json" },
+      { kind: "M", path: "/reviewed config/canonical-mappings.json", targetPath: "/reviewed config/canonical-mappings.json" },
+      { kind: "A", path: "models/new.json", targetPath: "/synthetic-after/models/new.json" },
+      { kind: "D", path: "models/old.json", targetPath: "/synthetic-before/models/old.json" },
+      { kind: "D", path: "models/orphan.json", targetPath: "/synthetic-before/models/orphan.json" },
+    ],
     warnings: ["a warning", "z warning"],
   });
 });
 
+test("AA net artifact changes handle absent metadata defensively", () => {
+  const state = { snapshotRoot: "/synthetic", manifest: null, canonicalMappings: null, manifestSnapshotFiles: [], generatedSnapshotFiles: [] };
+  assert.deepEqual(netAaArtifactChanges(state, state), { changes: [], warnings: [] });
+});
+
 test("interactive AA finalization reconciles before changed-publication cleanup and capture", async () => {
-  const before = { manifest: { path: "manifest.json", fingerprint: "old" }, canonicalMappings: { path: "canonical-mappings.json", fingerprint: "old-map" }, manifestSnapshotFiles: ["old.json"], generatedSnapshotFiles: ["old.json"] };
-  const after = { manifest: { path: "manifest.json", fingerprint: "new" }, canonicalMappings: { path: "canonical-mappings.json", fingerprint: "new-map" }, manifestSnapshotFiles: ["new.json"], generatedSnapshotFiles: ["new.json"] };
+  const before = { snapshotRoot: "/synthetic-aa", manifest: { path: "manifest.json", targetPath: "/synthetic-aa/manifest.json", fingerprint: "old" }, canonicalMappings: { path: "canonical-mappings.json", targetPath: "/synthetic-aa/canonical-mappings.json", fingerprint: "old-map" }, manifestSnapshotFiles: ["old.json"], generatedSnapshotFiles: ["old.json"] };
+  const after = { snapshotRoot: "/synthetic-aa", manifest: { path: "manifest.json", targetPath: "/synthetic-aa/manifest.json", fingerprint: "new" }, canonicalMappings: { path: "canonical-mappings.json", targetPath: "/synthetic-aa/canonical-mappings.json", fingerprint: "new-map" }, manifestSnapshotFiles: ["new.json"], generatedSnapshotFiles: ["new.json"] };
   const calls: string[] = []; const warnings = ["publication warning"];
   const result = await finalizeAaSync("initial", true, true, before, warnings, undefined, async () => { calls.push("reconcile"); return "reconciled"; }, {
     discover: async () => [],
@@ -192,7 +213,12 @@ test("interactive AA finalization reconciles before changed-publication cleanup 
   } as any);
   assert.deepEqual(calls, ["reconcile", "cleanup", "capture"]);
   assert.equal(result.report, "reconciled");
-  assert.deepEqual(result.aaArtifacts, { changes: [{ kind: "M", path: "manifest.json" }, { kind: "M", path: "canonical-mappings.json" }, { kind: "A", path: "models/new.json" }, { kind: "D", path: "models/old.json" }], warnings: ["cleanup warning", "publication warning"] });
+  assert.deepEqual(result.aaArtifacts, { changes: [
+    { kind: "M", path: "manifest.json", targetPath: "/synthetic-aa/manifest.json" },
+    { kind: "M", path: "canonical-mappings.json", targetPath: "/synthetic-aa/canonical-mappings.json" },
+    { kind: "A", path: "models/new.json", targetPath: "/synthetic-aa/models/new.json" },
+    { kind: "D", path: "models/old.json", targetPath: "/synthetic-aa/models/old.json" },
+  ], warnings: ["cleanup warning", "publication warning"] });
 });
 
 test("interactive AA finalization skips cleanup and capture for a successful semantic no-op", async () => {

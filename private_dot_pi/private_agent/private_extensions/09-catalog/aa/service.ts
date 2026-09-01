@@ -11,8 +11,9 @@ export interface ReviewedVariant extends AaCandidate { thinkingLevel: ThinkingLe
 export interface PublicationOptions { prune?: boolean; }
 export interface PublicationResult { changed: boolean; warnings: string[]; }
 export interface CleanupResult { deleted: string[]; warnings: string[]; }
-export interface ArtifactFingerprint { path: string; fingerprint: string; }
+export interface ArtifactFingerprint { path: string; targetPath: string; fingerprint: string; }
 export interface ArtifactState {
+  snapshotRoot: string;
   manifest: ArtifactFingerprint | null;
   canonicalMappings: ArtifactFingerprint | null;
   manifestSnapshotFiles: string[];
@@ -25,6 +26,10 @@ const PRUNE_GRACE_MS = 300_000;
 const GENERATED_SNAPSHOT = /^[a-f0-9]{16}-[a-f0-9]{16}\.json$/;
 const digestText = (value: string) => createHash("sha256").update(value).digest("hex");
 const ordered = (values: Iterable<string>) => [...new Set(values)].sort(codePointCompare);
+function displayArtifactPath(snapshotRoot: string, targetPath: string): string {
+  const relative = path.relative(snapshotRoot, targetPath);
+  return relative && !path.isAbsolute(relative) && relative !== ".." && !relative.startsWith(`..${path.sep}`) ? relative : targetPath;
+}
 function warning(warnings: string[], value: string): void { if (!warnings.includes(value)) warnings.push(value); }
 function isMissingSnapshot(error: unknown): boolean { return error instanceof Error && error.message.startsWith("missing required file:"); }
 
@@ -204,10 +209,13 @@ class AaService {
   async check(env: NodeJS.ProcessEnv = process.env): Promise<void> { const config = baseConfig(env); await validateArtifacts(config, true, this.deps.now(), this.deps.fsHooks.beforeSnapshotRead); }
   async captureArtifactState(env: NodeJS.ProcessEnv = process.env): Promise<ArtifactState> {
     const config = baseConfig(env); await assertSecureDirectory(config.paths.snapshotRoot); await assertSecureDirectory(config.paths.modelsDir);
+    const snapshotRoot = path.resolve(config.paths.snapshotRoot);
+    const manifestTargetPath = path.resolve(config.paths.manifest);
+    const mappingsTargetPath = path.resolve(config.paths.mappings);
     let manifest: ArtifactFingerprint | null = null; let manifestSnapshotFiles: string[] = [];
     try {
       const loaded = await readValidatedManifest(config);
-      manifest = { path: "manifest.json", fingerprint: loaded.fingerprint };
+      manifest = { path: displayArtifactPath(snapshotRoot, manifestTargetPath), targetPath: manifestTargetPath, fingerprint: loaded.fingerprint };
       manifestSnapshotFiles = ordered(loaded.manifest.models.map((entry) => entry.file));
     } catch (error) { if (!isMissingSnapshot(error)) throw error; }
     let canonicalMappings: ArtifactFingerprint | null = null;
@@ -215,13 +223,13 @@ class AaService {
       await assertSecureFile(config.paths.mappings); const text = await readFile(config.paths.mappings, "utf8"); let value: unknown;
       try { value = JSON.parse(text); } catch { throw new Error("invalid JSON in canonical-mappings.json"); }
       if (!validateCanonicalMappings(value)) throw new Error("invalid canonical mappings");
-      canonicalMappings = { path: "canonical-mappings.json", fingerprint: digestText(text) };
+      canonicalMappings = { path: displayArtifactPath(snapshotRoot, mappingsTargetPath), targetPath: mappingsTargetPath, fingerprint: digestText(text) };
     } catch (error) { if (!isMissingSnapshot(error)) throw error; }
     const generatedSnapshotFiles: string[] = [];
     for (const file of await readdir(config.paths.modelsDir)) if (GENERATED_SNAPSHOT.test(file)) {
       await assertSecureFile(path.join(config.paths.modelsDir, file)); generatedSnapshotFiles.push(file);
     }
-    return { manifest, canonicalMappings, manifestSnapshotFiles, generatedSnapshotFiles: ordered(generatedSnapshotFiles) };
+    return { snapshotRoot, manifest, canonicalMappings, manifestSnapshotFiles, generatedSnapshotFiles: ordered(generatedSnapshotFiles) };
   }
   async cleanupObsoleteSnapshots(signal?: AbortSignal, env: NodeJS.ProcessEnv = process.env): Promise<CleanupResult> {
     const config = baseConfig(env); const lock = await acquireLock(config); const deleted: string[] = []; const warnings: string[] = [];

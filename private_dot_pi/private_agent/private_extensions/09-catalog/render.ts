@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { AaArtifactChangeSummary, CatalogSyncReport } from "./sync.ts";
 import type { CatalogState } from "./types.ts";
 
@@ -50,6 +51,21 @@ export function renderCatalogOverview(
   return { text: `${summary}\n${health}`, level: issues.length ? "warning" : "info" };
 }
 
+const CONTROL_CHARACTER = /[\x00-\x1f\x7f]/;
+
+function quotePosixShellArgument(value: string): string {
+  return `'${value.replaceAll("'", `'"'"'`)}'`;
+}
+
+function appendPosixCommand(lines: string[], command: string, targetPaths: string[]): void {
+  lines.push(`${command} -- \\`);
+  for (const [index, targetPath] of targetPaths.entries()) lines.push(`  ${quotePosixShellArgument(targetPath)}${index < targetPaths.length - 1 ? " \\" : ""}`);
+}
+
+function isSafeArtifactTarget(targetPath: unknown): targetPath is string {
+  return typeof targetPath === "string" && path.isAbsolute(targetPath) && !CONTROL_CHARACTER.test(targetPath);
+}
+
 export function renderCatalogSync(report: CatalogSyncReport, aaArtifacts?: AaArtifactChangeSummary): string {
   const lines = ["Catalog sync completed"];
   for (const model of report.models) {
@@ -60,9 +76,25 @@ export function renderCatalogSync(report: CatalogSyncReport, aaArtifacts?: AaArt
     } else lines.push("  AA: unresolved — no exact reviewed mapping");
   }
   if (aaArtifacts?.changes.length) {
-    lines.push("", "AA artifact changes to track (relative to configured snapshot root):");
-    for (const change of aaArtifacts.changes) lines.push(`  ${change.kind} ${change.path}`);
-    for (const warning of aaArtifacts.warnings) lines.push(`  ! ${warning}`);
+    lines.push("", "AA artifact changes to track:");
+    for (const change of aaArtifacts.changes) lines.push(`  ${change.kind} ${isSafeArtifactTarget(change.targetPath) && typeof change.path === "string" && !CONTROL_CHARACTER.test(change.path) ? change.path : "[unsafe path omitted]"}`);
+    for (const warning of aaArtifacts.warnings) lines.push(`  ! ${CONTROL_CHARACTER.test(warning) ? "unsafe tracking warning omitted" : warning}`);
+
+    const safeTargets = aaArtifacts.changes.every((change) => isSafeArtifactTarget(change.targetPath));
+    if (safeTargets) {
+      const additions = aaArtifacts.changes.filter((change) => change.kind !== "D").map((change) => change.targetPath);
+      const deletions = aaArtifacts.changes.filter((change) => change.kind === "D").map((change) => change.targetPath);
+      lines.push("");
+      if (additions.length) appendPosixCommand(lines, "chezmoi add", additions);
+      if (deletions.length) {
+        if (additions.length) lines.push("");
+        appendPosixCommand(lines, "chezmoi forget", deletions);
+        lines.push("");
+        appendPosixCommand(lines, "rm -f", deletions);
+      }
+    } else {
+      lines.push("", "  ! Exact artifact commands omitted because a target path is unsafe or non-absolute.");
+    }
     lines.push("", "Review with: chezmoi status");
   } else if (aaArtifacts?.warnings.length) {
     lines.push("", "AA artifact tracking warnings:");

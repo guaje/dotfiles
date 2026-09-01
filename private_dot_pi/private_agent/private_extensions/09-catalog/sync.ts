@@ -1,3 +1,4 @@
+import path from "node:path";
 import { createSettingsStore } from "../08-settings/store.ts";
 import { loadBenchmarkAssets } from "../04-subagents/benchmark-assets.ts";
 import { qualifyBenchmarkProfiles } from "../04-subagents/benchmark-qualification.ts";
@@ -262,18 +263,21 @@ export interface AaOperations {
   captureArtifactState?(env?: NodeJS.ProcessEnv): Promise<ArtifactState>;
   cleanupObsoleteSnapshots?(signal?: AbortSignal, env?: NodeJS.ProcessEnv): Promise<CleanupResult>;
 }
-export interface AaArtifactChange { kind: "M" | "A" | "D"; path: string; }
+export interface AaArtifactChange { kind: "M" | "A" | "D"; path: string; targetPath: string; }
 export interface AaArtifactChangeSummary { changes: AaArtifactChange[]; warnings: string[]; }
 export function netAaArtifactChanges(before: ArtifactState, after: ArtifactState, warnings: Iterable<string> = []): AaArtifactChangeSummary {
   const changes: AaArtifactChange[] = [];
-  if (before.manifest?.fingerprint !== after.manifest?.fingerprint) changes.push({ kind: "M", path: "manifest.json" });
-  if (before.canonicalMappings?.fingerprint !== after.canonicalMappings?.fingerprint) changes.push({ kind: "M", path: "canonical-mappings.json" });
+  const changedMetadata = (prior: ArtifactState["manifest"], current: ArtifactState["manifest"]): void => {
+    if (prior?.fingerprint === current?.fingerprint) return;
+    const artifact = current ?? prior;
+    if (artifact) changes.push({ kind: "M", path: artifact.path, targetPath: artifact.targetPath });
+  };
+  changedMetadata(before.manifest, after.manifest);
+  changedMetadata(before.canonicalMappings, after.canonicalMappings);
   const beforeReferences = new Set(before.manifestSnapshotFiles), afterReferences = new Set(after.manifestSnapshotFiles);
-  for (const file of afterReferences) if (!beforeReferences.has(file)) changes.push({ kind: "A", path: `models/${file}` });
+  for (const file of [...afterReferences].sort(codePointCompare)) if (!beforeReferences.has(file)) changes.push({ kind: "A", path: `models/${file}`, targetPath: path.resolve(after.snapshotRoot, "models", file) });
   const afterGenerated = new Set(after.generatedSnapshotFiles);
-  for (const file of before.generatedSnapshotFiles) if (!afterGenerated.has(file)) changes.push({ kind: "D", path: `models/${file}` });
-  const rank = (change: AaArtifactChange): number => change.kind === "M" ? (change.path === "manifest.json" ? 0 : 1) : change.kind === "A" ? 2 : 3;
-  changes.sort((left, right) => rank(left) - rank(right) || codePointCompare(left.path, right.path));
+  for (const file of [...new Set(before.generatedSnapshotFiles)].sort(codePointCompare)) if (!afterGenerated.has(file)) changes.push({ kind: "D", path: `models/${file}`, targetPath: path.resolve(before.snapshotRoot, "models", file) });
   return { changes, warnings: [...new Set(warnings)].sort(codePointCompare) };
 }
 export async function captureAaArtifactState(operations: AaOperations = aaService): Promise<ArtifactState> {

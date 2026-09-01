@@ -81,18 +81,60 @@ test("catalog overview warns when no validated state is available", () => {
   assert.match(result.text, /Run \/catalog refresh or \/catalog sync\./);
 });
 
-test("catalog sync render lists deterministic AA artifact changes only when supplied", () => {
-  const report: any = { models: [], unresolvedCosts: [], missingAa: [] };
-  assert.doesNotMatch(renderCatalogSync(report), /AA artifact changes to track|chezmoi status/);
-  const rendered = renderCatalogSync(report, { changes: [
-    { kind: "M", path: "manifest.json" }, { kind: "M", path: "canonical-mappings.json" },
-    { kind: "A", path: "models/new.json" }, { kind: "D", path: "models/old.json" },
+const emptySyncReport: any = { models: [], unresolvedCosts: [], missingAa: [] };
+
+test("catalog sync renders exact grouped AA commands with POSIX quoting and deterministic order", () => {
+  const rendered = renderCatalogSync(emptySyncReport, { changes: [
+    { kind: "M", path: "manifest.json", targetPath: "/synthetic root/manifest.json" },
+    { kind: "M", path: "/reviewed config/canonical-mappings.json", targetPath: "/reviewed config/canonical-mappings.json" },
+    { kind: "A", path: "models/new'copy.json", targetPath: "/synthetic root/models/new'copy.json" },
+    { kind: "D", path: "models/old snapshot.json", targetPath: "/synthetic root/models/old snapshot.json" },
   ], warnings: ["snapshot cleanup was incomplete after successful publication"] });
-  assert.match(rendered, /AA artifact changes to track \(relative to configured snapshot root\):\n  M manifest\.json\n  M canonical-mappings\.json\n  A models\/new\.json\n  D models\/old\.json\n  ! snapshot cleanup was incomplete after successful publication/);
-  assert.match(rendered, /Review with: chezmoi status/);
-  const warningsOnly = renderCatalogSync(report, { changes: [], warnings: ["AA artifact state capture was unavailable"] });
+  assert.match(rendered, /AA artifact changes to track:\n  M manifest\.json\n  M \/reviewed config\/canonical-mappings\.json\n  A models\/new'copy\.json\n  D models\/old snapshot\.json\n  ! snapshot cleanup was incomplete after successful publication/);
+  const commandBlock = [
+    "chezmoi add -- \\",
+    "  '/synthetic root/manifest.json' \\",
+    "  '/reviewed config/canonical-mappings.json' \\",
+    "  '/synthetic root/models/new'\"'\"'copy.json'",
+    "",
+    "chezmoi forget -- \\",
+    "  '/synthetic root/models/old snapshot.json'",
+    "",
+    "rm -f -- \\",
+    "  '/synthetic root/models/old snapshot.json'",
+    "",
+    "Review with: chezmoi status",
+  ].join("\n");
+  assert.equal(rendered.includes(commandBlock), true);
+});
+
+test("catalog sync omits grouped commands whose artifact category is empty", () => {
+  const additionsOnly = renderCatalogSync(emptySyncReport, { changes: [{ kind: "A", path: "models/new.json", targetPath: "/synthetic/models/new.json" }], warnings: [] });
+  assert.match(additionsOnly, /chezmoi add --/); assert.doesNotMatch(additionsOnly, /chezmoi forget --|rm -f --/);
+  const deletionsOnly = renderCatalogSync(emptySyncReport, { changes: [{ kind: "D", path: "models/old.json", targetPath: "/synthetic/models/old.json" }], warnings: [] });
+  assert.doesNotMatch(deletionsOnly, /chezmoi add --/); assert.match(deletionsOnly, /chezmoi forget --[\s\S]*rm -f --/);
+  assert.match(deletionsOnly, /rm -f -- \\\n  '\/synthetic\/models\/old\.json'\n\nReview with: chezmoi status/);
+});
+
+test("catalog sync reports warnings without commands when there are no captured changes", () => {
+  assert.doesNotMatch(renderCatalogSync(emptySyncReport), /AA artifact changes to track|chezmoi status|chezmoi add|chezmoi forget|rm -f/);
+  const warningsOnly = renderCatalogSync(emptySyncReport, { changes: [], warnings: ["AA artifact state capture was unavailable"] });
   assert.match(warningsOnly, /AA artifact tracking warnings:\n  ! AA artifact state capture was unavailable/);
-  assert.doesNotMatch(warningsOnly, /AA artifact changes to track|chezmoi status/);
+  assert.doesNotMatch(warningsOnly, /AA artifact changes to track|chezmoi status|chezmoi add|chezmoi forget|rm -f/);
+});
+
+test("catalog sync suppresses all exact commands when any target path is unsafe", () => {
+  const rendered = renderCatalogSync(emptySyncReport, { changes: [
+    { kind: "M", path: "manifest.json", targetPath: "/synthetic/manifest.json" },
+    { kind: "M", path: "[unsafe path omitted]", targetPath: "/synthetic/bad\npath.json" },
+  ], warnings: [] });
+  assert.match(rendered, /Exact artifact commands omitted because a target path is unsafe or non-absolute\./);
+  assert.doesNotMatch(rendered, /chezmoi add --|chezmoi forget --|rm -f --|bad\npath/);
+  assert.match(rendered, /Review with: chezmoi status/);
+
+  const nonabsolute = renderCatalogSync(emptySyncReport, { changes: [{ kind: "A", path: "models/new.json", targetPath: "relative/models/new.json" }], warnings: [] });
+  assert.match(nonabsolute, /Exact artifact commands omitted because a target path is unsafe or non-absolute\./);
+  assert.doesNotMatch(nonabsolute, /chezmoi add --|relative\/models\/new\.json/);
 });
 
 test("catalog publishes the full discovered chat inventory while retaining exact scope flags", async () => {

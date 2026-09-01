@@ -164,6 +164,22 @@ test("writer builds exact v4 scores, remains a semantic no-op, and uses owner-on
   now += 10_000; const second = await service.refresh("runtime/model", undefined, item.env); assert.equal(second.changed, false); assert.equal(await readFile(path.join(item.root, "manifest.json"), "utf8"), manifestBefore);
 });
 
+test("artifact capture records resolved roots and exact custom metadata targets", { concurrency: false }, async () => {
+  const item = await fixture();
+  const mappingsPath = path.join(item.directory, "reviewed mappings.json");
+  item.env.PI_AA_CANONICAL_MAPPINGS = mappingsPath;
+  const service = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() });
+  await service.add("runtime/model", ID1, null, undefined, item.env);
+  await secureWrite(mappingsPath, { version: 1, mappings: [{ provider: "runtime", model: "model", canonicalId: "runtime/model", thinkingLevel: null, aaModelId: ID1 }] });
+
+  const captured = await service.captureArtifactState(item.env);
+  assert.equal(captured.snapshotRoot, path.resolve(item.root));
+  assert.equal(captured.manifest?.path, "manifest.json");
+  assert.equal(captured.manifest?.targetPath, path.join(item.root, "manifest.json"));
+  assert.equal(captured.canonicalMappings?.path, mappingsPath);
+  assert.equal(captured.canonicalMappings?.targetPath, mappingsPath);
+});
+
 test("shared writes preserve an exact pinned disabled baseline but reject disabled mapping changes", { concurrency: false }, async () => {
   const item = await fixture();
   await secureWrite(item.env.PI_AA_SETTINGS_CONFIG!, { enabledModels: ["legacy/model"] });
@@ -365,7 +381,10 @@ test("interactive publications defer pruning and final cleanup reports only secu
   assert.deepEqual(cleanup.deleted, [`models/${old}`, `models/${orphan}`].sort()); assert.deepEqual(cleanup.warnings, ["snapshot cleanup skipped an unexpected file"]);
   assert.equal((await readdir(path.join(item.root, "models"))).includes(old), false);
   const after = await updated.captureArtifactState(item.env);
-  assert.equal(after.manifest?.path, "manifest.json"); assert.equal(after.generatedSnapshotFiles.length, 1);
+  assert.equal(after.snapshotRoot, path.resolve(item.root));
+  assert.equal(after.manifest?.path, "manifest.json");
+  assert.equal(after.manifest?.targetPath, path.join(item.root, "manifest.json"));
+  assert.equal(after.generatedSnapshotFiles.length, 1);
 });
 
 test("standalone final cleanup warns on deletion failure without changing the current manifest", { concurrency: false }, async () => {

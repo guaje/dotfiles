@@ -345,3 +345,39 @@ test("extension registers /stats and opens a stats custom view in tui mode witho
   assert.ok(component, "custom view component was created");
   assert.match(component.render(80).join("\n"), /No usage data available/);
 });
+
+test("recorded provider charges are retained over later catalog rates", async () => {
+  const mod = await loadExtension();
+  const cost = mod.calculateUsageCostBreakdown({ input: 100, output: 20, cost: { total: 7.5 } }, { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 });
+  assert.equal(cost.total, 7.5);
+});
+
+test("unknown catalog prices remove Pi's required zero-cost placeholder from totals", async () => {
+  const mod = await loadExtension();
+  const rates = new Map([["test-provider/unknown", { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }]]);
+  mod.mergeCatalogCostRates(rates, { providers: [{ models: [{ canonicalId: "test-provider/unknown" }] }] });
+  assert.equal(rates.has("test-provider/unknown"), false);
+  const summary = mod.extractStats([{ type: "message", message: { role: "assistant", provider: "test-provider", model: "unknown", usage: { input: 1_000_000, output: 1_000_000 } } }], rates);
+  assert.equal(summary.main[0]?.cost, 0);
+  assert.equal(summary.hasNotionalCost, false);
+  assert.deepEqual(summary.unpricedModels, ["test-provider/unknown"]);
+});
+
+test("native login observations provide resolved pricing without reading auth.json", async () => {
+  const mod = await loadExtension();
+  const rates = new Map<string, any>();
+  mod.mergeCatalogCostRates(rates, { providers: [], nativeModels: [{ id: "login-provider/native", cost: { input: 3, output: 9, cacheRead: 0.3, cacheWrite: 3.75 } }] });
+  assert.deepEqual(rates.get("login-provider/native"), { input: 3, output: 9, cacheRead: 0.3, cacheWrite: 3.75 });
+});
+
+test("historical bare ids resolve only when unique", async () => {
+  const mod = await loadExtension();
+  const rates = new Map([
+    ["test-one/shared", { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 }],
+    ["test-two/shared", { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 }],
+  ]);
+  const summary = mod.extractStats([{ type: "message", message: { role: "assistant", model: "shared", usage: { input: 100 } } }], rates);
+  assert.equal(summary.main[0]?.model, "shared");
+  assert.equal(summary.hasNotionalCost, false);
+  assert.deepEqual(summary.unpricedModels, ["shared"]);
+});

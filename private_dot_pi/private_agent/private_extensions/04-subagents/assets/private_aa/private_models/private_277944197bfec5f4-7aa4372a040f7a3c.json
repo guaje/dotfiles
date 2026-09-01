@@ -1,5 +1,5 @@
 {
-  "capturedAt": 1787977667516,
+  "capturedAt": 1788236514728,
   "coverage": 1,
   "mapping": {
     "matchBasis": "manual",
@@ -16,11 +16,11 @@
   "outputTokens": {},
   "provider": "openai-codex",
   "publicPage": {
-    "contentSha256": "5b8cfb71746952f863595360af7b7ed618965279a49e31fa267200a0306743d7",
+    "contentSha256": "8d9eae3dbea9ed432c8a68ca8c0f7ea203b2d2a973030399d6811c5a980878e2",
     "extractorVersion": "aa-current-model-rsc-v1",
     "intelligenceIndexMethodologyVersion": "4.1.1",
-    "recordSha256": "11a2e90b1e6114047f18c414bc7a5e1d37c207830e93e261fe52a78e16ae8d44",
-    "retrievedAt": 1787977666513,
+    "recordSha256": "8d35d5e5e7d7511c986446424fc0e2b87626e7ee2f45c8accdf58d0940ab9ae1",
+    "retrievedAt": 1788236513726,
     "url": "https://artificialanalysis.ai/models/gpt-5-6-terra-low"
   },
   "scores": {
@@ -51,9 +51,9 @@
         },
         "fieldPath": "gdpvalNormalized",
         "normalizedScore": 37.629999999999995,
-        "retrievedAt": 1787977666513,
+        "retrievedAt": 1788236513726,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "11a2e90b1e6114047f18c414bc7a5e1d37c207830e93e261fe52a78e16ae8d44",
+        "sourceRecordDigest": "8d35d5e5e7d7511c986446424fc0e2b87626e7ee2f45c8accdf58d0940ab9ae1",
         "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-terra-low"
       },
       "tau2Telecom": {
@@ -64,9 +64,9 @@
         },
         "fieldPath": "tau2",
         "normalizedScore": 60.52631578947369,
-        "retrievedAt": 1787977666513,
+        "retrievedAt": 1788236513726,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "11a2e90b1e6114047f18c414bc7a5e1d37c207830e93e261fe52a78e16ae8d44",
+        "sourceRecordDigest": "8d35d5e5e7d7511c986446424fc0e2b87626e7ee2f45c8accdf58d0940ab9ae1",
         "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-terra-low"
       },
       "tau3Banking": {
@@ -77,9 +77,9 @@
         },
         "fieldPath": "tauBanking",
         "normalizedScore": 18.7628865979381,
-        "retrievedAt": 1787977666513,
+        "retrievedAt": 1788236513726,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "11a2e90b1e6114047f18c414bc7a5e1d37c207830e93e261fe52a78e16ae8d44",
+        "sourceRecordDigest": "8d35d5e5e7d7511c986446424fc0e2b87626e7ee2f45c8accdf58d0940ab9ae1",
         "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-terra-low"
       }
     },

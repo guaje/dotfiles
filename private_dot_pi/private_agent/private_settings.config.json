@@ -5,6 +5,7 @@
   "enabledModels": [
     "openai-codex/gpt-5.6-sol",
     "openai-codex/gpt-5.6-terra",
+    "pi/glm-5.3-flash",
     "reallms/glm-5.2",
     "openai-codex/gpt-5.6-luna",
     "kelley/Kimi-K2.6",

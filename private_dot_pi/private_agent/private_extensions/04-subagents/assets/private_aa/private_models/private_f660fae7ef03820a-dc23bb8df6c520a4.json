@@ -1,5 +1,5 @@
 {
-  "capturedAt": 1787977659238,
+  "capturedAt": 1788236507601,
   "coverage": 1,
   "mapping": {
     "matchBasis": "manual",
@@ -16,11 +16,11 @@
   "outputTokens": {},
   "provider": "openai-codex",
   "publicPage": {
-    "contentSha256": "60e273be72213a8f9d8d9ecd1aa58f15b01a6fa19b46e12d908080352845a8c4",
+    "contentSha256": "1652e45ec48e359c3c7dc9f3a0d103babc5176fd654975d9ba57d3ac89d7994f",
     "extractorVersion": "aa-current-model-rsc-v1",
     "intelligenceIndexMethodologyVersion": "4.1.1",
-    "recordSha256": "fb07a713a51c44a7013ea86ed78be45124c0ad2f62f86def71887316390e14dc",
-    "retrievedAt": 1787977658236,
+    "recordSha256": "5af10deb015abe0fe4cae241ebafad242e2b4c4355f7f3a015a11cb6915271a5",
+    "retrievedAt": 1788236506597,
     "url": "https://artificialanalysis.ai/models/gpt-5-6-sol-low"
   },
   "scores": {
@@ -51,9 +51,9 @@
         },
         "fieldPath": "gdpvalNormalized",
         "normalizedScore": 47.043499999999995,
-        "retrievedAt": 1787977658236,
+        "retrievedAt": 1788236506597,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "fb07a713a51c44a7013ea86ed78be45124c0ad2f62f86def71887316390e14dc",
+        "sourceRecordDigest": "5af10deb015abe0fe4cae241ebafad242e2b4c4355f7f3a015a11cb6915271a5",
         "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol-low"
       },
       "tau2Telecom": {
@@ -64,9 +64,9 @@
         },
         "fieldPath": "tau2",
         "normalizedScore": 76.0233918128655,
-        "retrievedAt": 1787977658236,
+        "retrievedAt": 1788236506597,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "fb07a713a51c44a7013ea86ed78be45124c0ad2f62f86def71887316390e14dc",
+        "sourceRecordDigest": "5af10deb015abe0fe4cae241ebafad242e2b4c4355f7f3a015a11cb6915271a5",
         "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol-low"
       },
       "tau3Banking": {
@@ -77,9 +77,9 @@
         },
         "fieldPath": "tauBanking",
         "normalizedScore": 29.0721649484536,
-        "retrievedAt": 1787977658236,
+        "retrievedAt": 1788236506597,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "fb07a713a51c44a7013ea86ed78be45124c0ad2f62f86def71887316390e14dc",
+        "sourceRecordDigest": "5af10deb015abe0fe4cae241ebafad242e2b4c4355f7f3a015a11cb6915271a5",
         "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol-low"
       }
     },

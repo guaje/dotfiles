@@ -1,5 +1,5 @@
 {
-  "capturedAt": 1787977678811,
+  "capturedAt": 1788236524288,
   "coverage": 0.8888888888888888,
   "mapping": {
     "matchBasis": "manual",
@@ -16,11 +16,11 @@
   "outputTokens": {},
   "provider": "qwen",
   "publicPage": {
-    "contentSha256": "df7334f1d14ecb4e2bda96575e16fa1651ef7a9197e4a7e1bfd3667f38670866",
+    "contentSha256": "3b228ebdb31eeb89d4bb095b23ed9dc947a8322f57f2b452592e39489a08f25c",
     "extractorVersion": "aa-current-model-rsc-v1",
     "intelligenceIndexMethodologyVersion": "4.1.1",
-    "recordSha256": "972413a622df82bf055b7d5ecc73962af44b0519816e21fd72c5e060f6647834",
-    "retrievedAt": 1787977677807,
+    "recordSha256": "a41178f9b799e92bac393c3b76b75c2335f64e404aa99e2cce6c055973271e15",
+    "retrievedAt": 1788236523283,
     "url": "https://artificialanalysis.ai/models/qwen3-8-27b"
   },
   "scores": {
@@ -32,7 +32,7 @@
     "knowledge": 15.583333333333332,
     "longContext": 77.3333333333333,
     "scientificReasoning": 43.28463950150697,
-    "toolUse": 50.09486855670105
+    "toolUse": 49.37761855670105
   },
   "source": {
     "name": "Qwen3.8 27B (xhigh)",
@@ -50,10 +50,10 @@
           "version": "AA Intelligence Index v4.1.1"
         },
         "fieldPath": "gdpvalNormalized",
-        "normalizedScore": 52.1485,
-        "retrievedAt": 1787977677807,
+        "normalizedScore": 50.714000000000006,
+        "retrievedAt": 1788236523283,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "972413a622df82bf055b7d5ecc73962af44b0519816e21fd72c5e060f6647834",
+        "sourceRecordDigest": "a41178f9b799e92bac393c3b76b75c2335f64e404aa99e2cce6c055973271e15",
         "sourceUrl": "https://artificialanalysis.ai/models/qwen3-8-27b"
       },
       "tau2Telecom": null,
@@ -65,15 +65,15 @@
         },
         "fieldPath": "tauBanking",
         "normalizedScore": 48.041237113402104,
-        "retrievedAt": 1787977677807,
+        "retrievedAt": 1788236523283,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "972413a622df82bf055b7d5ecc73962af44b0519816e21fd72c5e060f6647834",
+        "sourceRecordDigest": "a41178f9b799e92bac393c3b76b75c2335f64e404aa99e2cce6c055973271e15",
         "sourceUrl": "https://artificialanalysis.ai/models/qwen3-8-27b"
       }
     },
     "derivation": {
       "rule": "tau3-banking+gdpval-aa",
-      "score": 50.09486855670105,
+      "score": 49.37761855670105,
       "version": "v1"
     }
   },

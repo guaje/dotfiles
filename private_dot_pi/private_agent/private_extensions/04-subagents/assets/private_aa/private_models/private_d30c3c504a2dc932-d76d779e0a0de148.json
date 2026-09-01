@@ -1,0 +1,81 @@
+{
+  "capturedAt": 1788236531474,
+  "coverage": 0.8888888888888888,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1788236531474,
+    "status": "mapped",
+    "thinkingLevel": "max"
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.1"
+  },
+  "model": "glm-5.3-flash",
+  "modelId": "19496b81-9f41-4214-a77a-1df803b3c5ae",
+  "outputTokens": {},
+  "provider": "z-ai",
+  "publicPage": {
+    "contentSha256": "5e69b85fe007b4cfa1c89c396b8be85e09918f8d380d258faf7902793ad9774f",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.1.1",
+    "recordSha256": "19ce9ce619689527afa3a4f25dee24898d2c6399a485b9ea2110481071d3d993",
+    "retrievedAt": 1788236530468,
+    "url": "https://artificialanalysis.ai/models/glm-5-3-flash"
+  },
+  "scores": {
+    "agentic": 58.2,
+    "coding": 71.5,
+    "faithfulness": 72.36781609195403,
+    "instructionFollowing": null,
+    "intelligence": 57.5,
+    "knowledge": 27.500000000000004,
+    "longContext": 78,
+    "scientificReasoning": 48.83080239706743,
+    "toolUse": 54.2327474226804
+  },
+  "source": {
+    "name": "GLM-5.3-Flash",
+    "openrouterApiId": null,
+    "slug": "glm-5-3-flash"
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": "max",
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 61.248999999999995,
+        "retrievedAt": 1788236530468,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "19ce9ce619689527afa3a4f25dee24898d2c6399a485b9ea2110481071d3d993",
+        "sourceUrl": "https://artificialanalysis.ai/models/glm-5-3-flash"
+      },
+      "tau2Telecom": null,
+      "tau3Banking": {
+        "benchmark": {
+          "id": "tau3-banking",
+          "status": "current",
+          "version": "AA Intelligence Index v4.1.1"
+        },
+        "fieldPath": "tauBanking",
+        "normalizedScore": 47.2164948453608,
+        "retrievedAt": 1788236530468,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "19ce9ce619689527afa3a4f25dee24898d2c6399a485b9ea2110481071d3d993",
+        "sourceUrl": "https://artificialanalysis.ai/models/glm-5-3-flash"
+      }
+    },
+    "derivation": {
+      "rule": "tau3-banking+gdpval-aa",
+      "score": 54.2327474226804,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

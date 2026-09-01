@@ -1,5 +1,5 @@
 {
-  "capturedAt": 1787977657379,
+  "capturedAt": 1788236506423,
   "coverage": 1,
   "mapping": {
     "matchBasis": "manual",
@@ -16,11 +16,11 @@
   "outputTokens": {},
   "provider": "openai-codex",
   "publicPage": {
-    "contentSha256": "63b4e458484fed0c76214ed18b1e7d5e5b07b07bc8c51c73afd6a9dae142cfbc",
+    "contentSha256": "9fd618d9a51222a7cf0c9385e94df821bb691b89d3162d32ef4cd3d769f391e7",
     "extractorVersion": "aa-current-model-rsc-v1",
     "intelligenceIndexMethodologyVersion": "4.1.1",
-    "recordSha256": "742b5575698231ac27e4841d62661944cfcd8bba1c2eb22c64cd5cadc758fc55",
-    "retrievedAt": 1787977656376,
+    "recordSha256": "d117ff2b5fbb7a0d8d40405c99e353f6e9c34af7125da1dc840b793c6d7f744e",
+    "retrievedAt": 1788236505417,
     "url": "https://artificialanalysis.ai/models/gpt-5-6-sol-high"
   },
   "scores": {
@@ -51,9 +51,9 @@
         },
         "fieldPath": "gdpvalNormalized",
         "normalizedScore": 55.801500000000004,
-        "retrievedAt": 1787977656376,
+        "retrievedAt": 1788236505417,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "742b5575698231ac27e4841d62661944cfcd8bba1c2eb22c64cd5cadc758fc55",
+        "sourceRecordDigest": "d117ff2b5fbb7a0d8d40405c99e353f6e9c34af7125da1dc840b793c6d7f744e",
         "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol-high"
       },
       "tau2Telecom": {
@@ -64,9 +64,9 @@
         },
         "fieldPath": "tau2",
         "normalizedScore": 83.3333333333333,
-        "retrievedAt": 1787977656376,
+        "retrievedAt": 1788236505417,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "742b5575698231ac27e4841d62661944cfcd8bba1c2eb22c64cd5cadc758fc55",
+        "sourceRecordDigest": "d117ff2b5fbb7a0d8d40405c99e353f6e9c34af7125da1dc840b793c6d7f744e",
         "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol-high"
       },
       "tau3Banking": {
@@ -77,9 +77,9 @@
         },
         "fieldPath": "tauBanking",
         "normalizedScore": 36.701030927835,
-        "retrievedAt": 1787977656376,
+        "retrievedAt": 1788236505417,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "742b5575698231ac27e4841d62661944cfcd8bba1c2eb22c64cd5cadc758fc55",
+        "sourceRecordDigest": "d117ff2b5fbb7a0d8d40405c99e353f6e9c34af7125da1dc840b793c6d7f744e",
         "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol-high"
       }
     },

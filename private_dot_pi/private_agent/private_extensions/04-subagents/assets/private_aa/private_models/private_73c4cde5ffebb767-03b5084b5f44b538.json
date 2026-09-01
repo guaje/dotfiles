@@ -1,5 +1,5 @@
 {
-  "capturedAt": 1787977685197,
+  "capturedAt": 1788236530268,
   "coverage": 1,
   "mapping": {
     "matchBasis": "manual",
@@ -16,11 +16,11 @@
   "outputTokens": {},
   "provider": "reallms-dev",
   "publicPage": {
-    "contentSha256": "c6319baad78adcb702563a215cf4a0621d5113cc0aa8c66edf1d954b79af96c9",
+    "contentSha256": "7f0fa9ddce163336c3c633d333dae85be0b5baa29d3e560138148e9e5a945e5f",
     "extractorVersion": "aa-current-model-rsc-v1",
     "intelligenceIndexMethodologyVersion": "4.1.1",
-    "recordSha256": "41d2bcdce39df7501f07538da21d6a34b9ce405ab32a9c1cf51f65d257d4b331",
-    "retrievedAt": 1787977684192,
+    "recordSha256": "9f3d73b86264ff09a769e9b871ee91c6bdf1d09c6d61a102c605551fceaf8afb",
+    "retrievedAt": 1788236529264,
     "url": "https://artificialanalysis.ai/models/kimi-k2-7-code"
   },
   "scores": {
@@ -51,9 +51,9 @@
         },
         "fieldPath": "gdpvalNormalized",
         "normalizedScore": 34.3285,
-        "retrievedAt": 1787977684192,
+        "retrievedAt": 1788236529264,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "41d2bcdce39df7501f07538da21d6a34b9ce405ab32a9c1cf51f65d257d4b331",
+        "sourceRecordDigest": "9f3d73b86264ff09a769e9b871ee91c6bdf1d09c6d61a102c605551fceaf8afb",
         "sourceUrl": "https://artificialanalysis.ai/models/kimi-k2-7-code"
       },
       "tau2Telecom": {
@@ -64,9 +64,9 @@
         },
         "fieldPath": "tau2",
         "normalizedScore": 90.0584795321637,
-        "retrievedAt": 1787977684192,
+        "retrievedAt": 1788236529264,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "41d2bcdce39df7501f07538da21d6a34b9ce405ab32a9c1cf51f65d257d4b331",
+        "sourceRecordDigest": "9f3d73b86264ff09a769e9b871ee91c6bdf1d09c6d61a102c605551fceaf8afb",
         "sourceUrl": "https://artificialanalysis.ai/models/kimi-k2-7-code"
       },
       "tau3Banking": {
@@ -77,9 +77,9 @@
         },
         "fieldPath": "tauBanking",
         "normalizedScore": 20.2061855670103,
-        "retrievedAt": 1787977684192,
+        "retrievedAt": 1788236529264,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "41d2bcdce39df7501f07538da21d6a34b9ce405ab32a9c1cf51f65d257d4b331",
+        "sourceRecordDigest": "9f3d73b86264ff09a769e9b871ee91c6bdf1d09c6d61a102c605551fceaf8afb",
         "sourceUrl": "https://artificialanalysis.ai/models/kimi-k2-7-code"
       }
     },

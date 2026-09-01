@@ -1,5 +1,5 @@
 {
-  "capturedAt": 1787977660424,
+  "capturedAt": 1788236508791,
   "coverage": 1,
   "mapping": {
     "matchBasis": "manual",
@@ -16,11 +16,11 @@
   "outputTokens": {},
   "provider": "openai-codex",
   "publicPage": {
-    "contentSha256": "19644f93ab9a392a8947c43d417448acbe7c5f222322cce0690081c7bfdc39a0",
+    "contentSha256": "5045141acbd494f14741f59d387784055a2e59ed8c5002fdb1dbf6bb4f471725",
     "extractorVersion": "aa-current-model-rsc-v1",
     "intelligenceIndexMethodologyVersion": "4.1.1",
-    "recordSha256": "f2560f20b3ff9f2bf5416612a93f8f061081ad75e7b624b59530cca7e404bfe2",
-    "retrievedAt": 1787977659420,
+    "recordSha256": "2e2eee81ca2e7aaf75f448588ac1ceae49eb7133ab19aa4c2836ff6d0fee5bc7",
+    "retrievedAt": 1788236507787,
     "url": "https://artificialanalysis.ai/models/gpt-5-6-sol"
   },
   "scores": {
@@ -51,9 +51,9 @@
         },
         "fieldPath": "gdpvalNormalized",
         "normalizedScore": 60.507,
-        "retrievedAt": 1787977659420,
+        "retrievedAt": 1788236507787,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "f2560f20b3ff9f2bf5416612a93f8f061081ad75e7b624b59530cca7e404bfe2",
+        "sourceRecordDigest": "2e2eee81ca2e7aaf75f448588ac1ceae49eb7133ab19aa4c2836ff6d0fee5bc7",
         "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol"
       },
       "tau2Telecom": {
@@ -64,9 +64,9 @@
         },
         "fieldPath": "tau2",
         "normalizedScore": 85.0877192982456,
-        "retrievedAt": 1787977659420,
+        "retrievedAt": 1788236507787,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "f2560f20b3ff9f2bf5416612a93f8f061081ad75e7b624b59530cca7e404bfe2",
+        "sourceRecordDigest": "2e2eee81ca2e7aaf75f448588ac1ceae49eb7133ab19aa4c2836ff6d0fee5bc7",
         "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol"
       },
       "tau3Banking": {
@@ -77,9 +77,9 @@
         },
         "fieldPath": "tauBanking",
         "normalizedScore": 44.3298969072165,
-        "retrievedAt": 1787977659420,
+        "retrievedAt": 1788236507787,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "f2560f20b3ff9f2bf5416612a93f8f061081ad75e7b624b59530cca7e404bfe2",
+        "sourceRecordDigest": "2e2eee81ca2e7aaf75f448588ac1ceae49eb7133ab19aa4c2836ff6d0fee5bc7",
         "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol"
       }
     },

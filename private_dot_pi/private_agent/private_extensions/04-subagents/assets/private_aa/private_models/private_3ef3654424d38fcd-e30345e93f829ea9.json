@@ -1,5 +1,5 @@
 {
-  "capturedAt": 1787977680007,
+  "capturedAt": 1788236525510,
   "coverage": 1,
   "mapping": {
     "matchBasis": "manual",
@@ -16,11 +16,11 @@
   "outputTokens": {},
   "provider": "reallms",
   "publicPage": {
-    "contentSha256": "c00d01129b15627fef3aa74e4b4c79a9120c4ebf8c8412ba6552a165a5aeb331",
+    "contentSha256": "263ca83fa89cddd188e289d2ab826767fda27888944382efa8f7ff40b028c636",
     "extractorVersion": "aa-current-model-rsc-v1",
     "intelligenceIndexMethodologyVersion": "4.1.1",
-    "recordSha256": "2a76bed11990449cd93fdea8629cb81df7dd4893706163274f6b5bc5c6de3868",
-    "retrievedAt": 1787977679002,
+    "recordSha256": "7879f576d1816a29a6f4df994030f78977a1a2a276607eb991b93547b00f24f3",
+    "retrievedAt": 1788236524507,
     "url": "https://artificialanalysis.ai/models/qwen3-coder-next"
   },
   "scores": {
@@ -51,9 +51,9 @@
         },
         "fieldPath": "gdpvalNormalized",
         "normalizedScore": 11.0615,
-        "retrievedAt": 1787977679002,
+        "retrievedAt": 1788236524507,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "2a76bed11990449cd93fdea8629cb81df7dd4893706163274f6b5bc5c6de3868",
+        "sourceRecordDigest": "7879f576d1816a29a6f4df994030f78977a1a2a276607eb991b93547b00f24f3",
         "sourceUrl": "https://artificialanalysis.ai/models/qwen3-coder-next"
       },
       "tau2Telecom": {
@@ -64,9 +64,9 @@
         },
         "fieldPath": "tau2",
         "normalizedScore": 79.5321637426901,
-        "retrievedAt": 1787977679002,
+        "retrievedAt": 1788236524507,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "2a76bed11990449cd93fdea8629cb81df7dd4893706163274f6b5bc5c6de3868",
+        "sourceRecordDigest": "7879f576d1816a29a6f4df994030f78977a1a2a276607eb991b93547b00f24f3",
         "sourceUrl": "https://artificialanalysis.ai/models/qwen3-coder-next"
       },
       "tau3Banking": {
@@ -77,9 +77,9 @@
         },
         "fieldPath": "tauBanking",
         "normalizedScore": 5.36082474226804,
-        "retrievedAt": 1787977679002,
+        "retrievedAt": 1788236524507,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "2a76bed11990449cd93fdea8629cb81df7dd4893706163274f6b5bc5c6de3868",
+        "sourceRecordDigest": "7879f576d1816a29a6f4df994030f78977a1a2a276607eb991b93547b00f24f3",
         "sourceUrl": "https://artificialanalysis.ai/models/qwen3-coder-next"
       }
     },

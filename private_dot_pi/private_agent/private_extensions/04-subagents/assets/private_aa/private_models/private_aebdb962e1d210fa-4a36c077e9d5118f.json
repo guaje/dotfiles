@@ -1,5 +1,5 @@
 {
-  "capturedAt": 1787977683587,
+  "capturedAt": 1788236529059,
   "coverage": 0.8888888888888888,
   "mapping": {
     "matchBasis": "manual",
@@ -16,11 +16,11 @@
   "outputTokens": {},
   "provider": "reallms-dev",
   "publicPage": {
-    "contentSha256": "be503e5624aed0ca1a40029cf5e6c4eea8618e0ca194f68848bb347c94dd9c7b",
+    "contentSha256": "0689d7f7b0e9afc3b89214c7f93e5468e9beae55112cced6705d4559dc9af827",
     "extractorVersion": "aa-current-model-rsc-v1",
     "intelligenceIndexMethodologyVersion": "4.1.1",
-    "recordSha256": "98ab0015ffef68568e186f2ffbc9aebac1a2ec229b925ad8c8a8b5aa8ecc8935",
-    "retrievedAt": 1787977682583,
+    "recordSha256": "cd70d70774b769d620f7d624fce287337ec9b4917b899b9a8d18d6dc069cc819",
+    "retrievedAt": 1788236528055,
     "url": "https://artificialanalysis.ai/models/deepseek-v4-flash"
   },
   "scores": {
@@ -51,9 +51,9 @@
         },
         "fieldPath": "gdpvalNormalized",
         "normalizedScore": 52.364,
-        "retrievedAt": 1787977682583,
+        "retrievedAt": 1788236528055,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "98ab0015ffef68568e186f2ffbc9aebac1a2ec229b925ad8c8a8b5aa8ecc8935",
+        "sourceRecordDigest": "cd70d70774b769d620f7d624fce287337ec9b4917b899b9a8d18d6dc069cc819",
         "sourceUrl": "https://artificialanalysis.ai/models/deepseek-v4-flash"
       },
       "tau2Telecom": null,
@@ -65,9 +65,9 @@
         },
         "fieldPath": "tauBanking",
         "normalizedScore": 39.381443298969096,
-        "retrievedAt": 1787977682583,
+        "retrievedAt": 1788236528055,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "98ab0015ffef68568e186f2ffbc9aebac1a2ec229b925ad8c8a8b5aa8ecc8935",
+        "sourceRecordDigest": "cd70d70774b769d620f7d624fce287337ec9b4917b899b9a8d18d6dc069cc819",
         "sourceUrl": "https://artificialanalysis.ai/models/deepseek-v4-flash"
       }
     },

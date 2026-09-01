@@ -1,5 +1,5 @@
 {
-  "capturedAt": 1787977671887,
+  "capturedAt": 1788236518319,
   "coverage": 0.8888888888888888,
   "mapping": {
     "matchBasis": "manual",
@@ -16,11 +16,11 @@
   "outputTokens": {},
   "provider": "openai-codex",
   "publicPage": {
-    "contentSha256": "5f61d2a7250b88dee156dc77b5946e227f8a35e23d9496c9b9452935c133fe49",
+    "contentSha256": "485a887839d2cc1282639be31a8f6e2d9784346e7f6ce8264a27180604211180",
     "extractorVersion": "aa-current-model-rsc-v1",
     "intelligenceIndexMethodologyVersion": "4.1.1",
-    "recordSha256": "e109dc0ae2c77cc446b4197ded657bebb8a75e9f9093e252ceb55c35fe1b6136",
-    "retrievedAt": 1787977670884,
+    "recordSha256": "5967e92e9961cff0a35cfddcaa0f90643e53520fe8f953f299bf89a02831f707",
+    "retrievedAt": 1788236517312,
     "url": "https://artificialanalysis.ai/models/gpt-5-6-terra-non-reasoning"
   },
   "scores": {
@@ -51,9 +51,9 @@
         },
         "fieldPath": "gdpvalNormalized",
         "normalizedScore": 37.18300000000001,
-        "retrievedAt": 1787977670884,
+        "retrievedAt": 1788236517312,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "e109dc0ae2c77cc446b4197ded657bebb8a75e9f9093e252ceb55c35fe1b6136",
+        "sourceRecordDigest": "5967e92e9961cff0a35cfddcaa0f90643e53520fe8f953f299bf89a02831f707",
         "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-terra-non-reasoning"
       },
       "tau2Telecom": null,
@@ -65,9 +65,9 @@
         },
         "fieldPath": "tauBanking",
         "normalizedScore": 15.6701030927835,
-        "retrievedAt": 1787977670884,
+        "retrievedAt": 1788236517312,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "e109dc0ae2c77cc446b4197ded657bebb8a75e9f9093e252ceb55c35fe1b6136",
+        "sourceRecordDigest": "5967e92e9961cff0a35cfddcaa0f90643e53520fe8f953f299bf89a02831f707",
         "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-terra-non-reasoning"
       }
     },

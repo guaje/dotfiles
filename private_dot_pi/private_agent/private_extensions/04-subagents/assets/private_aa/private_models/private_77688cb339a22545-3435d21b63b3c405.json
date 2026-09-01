@@ -1,5 +1,5 @@
 {
-  "capturedAt": 1787977663389,
+  "capturedAt": 1788236511178,
   "coverage": 0.8888888888888888,
   "mapping": {
     "matchBasis": "manual",
@@ -16,11 +16,11 @@
   "outputTokens": {},
   "provider": "openai-codex",
   "publicPage": {
-    "contentSha256": "3dcea58563b39bea7b2f8a9287825079834f3a9098141629e636c83573c43aaf",
+    "contentSha256": "176d6b5540af0def264b9be146d69f2356b1e986db1f34702bb2c3a346c60ec2",
     "extractorVersion": "aa-current-model-rsc-v1",
     "intelligenceIndexMethodologyVersion": "4.1.1",
-    "recordSha256": "02a6336977d0dc4867f10793cfc202b062ce03f7210d2270aecc9d765ebbd5ce",
-    "retrievedAt": 1787977662387,
+    "recordSha256": "16baf541d9bd4cdfbf79680441e616e249983113593c21f6f6a3d6a28617261b",
+    "retrievedAt": 1788236510173,
     "url": "https://artificialanalysis.ai/models/gpt-5-6-sol-non-reasoning"
   },
   "scores": {
@@ -51,9 +51,9 @@
         },
         "fieldPath": "gdpvalNormalized",
         "normalizedScore": 43.955999999999996,
-        "retrievedAt": 1787977662387,
+        "retrievedAt": 1788236510173,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "02a6336977d0dc4867f10793cfc202b062ce03f7210d2270aecc9d765ebbd5ce",
+        "sourceRecordDigest": "16baf541d9bd4cdfbf79680441e616e249983113593c21f6f6a3d6a28617261b",
         "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol-non-reasoning"
       },
       "tau2Telecom": null,
@@ -65,9 +65,9 @@
         },
         "fieldPath": "tauBanking",
         "normalizedScore": 19.5876288659794,
-        "retrievedAt": 1787977662387,
+        "retrievedAt": 1788236510173,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "02a6336977d0dc4867f10793cfc202b062ce03f7210d2270aecc9d765ebbd5ce",
+        "sourceRecordDigest": "16baf541d9bd4cdfbf79680441e616e249983113593c21f6f6a3d6a28617261b",
         "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol-non-reasoning"
       }
     },

@@ -1,5 +1,5 @@
 {
-  "capturedAt": 1787977647248,
+  "capturedAt": 1788236498168,
   "coverage": 1,
   "mapping": {
     "matchBasis": "manual",
@@ -16,11 +16,11 @@
   "outputTokens": {},
   "provider": "kelley",
   "publicPage": {
-    "contentSha256": "419cff8bbe34655d63627dea19061f0538e1ab043f649165a850c260159751d2",
+    "contentSha256": "17adc30bc75af996e467d6280e54e343695112bf511e686f1f020add7fa0d901",
     "extractorVersion": "aa-current-model-rsc-v1",
     "intelligenceIndexMethodologyVersion": "4.1.1",
-    "recordSha256": "002bab57342368cfe8e8371c3ad37b82d932c37430ac63e773ae2bd2bac68f69",
-    "retrievedAt": 1787977646243,
+    "recordSha256": "9e2527bd252a6ebe65f9cca353094efb1a85b6b96872e82da54347cb12428cfb",
+    "retrievedAt": 1788236497161,
     "url": "https://artificialanalysis.ai/models/kimi-k2-6"
   },
   "scores": {
@@ -51,9 +51,9 @@
         },
         "fieldPath": "gdpvalNormalized",
         "normalizedScore": 34.4505,
-        "retrievedAt": 1787977646243,
+        "retrievedAt": 1788236497161,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "002bab57342368cfe8e8371c3ad37b82d932c37430ac63e773ae2bd2bac68f69",
+        "sourceRecordDigest": "9e2527bd252a6ebe65f9cca353094efb1a85b6b96872e82da54347cb12428cfb",
         "sourceUrl": "https://artificialanalysis.ai/models/kimi-k2-6"
       },
       "tau2Telecom": {
@@ -64,9 +64,9 @@
         },
         "fieldPath": "tau2",
         "normalizedScore": 95.906432748538,
-        "retrievedAt": 1787977646243,
+        "retrievedAt": 1788236497161,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "002bab57342368cfe8e8371c3ad37b82d932c37430ac63e773ae2bd2bac68f69",
+        "sourceRecordDigest": "9e2527bd252a6ebe65f9cca353094efb1a85b6b96872e82da54347cb12428cfb",
         "sourceUrl": "https://artificialanalysis.ai/models/kimi-k2-6"
       },
       "tau3Banking": {
@@ -77,9 +77,9 @@
         },
         "fieldPath": "tauBanking",
         "normalizedScore": 23.298969072164898,
-        "retrievedAt": 1787977646243,
+        "retrievedAt": 1788236497161,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "002bab57342368cfe8e8371c3ad37b82d932c37430ac63e773ae2bd2bac68f69",
+        "sourceRecordDigest": "9e2527bd252a6ebe65f9cca353094efb1a85b6b96872e82da54347cb12428cfb",
         "sourceUrl": "https://artificialanalysis.ai/models/kimi-k2-6"
       }
     },

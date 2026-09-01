@@ -1,5 +1,5 @@
 {
-  "capturedAt": 1787977682404,
+  "capturedAt": 1788236527868,
   "coverage": 1,
   "mapping": {
     "matchBasis": "manual",
@@ -16,11 +16,11 @@
   "outputTokens": {},
   "provider": "reallms",
   "publicPage": {
-    "contentSha256": "6d12ae5d7c288f072ac25d9aa190095b245d1dac4f4dfaed0bcee34dd870b3a9",
+    "contentSha256": "e6d049d0bec78f192a785ac0f67066928814c3fb576159814fa60537f07b11eb",
     "extractorVersion": "aa-current-model-rsc-v1",
     "intelligenceIndexMethodologyVersion": "4.1.1",
-    "recordSha256": "0c2f525c7f96fef28b6d6ecf835177bf0fba99295d9653998338ad70a1653392",
-    "retrievedAt": 1787977681402,
+    "recordSha256": "9d705bc3ce50db8b8cad74687a2d92fcf9a57c72409cd3ac061e75d99688d241",
+    "retrievedAt": 1788236526865,
     "url": "https://artificialanalysis.ai/models/glm-5-2"
   },
   "scores": {
@@ -51,9 +51,9 @@
         },
         "fieldPath": "gdpvalNormalized",
         "normalizedScore": 49.8775,
-        "retrievedAt": 1787977681402,
+        "retrievedAt": 1788236526865,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "0c2f525c7f96fef28b6d6ecf835177bf0fba99295d9653998338ad70a1653392",
+        "sourceRecordDigest": "9d705bc3ce50db8b8cad74687a2d92fcf9a57c72409cd3ac061e75d99688d241",
         "sourceUrl": "https://artificialanalysis.ai/models/glm-5-2"
       },
       "tau2Telecom": {
@@ -64,9 +64,9 @@
         },
         "fieldPath": "tau2",
         "normalizedScore": 99.1228070175439,
-        "retrievedAt": 1787977681402,
+        "retrievedAt": 1788236526865,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "0c2f525c7f96fef28b6d6ecf835177bf0fba99295d9653998338ad70a1653392",
+        "sourceRecordDigest": "9d705bc3ce50db8b8cad74687a2d92fcf9a57c72409cd3ac061e75d99688d241",
         "sourceUrl": "https://artificialanalysis.ai/models/glm-5-2"
       },
       "tau3Banking": {
@@ -77,9 +77,9 @@
         },
         "fieldPath": "tauBanking",
         "normalizedScore": 34.639175257732,
-        "retrievedAt": 1787977681402,
+        "retrievedAt": 1788236526865,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "0c2f525c7f96fef28b6d6ecf835177bf0fba99295d9653998338ad70a1653392",
+        "sourceRecordDigest": "9d705bc3ce50db8b8cad74687a2d92fcf9a57c72409cd3ac061e75d99688d241",
         "sourceUrl": "https://artificialanalysis.ai/models/glm-5-2"
       }
     },

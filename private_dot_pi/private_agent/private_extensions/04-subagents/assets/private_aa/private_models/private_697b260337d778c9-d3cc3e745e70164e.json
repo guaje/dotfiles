@@ -1,5 +1,5 @@
 {
-  "capturedAt": 1787977668681,
+  "capturedAt": 1788236515900,
   "coverage": 1,
   "mapping": {
     "matchBasis": "manual",
@@ -16,11 +16,11 @@
   "outputTokens": {},
   "provider": "openai-codex",
   "publicPage": {
-    "contentSha256": "1b1e3249399e5ea88bb17b08745a5f26ae459085a61cbca3fb335109e174c2d5",
+    "contentSha256": "8e49e700f04497d6fe864601228139d328a0e9fb2a307d270976080429a51c5c",
     "extractorVersion": "aa-current-model-rsc-v1",
     "intelligenceIndexMethodologyVersion": "4.1.1",
-    "recordSha256": "cdf9585f7d5cdae65b7ca40dd6b65cdb60baa914dfa7db54ada989569bec215b",
-    "retrievedAt": 1787977667678,
+    "recordSha256": "486c981fc2e534416aae7c2ba86a7ec0628a07f23a945788e459d8f3d6be0cc4",
+    "retrievedAt": 1788236514895,
     "url": "https://artificialanalysis.ai/models/gpt-5-6-terra"
   },
   "scores": {
@@ -32,7 +32,7 @@
     "knowledge": 46.800000000000004,
     "longContext": 79.6666666666667,
     "scientificReasoning": 55.14511815716634,
-    "toolUse": 46.74359278350515
+    "toolUse": 45.79984278350514
   },
   "source": {
     "name": "GPT-5.6 Terra (max)",
@@ -50,10 +50,10 @@
           "version": "AA Intelligence Index v4.1.1"
         },
         "fieldPath": "gdpvalNormalized",
-        "normalizedScore": 53.28099999999999,
-        "retrievedAt": 1787977667678,
+        "normalizedScore": 51.39349999999999,
+        "retrievedAt": 1788236514895,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "cdf9585f7d5cdae65b7ca40dd6b65cdb60baa914dfa7db54ada989569bec215b",
+        "sourceRecordDigest": "486c981fc2e534416aae7c2ba86a7ec0628a07f23a945788e459d8f3d6be0cc4",
         "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-terra"
       },
       "tau2Telecom": {
@@ -64,9 +64,9 @@
         },
         "fieldPath": "tau2",
         "normalizedScore": 86.2573099415205,
-        "retrievedAt": 1787977667678,
+        "retrievedAt": 1788236514895,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "cdf9585f7d5cdae65b7ca40dd6b65cdb60baa914dfa7db54ada989569bec215b",
+        "sourceRecordDigest": "486c981fc2e534416aae7c2ba86a7ec0628a07f23a945788e459d8f3d6be0cc4",
         "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-terra"
       },
       "tau3Banking": {
@@ -77,15 +77,15 @@
         },
         "fieldPath": "tauBanking",
         "normalizedScore": 40.2061855670103,
-        "retrievedAt": 1787977667678,
+        "retrievedAt": 1788236514895,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "cdf9585f7d5cdae65b7ca40dd6b65cdb60baa914dfa7db54ada989569bec215b",
+        "sourceRecordDigest": "486c981fc2e534416aae7c2ba86a7ec0628a07f23a945788e459d8f3d6be0cc4",
         "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-terra"
       }
     },
     "derivation": {
       "rule": "tau3-banking+gdpval-aa",
-      "score": 46.74359278350515,
+      "score": 45.79984278350514,
       "version": "v1"
     }
   },

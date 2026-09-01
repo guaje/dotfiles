@@ -1,5 +1,5 @@
 {
-  "capturedAt": 1787977674659,
+  "capturedAt": 1788236520665,
   "coverage": 0.8888888888888888,
   "mapping": {
     "matchBasis": "manual",
@@ -16,11 +16,11 @@
   "outputTokens": {},
   "provider": "qwen",
   "publicPage": {
-    "contentSha256": "c074f16bfc93e4ccc6c08515a5953c7ade2738bf7a82dabe20b9d79f560f586d",
+    "contentSha256": "00d716d8c5c7d1639830059b10c5165a3a4ad67ffeeb15bca9b7ac75a3cdc6a7",
     "extractorVersion": "aa-current-model-rsc-v1",
     "intelligenceIndexMethodologyVersion": "4.1.1",
-    "recordSha256": "035bd98c5594b295bc8985f030f66a5f356a03c0ad7335a90573540d65b704ce",
-    "retrievedAt": 1787977673653,
+    "recordSha256": "7bd9fe44dcdaa9c5eb4aa319468013b8072136bdc5e76d4f5e1e184462682f3f",
+    "retrievedAt": 1788236519662,
     "url": "https://artificialanalysis.ai/models/qwen3-8-27b-low"
   },
   "scores": {
@@ -51,9 +51,9 @@
         },
         "fieldPath": "gdpvalNormalized",
         "normalizedScore": 49.418499999999995,
-        "retrievedAt": 1787977673653,
+        "retrievedAt": 1788236519662,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "035bd98c5594b295bc8985f030f66a5f356a03c0ad7335a90573540d65b704ce",
+        "sourceRecordDigest": "7bd9fe44dcdaa9c5eb4aa319468013b8072136bdc5e76d4f5e1e184462682f3f",
         "sourceUrl": "https://artificialanalysis.ai/models/qwen3-8-27b-low"
       },
       "tau2Telecom": null,
@@ -65,9 +65,9 @@
         },
         "fieldPath": "tauBanking",
         "normalizedScore": 32.1649484536082,
-        "retrievedAt": 1787977673653,
+        "retrievedAt": 1788236519662,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "035bd98c5594b295bc8985f030f66a5f356a03c0ad7335a90573540d65b704ce",
+        "sourceRecordDigest": "7bd9fe44dcdaa9c5eb4aa319468013b8072136bdc5e76d4f5e1e184462682f3f",
         "sourceUrl": "https://artificialanalysis.ai/models/qwen3-8-27b-low"
       }
     },

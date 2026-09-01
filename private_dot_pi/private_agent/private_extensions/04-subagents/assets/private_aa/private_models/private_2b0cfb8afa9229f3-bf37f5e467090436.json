@@ -1,5 +1,5 @@
 {
-  "capturedAt": 1787977648740,
+  "capturedAt": 1788236499349,
   "coverage": 0.8888888888888888,
   "mapping": {
     "matchBasis": "manual",
@@ -16,11 +16,11 @@
   "outputTokens": {},
   "provider": "openai-codex",
   "publicPage": {
-    "contentSha256": "337ba6b76adf882251ea4ebc7ae6bdd3bf94156245733b00bf692014f37fe59b",
+    "contentSha256": "e8581786891c67961f8a65735eb15f2d1438eddc9fd1f7b3c2a9ee51d58d7cf9",
     "extractorVersion": "aa-current-model-rsc-v1",
     "intelligenceIndexMethodologyVersion": "4.1.1",
-    "recordSha256": "f60b788490f3aaf83000f144e1394014495041a64cbd764b818d4c55cd88b632",
-    "retrievedAt": 1787977647734,
+    "recordSha256": "007b00990b1764aa7ce28273af03f3fa207a80308a821d33d8ab9b30b4e650e9",
+    "retrievedAt": 1788236498342,
     "url": "https://artificialanalysis.ai/models/gpt-5-6-luna-high"
   },
   "scores": {
@@ -51,9 +51,9 @@
         },
         "fieldPath": "gdpvalNormalized",
         "normalizedScore": 47.842,
-        "retrievedAt": 1787977647734,
+        "retrievedAt": 1788236498342,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "f60b788490f3aaf83000f144e1394014495041a64cbd764b818d4c55cd88b632",
+        "sourceRecordDigest": "007b00990b1764aa7ce28273af03f3fa207a80308a821d33d8ab9b30b4e650e9",
         "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-luna-high"
       },
       "tau2Telecom": null,
@@ -65,9 +65,9 @@
         },
         "fieldPath": "tauBanking",
         "normalizedScore": 25.1546391752577,
-        "retrievedAt": 1787977647734,
+        "retrievedAt": 1788236498342,
         "sourceKind": "public-page",
-        "sourceRecordDigest": "f60b788490f3aaf83000f144e1394014495041a64cbd764b818d4c55cd88b632",
+        "sourceRecordDigest": "007b00990b1764aa7ce28273af03f3fa207a80308a821d33d8ab9b30b4e650e9",
         "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-luna-high"
       }
     },

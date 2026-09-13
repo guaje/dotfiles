@@ -3,7 +3,7 @@
 # Nothing below TEST_FIXTURE is allowed to point at the caller's HOME/source.
 
 setup_secret_fixture() {
-    local script_dir repo key recipient fixture_parent
+    local script_dir repo key recipient fixture_parent configured_source
     script_dir=$(CDPATH='' cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
     repo=$(CDPATH='' cd "$script_dir/.." && pwd)
     REAL_HOME_SENTINEL=${HOME:-}
@@ -68,8 +68,14 @@ EOF
         printf '❌ hook launcher recursively invokes chezmoi and can deadlock\n' >&2
         return 1
     fi
-    test "$(chezmoi --config "$rendered_config" --source "$TEST_FIXTURE/source" \
-        --destination "$HOME" source-path)" = "$TEST_FIXTURE/source"
+    configured_source=$(chezmoi --config "$rendered_config" --source "$TEST_FIXTURE/source" \
+        --destination "$HOME" source-path)
+    configured_source=$(CDPATH='' cd -- "$configured_source" && pwd -P)
+    if [ "$configured_source" != "$TEST_FIXTURE_SOURCE" ]; then
+        printf '❌ fixture source mismatch: expected %s, got %s\n' \
+            "$TEST_FIXTURE_SOURCE" "$configured_source" >&2
+        return 1
+    fi
 }
 
 prospective_fixture_mapping() {

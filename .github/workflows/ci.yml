@@ -23,7 +23,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y zsh fish age curl jq shellcheck
+          sudo apt-get install -y zsh fish age curl jq
           mkdir -p "$HOME/.local/bin"
           # Install chezmoi
           sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
@@ -32,6 +32,11 @@ jobs:
           curl -LO "https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.amd64"
           mv "sops-v${SOPS_VERSION}.linux.amd64" "$HOME/.local/bin/sops"
           chmod +x "$HOME/.local/bin/sops"
+          # Ubuntu's package can lag behind the directives used by this repo.
+          SHELLCHECK_VERSION=0.10.0
+          curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
+            | tar -xJ -C /tmp
+          mv "/tmp/shellcheck-v${SHELLCHECK_VERSION}/shellcheck" "$HOME/.local/bin/shellcheck"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Setup environment and age key
@@ -63,18 +68,33 @@ jobs:
           sops --decrypt test_sops.enc.yaml | grep -q "test: value"
           test "$(chezmoi source-path)" = "$HOME/.local/share/chezmoi"
 
-      - name: Run Bash tests and ShellCheck
+      - name: Test secret add hook
         shell: bash
         run: |
-          # Ensure scripts are executable
-          chmod +x ./scripts/*.sh
-          # Run from the destination directory; the scripts look up the source via `chezmoi source-path`
           cd "$HOME"
           bash "$GITHUB_WORKSPACE/scripts/test_check-secrets.sh"
+
+      - name: Test removed-file update hook
+        shell: bash
+        run: |
+          cd "$HOME"
           bash "$GITHUB_WORKSPACE/scripts/test_check-removed-files.sh"
+
+      - name: Test secret rendering
+        shell: bash
+        run: |
+          cd "$HOME"
           bash "$GITHUB_WORKSPACE/scripts/test_apply-secrets.sh"
+
+      - name: Test reusable secret scanner
+        shell: bash
+        run: |
+          cd "$HOME"
           bash "$GITHUB_WORKSPACE/scripts/test_scan-secrets.sh"
-          shellcheck "$GITHUB_WORKSPACE"/scripts/*.sh
+
+      - name: Run ShellCheck
+        shell: bash
+        run: shellcheck "$GITHUB_WORKSPACE"/scripts/*.sh
 
   test-macos:
     runs-on: macos-latest
@@ -121,13 +141,30 @@ jobs:
           sops --decrypt test_sops.enc.yaml | grep -q "test: value"
           test "$(chezmoi source-path)" = "$HOME/.local/share/chezmoi"
 
-      - name: Run tests on macOS
+      - name: Test secret add hook on macOS
         shell: bash
         run: |
-          chmod +x ./scripts/*.sh
           cd "$HOME"
           "$BREW_BASH" "$GITHUB_WORKSPACE/scripts/test_check-secrets.sh"
+
+      - name: Test removed-file update hook on macOS
+        shell: bash
+        run: |
+          cd "$HOME"
           "$BREW_BASH" "$GITHUB_WORKSPACE/scripts/test_check-removed-files.sh"
+
+      - name: Test secret rendering on macOS
+        shell: bash
+        run: |
+          cd "$HOME"
           "$BREW_BASH" "$GITHUB_WORKSPACE/scripts/test_apply-secrets.sh"
+
+      - name: Test reusable secret scanner on macOS
+        shell: bash
+        run: |
+          cd "$HOME"
           "$BREW_BASH" "$GITHUB_WORKSPACE/scripts/test_scan-secrets.sh"
-          shellcheck "$GITHUB_WORKSPACE"/scripts/*.sh
+
+      - name: Run ShellCheck on macOS
+        shell: bash
+        run: shellcheck "$GITHUB_WORKSPACE"/scripts/*.sh

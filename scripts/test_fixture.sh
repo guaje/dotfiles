@@ -3,7 +3,7 @@
 # Nothing below TEST_FIXTURE is allowed to point at the caller's HOME/source.
 
 setup_secret_fixture() {
-    local script_dir repo key recipient
+    local script_dir repo key recipient fixture_parent
     script_dir=$(CDPATH='' cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
     repo=$(CDPATH='' cd "$script_dir/.." && pwd)
     REAL_HOME_SENTINEL=${HOME:-}
@@ -14,8 +14,10 @@ setup_secret_fixture() {
         REAL_HOME_SENTINEL_SUM=$(cksum "$REAL_HOME_SENTINEL_PATH")
     fi
     REAL_REPO_SENTINEL=$(cksum "$repo/scripts/check-secrets.sh" "$repo/scripts/check-secrets.awk" | cksum)
-    TEST_FIXTURE=$(mktemp -d "${TMPDIR:-/tmp}/chezmoi-secret-tests.XXXXXX")
+    fixture_parent=$(CDPATH='' cd -- "${TMPDIR:-/tmp}" && pwd -P)
+    TEST_FIXTURE=$(mktemp -d "$fixture_parent/chezmoi-secret-tests.XXXXXX")
     TEST_FIXTURE_ROOT=$TEST_FIXTURE
+    TEST_FIXTURE_PARENT=$fixture_parent
     mkdir -p "$TEST_FIXTURE/home" "$TEST_FIXTURE/config/chezmoi" "$TEST_FIXTURE/cache" "$TEST_FIXTURE/state"
     cp -a "$repo/." "$TEST_FIXTURE/source"
     mkdir -p "$TEST_FIXTURE/home/.local/share"
@@ -95,5 +97,5 @@ finish_secret_fixture() {
         [ "$(cksum "$REAL_HOME_SENTINEL_PATH")" = "$REAL_HOME_SENTINEL_SUM" ] || { printf '❌ real HOME sentinel changed\n' >&2; return 1; }
     fi
     [ "$HOME" = "$TEST_FIXTURE_ROOT/home" ] || { printf '❌ fixture HOME escaped\n' >&2; return 1; }
-    case $TEST_FIXTURE_ROOT in "${TMPDIR:-/tmp}"/chezmoi-secret-tests.*) rm -rf "$TEST_FIXTURE_ROOT" ;; *) printf '❌ refusing fixture cleanup outside validated root\n' >&2; return 1 ;; esac
+    case $TEST_FIXTURE_ROOT in "$TEST_FIXTURE_PARENT"/chezmoi-secret-tests.*) rm -rf "$TEST_FIXTURE_ROOT" ;; *) printf '❌ refusing fixture cleanup outside validated root\n' >&2; return 1 ;; esac
 }

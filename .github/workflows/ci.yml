@@ -145,7 +145,19 @@ jobs:
         shell: bash
         run: |
           cd "$HOME"
-          "$BREW_BASH" "$GITHUB_WORKSPACE/scripts/test_check-secrets.sh"
+          log="$RUNNER_TEMP/test-check-secrets.log"
+          set +e
+          "$BREW_BASH" -x "$GITHUB_WORKSPACE/scripts/test_check-secrets.sh" 2>&1 | tee "$log"
+          status=${PIPESTATUS[0]}
+          set -e
+          if (( status != 0 )); then
+            details=$(tail -n 40 "$log")
+            details=${details//'%'/'%25'}
+            details=${details//$'\r'/'%0D'}
+            details=${details//$'\n'/'%0A'}
+            printf '::error file=scripts/test_check-secrets.sh,title=macOS secret-hook test failed::%s\n' "$details"
+            exit "$status"
+          fi
 
       - name: Test removed-file update hook on macOS
         shell: bash

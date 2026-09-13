@@ -31,10 +31,16 @@ When you run `chezmoi add <file>`, the script triggers and provides several opti
 1. **📦 Full Encryption:** Encrypts the entire file using `chezmoi`'s built-in `age` support.
 2. **🛡️ SOPS Strategy (Recommended):**
    - Extracts only the sensitive key-value pairs.
-   - Saves them into a SOPS-encrypted YAML file in subdirectories within `secrets/` mirroring their relative `$HOME` path (e.g., `secrets/dot_config/app/settings.yaml.sops.yaml`).
-   - Converts the original file into a `chezmoi` template that retrieves values from the encrypted secrets at `chezmoi apply` time.
+   - Stores them in an encrypted file under `secrets/`, following the same path as the original file (for example, `secrets/dot_config/app/settings.yaml.sops.yaml`).
+   - Replaces the original file with a template that reads those secrets when `chezmoi apply` runs. Plaintext is never saved in the source directory, and an interrupted add can be retried safely.
 3. **📄 Plain:** Adds the file as-is (not recommended for secrets).
 4. **🛑 Abort:** Cancels the `add` operation.
+
+Options 1 and 2 safely finish the conversion and then stop the original `chezmoi add` command. Add sensitive files one at a time so each choice can be reviewed.
+
+The hook marks the templates it creates, so it will not overwrite templates maintained by hand. Normal value changes are updated automatically. If secret fields are added, removed, or renamed, the hook stops without changing anything and asks for a manual migration.
+
+For a manual migration, back up the existing template and encrypted SOPS file outside the source directory, move the old pair aside, and run `chezmoi add` again. Test the new result before deleting the backup, and restore the backup if anything fails. Never place a decrypted backup in the repository.
 
 #### 🚀 Usage
 
@@ -97,13 +103,30 @@ Use it in CI with tracked files:
 git ls-files | xargs ./scripts/scan-secrets.sh
 ```
 
-Run the dedicated scanner tests:
+Run the security-focused test suites:
 
 ```bash
-./scripts/test_scan-secrets.sh
+bash ./scripts/test_check-secrets.sh
+bash ./scripts/test_apply-secrets.sh
+bash ./scripts/test_scan-secrets.sh
+bash ./scripts/test_check-removed-files.sh
 ```
 
-These tests are also automatically executed via GitHub Actions on every push to the `scripts/` directory or the main configuration template, ensuring compatibility across `bash`, `zsh`, and `fish` shells.
+The tests use temporary directories and test-only secrets, so they do not touch the real source directory or reveal real values. CI runs the same Bash tests and ShellCheck on Linux and macOS.
+
+On macOS, install a current version of Bash and the required tools with Homebrew:
+
+```bash
+brew install bash chezmoi sops age jq
+```
+
+It is fine to launch `chezmoi` from zsh. The hooks themselves run with the Homebrew version of Bash found in `PATH`; macOS's built-in Bash 3.2 is too old.
+
+### 🗑️ Removed Files After Updates
+
+Before an update, `scripts/check-removed-files.sh` quickly records which source files belong to which destination files. After the update, it looks only at files deleted or renamed by Git. If an old destination may need to be removed, the hook asks about it individually—there is no “delete all” option.
+
+The hook never deletes directories and leaves a file alone if it was modified, is still managed, or cannot be checked safely. Dry runs and non-interactive updates do not delete anything. `jq` is required; if it or any needed information is unavailable, the hook reports the file instead of removing it.
 
 ### 🔧 Configuration
 

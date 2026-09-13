@@ -1,10 +1,11 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
-# Portable test script for check-secrets.sh apply verification.
-# Verifies that `chezmoi apply` correctly renders secrets using SOPS and templates.
-
-set -eu
-
+# Isolated apply-rendering integration test.
+set -euo pipefail
+SCRIPT_DIR=$(CDPATH='' cd "$(dirname "$0")" && pwd)
+# shellcheck disable=SC1091 # Sourced dynamically from the script directory.
+. "$SCRIPT_DIR/test_fixture.sh"
+setup_secret_fixture
 SOURCE_DIR=$(chezmoi source-path)
 TEST_ROOT="$HOME/.test"
 CONFIG_TEST_ROOT="$HOME/.config/test"
@@ -29,6 +30,7 @@ cleanup() {
     if [ -d "$SOURCE_DIR/secrets" ]; then
         find "$SOURCE_DIR/secrets" -depth -mindepth 1 -type d -empty -exec rmdir {} \; 2>/dev/null || true
     fi
+    finish_secret_fixture
 }
 
 fail() {

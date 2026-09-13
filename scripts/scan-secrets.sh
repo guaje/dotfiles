@@ -1,9 +1,9 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 # Reusable secret scanner for CI/pre-commit.
 # Uses the same awk detector as check-secrets.sh, but does not depend on chezmoi add hooks.
 
-set -eu
+set -euo pipefail
 
 SENSITIVE_PATTERNS='API_KEY
 PASSWORD
@@ -22,7 +22,7 @@ DSN
 CONNECTION_STRING
 COOKIE
 SESSION'
-SCRIPT_DIR=$(CDPATH= cd "$(dirname "$0")" && pwd)
+SCRIPT_DIR=$(CDPATH='' cd "$(dirname "$0")" && pwd)
 CHECK_SECRETS_AWK=$SCRIPT_DIR/check-secrets.awk
 QUIET=false
 USE_GIT_STAGED=false
@@ -48,20 +48,33 @@ EOF
 }
 
 collect_git_staged() {
-    git diff --cached --name-only --diff-filter=ACMR
+    git diff --cached --name-only --diff-filter=ACMR -z
 }
 
 json_escape() {
-    printf '%s' "$1" | awk '
-    BEGIN { ORS = "" }
-    {
-        gsub(/\\/, "\\\\")
-        gsub(/"/, "\\\"")
-        gsub(/\t/, "\\t")
-        gsub(/\r/, "\\r")
-        gsub(/\n/, "\\n")
-        printf "%s", $0
-    }'
+    local value=$1 char escaped='' code hex
+    local LC_ALL=C
+
+    while [ -n "$value" ]; do
+        char=${value%"${value#?}"}
+        value=${value#?}
+        case $char in
+            \\) escaped+=$'\\\\' ;;
+            '"') escaped+='\"' ;;
+            $'\b') escaped+='\b' ;;
+            $'\f') escaped+='\f' ;;
+            $'\n') escaped+='\n' ;;
+            $'\r') escaped+='\r' ;;
+            $'\t') escaped+='\t' ;;
+            [[:cntrl:]])
+                printf -v code '%d' "'$char"
+                printf -v hex '\u%04x' "$code"
+                escaped+=$hex
+                ;;
+            *) escaped+=$char ;;
+        esac
+    done
+    printf '%s' "$escaped"
 }
 
 append_json_finding() {
@@ -115,27 +128,48 @@ append_sarif_result() {
         "${line:-1}" >> "$RESULTS_TMP"
 }
 
+gha_property_escape() {
+    local value=$1
+    value=${value//'%'/'%25'}
+    value=${value//$'\r'/'%0D'}
+    value=${value//$'\n'/'%0A'}
+    value=${value//':'/'%3A'}
+    value=${value//','/'%2C'}
+    printf '%s' "$value"
+}
+
+gha_message_escape() {
+    local value=$1
+    value=${value//'%'/'%25'}
+    value=${value//$'\r'/'%0D'}
+    value=${value//$'\n'/'%0A'}
+    printf '%s' "$value"
+}
+
 emit_gha_annotation() {
-    file=$1
-    label=$2
-    line=$3
-    printf '::error file=%s,line=%s,title=%s::Potential secret detected (%s)\n' \
-        "$file" \
-        "${line:-1}" \
-        "$label" \
-        "$label"
+    local file=$1 label=$2 line=$3 message
+    message="Potential secret detected ($label)"
+    printf '::error file=%s,line=%s,title=%s::%s\n' \
+        "$(gha_property_escape "$file")" \
+        "$(gha_property_escape "${line:-1}")" \
+        "$(gha_property_escape "$label")" \
+        "$(gha_message_escape "$message")"
 }
 
 scan_file() {
     file=$1
+    local scan_path=$file
+    # Git paths are repository-relative and may begin with '-'. Prefix those
+    # before passing them to awk so they cannot be interpreted as options.
+    [[ $scan_path == -* ]] && scan_path=./$scan_path
 
-    if [ ! -f "$file" ]; then
+    if [ ! -f "$scan_path" ]; then
         return 0
     fi
 
     files_scanned=$((files_scanned + 1))
 
-    if result=$(SENSITIVE_PATTERNS="$SENSITIVE_PATTERNS" awk -v mode=detect -v output_format=tsv -f "$CHECK_SECRETS_AWK" "$file" 2>/dev/null); then
+    if result=$(SENSITIVE_PATTERNS="$SENSITIVE_PATTERNS" awk -v mode=detect -v output_format=tsv -f "$CHECK_SECRETS_AWK" "$scan_path" 2>/dev/null); then
         label=$(printf '%s\n' "$result" | awk -F '\t' 'NR==1 {print $1}')
         line=$(printf '%s\n' "$result" | awk -F '\t' 'NR==1 {print $2}')
         findings=$((findings + 1))
@@ -162,20 +196,18 @@ scan_file() {
     return 0
 }
 
-FILES_TMP=$(mktemp "${TMPDIR:-/tmp}/scan-secrets.files.XXXXXX") || exit 1
-RESULTS_TMP=$(mktemp "${TMPDIR:-/tmp}/scan-secrets.results.XXXXXX") || {
-    rm -f "$FILES_TMP"
-    exit 1
-}
+RESULTS_TMP=$(mktemp "${TMPDIR:-/tmp}/scan-secrets.results.XXXXXX") || exit 1
 RULES_TMP=$(mktemp "${TMPDIR:-/tmp}/scan-secrets.rules.XXXXXX") || {
-    rm -f "$FILES_TMP" "$RESULTS_TMP"
+    rm -f "$RESULTS_TMP"
     exit 1
 }
+# shellcheck disable=SC2329 # Invoked through the EXIT trap.
 cleanup() {
-    rm -f "$FILES_TMP" "$RESULTS_TMP" "$RULES_TMP"
+    rm -f "$RESULTS_TMP" "$RULES_TMP"
 }
 trap cleanup EXIT HUP INT TERM
 
+FILES=()
 while [ $# -gt 0 ]; do
     case $1 in
         --git-staged)
@@ -210,7 +242,7 @@ while [ $# -gt 0 ]; do
             exit 1
             ;;
         *)
-            printf '%s\n' "$1" >> "$FILES_TMP"
+            FILES+=("$1")
             ;;
     esac
     shift
@@ -227,15 +259,17 @@ case $FORMAT in
 esac
 
 while [ $# -gt 0 ]; do
-    printf '%s\n' "$1" >> "$FILES_TMP"
+    FILES+=("$1")
     shift
 done
 
 if [ "$USE_GIT_STAGED" = true ]; then
-    collect_git_staged >> "$FILES_TMP"
+    while IFS= read -r -d '' file; do
+        FILES+=("$file")
+    done < <(collect_git_staged)
 fi
 
-if [ ! -s "$FILES_TMP" ]; then
+if [ ${#FILES[@]} -eq 0 ]; then
     printf 'No files to scan\n' >&2
     usage >&2
     exit 1
@@ -249,12 +283,11 @@ sarif_rules_first=true
 sarif_results_first=true
 sarif_rules_seen=
 
-while IFS= read -r file; do
-    [ -n "$file" ] || continue
+for file in "${FILES[@]}"; do
     if ! scan_file "$file"; then
         found=1
     fi
-done < "$FILES_TMP"
+done
 
 case "$FORMAT" in
     json)
@@ -270,7 +303,7 @@ case "$FORMAT" in
         ;;
     sarif)
         printf '{\n'
-        printf '  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",\n'
+        printf '  "%s": "https://json.schemastore.org/sarif-2.1.0.json",\n' "\$schema"
         printf '  "version": "2.1.0",\n'
         printf '  "runs": [\n'
         printf '    {\n'

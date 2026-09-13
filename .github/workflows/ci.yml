@@ -10,22 +10,20 @@ on:
     paths:
       - 'scripts/**'
       - '.chezmoi.toml.tmpl'
+      - '.github/workflows/ci.yml'
+      - 'README.md'
   workflow_dispatch:
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        shell_name: [bash, zsh, fish]
     steps:
       - uses: actions/checkout@v5
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y zsh fish age curl
+          sudo apt-get install -y zsh fish age curl jq shellcheck
           mkdir -p "$HOME/.local/bin"
           # Install chezmoi
           sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
@@ -35,17 +33,6 @@ jobs:
           mv "sops-v${SOPS_VERSION}.linux.amd64" "$HOME/.local/bin/sops"
           chmod +x "$HOME/.local/bin/sops"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Smoke test selected shell
-        shell: bash
-        run: |
-          echo "Running matrix shell: ${{ matrix.shell_name }}"
-          command -v "${{ matrix.shell_name }}"
-          case "${{ matrix.shell_name }}" in
-            bash) bash -lc 'echo bash ready' ;;
-            zsh) zsh -lc 'echo zsh ready' ;;
-            fish) fish -c 'echo fish ready' ;;
-          esac
 
       - name: Setup environment and age key
         shell: bash
@@ -76,16 +63,71 @@ jobs:
           sops --decrypt test_sops.enc.yaml | grep -q "test: value"
           test "$(chezmoi source-path)" = "$HOME/.local/share/chezmoi"
 
-      - name: Run tests from selected shell
+      - name: Run Bash tests and ShellCheck
         shell: bash
         run: |
-          echo "Executing tests in ${matrix_shell} environment"
           # Ensure scripts are executable
           chmod +x ./scripts/*.sh
           # Run from the destination directory; the scripts look up the source via `chezmoi source-path`
           cd "$HOME"
-          sh "$GITHUB_WORKSPACE/scripts/test_check-secrets.sh"
-          sh "$GITHUB_WORKSPACE/scripts/test_apply-secrets.sh"
-          sh "$GITHUB_WORKSPACE/scripts/test_scan-secrets.sh"
-        env:
-          matrix_shell: ${{ matrix.shell_name }}
+          bash "$GITHUB_WORKSPACE/scripts/test_check-secrets.sh"
+          bash "$GITHUB_WORKSPACE/scripts/test_check-removed-files.sh"
+          bash "$GITHUB_WORKSPACE/scripts/test_apply-secrets.sh"
+          bash "$GITHUB_WORKSPACE/scripts/test_scan-secrets.sh"
+          shellcheck "$GITHUB_WORKSPACE"/scripts/*.sh
+
+  test-macos:
+    runs-on: macos-latest
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install macOS dependencies
+        shell: bash
+        run: |
+          brew install bash chezmoi sops age jq shellcheck
+          BREW_PREFIX=$(brew --prefix)
+          echo "$BREW_PREFIX/bin" >> "$GITHUB_PATH"
+          echo "BREW_BASH=$BREW_PREFIX/bin/bash" >> "$GITHUB_ENV"
+
+      - name: Verify modern Bash
+        shell: bash
+        run: |
+          "$BREW_BASH" --version
+          "$BREW_BASH" -c '(( BASH_VERSINFO[0] >= 4 ))'
+          test "$(command -v bash)" = "$BREW_BASH"
+
+      - name: Setup macOS environment and age key
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.config/chezmoi"
+          age-keygen -o "$HOME/.config/chezmoi/key.txt"
+          PUBKEY=$(grep "public key:" "$HOME/.config/chezmoi/key.txt" | cut -d: -f2 | xargs)
+          echo "CI_PUBKEY=$PUBKEY" >> "$GITHUB_ENV"
+
+      - name: Initialize chezmoi on macOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          chezmoi init --source .
+          mkdir -p "$HOME/.local/share"
+          rm -rf "$HOME/.local/share/chezmoi"
+          ln -s "$PWD" "$HOME/.local/share/chezmoi"
+          sed -i '' "s/recipient = \".*\"/recipient = \"$CI_PUBKEY\"/" "$HOME/.config/chezmoi/chezmoi.toml"
+          export SOPS_AGE_KEY_FILE="$HOME/.config/chezmoi/key.txt"
+          echo "test: value" > test_sops.yaml
+          sops --encrypt --age "$CI_PUBKEY" test_sops.yaml > test_sops.enc.yaml
+          sops --decrypt test_sops.enc.yaml | grep -q "test: value"
+          test "$(chezmoi source-path)" = "$HOME/.local/share/chezmoi"
+
+      - name: Run tests on macOS
+        shell: bash
+        run: |
+          chmod +x ./scripts/*.sh
+          cd "$HOME"
+          "$BREW_BASH" "$GITHUB_WORKSPACE/scripts/test_check-secrets.sh"
+          "$BREW_BASH" "$GITHUB_WORKSPACE/scripts/test_check-removed-files.sh"
+          "$BREW_BASH" "$GITHUB_WORKSPACE/scripts/test_apply-secrets.sh"
+          "$BREW_BASH" "$GITHUB_WORKSPACE/scripts/test_scan-secrets.sh"
+          shellcheck "$GITHUB_WORKSPACE"/scripts/*.sh

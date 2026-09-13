@@ -349,7 +349,7 @@ function scan_line(line, line_no,    rest, base, segment, key, value_part, first
                 preview_found = 1
                 if (!preview_printed[line_no]) {
                     preview_printed[line_no] = 1
-                    print line_no "\t" lines[line_no]
+                    print line_no "\t" normalize((strong_label != "" ? strong_label : key)) "\t[REDACTED]"
                 }
             } else {
                 add_occurrence(line_no, key, secret_value, replace_start, replace_len)
@@ -363,8 +363,38 @@ function scan_line(line, line_no,    rest, base, segment, key, value_part, first
     return 0
 }
 
-function template_ref(secret_name) {
-    return "{{ (index ((secret \"-d\" (joinPath .chezmoi.sourceDir \"secrets/" sops_file_name "\") | fromYaml).data | fromYaml) \"" secret_name "\") }}"
+# quote_template_string emits a complete Go-template double-quoted string.
+# The parser only accepts printable key characters, but sops_file_name is
+# supplied by the caller, so reject controls defensively before escaping.
+function quote_template_string(value,    i, ch, output) {
+    output = "\""
+    for (i = 1; i <= length(value); i++) {
+        ch = substr(value, i, 1)
+        if (ch ~ /[[:cntrl:]]/) {
+            return ""
+        }
+        if (ch == "\\") {
+            output = output "\\\\"
+        } else if (ch == "\"") {
+            output = output "\\\""
+        } else {
+            output = output ch
+        }
+    }
+    return output "\""
+}
+
+function template_ref(secret_name, path, key) {
+    path = quote_template_string("secrets/" sops_file_name)
+    key = quote_template_string(secret_name)
+    if (path == "" || key == "") {
+        template_error = 1
+        return ""
+    }
+    # Generated sidecars use SOPS' binary envelope so encryption verification
+    # can compare exact bytes. Decrypting the stable .yaml file therefore
+    # yields a data string containing the extracted YAML payload.
+    return "{{ (index ((secret \"-d\" (joinPath .chezmoi.sourceDir " path ") | fromYaml).data | fromYaml) " key ") }}"
 }
 
 function yaml_escape(value) {
@@ -404,7 +434,7 @@ BEGIN {
             preview_found = 1
             if (!preview_printed[line_count]) {
                 preview_printed[line_count] = 1
-                print line_count "\t" $0
+                print line_count "\t" normalize(strong_label) "\t[REDACTED]"
             }
         }
     }
@@ -445,9 +475,12 @@ END {
         } else {
             occurrence_secret_name[i] = key "__" key_seen[key]
         }
+        secret_name_totals[occurrence_secret_name[i]]++
+        if (secret_name_totals[occurrence_secret_name[i]] > 1) {
+            template_error = 1
+        }
     }
 
-    print "{{- /* chezmoi:template */ -}}" > template_file
     for (line_no = 1; line_no <= line_count; line_no++) {
         output = lines[line_no]
         for (i = occurrence_count; i >= 1; i--) {
@@ -456,10 +489,35 @@ END {
             }
             output = substr(output, 1, occurrence_start[i] - 1) template_ref(occurrence_secret_name[i]) substr(output, occurrence_start[i] + occurrence_len[i])
         }
-        print output >> template_file
+        generated_lines[line_no] = output
+    }
+
+    for (line_no = 1; line_no <= line_count; line_no++) {
+        if (has_strong_pattern(generated_lines[line_no])) {
+            template_error = 1
+        }
+    }
+    if (template_error) {
+        exit 3
+    }
+
+    print "{{- /* chezmoi:template */ -}}" > template_file
+    print "{{- /* check-secrets:generated:v1 */ -}}" >> template_file
+    for (line_no = 1; line_no <= line_count; line_no++) {
+        print generated_lines[line_no] >> template_file
     }
 
     for (i = 1; i <= occurrence_count; i++) {
-        print occurrence_secret_name[i] ": '" yaml_escape(occurrence_value[i]) "'" >> secrets_file
+        secret_name = occurrence_secret_name[i]
+        print secret_name ": '" yaml_escape(occurrence_value[i]) "'" >> secrets_file
+        if (ids_file != "") {
+            print secret_name >> ids_file
+        }
+        if (duplicate_bindings_file != "" && key_totals[occurrence_key[i]] > 1) {
+            line_no = occurrence_line[i]
+            print secret_name "\tPREV\t" (line_no > 1 ? generated_lines[line_no - 1] : "<BOF>") >> duplicate_bindings_file
+            print secret_name "\tHERE\t" generated_lines[line_no] >> duplicate_bindings_file
+            print secret_name "\tNEXT\t" (line_no < line_count ? generated_lines[line_no + 1] : "<EOF>") >> duplicate_bindings_file
+        }
     }
 }

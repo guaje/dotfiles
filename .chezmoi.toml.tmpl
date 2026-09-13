@@ -8,8 +8,16 @@ encryption = "age"
     args = ["-c", "export SOPS_AGE_KEY_FILE=$(eval echo \"$SOPS_AGE_KEY_FILE\"); exec sops \"$@\"", "--"]
 
 [env]
-    SOPS_AGE_KEY_FILE = "~/.config/chezmoi/key.txt"
+    SOPS_AGE_KEY_FILE = "{{ .chezmoi.homeDir }}/.config/chezmoi/key.txt"
 
 [hooks.add.pre]
     command = "bash"
-    args = ["-c", "exec \"$(chezmoi source-path)/scripts/check-secrets.sh\" \"$@\"", "--"]
+    args = ["-c", "exec \"$CHEZMOI_SOURCE_DIR/scripts/check-secrets.sh\" \"$@\"", "--"]
+
+[hooks.update.pre]
+    command = "bash"
+    args = ["-c", "exec \"$CHEZMOI_SOURCE_DIR/scripts/check-removed-files.sh\" pre \"$@\"", "--"]
+
+[hooks.update.post]
+    command = "bash"
+    args = ["-c", "exec \"$CHEZMOI_SOURCE_DIR/scripts/check-removed-files.sh\" post \"$@\"", "--"]

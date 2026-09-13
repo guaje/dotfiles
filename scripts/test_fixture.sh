@@ -19,7 +19,7 @@ setup_secret_fixture() {
     TEST_FIXTURE_ROOT=$TEST_FIXTURE
     TEST_FIXTURE_PARENT=$fixture_parent
     mkdir -p "$TEST_FIXTURE/home" "$TEST_FIXTURE/config/chezmoi" "$TEST_FIXTURE/cache" "$TEST_FIXTURE/state"
-    cp -a "$repo/." "$TEST_FIXTURE/source"
+    cp -R -p "$repo/." "$TEST_FIXTURE/source"
     mkdir -p "$TEST_FIXTURE/home/.local/share"
     ln -s "$TEST_FIXTURE/source" "$TEST_FIXTURE/home/.local/share/chezmoi"
     export HOME="$TEST_FIXTURE/home"
@@ -45,7 +45,7 @@ encryption = "age"
     SOPS_AGE_KEY_FILE = "$key"
 [hooks.add.pre]
     command = "bash"
-    args = ["-c", "exec \"\$(chezmoi source-path)/scripts/check-secrets.sh\" \"\$@\"", "--"]
+    args = ["-c", "exec \"\$CHEZMOI_SOURCE_DIR/scripts/check-secrets.sh\" \"\$@\"", "--"]
 EOF
     export SOPS_AGE_KEY_FILE="$key"
     export TEST_FIXTURE_SOURCE="$TEST_FIXTURE/source"
@@ -87,7 +87,7 @@ prospective_fixture_mapping() {
     oracle=$(mktemp -d "${TMPDIR:-/tmp}/chezmoi-oracle.XXXXXX")
     chmod 700 "$oracle"
     source="$oracle/source"; mkdir "$source"
-    cp -a "$(chezmoi source-path)/." "$source/"
+    cp -R -p "$(chezmoi source-path)/." "$source/"
     CHECK_SECRETS_BYPASS=1 chezmoi --config /dev/null --config-format toml --cache "$oracle/cache" --persistent-state "$oracle/state" --source "$source" --destination "$destination" add "$target" >/dev/null
     mapped=$(chezmoi --config /dev/null --config-format toml --cache "$oracle/cache" --persistent-state "$oracle/state" --source "$source" --destination "$destination" source-path "$target")
     relative=${mapped#"$source"/}

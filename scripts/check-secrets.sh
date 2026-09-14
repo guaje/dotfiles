@@ -266,7 +266,7 @@ prospective_source_path() {
     esac
     oracle_source=$ORACLE_ROOT/source
     mkdir "$oracle_source" || { cleanup_oracle_root; return 1; }
-    cp -a "$SOURCE_DIR/." "$oracle_source/" || { cleanup_oracle_root; return 1; }
+    cp -R -p "$SOURCE_DIR/." "$oracle_source/" || { cleanup_oracle_root; return 1; }
     # Preserve an existing source mapping (especially a .tmpl attribute).
     # Only add in the sacrificial copy when the target is genuinely unmanaged.
     oracle_path=$(chezmoi --config /dev/null --config-format toml --cache "$ORACLE_ROOT/cache" --persistent-state "$ORACLE_ROOT/state" --source "$oracle_source" --destination "$destination" source-path "$target" 2>/dev/null) || oracle_path=

@@ -79,12 +79,13 @@ EOF
 }
 
 prospective_fixture_mapping() {
-    local target=$1 destination=${2:-$HOME} oracle source mapped relative
+    local target=$1 destination=${2:-$HOME} oracle oracle_parent source mapped relative
     case $target in
         /*) ;;
         *) target=$destination/$target ;;
     esac
-    oracle=$(mktemp -d "${TMPDIR:-/tmp}/chezmoi-oracle.XXXXXX")
+    oracle_parent=$(CDPATH='' cd -- "${TMPDIR:-/tmp}" && pwd -P)
+    oracle=$(mktemp -d "$oracle_parent/chezmoi-oracle.XXXXXX")
     chmod 700 "$oracle"
     source="$oracle/source"; mkdir "$source"
     cp -R -p "$(chezmoi source-path)/." "$source/"

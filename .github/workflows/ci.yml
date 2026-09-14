@@ -166,7 +166,22 @@ jobs:
         shell: bash
         run: |
           cd "$HOME"
-          "$BREW_BASH" "$GITHUB_WORKSPACE/scripts/test_check-removed-files.sh"
+          log="$RUNNER_TEMP/test-check-removed-files.log"
+          set +e
+          "$BREW_BASH" -x "$GITHUB_WORKSPACE/scripts/test_check-removed-files.sh" 2>&1 | tee "$log"
+          status=${PIPESTATUS[0]}
+          set -e
+          if (( status != 0 )); then
+            details=$(grep -E '❌|failed|failure|error:|not found|illegal option|command not found' "$log" | tail -n 30 || true)
+            if [[ -z $details ]]; then
+              details=$(tail -n 40 "$log")
+            fi
+            details=${details//'%'/'%25'}
+            details=${details//$'\r'/'%0D'}
+            details=${details//$'\n'/'%0A'}
+            printf '::error file=scripts/test_check-removed-files.sh,title=macOS removed-file test failed::%s\n' "$details"
+            exit "$status"
+          fi
 
       - name: Test secret rendering on macOS
         shell: bash

@@ -84,7 +84,7 @@ for oracle in "$HOME/oracle-normal" "$HOME/.oracle-hidden" "$HOME/.config/oracle
     # macOS may report the physical source path while the fixture helper uses
     # the equivalent ~/.local/share/chezmoi symlink. Compare file identity so
     # this still detects an incorrect chezmoi source name.
-    [[ $expected -ef $actual ]] || { printf 'expected=%s actual=%s\n' "$expected" "$actual" >&2; fail "source-path was not prospective for $oracle"; }
+    [[ $expected -ef $actual ]] || fail "source-path was not prospective for $oracle (expected=$expected actual=$actual)"
 done
 rm -rf "$SOURCE_DIR"/*oracle* "$SOURCE_DIR"/dot_config/oracle "$HOME"/oracle-normal "$HOME"/.oracle-hidden "$HOME"/.config/oracle "$HOME"/oracle-executable "$HOME"/oracle-private
 pass "prospective source-path compatibility passed"

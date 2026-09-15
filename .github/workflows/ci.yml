@@ -172,8 +172,8 @@ jobs:
           status=${PIPESTATUS[0]}
           set -e
           if (( status != 0 )); then
-            details=$(grep -E 'check-removed-files:|❌' "$log" | tail -n 20 || true)
-            tail_lines=$(tail -n 25 "$log")
+            details=$(grep -E 'check-removed-files:|❌' "$log" | tail -n 12 || true)
+            tail_lines=$(tail -n 6 "$log" | cut -c1-300)
             details="${details}"$'\n'"${tail_lines}"
             details=${details//'%'/'%25'}
             details=${details//$'\r'/'%0D'}

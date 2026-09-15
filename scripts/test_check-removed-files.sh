@@ -7,6 +7,9 @@ set -euo pipefail
 SCRIPT_DIR=$(CDPATH='' cd "$(dirname "$0")" && pwd)
 HOOK="$SCRIPT_DIR/check-removed-files.sh"
 ROOT=$(mktemp -d "${TMPDIR:-/tmp}/check-removed-files-test.XXXXXX")
+# The hook canonicalizes the work tree via git; macOS reports /tmp as
+# /private/tmp, so tests must compare against the physical path too.
+ROOT=$(CDPATH='' cd -- "$ROOT" && pwd -P)
 
 cleanup() { rm -rf "$ROOT"; }
 trap cleanup EXIT HUP INT TERM

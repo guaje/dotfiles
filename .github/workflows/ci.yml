@@ -172,7 +172,7 @@ jobs:
           status=${PIPESTATUS[0]}
           set -e
           if (( status != 0 )); then
-            details=$(grep -E '❌|failed|failure|error:|not found|illegal option|command not found' "$log" | tail -n 30 || true)
+            details=$(grep -E 'check-removed-files:|❌' "$log" | tail -n 30 || true)
             if [[ -z $details ]]; then
               details=$(tail -n 40 "$log")
             fi

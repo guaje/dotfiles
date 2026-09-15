@@ -14,7 +14,14 @@ ROOT=$(CDPATH='' cd -- "$ROOT" && pwd -P)
 cleanup() { rm -rf "$ROOT"; }
 trap cleanup EXIT HUP INT TERM
 
-fail() { printf '❌ %s\n' "$*" >&2; exit 1; }
+fail() {
+    printf '❌ %s\n' "$*" >&2
+    if [[ -n ${CASE:-} && -f $CASE/session.txt ]]; then
+        printf '%s\n' '--- hook session output ---' >&2
+        tr -d '\r' < "$CASE/session.txt" >&2
+    fi
+    exit 1
+}
 pass() { printf '✅ %s\n' "$*"; }
 
 make_mock() {
@@ -79,21 +86,33 @@ run_hook() {
         "$HOOK" "$@"
 }
 
-# script(1) supplies a controlling terminal. Its stdin becomes the answer to
-# the hook's /dev/tty prompt.
+# script(1) supplies a controlling terminal; its stdin becomes the answer to
+# the hook's /dev/tty prompt. BSD script stops relaying and tears down the
+# session as soon as its stdin reaches EOF, so a feeder keeps stdin open until
+# the hook process exits.
 run_post_answer() {
     local answer=$1
+    local -a script_args
     if [[ $(uname -s) == Darwin ]]; then
-        printf '%b\n' "$answer" | env PATH="$CASE/bin:$PATH" MOCK_MAP="$MAP" MOCK_MANAGED="$MANAGED" MOCK_CALLS="$CALLS" \
-            CHEZMOI_SOURCE_DIR="$SRC" CHEZMOI_DEST_DIR="$DEST" \
-            CHEZMOI_WORKING_TREE="$SRC" CHEZMOI_CACHE_DIR="$CACHE" \
-            script -q /dev/null "$HOOK" post >/dev/null
+        # BSD script takes the command as positional arguments.
+        script_args=(-q "$CASE/session.txt" "$HOOK" post)
     else
-        printf '%b\n' "$answer" | env PATH="$CASE/bin:$PATH" MOCK_MAP="$MAP" MOCK_MANAGED="$MANAGED" MOCK_CALLS="$CALLS" \
-            CHEZMOI_SOURCE_DIR="$SRC" CHEZMOI_DEST_DIR="$DEST" \
-            CHEZMOI_WORKING_TREE="$SRC" CHEZMOI_CACHE_DIR="$CACHE" \
-            script -qec "'$HOOK' post" /dev/null >/dev/null
+        # util-linux script requires -c and does not take extra arguments.
+        script_args=(-qec "'$HOOK' post" "$CASE/session.txt")
     fi
+    # BSD script tears the session down when its stdin reaches EOF, so stdin is
+    # a FIFO held open by the caller until the hook has finished.
+    mkfifo "$CASE/answer-in"
+    env PATH="$CASE/bin:$PATH" MOCK_MAP="$MAP" MOCK_MANAGED="$MANAGED" MOCK_CALLS="$CALLS" \
+        CHEZMOI_SOURCE_DIR="$SRC" CHEZMOI_DEST_DIR="$DEST" \
+        CHEZMOI_WORKING_TREE="$SRC" CHEZMOI_CACHE_DIR="$CACHE" \
+        script "${script_args[@]}" < "$CASE/answer-in" >/dev/null &
+    local script_pid=$!
+    exec {ANSWER_FD}> "$CASE/answer-in"
+    printf '%b\n' "$answer" > "$CASE/answer-in" &
+    wait "$script_pid"
+    exec {ANSWER_FD}>&-
+    rm -f "$CASE/answer-in"
 }
 
 prepare_file() {

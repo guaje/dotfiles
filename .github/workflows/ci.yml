@@ -163,6 +163,7 @@ jobs:
           fi
 
       - name: Test removed-file update hook on macOS
+        timeout-minutes: 15
         shell: bash
         run: |
           cd "$HOME"

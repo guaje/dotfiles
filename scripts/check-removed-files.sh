@@ -217,6 +217,16 @@ is_confidently_unmanaged() {
 
 prompt_delete() {
     local target=$1 answer=${CHECK_REMOVED_FILES_CHOICE:-}
+    # Test-only answer queue: one answer per prompt, popped in order. When the
+    # queue is exhausted or unset, the interactive read below runs.
+    if [[ -z $answer && -n ${CHECK_REMOVED_FILES_ANSWERS:-} ]]; then
+        answer=${CHECK_REMOVED_FILES_ANSWERS%%$'\n'*}
+        if [[ $CHECK_REMOVED_FILES_ANSWERS == *$'\n'* ]]; then
+            CHECK_REMOVED_FILES_ANSWERS=${CHECK_REMOVED_FILES_ANSWERS#*$'\n'}
+        else
+            CHECK_REMOVED_FILES_ANSWERS=
+        fi
+    fi
     if [[ -z $answer ]]; then
         printf 'Delete unmanaged target %q? [y]es/[N]o/[s]kip all/[q]uit: ' "$target" >&4
         IFS= read -r answer <&3 || answer=q

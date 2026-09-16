@@ -93,25 +93,30 @@ run_hook() {
 run_post_answer() {
     local answer=$1
     if [[ $(uname -s) == Darwin ]]; then
-        # macOS script(1) rejects non-tty stdin, so drive the hook through
-        # expect(1), which allocates a pty and answers the /dev/tty prompt.
-        # The session log keeps hook decisions visible on failure.
+        # macOS script(1) rejects non-tty stdin, so expect(1) is used purely as
+        # a pty allocator. The answers themselves are preset through the hook's
+        # test-only queue so no input has to cross the pty: macOS script(1)
+        # cannot be fed from a pipe or FIFO. A watchdog kills a stuck hook so a
+        # failure surfaces with diagnostics instead of hanging the job.
         # shellcheck disable=SC2016 # Tcl references, not shell expansions.
-        POST_ANSWER="$answer" SESSION_FILE="$CASE/session.txt" \
+        if ! CHECK_REMOVED_FILES_ANSWERS="$(printf '%b' "$answer")" SESSION_FILE="$CASE/session.txt" \
             env PATH="$CASE/bin:$PATH" MOCK_MAP="$MAP" MOCK_MANAGED="$MANAGED" MOCK_CALLS="$CALLS" \
                 HOOK="$HOOK" \
                 CHEZMOI_SOURCE_DIR="$SRC" CHEZMOI_DEST_DIR="$DEST" \
                 CHEZMOI_WORKING_TREE="$SRC" CHEZMOI_CACHE_DIR="$CACHE" \
                 expect -c '
-                    set timeout 120
+                    set timeout 90
                     log_file $env(SESSION_FILE)
                     spawn $env(HOOK) post
-                    after 500
-                    send -- "$env(POST_ANSWER)\r"
-                    expect eof
+                    expect {
+                        eof {}
+                        timeout { exec kill -9 [exp_pid]; exit 124 }
+                    }
                     lassign [wait] _ _ _ status
                     exit $status
-                ' >/dev/null
+                ' >/dev/null; then
+            fail 'hook pty session failed or timed out'
+        fi
         return
     fi
     local -a script_args

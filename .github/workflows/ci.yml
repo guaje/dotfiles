@@ -142,18 +142,19 @@ jobs:
           test "$(chezmoi source-path)" = "$HOME/.local/share/chezmoi"
 
       - name: Test secret add hook on macOS
+        timeout-minutes: 15
         shell: bash
         run: |
           cd "$HOME"
           log="$RUNNER_TEMP/test-check-secrets.log"
           set +e
-          "$BREW_BASH" -x "$GITHUB_WORKSPACE/scripts/test_check-secrets.sh" 2>&1 | tee "$log"
+          "$BREW_BASH" "$GITHUB_WORKSPACE/scripts/test_check-secrets.sh" 2>&1 | tee "$log"
           status=${PIPESTATUS[0]}
           set -e
           if (( status != 0 )); then
-            details=$(grep -E '❌|failed|failure|error:|not found|illegal option|command not found' "$log" | tail -n 30 || true)
+            details=$(grep -E '❌' "$log" | tail -n 10 || true)
             if [[ -z $details ]]; then
-              details=$(tail -n 40 "$log")
+              details=$(tail -n 20 "$log" | cut -c1-300)
             fi
             details=${details//'%'/'%25'}
             details=${details//$'\r'/'%0D'}
@@ -169,13 +170,14 @@ jobs:
           cd "$HOME"
           log="$RUNNER_TEMP/test-check-removed-files.log"
           set +e
-          "$BREW_BASH" -x "$GITHUB_WORKSPACE/scripts/test_check-removed-files.sh" 2>&1 | tee "$log"
+          "$BREW_BASH" "$GITHUB_WORKSPACE/scripts/test_check-removed-files.sh" 2>&1 | tee "$log"
           status=${PIPESTATUS[0]}
           set -e
           if (( status != 0 )); then
             details=$(grep -E 'check-removed-files:|❌' "$log" | tail -n 12 || true)
-            tail_lines=$(tail -n 6 "$log" | cut -c1-300)
-            details="${details}"$'\n'"${tail_lines}"
+            if [[ -z $details ]]; then
+              details=$(tail -n 20 "$log" | cut -c1-300)
+            fi
             details=${details//'%'/'%25'}
             details=${details//$'\r'/'%0D'}
             details=${details//$'\n'/'%0A'}

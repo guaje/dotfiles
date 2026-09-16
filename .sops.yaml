@@ -1,0 +1,12 @@
+# SOPS creation rules for this checkout. scripts/check-secrets.sh always
+# passes its recipient explicitly, so these rules are a safety net for manual
+# sops usage: any ciphertext created under secrets/ is always encrypted with
+# this checkout's age key. The catch-all rule also keeps hook-internal
+# temporary payloads (which live outside secrets/) working when sops is
+# invoked from inside this checkout; without it sops fails with "no matching
+# creation rules found" for any path the rules above do not match.
+creation_rules:
+  - path_regex: '(^|/)secrets/.*\.sops\.yaml$'
+    age: age1ykg448l6aj2znrqc4y00uzjfzkx7v7gdpj7xjymnjsg7vh4mjd7sj4mney
+  - path_regex: '.*'
+    age: age1ykg448l6aj2znrqc4y00uzjfzkx7v7gdpj7xjymnjsg7vh4mjd7sj4mney

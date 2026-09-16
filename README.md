@@ -40,6 +40,12 @@ Options 1 and 2 safely finish the conversion and then stop the original `chezmoi
 
 The hook marks the templates it creates, so it will not overwrite templates maintained by hand. Normal value changes are updated automatically. If secret fields are added, removed, or renamed, the hook stops without changing anything and asks for a manual migration.
 
+#### 🔑 Age identity bootstrap and `.sops.yaml`
+
+The private age key (`key.txt`) never lives in the repository. On a fresh machine, `run_onchange_before_decrypt-private-key.sh.tmpl` restores it from the passphrase-protected `key.txt.age` backup: it decrypts into a hidden temporary file, verifies the identity's public key against the `recipient` configured in `chezmoi.toml`, and only then installs it atomically with `0600` permissions. An existing key is never overwritten; a key that contradicts the configured recipient fails the update with a message explaining how to re-bootstrap.
+
+The repository also carries a `.sops.yaml` with creation rules for `secrets/*.sops.yaml`. The `check-secrets.sh` hook always passes its recipient explicitly, so the rules are a safety net for manual `sops` usage: any ciphertext created under `secrets/` is always encrypted with this checkout's age key.
+
 For a manual migration, back up the existing template and encrypted SOPS file outside the source directory, move the old pair aside, and run `chezmoi add` again. Test the new result before deleting the backup, and restore the backup if anything fails. Never place a decrypted backup in the repository.
 
 #### 🚀 Usage

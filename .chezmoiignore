@@ -17,6 +17,9 @@
 # Ignore the age private key backup (if any)
 key.txt.age
 
+# .sops.yaml only configures sops inside the source checkout
+.sops.yaml
+
 # Ignore documentation
 README.md
 

@@ -1,7 +1,89 @@
 #!/bin/sh
+# Restore the age identity on a fresh machine by decrypting the
+# passphrase-protected backup stored in the source tree. Hardened bootstrap:
+# the identity is decrypted into a hidden temporary file in the same
+# directory, verified against the recipient configured for this checkout, and
+# only then installed atomically. An existing identity is never overwritten.
+# Verification reads the public key comment written by age-keygen, so the
+# backup must be an age-keygen output file.
 
-if [ ! -f "${HOME}/.config/chezmoi/key.txt" ]; then
-    mkdir -p "${HOME}/.config/chezmoi"
-    chezmoi age decrypt --output "${HOME}/.config/chezmoi/key.txt" --passphrase "{{ .chezmoi.sourceDir }}/key.txt.age"
-    chmod 600 "${HOME}/.config/chezmoi/key.txt"
+set -u
+
+CONFIG_DIR="${HOME}/.config/chezmoi"
+KEY_FILE="${CONFIG_DIR}/key.txt"
+CIPHERTEXT="{{ .chezmoi.sourceDir }}/key.txt.age"
+
+log_error() {
+    printf '%s\n' "decrypt-private-key: $*" >&2
+}
+
+# The configured recipient is the trust anchor for verification.
+expected_recipient() {
+    sed -n 's/^[[:space:]]*recipient[[:space:]]*=[[:space:]]*"\([^"]*\)".*$/\1/p' \
+        "${CONFIG_DIR}/chezmoi.toml" 2>/dev/null | head -n 1
+}
+
+# Print the public key recorded in an age identity file, or nothing when the
+# file does not carry an age-keygen public key comment.
+identity_recipient() {
+    awk '/^# public key:/ { sub(/^# public key:[[:space:]]*/, ""); print; exit }' "$1" 2>/dev/null
+}
+
+if [ ! -f "$CIPHERTEXT" ]; then
+    exit 0
+fi
+
+if [ ! -d "$CONFIG_DIR" ]; then
+    mkdir -p "$CONFIG_DIR" || exit 1
+fi
+umask 077
+chmod 700 "$CONFIG_DIR" 2>/dev/null || true
+
+EXPECTED=$(expected_recipient)
+
+# An existing identity is never replaced automatically. When its recorded
+# public key contradicts the configured recipient, fail closed: a mismatched
+# key would make every later decrypt fail confusingly. Remove the key file
+# manually to re-bootstrap.
+if [ -s "$KEY_FILE" ]; then
+    if [ -n "$EXPECTED" ]; then
+        ACTUAL=$(identity_recipient "$KEY_FILE")
+        if [ -n "$ACTUAL" ] && [ "$ACTUAL" != "$EXPECTED" ]; then
+            log_error 'existing age identity does not match the configured recipient; inspect it and remove the file to re-bootstrap.'
+            exit 1
+        fi
+    fi
+    exit 0
+fi
+
+# Decrypt into a hidden temporary file in the same directory so installation
+# is a same-filesystem atomic move and a failed decryption never leaves a
+# partial key behind that later runs would mistake for a working identity.
+TMP_KEY=$(mktemp "$CONFIG_DIR/.key.txt.XXXXXX") || exit 1
+trap 'rm -f "$TMP_KEY"' EXIT INT TERM HUP
+
+if ! chezmoi age decrypt --output "$TMP_KEY" --passphrase "$CIPHERTEXT" >/dev/null 2>&1; then
+    log_error 'unable to decrypt the age identity backup.'
+    exit 1
+fi
+
+ACTUAL=$(identity_recipient "$TMP_KEY")
+if [ -z "$ACTUAL" ]; then
+    log_error 'decrypted backup does not carry an age-keygen public key comment; refusing to install it.'
+    exit 1
+fi
+if [ -n "$EXPECTED" ] && [ "$ACTUAL" != "$EXPECTED" ]; then
+    log_error 'decrypted age identity does not match the configured recipient; refusing to install it.'
+    exit 1
+fi
+
+chmod 600 "$TMP_KEY"
+# No clobber: if a concurrent process installed an identity meanwhile, keep it.
+if mv -n "$TMP_KEY" "$KEY_FILE" && [ ! -e "$TMP_KEY" ]; then
+    TMP_KEY=
+    trap - EXIT INT TERM HUP
+    printf '%s\n' 'decrypt-private-key: restored the age identity from the encrypted backup.'
+else
+    log_error 'an age identity appeared concurrently; leaving it untouched.'
+    exit 1
 fi

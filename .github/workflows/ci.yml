@@ -80,6 +80,12 @@ jobs:
           cd "$HOME"
           bash "$GITHUB_WORKSPACE/scripts/test_check-removed-files.sh"
 
+      - name: Test bootstrap hook
+        shell: bash
+        run: |
+          cd "$HOME"
+          bash "$GITHUB_WORKSPACE/scripts/test_bootstrap.sh"
+
       - name: Test secret rendering
         shell: bash
         run: |
@@ -184,6 +190,12 @@ jobs:
             printf '::error file=scripts/test_check-removed-files.sh,title=macOS removed-file test failed::%s\n' "$details"
             exit "$status"
           fi
+
+      - name: Test bootstrap hook on macOS
+        shell: bash
+        run: |
+          cd "$HOME"
+          "$BREW_BASH" "$GITHUB_WORKSPACE/scripts/test_bootstrap.sh"
 
       - name: Test secret rendering on macOS
         shell: bash

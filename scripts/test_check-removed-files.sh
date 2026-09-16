@@ -92,16 +92,34 @@ run_hook() {
 # the hook process exits.
 run_post_answer() {
     local answer=$1
-    local -a script_args
     if [[ $(uname -s) == Darwin ]]; then
-        # BSD script takes the command as positional arguments.
-        script_args=(-q "$CASE/session.txt" "$HOOK" post)
-    else
-        # util-linux script requires -c and does not take extra arguments.
-        script_args=(-qec "'$HOOK' post" "$CASE/session.txt")
+        # macOS script(1) rejects non-tty stdin, so drive the hook through
+        # expect(1), which allocates a pty and answers the /dev/tty prompt.
+        # The session log keeps hook decisions visible on failure.
+        # shellcheck disable=SC2016 # Tcl references, not shell expansions.
+        POST_ANSWER="$answer" SESSION_FILE="$CASE/session.txt" \
+            env PATH="$CASE/bin:$PATH" MOCK_MAP="$MAP" MOCK_MANAGED="$MANAGED" MOCK_CALLS="$CALLS" \
+                HOOK="$HOOK" \
+                CHEZMOI_SOURCE_DIR="$SRC" CHEZMOI_DEST_DIR="$DEST" \
+                CHEZMOI_WORKING_TREE="$SRC" CHEZMOI_CACHE_DIR="$CACHE" \
+                expect -c '
+                    set timeout 120
+                    log_file $env(SESSION_FILE)
+                    spawn $env(HOOK) post
+                    after 500
+                    send -- "$env(POST_ANSWER)\r"
+                    expect eof
+                    lassign [wait] _ _ _ status
+                    exit $status
+                ' >/dev/null
+        return
     fi
-    # BSD script tears the session down when its stdin reaches EOF, so stdin is
-    # a FIFO held open by the caller until the hook has finished.
+    local -a script_args
+    # util-linux script requires -c and does not take extra arguments.
+    script_args=(-qec "'$HOOK' post" "$CASE/session.txt")
+    # script(1) supplies a controlling terminal; its stdin becomes the answer
+    # to the hook's /dev/tty prompt. A FIFO held open by the caller keeps the
+    # session alive until the hook finishes.
     mkfifo "$CASE/answer-in"
     env PATH="$CASE/bin:$PATH" MOCK_MAP="$MAP" MOCK_MANAGED="$MANAGED" MOCK_CALLS="$CALLS" \
         CHEZMOI_SOURCE_DIR="$SRC" CHEZMOI_DEST_DIR="$DEST" \

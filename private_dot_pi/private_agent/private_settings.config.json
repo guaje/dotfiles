@@ -1,5 +1,5 @@
 {
-  "defaultModel": "glm-5.6-flash",
+  "defaultModel": "glm-5.3-flash",
   "defaultProvider": "pi",
   "defaultThinkingLevel": "high",
   "enabledModels": [
@@ -10,7 +10,6 @@
     "reallms/glm-5.2",
     "openai-codex/gpt-5.6-luna",
     "kelley/Kimi-K2.6",
-    "reallms-dev/Kimi-K2.7-Code",
     "pi/qwen3.8-27b",
     "reallms-dev/Laguna-S-2.1-FP8",
     "reallms/gemma-4-31B-it",

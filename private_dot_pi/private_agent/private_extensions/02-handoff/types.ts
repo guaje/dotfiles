@@ -9,6 +9,8 @@ export interface HandoffState {
   sessionAuthority: SessionAuthority;
   toolRoute: ToolRoute;
   syncState: SyncState;
+  /** Set while offline: normalized failure reason from the last synchronization attempt. */
+  offlineReason?: string;
   target?: RemoteTarget;
   sessionId?: string;
   cachePath?: string;

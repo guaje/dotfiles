@@ -29,6 +29,13 @@ export function handoffStatus(state: HandoffState): string {
   return "⌂ tools→local • history local";
 }
 
+/** Diagnostics view for /ssh status; appends the last synchronization failure without cluttering the HUD. */
+export function handoffStatusDetail(state: HandoffState): string {
+  const base = handoffStatus(state);
+  if (state.syncState === "offline" && state.offlineReason) return `${base} — ${state.offlineReason}`;
+  return base;
+}
+
 export function handoffHudVariants(state: HandoffState): HudVariants {
   const full = handoffStatus(state);
   const icon = full.split(" ")[0] || "⌂";

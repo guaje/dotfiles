@@ -34,6 +34,23 @@ export interface SynchronizeDependencies {
   saveManifest?: typeof saveManifest;
 }
 
+const MAX_OFFLINE_REASON = 200;
+
+function describe(error: unknown): string {
+  if (error instanceof HandoffGateError) return error.response.error || "remote Handoff helper failed";
+  if (error instanceof Error) return error.message || error.name;
+  return String(error);
+}
+
+/** Bounded reason that always starts with its stage; long details keep their tail, preserving the actionable line of remote helper tracebacks (e.g. ENOSPC). */
+function offline(state: HandoffState, stage: string, detail?: string): HandoffState {
+  const tail = (detail ?? "").replace(/\s+/g, " ").trim();
+  if (!tail) return { ...state, syncState: "offline", offlineReason: stage };
+  const budget = MAX_OFFLINE_REASON - stage.length - 4;
+  const body = tail.length > budget ? (budget > 0 ? `…${tail.slice(-budget)}` : "…") : tail;
+  return { ...state, syncState: "offline", offlineReason: `${stage}: ${body}` };
+}
+
 /** Lock/CAS synchronization. Any transport ambiguity leaves the dirty cache untouched. */
 export async function synchronize(state: HandoffState, localSessionFile: string, dependencies: SynchronizeDependencies = {}): Promise<HandoffState> {
   if (!state.target || !state.sessionId) throw new Error("No remote session selected");
@@ -44,11 +61,18 @@ export async function synchronize(state: HandoffState, localSessionFile: string,
   } catch (error) {
     const response = error instanceof HandoffGateError ? error.response : undefined;
     const recoveryToken = response?.recoveryToken;
-    if (!response?.recoveryRequired || typeof recoveryToken !== "string" || !dependencies.confirmRecovery || !await dependencies.confirmRecovery(`Recover the expired lock for session ${state.sessionId}?`)) {
-      return { ...state, syncState: "offline" };
+    if (!response?.recoveryRequired || typeof recoveryToken !== "string") {
+      return offline(state, "lock acquisition failed", describe(error));
     }
-    await request(state.target, "recover-lock", [state.sessionId, "--token", recoveryToken]);
-    lock = await request(state.target, "acquire-lock", [state.sessionId, "--owner", process.env.USER || "pi"]);
+    if (!dependencies.confirmRecovery || !await dependencies.confirmRecovery(`Recover the expired lock for session ${state.sessionId}?`)) {
+      return offline(state, "stale lock recovery was declined");
+    }
+    try {
+      await request(state.target, "recover-lock", [state.sessionId, "--token", recoveryToken]);
+      lock = await request(state.target, "acquire-lock", [state.sessionId, "--owner", process.env.USER || "pi"]);
+    } catch (recoveryError) {
+      return offline(state, "lock recovery failed", describe(recoveryError));
+    }
   }
   try {
     const current = await request(state.target, "fetch-manifest", [state.sessionId]).catch(() => undefined);
@@ -58,12 +82,12 @@ export async function synchronize(state: HandoffState, localSessionFile: string,
     const committed: any = await request(state.target, "commit", [state.sessionId, "--nonce", lock.nonce, "--token", lock.token, "--generation", String(expected.generation), "--expected-hash", expected.hash ?? "", "--hash", digest], local);
     await (dependencies.saveSnapshot ?? saveSnapshot)(state.sessionId, local);
     await (dependencies.saveManifest ?? saveManifest)(state.sessionId, committed.manifest);
-    return { ...state, syncState: "clean", manifest: committed.manifest, lock: undefined };
-  } catch {
+    return { ...state, syncState: "clean", manifest: committed.manifest, lock: undefined, offlineReason: undefined };
+  } catch (error) {
     try {
       const latest: any = await request(state.target, "fetch-manifest", [state.sessionId]);
       return { ...state, syncState: "conflict", manifest: latest.manifest };
-    } catch { return { ...state, syncState: "offline" }; }
+    } catch { return offline(state, "commit failed", describe(error)); }
   } finally {
     if (lock?.nonce && lock?.token) await request(state.target, "release-lock", [state.sessionId, "--nonce", lock.nonce, "--token", lock.token]).catch(() => undefined);
   }

@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { discoverSshHosts, validateManualTarget } from "../ssh-config.ts";
-import { handoffHudVariants, handoffStatus } from "../status.ts";
+import { handoffHudVariants, handoffStatus, handoffStatusDetail } from "../status.ts";
 import { applyRemoteSessionAction, canRouteRemote, initialState, restoreState, toggleToolRoute } from "../state.ts";
 import { remotePath } from "../operations.ts";
 import { PathBoundaryError } from "../errors.ts";
@@ -48,4 +48,11 @@ test("HUD variants split the icon from muted detail and preserve the local label
   assert.equal(local.full.map((segment) => segment.text).join(""), "⌂ tools→local • history local");
   const offline = handoffHudVariants({ ...initialState(), syncState: "offline" });
   assert.equal(offline.full[0]?.tone, "error");
+});
+
+test("status detail appends the offline reason without changing the HUD text", () => {
+  const base = { ...initialState(), syncState: "offline" as const };
+  assert.equal(handoffStatusDetail(base), "⚠ remote offline • changes retained");
+  assert.equal(handoffStatus({ ...base, offlineReason: "commit failed: OSError: [Errno 28] No space left on device" }), "⚠ remote offline • changes retained");
+  assert.equal(handoffStatusDetail({ ...base, offlineReason: "commit failed: OSError: [Errno 28] No space left on device" }), "⚠ remote offline • changes retained — commit failed: OSError: [Errno 28] No space left on device");
 });

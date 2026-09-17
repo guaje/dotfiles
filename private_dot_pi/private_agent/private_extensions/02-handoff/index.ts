@@ -6,7 +6,7 @@ import { notifyRemoteRouteChanged, setRemoteBashBackend } from "./backend-regist
 import { createRemoteOperations } from "./operations.ts";
 import { discoverSshHosts, validateManualTarget } from "./ssh-config.ts";
 import { applyRemoteSessionAction, initialState, restoreState, toggleToolRoute } from "./state.ts";
-import { handoffHudVariants, handoffStatus } from "./status.ts";
+import { handoffHudVariants, handoffStatusDetail } from "./status.ts";
 import { registerHudItem, type HudItemHandle } from "../00-hud/api.ts";
 import { materializeSession } from "./session-materializer.ts";
 import { ensureRemoteHelper } from "./installer.ts";
@@ -19,6 +19,7 @@ import { authorizedRemoteOperations } from "./remote-authorization.ts";
 import { dispatchConnectedAction } from "./connection-actions.ts";
 
 function appendContext(pi: any, state: HandoffState) { pi.appendEntry?.({ type: "custom", customType: "handoff-context", data: { state } }); }
+function offlineNotice(reason?: string): string { return `Handoff sync failed: ${reason || "remote could not be reached"} • changes retained locally`; }
 function restored(branch: any[]): HandoffState { for (let i = branch.length - 1; i >= 0; i--) { const entry = branch[i]; if (entry?.type === "custom" && entry.customType === "handoff-context") return restoreState(entry.data?.state); } return initialState(); }
 
 export default async function handoff(pi: ExtensionAPI) {
@@ -67,7 +68,8 @@ export default async function handoff(pi: ExtensionAPI) {
       setState({ ...candidate, syncState: "syncing" });
       const materialized = await materializeSession(file, cacheRoot).catch(() => file);
       const synced = await synchronize(candidate, materialized, { confirmRecovery: (message) => ctx.ui.confirm("Recover stale Handoff lock?", message) });
-      setState(synced.syncState === "clean" ? synced : { ...state, syncState: synced.syncState });
+      setState(synced.syncState === "clean" ? synced : { ...state, syncState: synced.syncState, offlineReason: synced.offlineReason });
+      if (synced.syncState === "offline") ctx.ui?.notify?.(offlineNotice(synced.offlineReason), "error");
       return;
     }
     if (action === "resume") return resumeRemoteSession(ctx, selected);
@@ -76,9 +78,9 @@ export default async function handoff(pi: ExtensionAPI) {
   const command = async (args: string, ctx: any) => {
     activeCtx = ctx;
     const sub = args.trim();
-    if (sub === "status") return ctx.ui.notify(handoffStatus(state), "info");
+    if (sub === "status") return ctx.ui.notify(handoffStatusDetail(state), "info");
     if (sub === "disconnect") { setState(initialState()); return; }
-    if (sub === "sync") { if (state.connection !== "connected") return ctx.ui.notify("Not connected", "warning"); if (state.sessionAuthority !== "remote" || !state.sessionId || !ctx.sessionManager.getSessionFile?.()) return ctx.ui.notify("Tools are connected; no remote session to synchronize", "info"); setState({ ...state, syncState: "syncing" }); setState(await synchronize(state, ctx.sessionManager.getSessionFile(), { confirmRecovery: (message) => ctx.ui.confirm("Recover stale Handoff lock?", message) })); return; }
+    if (sub === "sync") { if (state.connection !== "connected") return ctx.ui.notify("Not connected", "warning"); if (state.sessionAuthority !== "remote" || !state.sessionId || !ctx.sessionManager.getSessionFile?.()) return ctx.ui.notify("Tools are connected; no remote session to synchronize", "info"); setState({ ...state, syncState: "syncing" }); const result = await synchronize(state, ctx.sessionManager.getSessionFile(), { confirmRecovery: (message) => ctx.ui.confirm("Recover stale Handoff lock?", message) }); setState(result); if (result.syncState === "offline") ctx.ui?.notify?.(offlineNotice(result.offlineReason), "error"); return; }
     if (sub === "toggle") { await ctx.waitForIdle?.(); setState(toggleToolRoute(state)); return; }
     if (await dispatchConnectedAction(sub, ctx, state, {
       resumeRemoteSession,

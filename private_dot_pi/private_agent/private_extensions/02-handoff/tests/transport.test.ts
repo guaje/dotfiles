@@ -72,3 +72,26 @@ test("sshGetConfig emits completed result when child exits 0", async () => {
   const result = await p;
   assert.equal(result.hostname, "w"); assert.equal(result.user, "me"); assert.equal(result.port, "2222");
 });
+test("requests to one host share a multiplexed connection over a bounded socket path", async () => {
+  const seen: string[][] = []; const child = new Child();
+  const spawn = ((_cmd: string, values: string[]) => { seen.push(values); queueMicrotask(() => child.emit("close", 0)); return child as any; }) as any;
+  await sshExec({ alias: "work", user: "me", spawn }, "pwd");
+  await sshExec({ alias: "work", user: "me", spawn }, "ls");
+  await sshExec({ alias: "other", user: "me", spawn }, "pwd");
+  for (const args of seen) {
+    assert.ok(args.includes("ControlMaster=auto"), args.join(" "));
+    assert.ok(args.includes("ControlPersist=45"), args.join(" "));
+    const control = args.find((entry) => entry.startsWith("ControlPath="))!;
+    // OpenSSH caps a control path at the sockaddr_un limit; over it, every connection would fail.
+    assert.ok(control.length <= 104, `control path is too long: ${control}`);
+  }
+  const socket = (args: string[]) => args.find((entry) => entry.startsWith("ControlPath="))!;
+  assert.equal(socket(seen[0]), socket(seen[1]), "the same host and user reuse the same master");
+  assert.notEqual(socket(seen[0]), socket(seen[2]), "another host gets its own master");
+});
+test("multiplexing is opt-out for isolated harnesses", async () => {
+  let args: string[] = []; const child = new Child();
+  await sshExec({ alias: "work", multiplex: false, spawn: ((_cmd: string, values: string[]) => { args = values; queueMicrotask(() => child.emit("close", 0)); return child as any; }) as any }, "pwd");
+  assert.ok(!args.some((entry) => entry.startsWith("-o") === false && entry.startsWith("Control")), args.join(" "));
+  assert.ok(!args.some((entry) => entry.includes("ControlPath")), args.join(" "));
+});

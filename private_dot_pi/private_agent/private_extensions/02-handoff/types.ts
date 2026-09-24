@@ -9,8 +9,8 @@ export interface HandoffState {
   sessionAuthority: SessionAuthority;
   toolRoute: ToolRoute;
   syncState: SyncState;
-  /** Set while offline: normalized failure reason from the last synchronization attempt. */
-  offlineReason?: string;
+  /** Set while offline or in conflict: bounded, actionable reason from the last synchronization attempt. */
+  syncReason?: string;
   target?: RemoteTarget;
   sessionId?: string;
   cachePath?: string;
@@ -20,3 +20,6 @@ export interface HandoffState {
 export interface HandoffContextEntry { type: "handoff-context"; state: HandoffState; }
 export interface SshHost { alias: string; source: string; }
 export interface TransportResult { stdout: Buffer; stderr: Buffer; code: number; }
+
+/** Transfer progress for the HUD: chunk counts while sending, bytes while reading. */
+export interface SyncProgress { phase: "upload" | "download"; unit: "chunk" | "byte"; done: number; total: number }

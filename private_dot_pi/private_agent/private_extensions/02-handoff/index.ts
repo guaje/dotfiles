@@ -1,6 +1,9 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createEditTool, createFindTool, createGrepTool, createLsTool, createReadTool, createWriteTool } from "@earendil-works/pi-coding-agent";
+import { readdir, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { cacheRoot } from "./config.ts";
+import { createChunkSizer, type ChunkSizer } from "./chunk-sizing.ts";
 import { getHandoffSettings, registerHandoffShortcut } from "./settings.ts";
 import { notifyRemoteRouteChanged, setRemoteBashBackend } from "./backend-registry.ts";
 import { createRemoteOperations } from "./operations.ts";
@@ -11,15 +14,19 @@ import { registerHudItem, type HudItemHandle } from "../00-hud/api.ts";
 import { materializeSession } from "./session-materializer.ts";
 import { ensureRemoteHelper } from "./installer.ts";
 import { shellLiteral, shellTest, sshExec, sshGetConfig } from "./transport.ts";
-import { requestGate, synchronize } from "./sync.ts";
-import type { HandoffState, RemoteTarget } from "./types.ts";
+import { requestGate, fetchSnapshot, remoteManifest, synchronize } from "./sync.ts";
+import { pullRemoteHistory, type PullIo } from "./pull.ts";
+import type { HandoffState, RemoteTarget, SyncProgress } from "./types.ts";
 import { selectLabeledOption as select } from "./ui.ts";
 import { chooseWorkspace } from "./choose-workspace.ts";
 import { authorizedRemoteOperations } from "./remote-authorization.ts";
 import { dispatchConnectedAction } from "./connection-actions.ts";
 
 function appendContext(pi: any, state: HandoffState) { pi.appendEntry?.({ type: "custom", customType: "handoff-context", data: { state } }); }
-function offlineNotice(reason?: string): string { return `Handoff sync failed: ${reason || "remote could not be reached"} • changes retained locally`; }
+function syncFailureNotice(syncState: string, reason?: string): string {
+  const lead = syncState === "conflict" ? "Handoff sync conflict" : "Handoff sync failed";
+  return `${lead}: ${reason || "remote could not be reached"} • changes retained locally`;
+}
 function restored(branch: any[]): HandoffState { for (let i = branch.length - 1; i >= 0; i--) { const entry = branch[i]; if (entry?.type === "custom" && entry.customType === "handoff-context") return restoreState(entry.data?.state); } return initialState(); }
 
 export default async function handoff(pi: ExtensionAPI) {
@@ -28,17 +35,147 @@ export default async function handoff(pi: ExtensionAPI) {
   const setState = (next: HandoffState, persist = true) => { state = next; notifyRemoteRouteChanged(); hud?.update({ variants: handoffHudVariants(state), visible: true }); if (persist) appendContext(pi, state); };
   const remote = () => state.target && state.connection === "connected" && state.toolRoute === "remote" ? createRemoteOperations({ alias: state.target.alias, user: state.target.user, port: state.target.port, workspace: state.target.workspace, localCwd: activeCtx?.cwd ?? process.cwd() }) : undefined;
   const chooseWorkspaceDeps = { sshExec, selectLabeledOption: select, shellLiteral, shellTest };
+  /** Measured link quality, kept per host under the Handoff cache; advisory only. */
+  let sizerPromise: Promise<ChunkSizer> | undefined;
+  const sizer = () => (sizerPromise ??= createChunkSizer());
+  /** Set while a push found unread remote turns: the relocation finishes the push in the replacement context. */
+  let pushAfterMerge = false;
+  /** HUD-scale progress; chunk counts while sending, bytes while reading. */
+  const reportProgress = (update: SyncProgress) => hud?.update({ variants: handoffHudVariants(state, update), visible: true });
   const resumeRemoteSession = async (ctx: any, target: RemoteTarget) => {
     try {
       const sessionsResult = await requestGate(target, "list-sessions") as { ok: boolean; sessions?: string[]; error?: string };
       if (sessionsResult.ok && sessionsResult.sessions && sessionsResult.sessions.length > 0) {
         const sessionChoice = await select(ctx, "Resume session", sessionsResult.sessions.map((sid) => ({ label: sid, value: sid })));
-        if (sessionChoice) setState(applyRemoteSessionAction({ ...state, connection: "connected", target }, "resume", sessionChoice));
+        if (sessionChoice) {
+          setState(applyRemoteSessionAction({ ...state, connection: "connected", target }, "resume", sessionChoice));
+          // A foreign lineage is now attached to this session: detect and offer before work continues.
+          await pull(ctx, { assumeWanted: false });
+        }
         // Cancellation is not consent to create a new remote session.
         return;
       }
     } catch { return ctx.ui?.notify?.("Could not list remote sessions", "warning"); }
     return ctx.ui?.notify?.("No remote sessions available to resume", "info");
+  };
+  /**
+   * Adapter from the extension's command context to the UI-free pull pipeline. Once the session has
+   * been relocated the pre-switch `ctx` and `pi` are stale, so anything the merge must persist travels
+   * inside the merged file and anything it must say goes through the replacement-session context.
+   */
+  const pullIo = (ctx: any): PullIo => {
+    const localFile = ctx.sessionManager.getSessionFile?.() as string | undefined;
+    const sessionDir = () => ctx.sessionManager.getSessionDir?.() ?? join(localFile ?? ".", "..");
+    let replacement: any;
+    // The snapshot's manifest is observed while downloading so the merged session can record the remote
+    // head it now contains; that record is what authorizes the next push.
+    let head: { generation: number; hash: string } | undefined;
+    let mergedTurns = 0;
+    return {
+      localSessionFile: localFile ?? "",
+      snapshot: async () => {
+        const measured = await sizer();
+        const started = Date.now();
+        const data = await fetchSnapshot(state.target!, state.sessionId!, requestGate, measured.pick(state.target!), { observe: (manifest) => { head = manifest; } });
+        measured.record(state.target!, { bytes: data.length, ms: Date.now() - started, ok: true });
+        return data;
+      },
+      headUnchanged: async () => {
+        const seen = state.manifest?.hash;
+        if (!seen) return false; // never synchronized from a recorded head: do the real comparison
+        return (await remoteManifest(state.target!, state.sessionId!))?.hash === seen;
+      },
+      localText: () => readFile(localFile as string, "utf8"),
+      findExisting: async (text) => {
+        for (const name of await readdir(sessionDir())) {
+          const candidate = join(sessionDir(), name);
+          if (!name.endsWith(".jsonl") || candidate === localFile) continue;
+          if (await readFile(candidate, "utf8").catch(() => "") === text) return candidate;
+        }
+        return null;
+      },
+      write: async (fileName, text) => {
+        const destination = join(sessionDir(), fileName);
+        await writeFile(destination, text, { flag: "wx", mode: 0o600 });
+        return destination;
+      },
+      // The merged session carries the remote turns, so it must be pushed back. This rides along as a
+      // session entry because the current context cannot write to the session after a relocation.
+      mergedContext: ({ imported, mergeBase }) => {
+        mergedTurns = imported;
+        return [
+        { type: "custom", customType: "handoff-context", data: { state: { ...state, syncState: "dirty", syncReason: undefined, ...(head ? { manifest: head } : {}) } } },
+        { type: "custom", customType: "handoff-merge", data: { remoteSessionId: state.sessionId, alias: state.target?.alias, imported, mergeBase } },
+        ];
+      },
+      // The merged file already ends on the chosen branch, so switching alone lands the session there.
+      switchTo: async (destination) => {
+        const result = await ctx.switchSession?.(destination, {
+          withSession: async (next: any) => {
+            replacement = next;
+            if (!pushAfterMerge) return;
+            pushAfterMerge = false;
+            // A push that met unread remote turns merges them in and finishes here, where the context is live.
+            const merged: HandoffState = { ...state, syncState: "syncing", syncReason: undefined, manifest: head ?? state.manifest };
+            const measured = await sizer();
+            const pushed = await synchronize(merged, destination, {
+              confirmRecovery: (message) => next.ui.confirm("Recover stale Handoff lock?", message),
+              pickChunkBytes: (target, negotiated) => measured.pick(target, negotiated),
+              onTransferSample: (sample) => measured.record(state.target!, sample),
+            });
+            const words = pushed.syncState === "clean"
+              ? `Handoff sync: merged ${mergedTurns} remote ${mergedTurns === 1 ? "turn" : "turns"} in as a branch and pushed the combined session to ${state.target?.alias}`
+              : syncFailureNotice(pushed.syncState, pushed.syncReason);
+            next.ui?.notify?.(words, pushed.syncState === "clean" ? "info" : "error");
+          },
+        });
+        return !result?.cancelled;
+      },
+      announce: (message, tone) => (replacement?.ui ?? ctx.ui)?.notify?.(message, tone ?? "info"),
+      ask: async (title, detail) => Boolean(ctx.ui?.confirm && await ctx.ui.confirm(title, detail)),
+      notify: (message, tone) => ctx.ui?.notify?.(message, tone ?? "info"),
+    };
+  };
+
+  /** Import the remote lineage beside this session's turns; all bookkeeping lives in the merged file. */
+  const pull = async (ctx: any, options: { assumeWanted?: boolean; announceClean?: boolean; prefix?: string; silentResult?: boolean } = {}) => {
+    const target = state.target;
+    if (state.connection !== "connected" || !target || !state.sessionId) { ctx.ui?.notify?.("Handoff pull needs a connected remote session", "warning"); return { outcome: "needs-connection" as const }; }
+    if (!ctx.sessionManager.getSessionFile?.()) { ctx.ui?.notify?.("This session is not saved to a file, so remote history cannot be merged into it", "warning"); return { outcome: "needs-file" as const }; }
+    return pullRemoteHistory(pullIo(ctx), { alias: target.alias, ...options });
+  };
+
+  /** True when a conflict result means the remote holds turns this session never read. */
+  const unreadRemoteTurns = (result: HandoffState) => result.syncState === "conflict" && (result.syncReason ?? "").startsWith("remote snapshot advanced");
+
+  /**
+   * Push a session file. When the remote has moved beyond what this session has read, the push first
+   * merges those turns in as a branch and finishes from the relocated session — never over them.
+   * Returns undefined once the session has been relocated: the caller's context is stale after that.
+   */
+  const push = async (ctx: any, current: HandoffState, file: string): Promise<HandoffState | undefined> => {
+    const measured = await sizer();
+    const result = await synchronize(current, file, {
+      confirmRecovery: (message) => ctx.ui.confirm("Recover stale Handoff lock?", message),
+      onProgress: reportProgress,
+      pickChunkBytes: (target, negotiated) => measured.pick(target, negotiated),
+      onTransferSample: (sample) => measured.record(state.target!, sample),
+      fetch: async (target, sessionId) => {
+        const started = Date.now();
+        const data = await fetchSnapshot(target, sessionId, requestGate, measured.pick(target));
+        measured.record(target, { bytes: data.length, ms: Date.now() - started, ok: true });
+        return data;
+      },
+    });
+    // Relocation is a command-context capability: the idle auto-sync reports and stops instead.
+    if (unreadRemoteTurns(result) && ctx.switchSession) {
+      pushAfterMerge = true;
+      const merged = await pull(ctx, { assumeWanted: true, prefix: "Handoff sync", silentResult: true });
+      // Only a relocation hands the push to the replacement context; a refused merge keeps the conflict.
+      if (merged.outcome === "imported" && merged.switched) return undefined;
+      pushAfterMerge = false;
+    }
+    return result;
   };
   const connect = async (ctx: any) => {
     const hosts = await discoverSshHosts(); const pick = await select(ctx, "SSH host", [...hosts.map((host) => ({ label: host.alias, value: host.alias })), { label: "Enter host…", value: "__manual__" }]);
@@ -67,9 +204,10 @@ export default async function handoff(pi: ExtensionAPI) {
       if (!file) return;
       setState({ ...candidate, syncState: "syncing" });
       const materialized = await materializeSession(file, cacheRoot).catch(() => file);
-      const synced = await synchronize(candidate, materialized, { confirmRecovery: (message) => ctx.ui.confirm("Recover stale Handoff lock?", message) });
-      setState(synced.syncState === "clean" ? synced : { ...state, syncState: synced.syncState, offlineReason: synced.offlineReason });
-      if (synced.syncState === "offline") ctx.ui?.notify?.(offlineNotice(synced.offlineReason), "error");
+      const synced = await push(ctx, candidate, materialized);
+      if (!synced) return; // merged into a new session file that is already pushed; this context is stale
+      setState(synced.syncState === "clean" ? synced : { ...state, syncState: synced.syncState, syncReason: synced.syncReason });
+      if (["offline", "conflict"].includes(synced.syncState)) ctx.ui?.notify?.(syncFailureNotice(synced.syncState, synced.syncReason), "error");
       return;
     }
     if (action === "resume") return resumeRemoteSession(ctx, selected);
@@ -78,9 +216,10 @@ export default async function handoff(pi: ExtensionAPI) {
   const command = async (args: string, ctx: any) => {
     activeCtx = ctx;
     const sub = args.trim();
+    if (sub === "pull") return pull(ctx, { assumeWanted: true, announceClean: true });
     if (sub === "status") return ctx.ui.notify(handoffStatusDetail(state), "info");
     if (sub === "disconnect") { setState(initialState()); return; }
-    if (sub === "sync") { if (state.connection !== "connected") return ctx.ui.notify("Not connected", "warning"); if (state.sessionAuthority !== "remote" || !state.sessionId || !ctx.sessionManager.getSessionFile?.()) return ctx.ui.notify("Tools are connected; no remote session to synchronize", "info"); setState({ ...state, syncState: "syncing" }); const result = await synchronize(state, ctx.sessionManager.getSessionFile(), { confirmRecovery: (message) => ctx.ui.confirm("Recover stale Handoff lock?", message) }); setState(result); if (result.syncState === "offline") ctx.ui?.notify?.(offlineNotice(result.offlineReason), "error"); return; }
+    if (sub === "sync") { if (state.connection !== "connected") return ctx.ui.notify("Not connected", "warning"); if (state.sessionAuthority !== "remote" || !state.sessionId || !ctx.sessionManager.getSessionFile?.()) return ctx.ui.notify("Tools are connected; no remote session to synchronize", "info"); setState({ ...state, syncState: "syncing" }); const result = await push(ctx, state, ctx.sessionManager.getSessionFile()); if (!result) return; setState(result); if (["offline", "conflict"].includes(result.syncState)) ctx.ui?.notify?.(syncFailureNotice(result.syncState, result.syncReason), "error"); return; }
     if (sub === "toggle") { await ctx.waitForIdle?.(); setState(toggleToolRoute(state)); return; }
     if (await dispatchConnectedAction(sub, ctx, state, {
       resumeRemoteSession,

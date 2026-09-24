@@ -30,8 +30,10 @@ class GateTests(unittest.TestCase):
     def test_version_and_locked_cas_commit(self):
         code, value = self.call("version")
         self.assertEqual(code, 0)
-        self.assertEqual(value["version"], 2)
+        self.assertEqual(value["version"], 3)
         self.assertEqual(value["checksum"], hashlib.sha256(HELPER.read_bytes()).hexdigest())
+        self.assertEqual(value["limits"]["protocol"], [2, 3])
+        self.assertGreater(value["limits"]["snapshotBytes"], value["limits"]["chunkBytes"])
         code, lock = self.call("acquire-lock", "session", "--owner", "test")
         self.assertEqual(code, 0)
         data = b'{"type":"session"}\n'
@@ -95,10 +97,111 @@ class GateTests(unittest.TestCase):
         code, value = self.stdio({"version": 2, "command": "version", "dataBase64": base64.b64encode(data).decode()})
         self.assertEqual(code, 0)
         self.assertTrue(value["ok"])
+        code, modern = self.stdio({"version": 3, "command": "version"})
+        self.assertEqual(code, 0)
+        self.assertEqual(modern["limits"]["chunkBytes"], 2 * 1024 * 1024)
         for request in vectors["invalidRequests"]:
             code, value = self.stdio(request)
             self.assertEqual(code, 2)
             self.assertFalse(value["ok"])
+
+    def lock_args(self, session):
+        code, lock = self.call("acquire-lock", session, "--owner", "test")
+        self.assertEqual(code, 0)
+        return ["--nonce", lock["nonce"], "--token", lock["token"]]
+
+    def stage(self, session, args, data, chunk_bytes):
+        digest = hashlib.sha256(data).hexdigest()
+        code, begun = self.call("begin-upload", session, *args, "--total-bytes", str(len(data)), "--chunk-bytes", str(chunk_bytes), "--sha256", digest)
+        self.assertEqual(code, 0, begun)
+        upload = begun["upload"]["id"]
+        for index in range(0, max(1, -(-len(data) // chunk_bytes))):
+            chunk = data[index * chunk_bytes:(index + 1) * chunk_bytes]
+            code, stored = self.call("put-chunk", session, *args, "--upload", upload, "--index", str(index), "--sha256", hashlib.sha256(chunk).hexdigest(), data=chunk)
+            self.assertEqual(code, 0, stored)
+        return upload, digest
+
+    def test_chunked_upload_promotes_one_atomic_snapshot(self):
+        args = self.lock_args("big")
+        data = b'{"type":"session"}\n{"type":"message"}\n'
+        upload, digest = self.stage("big", args, data, 8)
+        code, staged = self.call("fetch-manifest", "big")
+        self.assertEqual(code, 2)
+        self.assertFalse(staged.get("ok"))
+        code, done = self.call("finish-upload", "big", *args, "--upload", upload, "--generation", "0", "--hash", digest)
+        self.assertEqual(code, 0, done)
+        self.assertEqual(done["manifest"]["generation"], 1)
+        code, fetched = self.call("fetch-manifest", "big")
+        self.assertEqual(fetched["jsonl"], data.decode())
+        self.assertFalse((Path(self.root.name) / "sessions" / "big" / "incoming" / upload).exists())
+
+    def test_partial_upload_cannot_be_committed(self):
+        args = self.lock_args("partial")
+        digest = hashlib.sha256(b"0123456789").hexdigest()
+        code, begun = self.call("begin-upload", "partial", *args, "--total-bytes", "10", "--chunk-bytes", "4", "--sha256", digest)
+        upload = begun["upload"]["id"]
+        self.call("put-chunk", "partial", *args, "--upload", upload, "--index", "0", "--sha256", hashlib.sha256(b"0123").hexdigest(), data=b"0123")
+        code, early = self.call("finish-upload", "partial", *args, "--upload", upload, "--generation", "0", "--hash", digest)
+        self.assertEqual(code, 2)
+        self.assertIn("assembled", early["error"])
+        code, manifest = self.call("fetch-manifest", "partial")
+        self.assertEqual(code, 2)
+
+    def test_chunk_hash_mismatch_and_ordering_are_rejected(self):
+        args = self.lock_args("chunks")
+        digest = hashlib.sha256(b"0123456789").hexdigest()
+        code, begun = self.call("begin-upload", "chunks", *args, "--total-bytes", "10", "--chunk-bytes", "4", "--sha256", digest)
+        upload = begun["upload"]["id"]
+        code, skipped = self.call("put-chunk", "chunks", *args, "--upload", upload, "--index", "1", "--sha256", hashlib.sha256(b"4567").hexdigest(), data=b"4567")
+        self.assertEqual(code, 2)
+        self.assertIn("out of order", skipped["error"])
+        code, bad = self.call("put-chunk", "chunks", *args, "--upload", upload, "--index", "0", "--sha256", hashlib.sha256(b"wrong").hexdigest(), data=b"0123")
+        self.assertEqual(code, 2)
+        self.assertIn("chunk hash mismatch", bad["error"])
+
+    def test_abort_discards_staged_chunks(self):
+        args = self.lock_args("abandoned")
+        upload, digest = self.stage("abandoned", args, b"01234567", 4)
+        code, aborted = self.call("abort-upload", "abandoned", *args, "--upload", upload)
+        self.assertEqual(code, 0, aborted)
+        code, finished = self.call("finish-upload", "abandoned", *args, "--upload", upload, "--generation", "0", "--hash", digest)
+        self.assertEqual(code, 2)
+        self.assertIn("unknown or finished upload", finished["error"])
+
+    def test_declared_total_and_chunk_size_are_enforced_at_begin(self):
+        args = self.lock_args("limits")
+        digest = hashlib.sha256(b"").hexdigest()
+        code, huge = self.call("begin-upload", "limits", *args, "--total-bytes", str(1024 * 1024 * 1024 * 8), "--chunk-bytes", "4", "--sha256", digest)
+        self.assertEqual(code, 2)
+        self.assertIn("session limit", huge["error"])
+        code, fat = self.call("begin-upload", "limits", *args, "--total-bytes", "8", "--chunk-bytes", str(64 * 1024 * 1024), "--sha256", digest)
+        self.assertEqual(code, 2)
+        self.assertIn("chunk size exceeds", fat["error"])
+
+    def test_snapshot_can_be_downloaded_in_chunks(self):
+        args = self.lock_args("dl")
+        data = b'{"type":"session"}\n' + b'{"type":"message"}\n' * 40
+        upload, digest = self.stage("dl", args, data, 32)
+        self.assertEqual(self.call("finish-upload", "dl", *args, "--upload", upload, "--generation", "0", "--hash", digest)[0], 0)
+        code, first = self.call("fetch-chunk", "dl", "--offset", "0", "--length", "16")
+        self.assertEqual(code, 0)
+        self.assertEqual(first["total"], len(data))
+        self.assertEqual(first["manifest"]["hash"], digest)
+        self.assertEqual(base64.b64decode(first["base64"]), data[:16])
+        assembled = b""
+        offset = 0
+        while offset < len(data):
+            code, page = self.call("fetch-chunk", "dl", "--offset", str(offset), "--length", "64")
+            self.assertEqual(code, 0)
+            blob = base64.b64decode(page["base64"])
+            self.assertTrue(len(blob) <= 64)
+            assembled += blob
+            offset += len(blob)
+        self.assertEqual(assembled, data)
+        self.assertEqual(hashlib.sha256(assembled).hexdigest(), digest)
+        code, missing = self.call("fetch-chunk", "empty", "--offset", "0", "--length", "16")
+        self.assertEqual(code, 2)
+        self.assertIn("no snapshot", missing["error"])
 
     def test_invalid_session_never_escapes_root(self):
         code, _value = self.call("acquire-lock", "../bad", "--owner", "test")

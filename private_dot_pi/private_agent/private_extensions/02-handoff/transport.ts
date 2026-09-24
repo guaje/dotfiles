@@ -1,17 +1,48 @@
 import { spawn as nodeSpawn, type ChildProcess } from "node:child_process";
-import { MAX_OUTPUT_BYTES, MAX_STDIN_BYTES, SSH_TIMEOUT_MS } from "./config.ts";
+import { createHash } from "node:crypto";
+import { mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { MAX_OUTPUT_BYTES, MAX_STDIN_BYTES, SSH_MULTIPLEX, SSH_TIMEOUT_MS, cacheRoot } from "./config.ts";
 import { TransportError } from "./errors.ts";
 import type { TransportResult } from "./types.ts";
 
-export interface SshTransportOptions { alias: string; user?: string; port?: number; timeoutMs?: number; signal?: AbortSignal; spawn?: typeof nodeSpawn; stdin?: Buffer | string; maxOutputBytes?: number; /** Exact remote exit codes accepted by a framed protocol caller; ordinary SSH remains zero-only. */ acceptedExitCodes?: readonly number[]; /** Opt-in isolated-test transport hardening; production keeps the user's SSH config. */ knownHostsPath?: string; identityFile?: string; }
+export interface SshTransportOptions { alias: string; user?: string; port?: number; timeoutMs?: number; signal?: AbortSignal; spawn?: typeof nodeSpawn; stdin?: Buffer | string; maxOutputBytes?: number; /** Exact remote exit codes accepted by a framed protocol caller; ordinary SSH remains zero-only. */ acceptedExitCodes?: readonly number[];/** Set false to force a fresh connection per request (opt-in live harness isolation). */ multiplex?: boolean; /** Opt-in isolated-test transport hardening; production keeps the user's SSH config. */ knownHostsPath?: string; identityFile?: string; }
 function bounded(chunks: Buffer[], chunk: Buffer, maximum: number) { const used = chunks.reduce((n, item) => n + item.length, 0); if (used < maximum) chunks.push(chunk.subarray(0, maximum - used)); }
-/** Executes SSH through argv only, with bounded piped stdin and concurrent output collection. */
+/**
+ * OpenSSH caps a control socket path at the length of sockaddr_un (about 104 bytes), and the cache
+ * directory can be longer than that, so the system temp directory is the fallback home.
+ */
+function socketDirectory() { return cacheRoot.length <= 60 ? join(cacheRoot, "sockets") : join(tmpdir(), "pi-handoff-ssh"); }
+function controlPath(target: Pick<SshTransportOptions, "alias" | "user" | "port">) {
+  const digest = createHash("sha256").update(`${target.user ?? ""}@${target.alias}:${target.port ?? 22}`).digest("hex").slice(0, 16);
+  const path = join(socketDirectory(), `${digest}.sock`);
+  return path.length <= 100 ? path : undefined;
+}
+const socketsReady = new Set<string>();
+/**
+ * Prepared synchronously: an await before the child is wired would delay the abort listener past a
+ * caller that aborts immediately, which strands the request.
+ */
+function socketReady(directory: string) {
+  if (socketsReady.has(directory)) return true;
+  try { mkdirSync(directory, { recursive: true, mode: 0o700 }); socketsReady.add(directory); return true; } catch { return false; }
+}
+
+/** Executes SSH through argv only, with bounded piped stdin and concurrent output collection. Requests to the same host share one multiplexed connection, so an operation pays one handshake instead of one per request. */
 export function sshExec(options: SshTransportOptions, script: string): Promise<TransportResult> {
-  return new Promise((resolve, reject) => {
+  let control: string | undefined;
+  if (options.multiplex ?? SSH_MULTIPLEX) {
+    control = controlPath(options);
+    // An unwritable socket directory only costs the speed-up, never the connection.
+    if (control && !socketReady(dirname(control))) control = undefined;
+  }
+  return new Promise<TransportResult>((resolve, reject) => {
     const input = options.stdin === undefined ? undefined : Buffer.from(options.stdin);
     if (input && input.length > MAX_STDIN_BYTES) return reject(new TransportError("SSH input exceeds limit"));
     const destination = options.user ? `${options.user}@${options.alias}` : options.alias;
     const args = ["-T", "-o", "BatchMode=yes", "-o", `ConnectTimeout=${Math.max(1, Math.ceil((options.timeoutMs ?? SSH_TIMEOUT_MS) / 1000))}`, "-o", "ConnectionAttempts=1", "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=2"];
+    if (control) args.push("-o", "ControlMaster=auto", "-o", `ControlPath=${control}`, "-o", "ControlPersist=45");
     if (options.port) args.push("-p", String(options.port));
     if (options.knownHostsPath) {
       args.push("-o", `UserKnownHostsFile=${options.knownHostsPath}`, "-o", "StrictHostKeyChecking=yes", "-o", "IdentitiesOnly=yes", "-o", "ForwardAgent=no", "-o", "ForwardX11=no", "-o", "ClearAllForwardings=yes", "-o", "PermitLocalCommand=no");

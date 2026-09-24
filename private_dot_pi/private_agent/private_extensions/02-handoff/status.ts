@@ -1,5 +1,5 @@
 import type { HudSegment, HudTone, HudVariants } from "../00-hud/api.ts";
-import type { HandoffState } from "./types.ts";
+import type { HandoffState, SyncProgress } from "./types.ts";
 
 function statusTone(state: HandoffState): HudTone {
   if (["offline", "stale", "conflict"].includes(state.syncState)) return "error";
@@ -16,8 +16,17 @@ function semanticSegments(text: string, tone: HudTone): HudSegment[] {
   ];
 }
 
-export function handoffStatus(state: HandoffState): string {
-  if (state.syncState === "syncing") return "⇅ synchronizing remote session";
+function megabytes(bytes: number) { return `${(bytes / (1024 * 1024)).toFixed(1)} MB`; }
+
+/** Kept as short as the rest of the HUD: an action, a count, and the size of what is moving. */
+function handoffProgress(progress: SyncProgress): string {
+  const action = progress.phase === "upload" ? "sending" : "reading";
+  const value = progress.unit === "chunk" ? `${progress.done}/${progress.total}` : `${megabytes(progress.done)}/${megabytes(progress.total)}`;
+  return `⇅ ${action} ${value}`;
+}
+
+export function handoffStatus(state: HandoffState, progress?: SyncProgress): string {
+  if (state.syncState === "syncing") return progress ? handoffProgress(progress) : "⇅ synchronizing remote session";
   if (state.syncState === "offline") return "⚠ remote offline • changes retained";
   if (state.syncState === "stale") return "◌ remote state stale • sync blocked";
   if (state.syncState === "locked") return "🔒 remote session locked";
@@ -32,14 +41,15 @@ export function handoffStatus(state: HandoffState): string {
 /** Diagnostics view for /ssh status; appends the last synchronization failure without cluttering the HUD. */
 export function handoffStatusDetail(state: HandoffState): string {
   const base = handoffStatus(state);
-  if (state.syncState === "offline" && state.offlineReason) return `${base} — ${state.offlineReason}`;
+  if (["offline", "conflict"].includes(state.syncState) && state.syncReason) return `${base} — ${state.syncReason}`;
   return base;
 }
 
-export function handoffHudVariants(state: HandoffState): HudVariants {
-  const full = handoffStatus(state);
+export function handoffHudVariants(state: HandoffState, progress?: SyncProgress): HudVariants {
+  const full = handoffStatus(state, progress);
   const icon = full.split(" ")[0] || "⌂";
-  const compact = state.connection === "connected" && state.target ? `${icon} ${state.target.alias}` : full;
+  // While a transfer runs, the progress is more useful than the host name in the narrow HUD.
+  const compact = progress || !(state.connection === "connected" && state.target) ? full : `${icon} ${state.target.alias}`;
   const tone = statusTone(state);
   return {
     full: semanticSegments(full, tone),

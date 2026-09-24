@@ -50,9 +50,12 @@ test("HUD variants split the icon from muted detail and preserve the local label
   assert.equal(offline.full[0]?.tone, "error");
 });
 
-test("status detail appends the offline reason without changing the HUD text", () => {
-  const base = { ...initialState(), syncState: "offline" as const };
-  assert.equal(handoffStatusDetail(base), "⚠ remote offline • changes retained");
-  assert.equal(handoffStatus({ ...base, offlineReason: "commit failed: OSError: [Errno 28] No space left on device" }), "⚠ remote offline • changes retained");
-  assert.equal(handoffStatusDetail({ ...base, offlineReason: "commit failed: OSError: [Errno 28] No space left on device" }), "⚠ remote offline • changes retained — commit failed: OSError: [Errno 28] No space left on device");
+test("status detail appends the sync reason without changing the HUD text", () => {
+  const offline = { ...initialState(), syncState: "offline" as const };
+  assert.equal(handoffStatusDetail(offline), "⚠ remote offline • changes retained");
+  assert.equal(handoffStatus({ ...offline, syncReason: "commit failed: snapshot exceeds limit" }), "⚠ remote offline • changes retained");
+  assert.equal(handoffStatusDetail({ ...offline, syncReason: "commit failed: snapshot exceeds limit" }), "⚠ remote offline • changes retained — commit failed: snapshot exceeds limit");
+  const conflict = { ...initialState(), syncState: "conflict" as const };
+  assert.equal(handoffStatusDetail(conflict), "⚡ remote session conflict");
+  assert.equal(handoffStatusDetail({ ...conflict, syncReason: "remote snapshot advanced" }), "⚡ remote session conflict — remote snapshot advanced");
 });

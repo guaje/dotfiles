@@ -41,3 +41,36 @@ test("confirmed install stages, verifies, atomically moves, and rechecks", async
   assert.ok(scripts.some((script) => script.startsWith("mv -f")));
   assert.ok(scripts.filter((script) => script.startsWith("python3")).length >= 3);
 });
+
+test("a verified helper is trusted only for a window, per host and checksum", async () => {
+  let calls = 0;
+  let clock = 1_000;
+  const deps = {
+    loadArtifact: async () => artifact,
+    exec: (async () => { calls++; return result({ ok: true, version: HANDOFF_PROTOCOL_VERSION, checksum: artifact.checksum }); }) as any,
+    now: () => clock,
+    readyTtlMs: 1_000,
+  };
+  await (await import("../installer.ts")).assertRemoteHelperReady({ alias: "window-a" }, deps as any);
+  await (await import("../installer.ts")).assertRemoteHelperReady({ alias: "window-a" }, deps as any);
+  assert.equal(calls, 1, "the window must not repeat the version handshake for every request");
+  clock += 1_001;
+  await (await import("../installer.ts")).assertRemoteHelperReady({ alias: "window-a" }, deps as any);
+  assert.equal(calls, 2, "an expired window re-verifies");
+  await (await import("../installer.ts")).assertRemoteHelperReady({ alias: "window-b" }, deps as any);
+  assert.equal(calls, 3, "one host's window never covers another host");
+});
+
+test("a helper that does not match the artifact is never trusted", async () => {
+  let calls = 0;
+  const deps = {
+    loadArtifact: async () => artifact,
+    exec: (async () => { calls++; return result({ ok: true, version: HANDOFF_PROTOCOL_VERSION, checksum: "someone-elses-build" }); }) as any,
+    now: () => 1,
+    readyTtlMs: 1_000,
+  };
+  const { assertRemoteHelperReady } = await import("../installer.ts");
+  await assert.rejects(assertRemoteHelperReady({ alias: "window-c" }, deps as any), /checksum mismatch/);
+  await assert.rejects(assertRemoteHelperReady({ alias: "window-c" }, deps as any), /checksum mismatch/);
+  assert.equal(calls, 2, "failures are never cached");
+});

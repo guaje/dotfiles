@@ -1,19 +1,20 @@
 {
-  "defaultModel": "glm-5.3-flash",
+  "defaultModel": "qwen3.8-flash-next",
   "defaultProvider": "pi",
-  "defaultThinkingLevel": "high",
+  "defaultThinkingLevel": "medium",
   "enabledModels": [
     "openai-codex/gpt-6-astra",
+    "openai-codex/gpt-6-sol",
     "openai-codex/gpt-5.6-sol",
+    "pi/glm-5.3-nvfp4",
+    "pi/qwen3.8-flash-next",
     "openai-codex/gpt-5.6-terra",
-    "pi/glm-5.3-flash",
     "reallms/glm-5.2",
+    "openai-codex/gpt-6-luna",
+    "pi/qwen3.8-27b",
     "openai-codex/gpt-5.6-luna",
     "kelley/Kimi-K2.6",
-    "pi/qwen3.8-27b",
-    "reallms-dev/Laguna-S-2.1-FP8",
-    "reallms/gemma-4-31B-it",
-    "reallms/Qwen3-Coder-Next"
+    "reallms-dev/Laguna-S-2.1-FP8"
   ],
   "extensions": [
     "extensions/00-hud/index.ts",

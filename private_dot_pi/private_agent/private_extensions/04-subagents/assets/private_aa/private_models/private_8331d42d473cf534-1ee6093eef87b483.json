@@ -1,0 +1,99 @@
+{
+  "capturedAt": 1790616447914,
+  "coverage": 1,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1790278207107,
+    "status": "mapped",
+    "thinkingLevel": null
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.3"
+  },
+  "model": "glm-5.2",
+  "modelId": "f7a4ea75-e548-4069-80d4-9be8bc7c009b",
+  "outputTokens": {},
+  "provider": "reallms",
+  "publicPage": {
+    "contentSha256": "8e05ca19cd645837e15606c588afff4c65f6b95912d58e7690146c47cd4bb51c",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.3.2",
+    "recordSha256": "dc5ec13adae2028edc81a91eef208e05ff575752567482b46cbcc546cae13635",
+    "retrievedAt": 1790616446910,
+    "url": "https://artificialanalysis.ai/models/glm-5-2"
+  },
+  "scores": {
+    "agentic": 38.4,
+    "coding": 68.8,
+    "faithfulness": 73.70044052863436,
+    "instructionFollowing": 73.3333333333333,
+    "intelligence": 33.7,
+    "knowledge": 24.333333333333336,
+    "longContext": 78.3333333333333,
+    "scientificReasoning": 50.50043486188067,
+    "toolUse": 38.757587628866
+  },
+  "source": {
+    "name": "GLM-5.2 (max)",
+    "openrouterApiId": null,
+    "slug": "glm-5-2"
+  },
+  "subBenchmarks": {
+    "critpt": 20.8571428571429,
+    "gpqa": 89.49494949494951,
+    "hle": 41.1492122335496,
+    "ifbench": 73.3333333333333
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": null,
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 42.876,
+        "retrievedAt": 1790616446910,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "dc5ec13adae2028edc81a91eef208e05ff575752567482b46cbcc546cae13635",
+        "sourceUrl": "https://artificialanalysis.ai/models/glm-5-2"
+      },
+      "tau2Telecom": {
+        "benchmark": {
+          "id": "tau2-telecom",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "tau2",
+        "normalizedScore": 99.1228070175439,
+        "retrievedAt": 1790616446910,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "dc5ec13adae2028edc81a91eef208e05ff575752567482b46cbcc546cae13635",
+        "sourceUrl": "https://artificialanalysis.ai/models/glm-5-2"
+      },
+      "tau3Banking": {
+        "benchmark": {
+          "id": "tau3-banking",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "tauBanking",
+        "normalizedScore": 34.639175257732,
+        "retrievedAt": 1790616446910,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "dc5ec13adae2028edc81a91eef208e05ff575752567482b46cbcc546cae13635",
+        "sourceUrl": "https://artificialanalysis.ai/models/glm-5-2"
+      }
+    },
+    "derivation": {
+      "rule": "tau3-banking+gdpval-aa",
+      "score": 38.757587628866,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

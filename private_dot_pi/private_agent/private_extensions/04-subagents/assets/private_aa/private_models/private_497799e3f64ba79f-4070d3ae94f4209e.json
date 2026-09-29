@@ -1,0 +1,75 @@
+{
+  "capturedAt": 1790616428066,
+  "coverage": 0.4444444444444444,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1790350442657,
+    "status": "mapped",
+    "thinkingLevel": "low"
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.3"
+  },
+  "model": "gpt-6-luna",
+  "modelId": "bf9708d8-933d-44f6-affa-b696a7a650c9",
+  "outputTokens": {},
+  "provider": "openai-codex",
+  "publicPage": {
+    "contentSha256": "fd24842b512e5d996bb28cd729e8912cffecbbf892fffa52193ae2c56b369f2e",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.3.2",
+    "recordSha256": "b22ea56104a4f9ae169b3f2d74e28742d13f862f77148ebb7252f2b4d39f3576",
+    "retrievedAt": 1790616427063,
+    "url": "https://artificialanalysis.ai/models/gpt-6-luna-low"
+  },
+  "scores": {
+    "agentic": null,
+    "coding": null,
+    "faithfulness": 15.700619020821605,
+    "instructionFollowing": null,
+    "intelligence": 20.9,
+    "knowledge": 40.766666666666666,
+    "longContext": 74,
+    "scientificReasoning": null,
+    "toolUse": null
+  },
+  "source": {
+    "name": "GPT-6 Luna (low)",
+    "openrouterApiId": null,
+    "slug": "gpt-6-luna-low"
+  },
+  "subBenchmarks": {
+    "critpt": 2.57142857142857,
+    "gpqa": null,
+    "hle": 20.2502316960148,
+    "ifbench": null
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": "low",
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 24.613,
+        "retrievedAt": 1790616427063,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "b22ea56104a4f9ae169b3f2d74e28742d13f862f77148ebb7252f2b4d39f3576",
+        "sourceUrl": "https://artificialanalysis.ai/models/gpt-6-luna-low"
+      },
+      "tau2Telecom": null,
+      "tau3Banking": null
+    },
+    "derivation": {
+      "rule": "unavailable",
+      "score": null,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

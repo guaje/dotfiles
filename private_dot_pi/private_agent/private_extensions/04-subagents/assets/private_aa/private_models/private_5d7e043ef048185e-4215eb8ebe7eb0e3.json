@@ -1,0 +1,75 @@
+{
+  "capturedAt": 1790616436592,
+  "coverage": 0.4444444444444444,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1790350451611,
+    "status": "mapped",
+    "thinkingLevel": "max"
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.3"
+  },
+  "model": "gpt-6-sol",
+  "modelId": "c50ea08c-88c0-4eb7-85b8-27f2bbf6d527",
+  "outputTokens": {},
+  "provider": "openai-codex",
+  "publicPage": {
+    "contentSha256": "ee7f436778085572936bd7207cc84c8c68d91b914589247aabcb24f9a8f6cf1c",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.3.2",
+    "recordSha256": "303f84cc9d11233cdcf2c60d0f9e009583f672fc2a10cd9b1bd96511c650f575",
+    "retrievedAt": 1790616435589,
+    "url": "https://artificialanalysis.ai/models/gpt-6-sol"
+  },
+  "scores": {
+    "agentic": null,
+    "coding": null,
+    "faithfulness": 39.875503478579276,
+    "instructionFollowing": null,
+    "intelligence": 47.5,
+    "knowledge": 54.48333333333333,
+    "longContext": 83.6666666666667,
+    "scientificReasoning": null,
+    "toolUse": null
+  },
+  "source": {
+    "name": "GPT-6 Sol (max)",
+    "openrouterApiId": null,
+    "slug": "gpt-6-sol"
+  },
+  "subBenchmarks": {
+    "critpt": 30.8571428571429,
+    "gpqa": null,
+    "hle": 47.914735866543104,
+    "ifbench": null
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": "max",
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 49.346500000000006,
+        "retrievedAt": 1790616435589,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "303f84cc9d11233cdcf2c60d0f9e009583f672fc2a10cd9b1bd96511c650f575",
+        "sourceUrl": "https://artificialanalysis.ai/models/gpt-6-sol"
+      },
+      "tau2Telecom": null,
+      "tau3Banking": null
+    },
+    "derivation": {
+      "rule": "unavailable",
+      "score": null,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

@@ -1,0 +1,87 @@
+{
+  "capturedAt": 1790616442716,
+  "coverage": 0.8888888888888888,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1790278199977,
+    "status": "mapped",
+    "thinkingLevel": "low"
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.3"
+  },
+  "model": "qwen3.8-27b",
+  "modelId": "7e30585f-fad7-40df-a8cb-03c1d96df38a",
+  "outputTokens": {},
+  "provider": "qwen",
+  "publicPage": {
+    "contentSha256": "f0b3d8987d3101130e897d82a8059a8893c9e1c2b99885065251dfc842d58360",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.3.2",
+    "recordSha256": "7a7eed5fabd80e0d1c24c5990a53e7fb2516e6bc7b407b213639ad8e9c71a822",
+    "retrievedAt": 1790616441711,
+    "url": "https://artificialanalysis.ai/models/qwen3-8-27b-low"
+  },
+  "scores": {
+    "agentic": 38.9,
+    "coding": 58.2,
+    "faithfulness": 47.14400643604183,
+    "instructionFollowing": null,
+    "intelligence": 26.2,
+    "knowledge": 17.133333333333333,
+    "longContext": 77.3333333333333,
+    "scientificReasoning": 32.86207768135477,
+    "toolUse": 37.1217242268041
+  },
+  "source": {
+    "name": "Qwen3.8 27B (low)",
+    "openrouterApiId": null,
+    "slug": "qwen3-8-27b-low"
+  },
+  "subBenchmarks": {
+    "critpt": 0,
+    "gpqa": 84.5454545454545,
+    "hle": 14.040778498609798,
+    "ifbench": null
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": "low",
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 42.0785,
+        "retrievedAt": 1790616441711,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "7a7eed5fabd80e0d1c24c5990a53e7fb2516e6bc7b407b213639ad8e9c71a822",
+        "sourceUrl": "https://artificialanalysis.ai/models/qwen3-8-27b-low"
+      },
+      "tau2Telecom": null,
+      "tau3Banking": {
+        "benchmark": {
+          "id": "tau3-banking",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "tauBanking",
+        "normalizedScore": 32.1649484536082,
+        "retrievedAt": 1790616441711,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "7a7eed5fabd80e0d1c24c5990a53e7fb2516e6bc7b407b213639ad8e9c71a822",
+        "sourceUrl": "https://artificialanalysis.ai/models/qwen3-8-27b-low"
+      }
+    },
+    "derivation": {
+      "rule": "tau3-banking+gdpval-aa",
+      "score": 37.1217242268041,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

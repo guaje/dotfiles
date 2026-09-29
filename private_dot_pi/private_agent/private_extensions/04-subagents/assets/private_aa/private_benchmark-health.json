@@ -1,0 +1,77 @@
+{
+  "digest": "927157e528fd1d3507a2a17624fa0e6809e51cce1beb8d12ae488d0741b18cf5",
+  "fields": {
+    "agenticIndex": {
+      "checked": 15,
+      "newestScoredRelease": null,
+      "scored": 0,
+      "status": "retired"
+    },
+    "critpt": {
+      "checked": 15,
+      "newestScoredRelease": "2026-09-22",
+      "scored": 15,
+      "status": "active"
+    },
+    "gdpvalNormalized": {
+      "checked": 15,
+      "newestScoredRelease": "2026-09-22",
+      "scored": 13,
+      "status": "active"
+    },
+    "gpqa": {
+      "checked": 15,
+      "newestScoredRelease": "2026-08-21",
+      "scored": 10,
+      "status": "lagging"
+    },
+    "hle": {
+      "checked": 15,
+      "newestScoredRelease": "2026-09-22",
+      "scored": 15,
+      "status": "active"
+    },
+    "ifbench": {
+      "checked": 15,
+      "newestScoredRelease": null,
+      "scored": 0,
+      "status": "retired"
+    },
+    "lcr": {
+      "checked": 15,
+      "newestScoredRelease": "2026-09-22",
+      "scored": 15,
+      "status": "active"
+    },
+    "omniscienceAccuracy": {
+      "checked": 15,
+      "newestScoredRelease": "2026-09-22",
+      "scored": 15,
+      "status": "active"
+    },
+    "omniscienceHallucinationRate": {
+      "checked": 15,
+      "newestScoredRelease": "2026-09-22",
+      "scored": 15,
+      "status": "active"
+    },
+    "tau2": {
+      "checked": 15,
+      "newestScoredRelease": null,
+      "scored": 0,
+      "status": "retired"
+    },
+    "tau3Banking": {
+      "checked": 15,
+      "newestScoredRelease": null,
+      "scored": 0,
+      "status": "retired"
+    }
+  },
+  "generatedAt": 1790614217640,
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.3"
+  },
+  "version": 1
+}

@@ -1,0 +1,99 @@
+{
+  "capturedAt": 1790616411515,
+  "coverage": 1,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1790278191024,
+    "status": "mapped",
+    "thinkingLevel": "xhigh"
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.3"
+  },
+  "model": "gpt-5.6-sol",
+  "modelId": "d998db47-9b67-4727-a2bb-2e1261020ac0",
+  "outputTokens": {},
+  "provider": "openai-codex",
+  "publicPage": {
+    "contentSha256": "bb6ad0ce4b812927b87308881813fb1b6815534ea7a7392232187eb87063de2e",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.3.2",
+    "recordSha256": "7bd6a7dc77c52f706414c3b823fc802de4912630b0dfb896c2fe6fb2dd8de35e",
+    "retrievedAt": 1790616410513,
+    "url": "https://artificialanalysis.ai/models/gpt-5-6-sol-xhigh"
+  },
+  "scores": {
+    "agentic": 47.4,
+    "coding": 78.3,
+    "faithfulness": 8.134358559287733,
+    "instructionFollowing": 71.0204081632653,
+    "intelligence": 44,
+    "knowledge": 58.81666666666666,
+    "longContext": 82.3333333333333,
+    "scientificReasoning": 56.3383559769102,
+    "toolUse": 45.2611649484536
+  },
+  "source": {
+    "name": "GPT-5.6 Sol (xhigh)",
+    "openrouterApiId": null,
+    "slug": "gpt-5-6-sol-xhigh"
+  },
+  "subBenchmarks": {
+    "critpt": 28.571428571428598,
+    "gpqa": 93.13131313131309,
+    "hle": 47.3123262279889,
+    "ifbench": 71.0204081632653
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": "xhigh",
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 52.378,
+        "retrievedAt": 1790616410513,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "7bd6a7dc77c52f706414c3b823fc802de4912630b0dfb896c2fe6fb2dd8de35e",
+        "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol-xhigh"
+      },
+      "tau2Telecom": {
+        "benchmark": {
+          "id": "tau2-telecom",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "tau2",
+        "normalizedScore": 84.7953216374269,
+        "retrievedAt": 1790616410513,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "7bd6a7dc77c52f706414c3b823fc802de4912630b0dfb896c2fe6fb2dd8de35e",
+        "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol-xhigh"
+      },
+      "tau3Banking": {
+        "benchmark": {
+          "id": "tau3-banking",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "tauBanking",
+        "normalizedScore": 38.144329896907195,
+        "retrievedAt": 1790616410513,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "7bd6a7dc77c52f706414c3b823fc802de4912630b0dfb896c2fe6fb2dd8de35e",
+        "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol-xhigh"
+      }
+    },
+    "derivation": {
+      "rule": "tau3-banking+gdpval-aa",
+      "score": 45.2611649484536,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

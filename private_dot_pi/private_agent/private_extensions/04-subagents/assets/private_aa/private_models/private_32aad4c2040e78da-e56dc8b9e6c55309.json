@@ -1,0 +1,75 @@
+{
+  "capturedAt": 1790616437763,
+  "coverage": 0.4444444444444444,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1790350452814,
+    "status": "mapped",
+    "thinkingLevel": "medium"
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.3"
+  },
+  "model": "gpt-6-sol",
+  "modelId": "780a4a85-17ff-4175-a8dd-ebca4823e61b",
+  "outputTokens": {},
+  "provider": "openai-codex",
+  "publicPage": {
+    "contentSha256": "a80613574e3725de9ecec03ad71efab08256219731ed634c6385726044c26a93",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.3.2",
+    "recordSha256": "bf261577361354e44507f885996aee0470e9e6c5a3521924e59d68b70a267656",
+    "retrievedAt": 1790616436759,
+    "url": "https://artificialanalysis.ai/models/gpt-6-sol-medium"
+  },
+  "scores": {
+    "agentic": null,
+    "coding": null,
+    "faithfulness": 43.21518080916577,
+    "instructionFollowing": null,
+    "intelligence": 39.8,
+    "knowledge": 53.449999999999996,
+    "longContext": 82.3333333333333,
+    "scientificReasoning": null,
+    "toolUse": null
+  },
+  "source": {
+    "name": "GPT-6 Sol (medium)",
+    "openrouterApiId": null,
+    "slug": "gpt-6-sol-medium"
+  },
+  "subBenchmarks": {
+    "critpt": 24.571428571428598,
+    "gpqa": null,
+    "hle": 40.9638554216867,
+    "ifbench": null
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": "medium",
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 41.0055,
+        "retrievedAt": 1790616436759,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "bf261577361354e44507f885996aee0470e9e6c5a3521924e59d68b70a267656",
+        "sourceUrl": "https://artificialanalysis.ai/models/gpt-6-sol-medium"
+      },
+      "tau2Telecom": null,
+      "tau3Banking": null
+    },
+    "derivation": {
+      "rule": "unavailable",
+      "score": null,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

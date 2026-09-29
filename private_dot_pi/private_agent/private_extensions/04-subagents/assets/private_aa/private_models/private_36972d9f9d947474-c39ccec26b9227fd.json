@@ -1,0 +1,87 @@
+{
+  "capturedAt": 1790616441496,
+  "coverage": 0.8888888888888888,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1790350459131,
+    "status": "mapped",
+    "thinkingLevel": "max"
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.3"
+  },
+  "model": "qwen3.8-flash-next",
+  "modelId": "9ac3908c-9eb2-44db-8c01-3ec7da6fc2ae",
+  "outputTokens": {},
+  "provider": "pi",
+  "publicPage": {
+    "contentSha256": "90e1e8df9abec2bfc9b5c230390368064ae2fe697c80b14f764778c098b06a98",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.3.2",
+    "recordSha256": "9a38c012a2db531f1d1bc57f11fa6ef3eee03c9e4f289cbaa8ff347531a2bc67",
+    "retrievedAt": 1790616440492,
+    "url": "https://artificialanalysis.ai/models/qwen3-8-flash-next"
+  },
+  "scores": {
+    "agentic": 53.6,
+    "coding": 73.1,
+    "faithfulness": 54.67991169977925,
+    "instructionFollowing": null,
+    "intelligence": 39.8,
+    "knowledge": 24.5,
+    "longContext": 79.6666666666667,
+    "scientificReasoning": 47.17019170031217,
+    "toolUse": 50.483662371134
+  },
+  "source": {
+    "name": "Qwen3.8-Flash-Next",
+    "openrouterApiId": null,
+    "slug": "qwen3-8-flash-next"
+  },
+  "subBenchmarks": {
+    "critpt": 11.1428571428571,
+    "gpqa": 92.32323232323229,
+    "hle": 38.044485634847106,
+    "ifbench": null
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": "max",
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 55.606500000000004,
+        "retrievedAt": 1790616440492,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "9a38c012a2db531f1d1bc57f11fa6ef3eee03c9e4f289cbaa8ff347531a2bc67",
+        "sourceUrl": "https://artificialanalysis.ai/models/qwen3-8-flash-next"
+      },
+      "tau2Telecom": null,
+      "tau3Banking": {
+        "benchmark": {
+          "id": "tau3-banking",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "tauBanking",
+        "normalizedScore": 45.360824742268,
+        "retrievedAt": 1790616440492,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "9a38c012a2db531f1d1bc57f11fa6ef3eee03c9e4f289cbaa8ff347531a2bc67",
+        "sourceUrl": "https://artificialanalysis.ai/models/qwen3-8-flash-next"
+      }
+    },
+    "derivation": {
+      "rule": "tau3-banking+gdpval-aa",
+      "score": 50.483662371134,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

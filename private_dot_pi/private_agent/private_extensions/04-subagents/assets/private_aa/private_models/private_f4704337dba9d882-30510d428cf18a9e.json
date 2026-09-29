@@ -1,0 +1,75 @@
+{
+  "capturedAt": 1790616429222,
+  "coverage": 0.4444444444444444,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1790350443857,
+    "status": "mapped",
+    "thinkingLevel": "max"
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.3"
+  },
+  "model": "gpt-6-luna",
+  "modelId": "6fb13851-40ce-4bda-ad3f-6b38e0c5daa7",
+  "outputTokens": {},
+  "provider": "openai-codex",
+  "publicPage": {
+    "contentSha256": "2ab413a5eab3ba4271ca087377613591aa4ea47fb822d2f3e1e3df110fa6149b",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.3.2",
+    "recordSha256": "1cf0db958cd33f867217bf78b329ef957c17b49e41a99d949708c26bec75d5a1",
+    "retrievedAt": 1790616428219,
+    "url": "https://artificialanalysis.ai/models/gpt-6-luna"
+  },
+  "scores": {
+    "agentic": null,
+    "coding": null,
+    "faithfulness": 23.273050696709163,
+    "instructionFollowing": null,
+    "intelligence": 37.3,
+    "knowledge": 43.78333333333334,
+    "longContext": 83.3333333333333,
+    "scientificReasoning": null,
+    "toolUse": null
+  },
+  "source": {
+    "name": "GPT-6 Luna (max)",
+    "openrouterApiId": null,
+    "slug": "gpt-6-luna"
+  },
+  "subBenchmarks": {
+    "critpt": 19.428571428571402,
+    "gpqa": null,
+    "hle": 38.5078776645042,
+    "ifbench": null
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": "max",
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 43.354499999999994,
+        "retrievedAt": 1790616428219,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "1cf0db958cd33f867217bf78b329ef957c17b49e41a99d949708c26bec75d5a1",
+        "sourceUrl": "https://artificialanalysis.ai/models/gpt-6-luna"
+      },
+      "tau2Telecom": null,
+      "tau3Banking": null
+    },
+    "derivation": {
+      "rule": "unavailable",
+      "score": null,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

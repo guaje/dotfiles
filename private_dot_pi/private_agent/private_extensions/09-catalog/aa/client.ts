@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
-import { canonicalDigest, isRecord, METHODOLOGY, PUBLIC_METHODOLOGY_VERSION, UUID } from "./schema.ts";
+import { AaMethodologyMismatchError, canonicalDigest, isRecord, METHODOLOGY, PUBLIC_METHODOLOGY_VERSION, UUID } from "./schema.ts";
 import type { BaseConfig } from "./config.ts";
 
-export interface CatalogRecord extends Record<string, unknown> { id: string; name: string; slug: string; evaluations?: Record<string, unknown>; }
+export interface CatalogRecord extends Record<string, unknown> { id: string; name: string; slug: string; evaluations?: Record<string, unknown>; pricing?: Record<string, unknown> | null; }
 export interface CatalogResult { records: CatalogRecord[]; sourceUrl: string; }
-export interface PublicResult { record: Record<string, unknown>; provenance: { url: string; retrievedAt: number; contentSha256: string; recordSha256: string; extractorVersion: "aa-current-model-rsc-v1"; intelligenceIndexMethodologyVersion: "4.1.1"; }; }
+export interface PublicResult { record: Record<string, unknown>; provenance: { url: string; retrievedAt: number; contentSha256: string; recordSha256: string; extractorVersion: "aa-current-model-rsc-v1"; intelligenceIndexMethodologyVersion: typeof PUBLIC_METHODOLOGY_VERSION; }; }
 
 function aborted(signal?: AbortSignal): void {
   if (!signal?.aborted) return;
@@ -50,7 +50,7 @@ async function jsonBody(response: Response, limit: number, signal?: AbortSignal)
 
 function catalogPage(value: unknown): { data: CatalogRecord[]; hasMore: boolean; version: string } {
   if (!isRecord(value) || !Array.isArray(value.data)) throw new Error("Artificial Analysis response has no model array");
-  const version = String(value.intelligence_index_version); if (version !== METHODOLOGY.version) throw new Error("unsupported Artificial Analysis methodology");
+  const version = String(value.intelligence_index_version); if (version !== METHODOLOGY.version) throw new AaMethodologyMismatchError(`Artificial Analysis Intelligence Index methodology changed: local pin ${METHODOLOGY.version}, upstream ${version}`);
   const data: CatalogRecord[] = [];
   for (const item of value.data) {
     if (!isRecord(item) || typeof item.id !== "string" || !UUID.test(item.id)) throw new Error("Artificial Analysis model array is invalid");
@@ -58,6 +58,7 @@ function catalogPage(value: unknown): { data: CatalogRecord[]; hasMore: boolean;
     if (item.slug !== undefined && (typeof item.slug !== "string" || /[\x00-\x1f\x7f]/.test(item.slug))) throw new Error("Artificial Analysis model identity is invalid");
     if (item.openrouter_api_id !== undefined && item.openrouter_api_id !== null && (typeof item.openrouter_api_id !== "string" || /[\x00-\x1f\x7f]/.test(item.openrouter_api_id))) throw new Error("Artificial Analysis model identity is invalid");
     if (item.evaluations !== undefined && !isRecord(item.evaluations)) throw new Error("Artificial Analysis evaluations are invalid");
+    if (item.pricing !== undefined && item.pricing !== null && !isRecord(item.pricing)) throw new Error("Artificial Analysis pricing is invalid");
     data.push(item as CatalogRecord);
   }
   if (!isRecord(value.pagination) || typeof value.pagination.has_more !== "boolean") throw new Error("Artificial Analysis pagination is invalid");
@@ -74,7 +75,7 @@ export async function fetchCatalog(config: BaseConfig & { apiKey: string }, sign
       const response = await fetch(url, { headers, redirect: "error", signal: active.signal });
       if (!response.ok) { await response.body?.cancel().catch(() => {}); throw new Error(`Artificial Analysis API HTTP status ${response.status}`); }
       const parsed = catalogPage(await jsonBody(response, config.limits.apiBytes, active.signal));
-      if (expectedVersion !== undefined && parsed.version !== expectedVersion) throw new Error("Artificial Analysis methodology changed during pagination"); expectedVersion = parsed.version;
+      if (expectedVersion !== undefined && parsed.version !== expectedVersion) throw new AaMethodologyMismatchError(`Artificial Analysis Intelligence Index methodology changed during pagination: ${expectedVersion} to ${parsed.version}`); expectedVersion = parsed.version;
       records.push(...parsed.data); if (!parsed.hasMore) return { records, sourceUrl: config.apiUrl.href };
     } catch (error) { if (signal?.aborted) throw new Error("operation aborted"); throw safeNetworkError(error, "Artificial Analysis API"); } finally { active.dispose(); }
   }
@@ -145,7 +146,7 @@ export async function fetchPublicModel(config: BaseConfig, slug: string, signal?
     if (!response || !response.ok) { await response?.body?.cancel().catch(() => {}); throw new Error(`Artificial Analysis public page HTTP status ${response?.status ?? 0}`); }
     if (current.href !== canonical.href) throw new Error("unsafe Artificial Analysis public page redirect");
     const bytes = await readBoundedBody(response, config.limits.publicBytes, active.signal); const html = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-    const extracted = publicRecordFrame(html); if (extracted.methodologyVersion !== PUBLIC_METHODOLOGY_VERSION) throw new Error("unsupported public Intelligence Index methodology");
+    const extracted = publicRecordFrame(html); if (extracted.methodologyVersion !== PUBLIC_METHODOLOGY_VERSION) throw new AaMethodologyMismatchError(`Artificial Analysis public Intelligence Index methodology changed: local pin ${PUBLIC_METHODOLOGY_VERSION}, upstream ${extracted.methodologyVersion}`);
     const record = extracted.record; const retrievedAt = Date.now();
     await abortableDelay(config.limits.pageDelayMs, active.signal);
     return { record, provenance: { url: canonical.href, retrievedAt, contentSha256: createHash("sha256").update(bytes).digest("hex"), recordSha256: canonicalDigest(record), extractorVersion: "aa-current-model-rsc-v1", intelligenceIndexMethodologyVersion: PUBLIC_METHODOLOGY_VERSION } };

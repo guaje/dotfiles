@@ -115,6 +115,46 @@ export function uniqueNormalizedAuthoritativeMatch(id: string, catalog: Authorit
   return matches.length === 1 ? matches[0] : undefined;
 }
 
+export interface AaReferencePriceEntry { slug: string; name: string | null; openrouterApiId: string | null; cost?: CostRates; }
+export interface AaReferencePriceCatalog { provenance: "aa-catalog:reference-price"; models: AaReferencePriceEntry[]; }
+
+/** AA catalog reference prices are USD per 1M tokens; null or absent fields stay unknown. */
+export function aaReferenceCost(raw: unknown): CostRates | undefined {
+  if (!record(raw)) return undefined;
+  const input = numeric(raw.price_1m_input_tokens);
+  const output = numeric(raw.price_1m_output_tokens);
+  if (input === undefined || output === undefined || (input === 0 && output === 0)) return undefined;
+  return { input, output, cacheRead: numeric(raw.price_1m_cache_hit_tokens) ?? 0, cacheWrite: numeric(raw.price_1m_cache_write_tokens) ?? 0 };
+}
+
+export function parseAaReferencePriceCatalog(records: readonly unknown[]): AaReferencePriceCatalog {
+  const models: AaReferencePriceEntry[] = [];
+  for (const raw of records) {
+    if (!record(raw) || typeof raw.slug !== "string" || !raw.slug) continue;
+    const cost = aaReferenceCost(raw.pricing);
+    models.push({ slug: raw.slug, ...(typeof raw.name === "string" ? { name: raw.name } : {}), ...(typeof raw.openrouter_api_id === "string" ? { openrouterApiId: raw.openrouter_api_id } : {}), ...(cost ? { cost } : {}) });
+  }
+  return { provenance: "aa-catalog:reference-price", models };
+}
+
+const aaIdentitySuffixes = (entry: AaReferencePriceEntry): string[] => [entry.slug, ...(entry.name ? [entry.name] : []), ...(entry.openrouterApiId ? [entry.openrouterApiId] : [])].map(normalizedModelSuffix).filter((suffix): suffix is string => !!suffix);
+
+/** Exact normalized identity match against AA's catalog; ambiguity never prices a model. */
+export function uniqueAaReferencePriceMatch(id: string, catalog: AaReferencePriceCatalog): { slug: string; cost: CostRates } | undefined {
+  const suffix = normalizedModelSuffix(id);
+  if (!suffix) return undefined;
+  const matches = catalog.models.filter((entry) => aaIdentitySuffixes(entry).includes(suffix));
+  return matches.length === 1 && matches[0]!.cost ? { slug: matches[0]!.slug, cost: matches[0]!.cost } : undefined;
+}
+
+/** Self-hosted quantization variants inherit the upstream base price; one raw `-<quant>` segment is stripped and the base must resolve uniquely. */
+export const AA_QUANTIZATION_PATTERN = /-(?:nvfp4|mxfp4|bf16|fp16|int8|int4|awq|gptq|gguf|q8k|q4k|q8|q4|fp8|fp4)$/i;
+export function uniqueAaQuantizedReferencePriceMatch(id: string, catalog: AaReferencePriceCatalog): { slug: string; cost: CostRates } | undefined {
+  const base = id.replace(AA_QUANTIZATION_PATTERN, "");
+  if (base === id || !normalizedModelSuffix(base)) return undefined;
+  return uniqueAaReferencePriceMatch(base, catalog);
+}
+
 export async function loadAuthoritativeCatalog(signal?: AbortSignal, url = AUTHORITATIVE_CATALOG_URL): Promise<AuthoritativeCatalog> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);

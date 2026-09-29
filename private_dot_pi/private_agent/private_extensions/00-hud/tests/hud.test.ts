@@ -1,16 +1,9 @@
 // Run with: npx -y tsx --test agent/extensions/00-hud/tests/hud.test.ts
 import assert from "node:assert/strict";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
 import test, { after } from "node:test";
+import { installPackageStubs, releasePackageStubs } from "../../tests/helpers/package-stubs.ts";
 
-const stubDir = resolve("agent/extensions/node_modules/@earendil-works/pi-tui");
-mkdirSync(stubDir, { recursive: true });
-writeFileSync(resolve(stubDir, "package.json"), JSON.stringify({ name: "@earendil-works/pi-tui", type: "module", exports: "./index.js" }));
-writeFileSync(resolve(stubDir, "index.js"), `
-export function visibleWidth(value) { return [...String(value).replace(/\\x1b\\[[0-?]*[ -\\/]*[@-~]/g, "")].length; }
-export function truncateToWidth(value, width) { return [...String(value)].slice(0, Math.max(0, width)).join(""); }
-`);
+installPackageStubs();
 
 let modules: Promise<{
   registry: typeof import("../registry.ts");
@@ -23,7 +16,7 @@ function load() {
     .then(([registry, layout, sanitize, render]) => ({ registry, layoutFooter: layout.layoutFooter, sanitizeHudText: sanitize.sanitizeHudText, render }));
 }
 
-after(() => rmSync(stubDir, { recursive: true, force: true }));
+after(() => releasePackageStubs());
 
 const variants = (text: string) => ({ full: [{ text }], compact: [{ text: text.slice(0, 4) }], icon: [{ text: text.slice(0, 1) }] });
 

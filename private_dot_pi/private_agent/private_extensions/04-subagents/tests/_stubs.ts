@@ -6,87 +6,16 @@
  * so we materialise minimal stubs into agent/extensions/node_modules/ before
  * importing a testable copy of the module under test.
  *
- * Each subagent test writes the SAME superset stubs, so the three test files
- * are safe to run in any order (and even in a shared process).
+ * Every suite in this repo installs the SAME union stubs through
+ * tests/helpers/package-stubs.ts, which is safe for parallel test processes:
+ * the stubs are reference-counted per process and only removed once no live
+ * test process still needs them.
  */
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { after } from "node:test";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { installPackageStubs, releasePackageStubs } from "../../tests/helpers/package-stubs.ts";
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-// subagent/tests/ -> ../.. -> agent/extensions
-const NODE_MODULES = resolve(HERE, "../../node_modules");
-const STUB_PACKAGES = ["@earendil-works/pi-ai", "@earendil-works/pi-coding-agent", "@earendil-works/pi-tui", "typebox"];
-after(() => { for (const name of STUB_PACKAGES) rmSync(resolve(NODE_MODULES, ...name.split("/")), { recursive: true, force: true }); });
-
-function writePkg(name: string, indexContent: string): void {
-	const dir = resolve(NODE_MODULES, ...name.split("/"));
-	mkdirSync(dir, { recursive: true });
-	writeFileSync(
-		resolve(dir, "package.json"),
-		JSON.stringify({ name, type: "module", exports: "./index.js" }),
-	);
-	writeFileSync(resolve(dir, "index.js"), `${indexContent}\n`);
-}
-
-/**
- * Minimal YAML frontmatter parser matching pi's parseFrontmatter for the
- * `key: value` lines used by agent fixtures.
- */
-const PARSE_FRONTMATTER = `
-export function parseFrontmatter(content) {
-  const m = content.match(/^---\\r?\\n([\\s\\S]*?)\\r?\\n---\\r?\\n?([\\s\\S]*)$/);
-  if (!m) return { frontmatter: {}, body: content };
-  const frontmatter = {};
-  for (const line of m[1].split(/\\r?\\n/)) {
-    const i = line.indexOf(':');
-    if (i === -1) continue;
-    frontmatter[line.slice(0, i).trim()] = line.slice(i + 1).trim();
-  }
-  return { frontmatter, body: m[2] };
-}
-`.trim();
+after(() => releasePackageStubs());
 
 export function writePackageStubs(): void {
-	writePkg(
-		"@earendil-works/pi-ai",
-		[
-			"export function StringEnum(values, options = {}) { return { type: 'string', enum: [...values], ...options }; }",
-			"export async function completeSimple() { return { role: 'assistant', content: [], usage: {} }; }",
-		].join("\n"),
-	);
-
-	writePkg(
-		"@earendil-works/pi-coding-agent",
-		[
-			"export function getAgentDir() { return globalThis.__subagentAgentDir || '/nonexistent-subagent-test'; }",
-			PARSE_FRONTMATTER,
-			"export function getMarkdownTheme() { return {}; }",
-			"export function withFileMutationQueue(_p, fn) { return fn(); }",
-		].join("\n"),
-	);
-
-	writePkg(
-		"@earendil-works/pi-tui",
-		[
-			"export class Container { constructor() { this.children = []; } addChild(c) { this.children.push(c); return c; } }",
-			"export class Text { constructor(text) { this.text = text; } }",
-			"export class Spacer { constructor(n) { this.n = n; } }",
-			"export class Markdown { constructor(text) { this.text = text; } }",
-		].join("\n"),
-	);
-
-	writePkg(
-		"typebox",
-		[
-			"export const Type = {",
-			"  Object(properties) { return { type: 'object', properties }; },",
-			"  Optional(schema) { return { ...schema, optional: true }; },",
-			"  Array(items, options = {}) { return { type: 'array', items, ...options }; },",
-			"  String(options = {}) { return { type: 'string', ...options }; },",
-			"  Boolean(options = {}) { return { type: 'boolean', ...options }; },",
-			"};",
-		].join("\n"),
-	);
+	installPackageStubs();
 }

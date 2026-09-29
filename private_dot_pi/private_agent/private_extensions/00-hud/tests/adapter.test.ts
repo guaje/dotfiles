@@ -1,23 +1,12 @@
 // Run with: npx -y tsx --test agent/extensions/00-hud/tests/adapter.test.ts
 import assert from "node:assert/strict";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
 import test, { after } from "node:test";
+import { resolve } from "node:path";
+import { installPackageStubs, releasePackageStubs } from "../../tests/helpers/package-stubs.ts";
 
-const stubDir = resolve("agent/extensions/node_modules/@earendil-works/pi-tui");
-mkdirSync(stubDir, { recursive: true });
-writeFileSync(resolve(stubDir, "package.json"), JSON.stringify({ name: "@earendil-works/pi-tui", type: "module", exports: "./index.js" }));
-writeFileSync(resolve(stubDir, "index.js"), `
-const strip = (value) => String(value).replace(/\\x1b\\[[0-?]*[ -\\/]*[@-~]/g, "");
-export function visibleWidth(value) { return [...strip(value)].length; }
-export function truncateToWidth(value, width, marker = "") {
-  const text = String(value);
-  if (visibleWidth(text) <= width) return text;
-  return [...strip(text)].slice(0, Math.max(0, width - visibleWidth(marker))).join("") + marker;
-}
-`);
+installPackageStubs();
 
-after(() => rmSync(stubDir, { recursive: true, force: true }));
+after(() => releasePackageStubs());
 
 const variants = (text: string) => ({ full: [{ text }] });
 

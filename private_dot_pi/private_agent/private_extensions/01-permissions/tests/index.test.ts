@@ -8,30 +8,10 @@ import { hasActiveRemoteRoute, setRemoteBashBackend } from "../../02-handoff/bac
 import { setSessionManagingStyle } from "../management-settings.ts";
 import { cacheHotkeys } from "../shortcuts.ts";
 import { importPiModule } from "../../packages/pi-package.ts";
+import { installPackageStubs, releasePackageStubs } from "../../tests/helpers/package-stubs.ts";
 import { approvalFingerprint, clearSessionApprovals, findSessionApproval, listSessionApprovals, rememberSessionApproval, resetSessionApprovalsForTests } from "../session-command-approvals.ts";
 
-const packageDir = resolve("agent/extensions/node_modules/@earendil-works/pi-coding-agent");
-const tuiDir = resolve("agent/extensions/node_modules/@earendil-works/pi-tui");
-mkdirSync(packageDir, { recursive: true });
-mkdirSync(tuiDir, { recursive: true });
-writeFileSync(resolve(packageDir, "package.json"), JSON.stringify({ name: "@earendil-works/pi-coding-agent", type: "module", exports: "./index.js" }));
-writeFileSync(resolve(packageDir, "index.js"), `
-export function isToolCallEventType(name, event) { return event?.toolName === name; }
-export function createBashTool(cwd, options) {
-  return {
-    name: "bash", label: "bash", description: "stub bash", parameters: { type: "object" }, promptGuidelines: ["original guideline"],
-    async execute(_id, params) { return { content: [{ type: "text", text: params.command }], details: { cwd, remote: Boolean(options?.operations) } }; },
-  };
-}
-`);
-writeFileSync(resolve(tuiDir, "package.json"), JSON.stringify({ name: "@earendil-works/pi-tui", type: "module", exports: "./index.js" }));
-writeFileSync(resolve(tuiDir, "index.js"), `
-export class Text { constructor(text) { this.text = text; } }
-export class Container { constructor() { this.children = []; } addChild(value) { this.children.push(value); } }
-export class Spacer { constructor(size) { this.size = size; } }
-export class SelectList { constructor(options) { this.options = options; } setSelectedIndex(index) { this.selectedIndex = index; } }
-export function matchesKey(data, key) { return key === "ctrl+:" ? data === "ctrl+:" : key === "shift+ctrl+:" && data === "shift+ctrl+:"; }
-`);
+installPackageStubs();
 
 const originalPiRoot = process.env.PI_CODING_AGENT_PACKAGE_ROOT;
 const fakePiRoot = mkdtempSync(join(tmpdir(), "permissions-pi-"));
@@ -52,8 +32,7 @@ process.env.PI_CODING_AGENT_PACKAGE_ROOT = fakePiRoot;
 
 after(() => {
   setRemoteBashBackend(undefined);
-  rmSync(packageDir, { recursive: true, force: true });
-  rmSync(tuiDir, { recursive: true, force: true });
+  releasePackageStubs();
   rmSync(fakePiRoot, { recursive: true, force: true });
   if (originalPiRoot === undefined) delete process.env.PI_CODING_AGENT_PACKAGE_ROOT;
   else process.env.PI_CODING_AGENT_PACKAGE_ROOT = originalPiRoot;

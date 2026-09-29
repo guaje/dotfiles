@@ -1,15 +1,13 @@
 // Run with: npx -y tsx --test agent/extensions/03-stats/tests/index.test.ts
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { installPackageStubs, releasePackageStubs } from "../../tests/helpers/package-stubs.ts";
 
 const EXTENSION_PATH = resolve("agent/extensions/03-stats/index.ts");
-const STUB_PACKAGE_DIR = resolve("agent/extensions/node_modules");
-const PI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@earendil-works/pi-coding-agent");
-const PI_TUI_PACKAGE_DIR = resolve(STUB_PACKAGE_DIR, "@earendil-works/pi-tui");
 
 function createModelsFixture() {
   const root = mkdtempSync(resolve(tmpdir(), "pi-stats-models-"));
@@ -28,33 +26,13 @@ function createModelsFixture() {
 }
 
 async function loadExtension() {
-  mkdirSync(PI_PACKAGE_DIR, { recursive: true });
-  writeFileSync(resolve(PI_PACKAGE_DIR, "package.json"), JSON.stringify({
-    name: "@earendil-works/pi-coding-agent",
-    type: "module",
-    exports: "./index.js",
-  }));
-  writeFileSync(resolve(PI_PACKAGE_DIR, "index.js"), "");
-
-  mkdirSync(PI_TUI_PACKAGE_DIR, { recursive: true });
-  writeFileSync(resolve(PI_TUI_PACKAGE_DIR, "package.json"), JSON.stringify({
-    name: "@earendil-works/pi-tui",
-    type: "module",
-    exports: "./index.js",
-  }));
-  writeFileSync(resolve(PI_TUI_PACKAGE_DIR, "index.js"), [
-    "export const Key = { escape: 'escape', up: 'up', down: 'down', pageUp: 'pageUp', pageDown: 'pageDown', home: 'home', end: 'end', space: 'space', ctrl: (k) => `ctrl+${k}` };",
-    "export function matchesKey(data, key) { return data === key || (key === 'escape' && data === '\\x1b') || (key === 'ctrl+c' && data === '\\x03'); }",
-    "export function truncateToWidth(text, width) { return String(text).slice(0, Math.max(0, width)); }",
-  ].join("\n"));
-
+  installPackageStubs();
   const moduleUrl = `${pathToFileURL(EXTENSION_PATH).href}?t=${Date.now()}`;
   return import(moduleUrl);
 }
 
 test.after(() => {
-  rmSync(PI_PACKAGE_DIR, { recursive: true, force: true });
-  rmSync(PI_TUI_PACKAGE_DIR, { recursive: true, force: true });
+  releasePackageStubs();
 });
 
 test("calculateUsageCost uses Pi's USD-per-1M-token formula including 1h cache writes", async () => {

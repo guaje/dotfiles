@@ -1,15 +1,17 @@
 import path from "node:path";
+import { readFile } from "node:fs/promises";
 import { createSettingsStore } from "../08-settings/store.ts";
-import { loadBenchmarkAssets } from "../04-subagents/benchmark-assets.ts";
+import { loadBenchmarkAssets, loadBenchmarkHealth } from "../04-subagents/benchmark-assets.ts";
 import { qualifyBenchmarkProfiles } from "../04-subagents/benchmark-qualification.ts";
-import type { BenchmarkThinkingLevel } from "../04-subagents/benchmark-types.ts";
+import type { BenchmarkHealthState, BenchmarkThinkingLevel } from "../04-subagents/benchmark-types.ts";
 import { refreshCatalog } from "./catalog.ts";
-import { loadAuthoritativeCatalog, loadOllamaCloudCatalog, loadReviewedCosts, normalizeCost, ollamaCloudModel, uniqueNormalizedAuthoritativeMatch } from "./cost-sources.ts";
+import { loadAuthoritativeCatalog, loadOllamaCloudCatalog, loadReviewedCosts, normalizeCost, ollamaCloudModel, parseAaReferencePriceCatalog, uniqueAaReferencePriceMatch, uniqueAaQuantizedReferencePriceMatch, uniqueNormalizedAuthoritativeMatch, type AaReferencePriceCatalog } from "./cost-sources.ts";
 import { loadProviderSettings } from "./provider-settings.ts";
 import { loadCatalogState, saveCatalogState } from "./state.ts";
 import type { CatalogModel, CatalogState, CostRates, ThinkingLevelMap } from "./types.ts";
-import { baseConfig, loadRequiredMappings } from "./aa/config.ts";
-import { aaService, validateReviewedVariants, type AaCandidate, type AaReviewCatalog, type ArtifactState, type CleanupResult, type PublicationOptions, type PublicationResult, type ReviewedVariant } from "./aa/service.ts";
+import { baseConfig, loadDiscoverConfig, loadRequiredMappings } from "./aa/config.ts";
+import { fetchCatalog } from "./aa/client.ts";
+import { aaService, validateReviewedVariants, type AaCandidate, type AaReviewCatalog, type ArtifactState, type BenchmarkHealthResult, type CleanupResult, type PublicationOptions, type PublicationResult, type ReviewedVariant, type ScopeEnforcementResult } from "./aa/service.ts";
 import { UUID, codePointCompare, isRecord } from "./aa/schema.ts";
 
 export interface SafeRuntimeModel {
@@ -29,6 +31,8 @@ export interface AaVariantReport {
   thinkingLevel: BenchmarkThinkingLevel;
   aaModelId: string;
   qualifiedProfiles: string[];
+  /** Qualified profiles whose gate relied on a retired-benchmark fallback substitution. */
+  substitutedProfiles?: string[];
 }
 
 export interface SyncedModelReport {
@@ -72,8 +76,21 @@ interface SyncDependencies {
   loadReviewedCosts: typeof loadReviewedCosts;
   loadOllamaCloudCatalog: typeof loadOllamaCloudCatalog;
   loadBenchmarkAssets: typeof loadBenchmarkAssets;
+  loadBenchmarkHealth: typeof loadBenchmarkHealth;
   loadAaConfig: typeof baseConfig;
   loadAaMappings: typeof loadRequiredMappings;
+  loadAaReferencePrices: (signal?: AbortSignal) => Promise<AaReferencePriceCatalog | null>;
+}
+
+/** AA catalog reference prices back self-hosted variants; any failure degrades to null. */
+async function loadAaReferencePriceCatalog(signal?: AbortSignal): Promise<AaReferencePriceCatalog | null> {
+  try {
+    const config = await loadDiscoverConfig(process.env);
+    const catalog = await fetchCatalog({ ...config, apiUrl: new URL("https://artificialanalysis.ai/api/v2/language/models/free") }, signal);
+    return parseAaReferencePriceCatalog(catalog.records);
+  } catch {
+    return null;
+  }
 }
 
 const defaults: SyncDependencies = {
@@ -86,8 +103,10 @@ const defaults: SyncDependencies = {
   loadReviewedCosts,
   loadOllamaCloudCatalog,
   loadBenchmarkAssets,
+  loadBenchmarkHealth,
   loadAaConfig: baseConfig,
   loadAaMappings: loadRequiredMappings,
+  loadAaReferencePrices: loadAaReferencePriceCatalog,
 };
 
 const runtimeId = (model: SafeRuntimeModel) => `${model.provider}/${model.id}`;
@@ -129,7 +148,8 @@ function runtimeCost(model: SafeRuntimeModel): CostRates | undefined {
   return normalizeCost(model.cost);
 }
 function providerCatalogCost(model: CatalogModel | undefined): CostRates | undefined {
-  if (!model?.cost || /^(?:authoritative:|ollama-cloud:|reviewed-override$)/.test(model.costProvenance ?? "")) return undefined;
+  // AA reference prices are re-resolved from the live catalog on every sync instead of being reused from state.
+  if (!model?.cost || /^(?:authoritative:|ollama-cloud:|reviewed-override$|aa-catalog:)/.test(model.costProvenance ?? "")) return undefined;
   return model.cost;
 }
 
@@ -162,10 +182,16 @@ export async function syncEnabledModels(pi: any, ctx: SyncContext, dependencies:
     if (ollama === undefined) ollama = await deps.loadOllamaCloudCatalog(ctx.signal).catch(() => null);
     return ollama;
   };
+  let aaPricing: AaReferencePriceCatalog | null | undefined;
+  const loadAaPricingOnce = async () => {
+    if (aaPricing === undefined) aaPricing = await deps.loadAaReferencePrices(ctx.signal).catch(() => null);
+    return aaPricing;
+  };
   const reviewed = await deps.loadReviewedCosts();
   const aaConfig = deps.loadAaConfig(process.env);
   const mappings = await deps.loadAaMappings(aaConfig).catch(() => { throw new Error("canonical AA mappings are unavailable or invalid"); });
   const assets = await deps.loadBenchmarkAssets(aaConfig.paths.snapshotRoot, aaConfig.limits.maxAgeMs).catch(() => null);
+  const benchmarkHealthState = await deps.loadBenchmarkHealth(aaConfig.paths.snapshotRoot, aaConfig.limits.maxAgeMs);
   const snapshotsByUuid = new Map((assets?.snapshots ?? []).map((snapshot) => [snapshot.modelId, snapshot]));
   const previousNative = new Map(state.nativeModels.map((model) => [model.id, { ...model, active: false }]));
   const reports: SyncedModelReport[] = [];
@@ -201,6 +227,13 @@ export async function syncEnabledModels(pi: any, ctx: SyncContext, dependencies:
       if (fallback) { cost = fallback; costProvenance = "reviewed-override"; }
       else if (ollamaModel?.available) costProvenance = "ollama-cloud:price-unpublished";
     }
+    if (!cost) {
+      const aaPricing = await loadAaPricingOnce();
+      const exact = aaPricing ? uniqueAaReferencePriceMatch(id, aaPricing) : undefined;
+      const quantized = !exact && aaPricing ? uniqueAaQuantizedReferencePriceMatch(id, aaPricing) : undefined;
+      const matched = exact ?? quantized;
+      if (matched) { cost = matched.cost; costProvenance = exact ? `aa-catalog:reference-price:${matched.slug}` : `aa-catalog:reference-price:quantized-variant:${matched.slug}`; }
+    }
     if (ollamaCloud && ollama === undefined) {
       const ollamaCatalog = await loadOllamaOnce();
       ollamaModel = ollamaCatalog ? ollamaCloudModel(id, ollamaCatalog) : undefined;
@@ -226,15 +259,17 @@ export async function syncEnabledModels(pi: any, ctx: SyncContext, dependencies:
     for (const entry of aaEntries) {
       const snapshot = snapshotsByUuid.get(entry.aaModelId);
       if (!snapshot) continue;
-      const qualifiedProfiles = qualifyBenchmarkProfiles({ input: Array.isArray(model.input) ? model.input as string[] : ["text"], contextWindow: model.contextWindow, maxTokens: model.maxTokens }, snapshot)
-        .filter((qualification) => qualification.qualified).map((qualification) => qualification.profile);
-      variants.push({ thinkingLevel: entry.thinkingLevel, aaModelId: entry.aaModelId, qualifiedProfiles });
+      const qualifications = qualifyBenchmarkProfiles({ input: Array.isArray(model.input) ? model.input as string[] : ["text"], contextWindow: model.contextWindow, maxTokens: model.maxTokens }, snapshot, benchmarkHealthState?.fields);
+      const qualifiedProfiles = qualifications.filter((qualification) => qualification.qualified).map((qualification) => qualification.profile);
+      const substitutedProfiles = qualifications.filter((qualification) => qualification.qualified && qualification.substitutions?.length).map((qualification) => qualification.profile);
+      variants.push({ thinkingLevel: entry.thinkingLevel, aaModelId: entry.aaModelId, qualifiedProfiles, ...(substitutedProfiles.length ? { substitutedProfiles } : {}) });
     }
     for (const snapshot of directSnapshots) {
       if (variants.some((variant) => variant.aaModelId === snapshot.modelId)) continue;
-      const qualifiedProfiles = qualifyBenchmarkProfiles({ input: Array.isArray(model.input) ? model.input as string[] : ["text"], contextWindow: model.contextWindow, maxTokens: model.maxTokens }, snapshot)
-        .filter((qualification) => qualification.qualified).map((qualification) => qualification.profile);
-      variants.push({ thinkingLevel: snapshot.thinkingLevel, aaModelId: snapshot.modelId, qualifiedProfiles });
+      const qualifications = qualifyBenchmarkProfiles({ input: Array.isArray(model.input) ? model.input as string[] : ["text"], contextWindow: model.contextWindow, maxTokens: model.maxTokens }, snapshot, benchmarkHealthState?.fields);
+      const qualifiedProfiles = qualifications.filter((qualification) => qualification.qualified).map((qualification) => qualification.profile);
+      const substitutedProfiles = qualifications.filter((qualification) => qualification.qualified && qualification.substitutions?.length).map((qualification) => qualification.profile);
+      variants.push({ thinkingLevel: snapshot.thinkingLevel, aaModelId: snapshot.modelId, qualifiedProfiles, ...(substitutedProfiles.length ? { substitutedProfiles } : {}) });
     }
     variants.sort((a, b) => codePointCompare(`${a.thinkingLevel ?? ""}/${a.aaModelId}`, `${b.thinkingLevel ?? ""}/${b.aaModelId}`));
     const providerSettings = settings.find((provider) => provider.id === model.provider);
@@ -243,7 +278,19 @@ export async function syncEnabledModels(pi: any, ctx: SyncContext, dependencies:
     reports.push({ id, source, canonicalId, ...(cost ? { cost } : {}), costProvenance, variantCapable, aaVariants: variants, aaMissing: variants.length === 0, available: ollamaCloud && ollama ? !!ollamaModel : catalogModel?.available ?? true });
   }
 
-  const nextState: CatalogState = { ...state, nativeModels: [...previousNative.values()].sort((a, b) => codePointCompare(a.id, b.id)) };
+  // Persist every price this sync resolved for scoped custom models so /catalog, /catalog refresh, and
+  // health reports read the same enrichment the sync report shows. Provider-published state costs are
+  // never overwritten, and later refreshes preserve the filled costs via the last-known-good merge.
+  const reportsById = new Map(reports.map((model) => [model.id, model] as const));
+  const providers = state.providers.map((provider) => ({
+    ...provider,
+    models: provider.models.map((model) => {
+      if (model.cost) return model;
+      const report = reportsById.get(`${provider.id}/${model.id}`);
+      return report?.cost ? { ...model, cost: report.cost, costProvenance: report.costProvenance } : model;
+    }),
+  }));
+  const nextState: CatalogState = { ...state, providers, nativeModels: [...previousNative.values()].sort((a, b) => codePointCompare(a.id, b.id)) };
   await deps.saveCatalogState(nextState);
   return {
     state: nextState,
@@ -262,6 +309,8 @@ export interface AaOperations {
   replaceReviewedVariants(runtimeModelId: string, canonicalId: string, variants: ReviewedVariant[], signal?: AbortSignal, env?: NodeJS.ProcessEnv, reviewedCatalog?: AaReviewCatalog["catalog"], options?: PublicationOptions): Promise<PublicationResult>;
   captureArtifactState?(env?: NodeJS.ProcessEnv): Promise<ArtifactState>;
   cleanupObsoleteSnapshots?(signal?: AbortSignal, env?: NodeJS.ProcessEnv): Promise<CleanupResult>;
+  enforceScope?(signal?: AbortSignal, env?: NodeJS.ProcessEnv): Promise<ScopeEnforcementResult>;
+  detectBenchmarkHealth?(signal?: AbortSignal, env?: NodeJS.ProcessEnv): Promise<BenchmarkHealthResult>;
 }
 export interface AaArtifactChange { kind: "M" | "A" | "D"; path: string; targetPath: string; }
 export interface AaArtifactChangeSummary { changes: AaArtifactChange[]; warnings: string[]; }
@@ -274,6 +323,7 @@ export function netAaArtifactChanges(before: ArtifactState, after: ArtifactState
   };
   changedMetadata(before.manifest, after.manifest);
   changedMetadata(before.canonicalMappings, after.canonicalMappings);
+  changedMetadata(before.benchmarkHealth, after.benchmarkHealth);
   const beforeReferences = new Set(before.manifestSnapshotFiles), afterReferences = new Set(after.manifestSnapshotFiles);
   for (const file of [...afterReferences].sort(codePointCompare)) if (!beforeReferences.has(file)) changes.push({ kind: "A", path: `models/${file}`, targetPath: path.resolve(after.snapshotRoot, "models", file) });
   const afterGenerated = new Set(after.generatedSnapshotFiles);
@@ -289,6 +339,33 @@ export async function cleanupAaObsoleteSnapshots(signal?: AbortSignal, operation
   return operations.cleanupObsoleteSnapshots(signal);
 }
 /** Finalize interactive AA work only after the sync's decisive catalog reconciliation. */
+/** Enforce /scoped-models as the lifecycle authority for reviewed-AA artifacts before the final cleanup. */
+export async function enforceAaScope(signal?: AbortSignal, operations: AaOperations = aaService): Promise<ScopeEnforcementResult> {
+  if (!operations.enforceScope) throw new Error("AA scope enforcement is unavailable");
+  return operations.enforceScope(signal);
+}
+
+const BENCHMARK_HEALTH_FRESH_MS = 7 * 86_400_000;
+
+/** Re-assess AA benchmark availability at most weekly; fresh artifacts skip all page fetches. */
+export async function detectAaBenchmarkHealth(signal?: AbortSignal, operations: AaOperations = aaService, env: NodeJS.ProcessEnv = process.env): Promise<BenchmarkHealthResult & { ran: boolean }> {
+  if (!operations.detectBenchmarkHealth) throw new Error("AA benchmark health detection is unavailable");
+  let fresh = false;
+  try {
+    const value: unknown = JSON.parse(await readFile(baseConfig(env).paths.benchmarkHealth, "utf8"));
+    const generatedAt = isRecord(value) && typeof value.generatedAt === "number" ? value.generatedAt : 0;
+    fresh = Date.now() - generatedAt <= BENCHMARK_HEALTH_FRESH_MS && generatedAt <= Date.now() + 60_000;
+  } catch { /* missing or corrupt artifacts always trigger a fresh assessment */ }
+  if (fresh) return { ran: false, changed: false, fields: {}, warnings: [] };
+  return { ran: true, ...(await operations.detectBenchmarkHealth(signal, env)) };
+}
+
+/** Read the current benchmark-health artifact for reporting; null when absent, stale, or invalid. */
+export async function loadAaBenchmarkHealth(): Promise<BenchmarkHealthState | null> {
+  const config = baseConfig(process.env);
+  return loadBenchmarkHealth(config.paths.snapshotRoot, config.limits.maxAgeMs);
+}
+
 export async function finalizeAaSync<Report>(
   report: Report,
   publishedAaSucceeded: boolean,

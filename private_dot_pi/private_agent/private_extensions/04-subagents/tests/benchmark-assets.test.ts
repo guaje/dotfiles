@@ -4,10 +4,11 @@ import { chmodSync, mkdtempSync, mkdirSync, readFileSync, renameSync, rmSync, wr
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { loadBenchmarkAssets, ROUTING_POLICY, validateRoutingPolicy } from "../benchmark-assets.ts";
+import { loadBenchmarkAssets, loadBenchmarkHealth, ROUTING_POLICY, validateRoutingPolicy } from "../benchmark-assets.ts";
 import { BENCHMARK_DIMENSIONS } from "../benchmark-types.ts";
+import { benchmarkHealthDigest, METHODOLOGY, PUBLIC_METHODOLOGY_VERSION } from "../../09-catalog/aa/schema.ts";
 
-const methodology = { id: "artificial-analysis-intelligence-index", version: "4.1" };
+const methodology = { id: METHODOLOGY.id, version: METHODOLOGY.version };
 const AA_MODEL_ID = "11111111-1111-4111-8111-111111111111";
 const scores = Object.fromEntries(BENCHMARK_DIMENSIONS.map((dimension) => [dimension, 50]));
 const canonical = (value: any): any => Array.isArray(value)
@@ -31,7 +32,7 @@ function fixture(mutator?: (manifest: any, snapshot: any) => void) {
 		methodology: { ...methodology },
 		mapping: { status: "mapped", matchBasis: "manual", reviewedAt: 900, thinkingLevel: null },
 		source: { name: "Synthetic", slug: "synthetic", openrouterApiId: "p/m" },
-		publicPage: { url: "https://artificialanalysis.ai/models/synthetic", retrievedAt: 1000, contentSha256: "a".repeat(64), recordSha256: "b".repeat(64), extractorVersion: "aa-current-model-rsc-v1", intelligenceIndexMethodologyVersion: "4.1.1" },
+		publicPage: { url: "https://artificialanalysis.ai/models/synthetic", retrievedAt: 1000, contentSha256: "a".repeat(64), recordSha256: "b".repeat(64), extractorVersion: "aa-current-model-rsc-v1", intelligenceIndexMethodologyVersion: PUBLIC_METHODOLOGY_VERSION },
 		scores: { ...scores },
 		toolUse: { components: { tau3Banking: null, gdpvalAaNormalized: null, tau2Telecom: { normalizedScore: 50, sourceKind: "api", fieldPath: "evaluations.tau2_telecom", benchmark: { id: "tau2-telecom", version: "test", status: "current" }, retrievedAt: 1000, sourceUrl: "https://artificialanalysis.ai/api/v2/language/models", sourceRecordDigest: "c".repeat(64) } }, derivation: { version: "v1", rule: "tau2-telecom-fallback", score: 50 } },
 		outputTokens: { balanced: 100 },
@@ -236,4 +237,49 @@ test("accepts only the tau3-plus-GDP primary pair or the legacy tau2 fallback", 
 		snapshot.coverage = 8 / 9;
 	});
 	try { assert.equal((await loadBenchmarkAssets(loneCurrent.root, 2000, 2000))?.snapshots[0]?.scores.toolUse, null); } finally { loneCurrent.dispose(); }
+});
+
+test("benchmark health artifacts load only when valid, fresh, digest-intact, and private", async () => {
+	const root = mkdtempSync(join(tmpdir(), "pi-benchmark-health-"));
+	try {
+		const entry = (field: string) => ({ checked: 15, scored: field === "ifbench" ? 0 : 12, status: field === "ifbench" ? "retired" : "lagging", newestScoredRelease: field === "ifbench" ? "2026-07-09" : "2026-08-20" });
+		const base = { version: 1 as const, methodology: { id: METHODOLOGY.id, version: METHODOLOGY.version }, fields: Object.fromEntries(BENCHMARK_DIMENSIONS.length ? ["agenticIndex", "critpt", "gdpvalNormalized", "gpqa", "hle", "ifbench", "lcr", "omniscienceAccuracy", "omniscienceHallucinationRate", "tau2", "tau3Banking"].map((field) => [field, entry(field)]) : []) };
+		const artifact = { ...base, generatedAt: 1_500, digest: benchmarkHealthDigest(base) };
+		const file = join(root, "benchmark-health.json");
+		const publish = (value: unknown, mode = 0o600) => { writeFileSync(file, JSON.stringify(value)); chmodSync(file, mode); };
+		publish(artifact);
+		const loaded = await loadBenchmarkHealth(root, 1_000, 2_000);
+		assert.equal(loaded?.fields.ifbench.status, "retired");
+		assert.equal(loaded?.fields.gpqa.status, "lagging");
+		assert.equal(await loadBenchmarkHealth(root, 400, 2_000), null);
+		assert.equal(await loadBenchmarkHealth(root, 1_000, 60_000), null);
+		publish({ ...artifact, digest: "0".repeat(64) });
+		assert.equal(await loadBenchmarkHealth(root, 1_000, 2_000), null);
+		publish({ ...artifact, fields: { ...artifact.fields, extra: entry("extra") } });
+		assert.equal(await loadBenchmarkHealth(root, 1_000, 2_000), null);
+		publish(artifact, 0o640);
+		assert.equal(await loadBenchmarkHealth(root, 1_000, 2_000), null);
+		publish(artifact);
+		writeFileSync(file, "{corrupt"); chmodSync(file, 0o600);
+		assert.equal(await loadBenchmarkHealth(root, 1_000, 2_000), null);
+		assert.equal(await loadBenchmarkHealth(join(root, "absent"), 1_000, 2_000), null);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("routing policy v5 fallback sources validate structurally", () => {
+	assert.equal(ROUTING_POLICY.version, "5");
+	assert.deepEqual(ROUTING_POLICY.profiles.planning.fallbackSources?.instructionFollowing, [{ fields: ["critpt"], floor: 10, healthField: "ifbench" }]);
+	assert.equal(ROUTING_POLICY.profiles.coding.fallbackSources, undefined);
+	const drift = structuredClone(ROUTING_POLICY) as any;
+	drift.profiles.review.fallbackSources.instructionFollowing[0].fields = ["faithfulness"];
+	assert.equal(validateRoutingPolicy(drift), false);
+	const foreign = structuredClone(ROUTING_POLICY) as any;
+	foreign.profiles.balanced.fallbackSources = { knowledge: [{ fields: ["critpt"], floor: 10, healthField: "ifbench" }] };
+	assert.equal(validateRoutingPolicy(foreign), false);
+	const floorless = structuredClone(ROUTING_POLICY) as any;
+	floorless.profiles.planning.fallbackSources.scientificReasoning[0].floor = -1;
+	assert.equal(validateRoutingPolicy(floorless), false);
+	const unretirable = structuredClone(ROUTING_POLICY) as any;
+	unretirable.profiles.review.fallbackSources.instructionFollowing[0].healthField = "critpt2";
+	assert.equal(validateRoutingPolicy(unretirable), false);
 });

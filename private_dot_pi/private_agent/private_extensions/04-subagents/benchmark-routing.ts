@@ -1,15 +1,14 @@
 import {
-	BENCHMARK_DIMENSIONS,
-	type BenchmarkDimension,
 	type BenchmarkRouteDiagnostics,
 	type BenchmarkSnapshot,
 	type BenchmarkThinkingLevel,
 	type CandidateEvaluationDiagnostics,
-	type QualityDiagnostics,
 	type RoutingProfile,
 	type ThinkingLevel,
 } from "./benchmark-types.ts";
 import { ROUTING_POLICY, validateRoutingPolicy } from "./benchmark-assets.ts";
+import { evaluateBenchmarkGates } from "./benchmark-qualification.ts";
+import type { BenchmarkHealth, QualityDiagnostics } from "./benchmark-types.ts";
 import { aaModelIdForCanonical, canonicalIdForRuntime } from "./canonical-mappings.ts";
 
 export interface RouteCandidate {
@@ -84,58 +83,8 @@ function predictedCompletion(
 		: null;
 }
 
-function benchmarkQuality(snapshot: BenchmarkSnapshot, profile: RoutingProfile): { quality?: QualityDiagnostics; gateReason?: CandidateEvaluationDiagnostics["gateReason"] } {
-	const policy = ROUTING_POLICY.profiles[profile];
-	let invalid = false;
-	for (const dimension of BENCHMARK_DIMENSIONS) {
-		const value = snapshot.scores[dimension];
-		const anchor = ROUTING_POLICY.anchors[dimension];
-		if (value !== null && (!Number.isFinite(value) || value < anchor.minimum || value > anchor.maximum)) invalid = true;
-	}
-
-	let totalWeight = 0;
-	let availableWeight = 0;
-	let weighted = 0;
-	const availableWeightedDimensions: BenchmarkDimension[] = [];
-	const missingWeightedDimensions: BenchmarkDimension[] = [];
-	for (const dimension of BENCHMARK_DIMENSIONS) {
-		const weight = policy.weights[dimension];
-		if (weight <= 0) continue;
-		totalWeight += weight;
-		const value = snapshot.scores[dimension];
-		if (value === null) {
-			missingWeightedDimensions.push(dimension);
-			continue;
-		}
-		availableWeight += weight;
-		availableWeightedDimensions.push(dimension);
-		const anchor = ROUTING_POLICY.anchors[dimension];
-		weighted += weight * Math.max(0, Math.min(1, (value - anchor.minimum) / (anchor.maximum - anchor.minimum)));
-	}
-	if (!(totalWeight > 0)) return { gateReason: "invalidBenchmark" };
-	const quality: QualityDiagnostics = {
-		A: availableWeight ? weighted / availableWeight : 0,
-		C: availableWeight / totalWeight,
-		Q: weighted / totalWeight,
-		totalWeight,
-		availableWeight,
-		availableWeightedDimensions,
-		missingWeightedDimensions,
-	};
-
-	// This order is contractual and is preserved in every no-winner diagnostic.
-	for (const dimension of policy.requiredDimensions) if (snapshot.scores[dimension] === null) return { quality, gateReason: "missingRequiredDimension" };
-	for (const [dimension, floor] of Object.entries(policy.mandatoryFloors)) {
-		const score = snapshot.scores[dimension as BenchmarkDimension];
-		if (score === null || score < floor!) return { quality, gateReason: "mandatoryFloor" };
-	}
-	if (ROUTING_POLICY.faithfulnessPolicy.appliesTo.includes(profile as "research" | "review")) {
-		const faithfulness = snapshot.scores.faithfulness;
-		if (faithfulness === null || faithfulness < ROUTING_POLICY.faithfulnessPolicy.floor) return { quality, gateReason: "faithfulnessFloor" };
-	}
-	if (quality.C < policy.minimumCoverage) return { quality, gateReason: "minimumCoverage" };
-	if (invalid) return { quality, gateReason: "invalidBenchmark" };
-	return { quality };
+function benchmarkQuality(snapshot: BenchmarkSnapshot, profile: RoutingProfile, health?: BenchmarkHealth) {
+	return evaluateBenchmarkGates(snapshot, profile, health);
 }
 
 function dominates(a: RankedCandidate, b: RankedCandidate): boolean {
@@ -152,6 +101,7 @@ export function routeBenchmarkModel(
 	health: LocalHealth[],
 	snapshotDigest: string,
 	requestedThinking?: ThinkingLevel,
+	benchmarkHealth?: BenchmarkHealth,
 ): BenchmarkRoute {
 	const exclusions: Record<string, number> = {
 		noSnapshot: 0,
@@ -227,7 +177,7 @@ export function routeBenchmarkModel(
 			&& (constraints.minimumMaxTokens === 0 || (Number.isFinite(candidate.maxTokens) && candidate.maxTokens! >= constraints.minimumMaxTokens));
 		if (!capable) reasons.push("capability");
 
-		const evaluated = benchmarkQuality(snapshot, profile);
+		const evaluated = benchmarkQuality(snapshot, profile, benchmarkHealth);
 		if (evaluated.gateReason) reasons.push(evaluated.gateReason);
 		const completion = healthy && capable && !evaluated.gateReason ? predictedCompletion(snapshot, profile, local!) : null;
 		if (healthy && capable && !evaluated.gateReason && !completion) reasons.push("speed");

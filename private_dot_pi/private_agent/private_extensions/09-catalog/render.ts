@@ -1,4 +1,5 @@
 import path from "node:path";
+import type { BenchmarkHealthState } from "../04-subagents/benchmark-types.ts";
 import type { AaArtifactChangeSummary, CatalogSyncReport } from "./sync.ts";
 import type { CatalogState } from "./types.ts";
 
@@ -53,27 +54,57 @@ export function renderCatalogOverview(
 
 const CONTROL_CHARACTER = /[\x00-\x1f\x7f]/;
 
+const MAX_RENDERED_POSIX_FRAGMENT = 48;
+
 function quotePosixShellArgument(value: string): string {
   return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
 
+/** Split a POSIX-quoted argument into short pieces. Adjacent quoted pieces are concatenated by the shell. */
+function quotePosixShellArgumentFragments(value: string): string[] {
+  const fragments: string[] = []; let current = "";
+  for (const character of value) {
+    const next = `${current}${character}`;
+    if (current && quotePosixShellArgument(next).length > MAX_RENDERED_POSIX_FRAGMENT) {
+      fragments.push(quotePosixShellArgument(current)); current = character;
+    } else current = next;
+  }
+  if (current) fragments.push(quotePosixShellArgument(current));
+  return fragments;
+}
+
 function appendPosixCommand(lines: string[], command: string, targetPaths: string[]): void {
   lines.push(`${command} -- \\`);
-  for (const [index, targetPath] of targetPaths.entries()) lines.push(`  ${quotePosixShellArgument(targetPath)}${index < targetPaths.length - 1 ? " \\" : ""}`);
+  for (const [targetIndex, targetPath] of targetPaths.entries()) {
+    const fragments = quotePosixShellArgumentFragments(targetPath);
+    for (const [fragmentIndex, fragment] of fragments.entries()) {
+      const finalFragment = fragmentIndex === fragments.length - 1;
+      // Continuation pieces must begin at column zero: indentation after a backslash-newline would become part of the argument.
+      lines.push(`${fragmentIndex === 0 ? "  " : ""}${fragment}${finalFragment ? (targetIndex < targetPaths.length - 1 ? " \\" : "") : "\\"}`);
+    }
+  }
 }
 
 function isSafeArtifactTarget(targetPath: unknown): targetPath is string {
   return typeof targetPath === "string" && path.isAbsolute(targetPath) && !CONTROL_CHARACTER.test(targetPath);
 }
 
-export function renderCatalogSync(report: CatalogSyncReport, aaArtifacts?: AaArtifactChangeSummary): string {
+export function renderCatalogSync(report: CatalogSyncReport, aaArtifacts?: AaArtifactChangeSummary, benchmarkHealth?: BenchmarkHealthState | null): string {
   const lines = ["Catalog sync completed"];
   for (const model of report.models) {
     lines.push("", `${model.id} [${model.source}]`, `  availability: ${model.available ? "available" : "unavailable"}`, `  pricing: ${model.cost ? `${model.cost.input} input / ${model.cost.output} output USD per 1M (${model.costProvenance})` : model.costProvenance === "ollama-cloud:price-unpublished" ? "unpublished (Ollama Cloud did not publish explicit numeric token pricing)" : "unresolved"}`);
     if (model.aaVariants.length) {
       lines.push("  AA variants:");
-      for (const variant of model.aaVariants) lines.push(`    ${variant.thinkingLevel ?? "generic"}: ${variant.qualifiedProfiles.length ? variant.qualifiedProfiles.join(", ") : "no benchmark-qualified profiles"}`);
+      for (const variant of model.aaVariants) lines.push(`    ${variant.thinkingLevel ?? "generic"}: ${variant.qualifiedProfiles.length ? variant.qualifiedProfiles.join(", ") : "no benchmark-qualified profiles"}${variant.substitutedProfiles?.length ? ` [fallback-substituted on AA data: ${variant.substitutedProfiles.join(", ")}]` : ""}`);
     } else lines.push("  AA: unresolved — no exact reviewed mapping");
+  }
+  if (report.missingAa.length) lines.push("", `AA mappings outstanding: ${report.missingAa.join(", ")} — /catalog sync offers interactive review for models with Artificial Analysis candidates.`);
+  if (benchmarkHealth) {
+    const concerns = Object.entries(benchmarkHealth.fields).filter(([, entry]) => entry && entry.status !== "active");
+    if (concerns.length) {
+      lines.push("", `AA benchmark coverage (assessed ${new Date(benchmarkHealth.generatedAt).toISOString().slice(0, 10)}):`);
+      for (const [field, entry] of concerns) lines.push(`  ! ${field}: ${entry!.status} upstream (${entry!.scored}/${entry!.checked} recent releases scored${entry!.newestScoredRelease ? `, last ${entry!.newestScoredRelease}` : ""})`);
+    }
   }
   if (aaArtifacts?.changes.length) {
     lines.push("", "AA artifact changes to track:");
@@ -85,6 +116,8 @@ export function renderCatalogSync(report: CatalogSyncReport, aaArtifacts?: AaArt
       const additions = aaArtifacts.changes.filter((change) => change.kind !== "D").map((change) => change.targetPath);
       const deletions = aaArtifacts.changes.filter((change) => change.kind === "D").map((change) => change.targetPath);
       lines.push("");
+      if ([...additions, ...deletions].some((targetPath) => quotePosixShellArgumentFragments(targetPath).length > 1)) lines.push("  Long artifact paths use shell-safe continuation fragments; copy the full command group unchanged.");
+      if (deletions.length) lines.push("  `chezmoi forget` applies only to tracked deletions; use `chezmoi status` to filter it.");
       if (additions.length) appendPosixCommand(lines, "chezmoi add", additions);
       if (deletions.length) {
         if (additions.length) lines.push("");

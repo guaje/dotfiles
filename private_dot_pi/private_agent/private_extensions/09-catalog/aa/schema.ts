@@ -6,10 +6,17 @@ export interface CanonicalMapping extends BatchMapping { canonicalId: string; }
 export interface ManifestEntry { provider: string; model: string; thinkingLevel: ThinkingLevel; modelId: string; file: string; capturedAt: number; contentDigest: string; }
 export interface ManifestV4 { version: 4; generatedAt: number; digest: string; methodology: { id: string; version: string }; models: ManifestEntry[]; }
 
-export const METHODOLOGY = { id: "artificial-analysis-intelligence-index", version: "4.1" };
-export const PUBLIC_METHODOLOGY_VERSION = "4.1.1";
+export const METHODOLOGY = { id: "artificial-analysis-intelligence-index", version: "4.3" };
+export const PUBLIC_METHODOLOGY_VERSION = "4.3.2";
+/** Thrown when the pinned Intelligence Index methodology no longer matches upstream or local artifacts; the message names both versions. */
+export class AaMethodologyMismatchError extends Error {
+  constructor(message: string) { super(message); this.name = "AaMethodologyMismatchError"; }
+}
 export const EXTRACTOR_VERSION = "aa-current-model-rsc-v1";
 export const DIMENSIONS = ["intelligence", "coding", "agentic", "toolUse", "scientificReasoning", "longContext", "instructionFollowing", "knowledge", "faithfulness"];
+export const SUB_BENCHMARK_FIELDS = ["critpt", "gpqa", "hle", "ifbench"];
+export const BENCHMARK_HEALTH_FIELDS = ["agenticIndex", "critpt", "gdpvalNormalized", "gpqa", "hle", "ifbench", "lcr", "omniscienceAccuracy", "omniscienceHallucinationRate", "tau2", "tau3Banking"];
+export const BENCHMARK_HEALTH_STATUSES = ["active", "lagging", "retired", "unknown"];
 export const PROFILE_NAMES = ["balanced", "coding", "agentic", "research", "planning", "review", "long-context"];
 const LEVELS = new Set<unknown>([null, "off", "low", "medium", "high", "xhigh", "max"]);
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -47,8 +54,12 @@ function validComponent(value: unknown, id: string, capturedAt: number, publicPa
   return value.sourceUrl === publicPage.url && value.sourceRecordDigest === publicPage.recordSha256;
 }
 
+const SNAPSHOT_KEYS = ["version", "provider", "model", "thinkingLevel", "modelId", "capturedAt", "methodology", "mapping", "source", "publicPage", "scores", "toolUse", "outputTokens", "taskTimeMs", "coverage"];
+
 export function validateSnapshot(value: unknown): boolean {
-  if (!isRecord(value) || !exactKeys(value, ["version", "provider", "model", "thinkingLevel", "modelId", "capturedAt", "methodology", "mapping", "source", "publicPage", "scores", "toolUse", "outputTokens", "taskTimeMs", "coverage"])) return false;
+  if (!isRecord(value) || !(exactKeys(value, SNAPSHOT_KEYS) || exactKeys(value, [...SNAPSHOT_KEYS, "subBenchmarks"]))) return false;
+  // Optional raw sub-benchmark values (0-100 domain) let reviewed fallback sources survive upstream retirement; legacy snapshots remain valid without them.
+  if ("subBenchmarks" in value && (!isRecord(value.subBenchmarks) || !exactKeys(value.subBenchmarks, SUB_BENCHMARK_FIELDS) || !Object.values(value.subBenchmarks).every((metric) => metric === null || finite(metric, 0, 100)))) return false;
   if (value.version !== 4 || !safeText(value.provider) || !safeText(value.model) || !isThinkingLevel(value.thinkingLevel) || typeof value.modelId !== "string" || !UUID.test(value.modelId) || !finite(value.capturedAt, 1) || !validMethodology(value.methodology) || !finite(value.coverage, 0, 1)) return false;
   const capturedAt = value.capturedAt as number;
   if (!isRecord(value.mapping) || !exactKeys(value.mapping, ["status", "matchBasis", "reviewedAt", "thinkingLevel"]) || value.mapping.status !== "mapped" || value.mapping.matchBasis !== "manual" || !finite(value.mapping.reviewedAt, 1, capturedAt) || value.mapping.thinkingLevel !== value.thinkingLevel) return false;
@@ -122,9 +133,41 @@ export function extractStrictV3Mappings(value: unknown): BatchMapping[] | null {
   }
   return validateBatchMappings(mappings) ? mappings : null;
 }
+/** Migration bridge: a digest-verified v4 manifest pinned to a different methodology version yields its mappings so the next publication republishes them under the current pin. Snapshots are never trusted across methodology versions. */
+export function extractLegacyV4Mappings(value: unknown): BatchMapping[] | null {
+  if (!isRecord(value) || !exactKeys(value, ["version", "generatedAt", "digest", "methodology", "models"]) || value.version !== 4 || !finite(value.generatedAt, 1) || typeof value.digest !== "string" || !isRecord(value.methodology) || value.methodology.id !== METHODOLOGY.id || typeof value.methodology.version !== "string" || value.methodology.version === METHODOLOGY.version || !Array.isArray(value.models)) return null;
+  const entries: ManifestEntry[] = [];
+  for (const entry of value.models) { if (!validateManifestEntry(entry)) return null; entries.push(entry); }
+  const mappings = entries.map((entry) => ({ provider: entry.provider, model: entry.model, thinkingLevel: entry.thinkingLevel, aaModelId: entry.modelId }));
+  return manifestEntriesDigest(entries) === value.digest && validateBatchMappings(mappings) ? mappings : null;
+}
 export function semanticSnapshotDigest(value: unknown): string {
   const copy = structuredClone(value) as Record<string, unknown>; delete copy.capturedAt;
   if (isRecord(copy.publicPage)) delete copy.publicPage.retrievedAt;
   if (isRecord(copy.toolUse) && isRecord(copy.toolUse.components)) for (const component of Object.values(copy.toolUse.components)) if (isRecord(component)) delete component.retrievedAt;
   return canonicalDigest(copy);
+}
+
+export interface BenchmarkFieldHealth { checked: number; scored: number; status: "active" | "lagging" | "retired" | "unknown"; newestScoredRelease: string | null; }
+export interface BenchmarkHealthV1 {
+  version: 1; generatedAt: number; digest: string; methodology: { id: string; version: string };
+  fields: Record<(typeof BENCHMARK_HEALTH_FIELDS)[number], BenchmarkFieldHealth>;
+}
+export function benchmarkHealthDigest(value: { version: 1; methodology: { id: string; version: string }; fields: BenchmarkHealthV1["fields"] }): string {
+  return canonicalDigest({ version: value.version, methodology: value.methodology, fields: value.fields });
+}
+/** Strict contract for the generated benchmark-health artifact. The digest binds version, methodology pin, and field evidence together. */
+export function validateBenchmarkHealth(value: unknown): value is BenchmarkHealthV1 {
+  if (!isRecord(value) || !exactKeys(value, ["version", "generatedAt", "digest", "methodology", "fields"]) || value.version !== 1 || !finite(value.generatedAt, 1)) return false;
+  if (!isRecord(value.methodology) || !exactKeys(value.methodology, ["id", "version"]) || value.methodology.id !== METHODOLOGY.id || value.methodology.version !== METHODOLOGY.version) return false;
+  if (typeof value.digest !== "string" || !SHA256.test(value.digest)) return false;
+  if (!isRecord(value.fields) || !exactKeys(value.fields, BENCHMARK_HEALTH_FIELDS)) return false;
+  for (const key of BENCHMARK_HEALTH_FIELDS) {
+    const entry = value.fields[key];
+    if (!isRecord(entry) || !exactKeys(entry, ["checked", "scored", "status", "newestScoredRelease"])) return false;
+    if (!finite(entry.checked, 0, 100) || !Number.isInteger(entry.checked) || !finite(entry.scored, 0, 100) || !Number.isInteger(entry.scored) || entry.scored > (entry.checked as number)) return false;
+    if (!BENCHMARK_HEALTH_STATUSES.includes(String(entry.status))) return false;
+    if (entry.newestScoredRelease !== null && (typeof entry.newestScoredRelease !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(entry.newestScoredRelease))) return false;
+  }
+  return benchmarkHealthDigest(value as BenchmarkHealthV1) === value.digest;
 }

@@ -3,7 +3,7 @@ import { persistReviewedReasoning, refreshCatalog, restoreCatalog } from "./cata
 import { renderCatalogOverview, renderCatalogSync } from "./render.ts";
 import { loadCatalogSettings, loadEnabledModels } from "./provider-settings.ts";
 import { loadCatalogState } from "./state.ts";
-import { aaReviewThinkingLevelOptions, captureAaArtifactState, finalizeAaSync, hasGenericAaMapping, isCompleteAaCandidateReview, prepareAaCandidateReview, publishReviewedAaVariants, syncEnabledModels, type AaCandidate, type ReviewedAaVariant } from "./sync.ts";
+import { aaReviewThinkingLevelOptions, captureAaArtifactState, detectAaBenchmarkHealth, enforceAaScope, finalizeAaSync, hasGenericAaMapping, isCompleteAaCandidateReview, loadAaBenchmarkHealth, prepareAaCandidateReview, publishReviewedAaVariants, syncEnabledModels, type AaCandidate, type ReviewedAaVariant } from "./sync.ts";
 import type { CatalogResult } from "./aa/client.ts";
 import type { BenchmarkThinkingLevel } from "../04-subagents/benchmark-types.ts";
 
@@ -120,12 +120,26 @@ export default async function catalogExtension(pi: ExtensionAPI) {
               ctx.ui.notify(`AA publication failed for ${modelId}; previous mappings remain valid: ${error instanceof Error ? error.message : String(error)}`, "error");
             }
           }
+          const scoped = await enforceAaScope(ctx.signal).catch((error: unknown) => {
+            const message = error instanceof Error ? error.message : String(error);
+            aaWarnings.push(`AA scope enforcement was skipped: ${message}`);
+            ctx.ui.notify(`AA scope enforcement was skipped: ${message}`, "warning");
+            return { changed: false, removed: [], warnings: [] as string[] };
+          });
+          aaWarnings.push(...scoped.warnings);
+          if (scoped.removed.length) aaWarnings.push(`Removed out-of-scope AA mappings: ${scoped.removed.join(", ")}`);
+          const benchmarkHealthRun = await detectAaBenchmarkHealth(ctx.signal).catch((error: unknown) => {
+            aaWarnings.push(`AA benchmark health detection was skipped: ${error instanceof Error ? error.message : String(error)}`);
+            return { ran: false, changed: false, fields: {}, warnings: [] as string[] };
+          });
+          aaWarnings.push(...benchmarkHealthRun.warnings);
           const finalized = await finalizeAaSync(
-            report, publishedAaSucceeded, changedAaGeneration, aaBefore, aaWarnings, ctx.signal,
+            report, publishedAaSucceeded || scoped.changed || benchmarkHealthRun.changed, changedAaGeneration || scoped.changed || benchmarkHealthRun.changed, aaBefore, aaWarnings, ctx.signal,
             () => syncEnabledModels(pi, ctx as never),
           );
           report = finalized.report;
-          ctx.ui.notify(renderCatalogSync(report, finalized.aaArtifacts), report.unresolvedCosts.length || report.missingAa.length || !!finalized.aaArtifacts?.warnings.length ? "warning" : "info");
+          const benchmarkHealthReport = await loadAaBenchmarkHealth();
+          ctx.ui.notify(renderCatalogSync(report, finalized.aaArtifacts, benchmarkHealthReport), report.unresolvedCosts.length || report.missingAa.length || !!finalized.aaArtifacts?.warnings.length ? "warning" : "info");
         } catch (error) {
           ctx.ui.notify(`Catalog sync failed: ${error instanceof Error ? error.message : String(error)}`, "error");
         }

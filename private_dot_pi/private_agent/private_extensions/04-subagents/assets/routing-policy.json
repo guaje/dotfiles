@@ -1,8 +1,8 @@
 {
-  "version": "4",
+  "version": "5",
   "methodology": {
     "id": "artificial-analysis-intelligence-index",
-    "version": "4.1"
+    "version": "4.3"
   },
   "anchors": {
     "intelligence": {
@@ -45,7 +45,10 @@
   "faithfulnessPolicy": {
     "metric": "AA Omniscience non-hallucination rate × 100",
     "floor": 7.5,
-    "appliesTo": ["research", "review"],
+    "appliesTo": [
+      "research",
+      "review"
+    ],
     "exemptions": []
   },
   "profiles": {
@@ -61,7 +64,10 @@
         "knowledge": 0.075,
         "faithfulness": 0.075
       },
-      "requiredDimensions": ["intelligence", "coding"],
+      "requiredDimensions": [
+        "intelligence",
+        "coding"
+      ],
       "minimumCoverage": 0.70,
       "mandatoryFloors": {},
       "outputTokensMetric": "balanced",
@@ -86,7 +92,10 @@
         "knowledge": 0.05,
         "faithfulness": 0.05
       },
-      "requiredDimensions": ["intelligence", "coding"],
+      "requiredDimensions": [
+        "intelligence",
+        "coding"
+      ],
       "minimumCoverage": 0.70,
       "mandatoryFloors": {
         "coding": 35
@@ -113,11 +122,14 @@
         "knowledge": 0.025,
         "faithfulness": 0.025
       },
-      "requiredDimensions": ["agentic", "toolUse"],
+      "requiredDimensions": [
+        "agentic",
+        "toolUse"
+      ],
       "minimumCoverage": 0.75,
       "mandatoryFloors": {
-        "agentic": 30,
-        "toolUse": 30
+        "agentic": 20,
+        "toolUse": 26
       },
       "outputTokensMetric": "agentic",
       "expectedOutputTokens": 1100,
@@ -141,7 +153,13 @@
         "knowledge": 0.25,
         "faithfulness": 0.15
       },
-      "requiredDimensions": ["intelligence", "scientificReasoning", "longContext", "knowledge", "faithfulness"],
+      "requiredDimensions": [
+        "intelligence",
+        "scientificReasoning",
+        "longContext",
+        "knowledge",
+        "faithfulness"
+      ],
       "minimumCoverage": 0.70,
       "mandatoryFloors": {
         "knowledge": 30
@@ -154,6 +172,18 @@
         "requiredInput": "text",
         "minimumContextWindow": 0,
         "minimumMaxTokens": 0
+      },
+      "fallbackSources": {
+        "scientificReasoning": [
+          {
+            "fields": [
+              "hle",
+              "critpt"
+            ],
+            "floor": 25,
+            "healthField": "gpqa"
+          }
+        ]
       }
     },
     "planning": {
@@ -168,7 +198,10 @@
         "knowledge": 0.025,
         "faithfulness": 0.025
       },
-      "requiredDimensions": ["scientificReasoning", "instructionFollowing"],
+      "requiredDimensions": [
+        "scientificReasoning",
+        "instructionFollowing"
+      ],
       "minimumCoverage": 0.75,
       "mandatoryFloors": {
         "scientificReasoning": 30,
@@ -182,6 +215,27 @@
         "requiredInput": "text",
         "minimumContextWindow": 0,
         "minimumMaxTokens": 0
+      },
+      "fallbackSources": {
+        "instructionFollowing": [
+          {
+            "fields": [
+              "critpt"
+            ],
+            "floor": 10,
+            "healthField": "ifbench"
+          }
+        ],
+        "scientificReasoning": [
+          {
+            "fields": [
+              "hle",
+              "critpt"
+            ],
+            "floor": 25,
+            "healthField": "gpqa"
+          }
+        ]
       }
     },
     "review": {
@@ -196,7 +250,10 @@
         "knowledge": 0.05,
         "faithfulness": 0.2
       },
-      "requiredDimensions": ["instructionFollowing", "faithfulness"],
+      "requiredDimensions": [
+        "instructionFollowing",
+        "faithfulness"
+      ],
       "minimumCoverage": 0.85,
       "mandatoryFloors": {
         "instructionFollowing": 30
@@ -209,6 +266,17 @@
         "requiredInput": "text",
         "minimumContextWindow": 0,
         "minimumMaxTokens": 0
+      },
+      "fallbackSources": {
+        "instructionFollowing": [
+          {
+            "fields": [
+              "critpt"
+            ],
+            "floor": 10,
+            "healthField": "ifbench"
+          }
+        ]
       }
     },
     "long-context": {
@@ -223,7 +291,10 @@
         "knowledge": 0.1,
         "faithfulness": 0.1
       },
-      "requiredDimensions": ["intelligence", "longContext"],
+      "requiredDimensions": [
+        "intelligence",
+        "longContext"
+      ],
       "minimumCoverage": 0.75,
       "mandatoryFloors": {
         "longContext": 30

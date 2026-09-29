@@ -27,12 +27,12 @@ for (const model of ["gpt-5.6-sol", "gpt-5.6-terra"]) {
 	}
 }
 
-test("Kimi-K2.7-Code is benchmark-selectable for its eligible profiles", async () => {
+test("Kimi-K2.6 is benchmark-selectable for its eligible profiles", async () => {
 	const assets = await realSnapshots();
-	const id = "reallms-dev/Kimi-K2.7-Code";
-	const snapshot = assets.snapshots.find((entry) => entry.provider === "reallms-dev" && entry.model === "Kimi-K2.7-Code" && entry.thinkingLevel === null);
+	const id = "kelley/Kimi-K2.6";
+	const snapshot = assets.snapshots.find((entry) => entry.provider === "kelley" && entry.model === "Kimi-K2.6" && entry.thinkingLevel === null);
 	assert.ok(snapshot, `${id} artifact is required`);
-	assert.equal(snapshot.scores.coding, 60.8);
+	assert.equal(snapshot.scores.coding, 61.8);
 	const kimi = [{ id, reasoning: true, input: ["text", "image"], contextWindow: 131_072, maxTokens: 163_840, supportsReasoningEffort: false }];
 	for (const profile of ["balanced", "coding", "research", "planning", "review", "long-context"] as const) {
 		const route = routeBenchmarkModel(profile, kimi, [snapshot], health(id), assets.manifest.digest);
@@ -45,15 +45,15 @@ test("Kimi-K2.7-Code is benchmark-selectable for its eligible profiles", async (
 
 test("reviewed canonical AA UUID routing is independent of the snapshot's legacy provider alias", async () => {
 	const assets = await realSnapshots();
-	const id = "reallms-dev/Kimi-K2.7-Code";
-	const snapshot = assets.snapshots.find((entry) => entry.provider === "reallms-dev" && entry.model === "Kimi-K2.7-Code" && entry.thinkingLevel === null);
+	const id = "kelley/Kimi-K2.6";
+	const snapshot = assets.snapshots.find((entry) => entry.provider === "kelley" && entry.model === "Kimi-K2.6" && entry.thinkingLevel === null);
 	assert.ok(snapshot);
 	const detached = { ...snapshot, provider: "legacy-provider", model: "legacy-alias" };
 	const route = routeBenchmarkModel("coding", candidate(id), [detached], health(id), assets.manifest.digest);
 	assert.equal(route.modelId, id);
 });
 
-for (const [id, thinking] of [["openai-codex/gpt-5.6-luna", "high"], ["reallms-dev/DeepSeek-V4-Flash-API", undefined]] as const) {
+for (const [id, thinking] of [["openai-codex/gpt-5.6-luna", "high"]] as const) {
 	test(`${id} remains research-eligible but review rejects missing instruction following`, async () => {
 		const assets = await realSnapshots();
 		const [provider, model] = id.split("/");

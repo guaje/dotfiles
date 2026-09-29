@@ -1,6 +1,6 @@
 import { getFreshCachedResults } from "../06-health/index.ts";
 import { getModelHealthSettings } from "../06-health/settings.ts";
-import { loadBenchmarkAssets, DEFAULT_SNAPSHOT_ROOT } from "./benchmark-assets.ts";
+import { loadBenchmarkAssets, loadBenchmarkHealth, DEFAULT_SNAPSHOT_ROOT } from "./benchmark-assets.ts";
 import { routeBenchmarkModel, type LocalHealth } from "./benchmark-routing.ts";
 import { parseRoutingProfile } from "./task-profile.ts";
 import type { BenchmarkRouteDiagnostics, RoutingProfile, ThinkingLevel } from "./benchmark-types.ts";
@@ -37,8 +37,9 @@ export async function selectModelForSubagent(options: { task?: string; routingPr
 		const [healthSettings, subagentSettings] = await Promise.all([getModelHealthSettings(), getSubagentExecutionSettings()]);
 		const assets = await loadBenchmarkAssets(options.snapshotRoot ?? DEFAULT_SNAPSHOT_ROOT, options.snapshotMaxAgeMs ?? subagentSettings.benchmarkSnapshotMaxAgeMs);
 		if (!assets || !models.length) return {};
+		const benchmarkHealth = await loadBenchmarkHealth(options.snapshotRoot ?? DEFAULT_SNAPSHOT_ROOT, options.snapshotMaxAgeMs ?? subagentSettings.benchmarkSnapshotMaxAgeMs);
 		const cached = await getFreshCachedResults(healthSettings.cacheTtlMs); if (!cached) return {};
-		const route = routeBenchmarkModel(profile, models, assets.snapshots, cached as LocalHealth[], assets.manifest.digest, options.thinking);
+		const route = routeBenchmarkModel(profile, models, assets.snapshots, cached as LocalHealth[], assets.manifest.digest, options.thinking, benchmarkHealth?.fields);
 		return route.modelId ? { modelId: route.modelId, thinkingLevel: route.thinkingLevel, selector: "benchmark", benchmarkRoute: route.diagnostics } : { benchmarkRoute: route.diagnostics };
 	} catch { return {}; }
 }

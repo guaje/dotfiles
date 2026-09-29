@@ -8,7 +8,7 @@ import { runCli } from "../aa/cli.ts";
 import { abortableDelay, extractCurrentModel, fetchCatalog, fetchPublicModel, readBoundedBody } from "../aa/client.ts";
 import { baseConfig, canonicalIdentity, loadDiscoverConfig, loadRequiredMappings, loadRuntimeConfig, validateCatalogUrl } from "../aa/config.ts";
 import { createAaService, suggestAaCandidates } from "../aa/service.ts";
-import { canonicalDigest, extractStrictV3Mappings, validateBatchMappings, validateCanonicalMappings, validateManifest, validateSnapshot } from "../aa/schema.ts";
+import { canonicalDigest, extractLegacyV4Mappings, extractStrictV3Mappings, manifestEntriesDigest, METHODOLOGY, PUBLIC_METHODOLOGY_VERSION, validateBatchMappings, validateCanonicalMappings, validateManifest, validateSnapshot } from "../aa/schema.ts";
 import { loadBenchmarkAssets, validManifest, validSnapshot } from "../../04-subagents/benchmark-assets.ts";
 
 const ID1 = "11111111-1111-4111-8111-111111111111";
@@ -23,8 +23,12 @@ async function fixture(): Promise<{ directory: string; root: string; env: NodeJS
   const settings = path.join(directory, "settings.json"), models = path.join(directory, "models.json"); await secureWrite(settings, { enabledModels: ["runtime/model"] }); await secureWrite(models, { providers: { runtime: { compat: { supportsReasoningEffort: true } } } });
   return { directory, root, env: { PI_AA_SETTINGS_CONFIG: settings, PI_AA_MODELS_CONFIG: models, PI_AA_SNAPSHOT_ROOT: root, PI_AA_CANONICAL_MAPPINGS: path.join(root, "canonical-mappings.json"), PI_CATALOG_STATE: path.join(directory, "catalog-state.json"), PI_AA_PUBLIC_PAGE_DELAY: "0", AA_API_KEY: "unit-secret" } };
 }
-function catalog(id = ID1) { return { records: [{ id, name: "Synthetic Model", slug: "synthetic-model", openrouter_api_id: "model", evaluations: { artificial_analysis_intelligence_index: 72, artificial_analysis_coding_index: 75, artificial_analysis_agentic_index: 70, tau_banking: 0.8, gdpval_aa_normalized: 0.75, tau2_telecom: 0.7, hle: 0.6, gpqa_diamond: 0.8, critpt: 0.7, aa_lcr: 0.9, ifbench: 0.85, aa_omniscience_accuracy: 0.65, aa_omniscience_non_hallucination_rate: 0.8 } }], sourceUrl: "https://artificialanalysis.ai/api/v2/language/models/free" }; }
-function publicPage(id = ID1) { return { record: { id, name: "Synthetic Model", slug: "synthetic-model", intelligenceIndex: 72, agenticIndex: 70, tauBanking: 0.8, gdpvalNormalized: 0.75, tau2: 0.7, hle: 0.6, gpqa: 0.8, critpt: 0.7, lcr: 0.9, ifbench: 0.85, omniscienceBreakdown: { accuracy: 0.65, hallucinationRate: 0.2 } }, provenance: { url: "https://artificialanalysis.ai/models/synthetic-model", retrievedAt: 1_700_000_000_000, contentSha256: HASH, recordSha256: HASH, extractorVersion: "aa-current-model-rsc-v1" as const, intelligenceIndexMethodologyVersion: "4.1.1" as const } }; }
+function catalog(id = ID1) { return { records: [{ id, name: "Synthetic Model", slug: "synthetic-model", openrouter_api_id: "model", evaluations: { artificial_analysis_intelligence_index: 72, artificial_analysis_coding_index: 75, artificial_analysis_agentic_index: 70 } }], sourceUrl: "https://artificialanalysis.ai/api/v2/language/models/free" }; }
+function publicPage(id = ID1) { return { record: { id, name: "Synthetic Model", slug: "synthetic-model", intelligenceIndex: 72, tauBanking: 0.8, gdpvalNormalized: 0.75, tau2: 0.7, hle: 0.6, gpqa: 0.8, critpt: 0.7, lcr: 0.9, ifbench: 0.85, omniscienceAccuracy: 0.65, omniscienceHallucinationRate: 0.2 }, provenance: { url: "https://artificialanalysis.ai/models/synthetic-model", retrievedAt: 1_700_000_000_000, contentSha256: HASH, recordSha256: HASH, extractorVersion: "aa-current-model-rsc-v1" as const, intelligenceIndexMethodologyVersion: PUBLIC_METHODOLOGY_VERSION } }; }
+function legacyManifest(entries: Array<{ provider: string; model: string; thinkingLevel: null; aaModelId: string }>) {
+  const models = entries.map((entry) => ({ provider: entry.provider, model: entry.model, thinkingLevel: entry.thinkingLevel, modelId: entry.aaModelId, file: `${entry.provider}-${entry.model}.json`, capturedAt: 1, contentDigest: HASH }));
+  return { version: 4, generatedAt: 1, digest: manifestEntriesDigest(models), methodology: { id: METHODOLOGY.id, version: "4.1" }, models };
+}
 
 test("CLI command matrix preserves usage status and offline missing behavior", { concurrency: false }, async () => {
   for (const args of [[], ["--check", "extra"], ["--missing", "extra"], ["--discover"], ["--add", "runtime/model"], ["--replace-batch"], ["--refresh"], ["--refresh-all", "extra"], ["--unknown"]]) {
@@ -36,7 +40,7 @@ test("CLI command matrix preserves usage status and offline missing behavior", {
 test("discover preserves catalog order and TSV-escapes fields", { concurrency: false }, async () => {
   const item = await fixture(); const original = globalThis.fetch; let out = "", err = "";
   try {
-    globalThis.fetch = async (input) => { assert.equal(new URL(String(input)).pathname, "/api/v2/language/models/free"); return new Response(JSON.stringify({ intelligence_index_version: 4.1, pagination: { has_more: false }, data: [{ id: ID1, name: "Model\\One", slug: "synthetic-model", openrouter_api_id: "model" }, { id: ID2, name: "Model Two", slug: "other", openrouter_api_id: "model" }] })); };
+    globalThis.fetch = async (input) => { assert.equal(new URL(String(input)).pathname, "/api/v2/language/models/free"); return new Response(JSON.stringify({ intelligence_index_version: Number(METHODOLOGY.version), pagination: { has_more: false }, data: [{ id: ID1, name: "Model\\One", slug: "synthetic-model", openrouter_api_id: "model" }, { id: ID2, name: "Model Two", slug: "other", openrouter_api_id: "model" }] })); };
     const status = await runCli(["--discover", "runtime/model"], { stdout: (text) => { out += text; }, stderr: (text) => { err += text; }, env: item.env }); assert.equal(status, 0); assert.equal(err, ""); assert.equal(out, `${ID1}\tsynthetic-model\tModel\\\\One\n${ID2}\tother\tModel Two\n`);
   } finally { globalThis.fetch = original; }
 });
@@ -44,7 +48,7 @@ test("discover preserves catalog order and TSV-escapes fields", { concurrency: f
 test("network and configured identities reject terminal control characters", { concurrency: false }, async () => {
   const item = await fixture(); const original = globalThis.fetch; let out = "", err = "";
   try {
-    globalThis.fetch = async () => new Response(JSON.stringify({ intelligence_index_version: 4.1, pagination: { has_more: false }, data: [{ id: ID1, name: "Model\u001b[31m", slug: "synthetic-model", openrouter_api_id: "model" }] }));
+    globalThis.fetch = async () => new Response(JSON.stringify({ intelligence_index_version: Number(METHODOLOGY.version), pagination: { has_more: false }, data: [{ id: ID1, name: "Model\u001b[31m", slug: "synthetic-model", openrouter_api_id: "model" }] }));
     assert.equal(await runCli(["--discover", "runtime/model"], { stdout: (text) => { out += text; }, stderr: (text) => { err += text; }, env: item.env }), 1);
     assert.equal(out, ""); assert.doesNotMatch(err, /\u001b/);
     for (const args of [["--discover", "runtime/bad\u001b"], ["--add", "runtime/bad\u0007", "--aa-model-id", ID1], ["--refresh", "runtime/bad\ninjected"], ["--replace-batch", path.join(item.directory, "bad\u001b.json")]]) {
@@ -58,11 +62,11 @@ test("network and configured identities reject terminal control characters", { c
 
 test("CLI add, replace, refresh, refresh-all, and check use the TypeScript service", { concurrency: false }, async () => {
   const item = await fixture(); const original = globalThis.fetch; let out = "", err = "";
-  const apiRecord = catalog().records[0]!; const pageRecord = publicPage().record; const publicHtml = `<script>self.__next_f.push(${JSON.stringify([1, JSON.stringify({ methodology: "Intelligence Index v4.1.1", currentModel: pageRecord })])})</script>`;
+  const apiRecord = catalog().records[0]!; const pageRecord = publicPage().record; const publicHtml = `<script>self.__next_f.push(${JSON.stringify([1, JSON.stringify({ methodology: `Intelligence Index v${PUBLIC_METHODOLOGY_VERSION}`, currentModel: pageRecord })])})</script>`;
   try {
     globalThis.fetch = async (input, init) => {
       const url = new URL(String(input));
-      if (url.pathname.startsWith("/api/")) { assert.equal(new Headers(init?.headers).get("x-api-key"), "unit-secret"); return new Response(JSON.stringify({ intelligence_index_version: 4.1, pagination: { has_more: false }, data: [apiRecord] })); }
+      if (url.pathname.startsWith("/api/")) { assert.equal(new Headers(init?.headers).get("x-api-key"), "unit-secret"); return new Response(JSON.stringify({ intelligence_index_version: Number(METHODOLOGY.version), pagination: { has_more: false }, data: [apiRecord] })); }
       assert.equal(new Headers(init?.headers).has("x-api-key"), false); return new Response(publicHtml);
     };
     const io = { stdout: (text: string) => { out += text; }, stderr: (text: string) => { err += text; }, env: item.env };
@@ -94,7 +98,7 @@ test("configured public delay is caller-abortable", async () => { const controll
 test("catalog client rejects redirects, preserves pagination order, and sanitizes failures", { concurrency: false }, async () => {
   const original = globalThis.fetch; const calls: Array<{ url: string; init?: RequestInit }> = [];
   try {
-    globalThis.fetch = async (input, init) => { calls.push({ url: String(input), init }); const page = new URL(String(input)).searchParams.get("page"); return new Response(JSON.stringify({ intelligence_index_version: 4.1, pagination: { has_more: page === "1" }, data: [{ id: page === "1" ? ID1 : ID2, name: `M${page}`, slug: `m-${page}` }] }), { status: 200 }); };
+    globalThis.fetch = async (input, init) => { calls.push({ url: String(input), init }); const page = new URL(String(input)).searchParams.get("page"); return new Response(JSON.stringify({ intelligence_index_version: Number(METHODOLOGY.version), pagination: { has_more: page === "1" }, data: [{ id: page === "1" ? ID1 : ID2, name: `M${page}`, slug: `m-${page}` }] }), { status: 200 }); };
     const config = { ...baseConfig({}), apiKey: "never-log-this" }; const result = await fetchCatalog(config); assert.deepEqual(result.records.map((record) => record.id), [ID1, ID2]); assert.equal(calls.length, 2); assert.equal(calls[0]!.init?.redirect, "error"); assert.equal(new Headers(calls[0]!.init?.headers).get("x-api-key"), "never-log-this");
     globalThis.fetch = async () => new Response(null, { status: 302, headers: { location: "https://evil.test" } }); await assert.rejects(fetchCatalog(config), (error: Error) => !error.message.includes("never-log-this") && /HTTP status 302/.test(error.message));
   } finally { globalThis.fetch = original; }
@@ -102,14 +106,14 @@ test("catalog client rejects redirects, preserves pagination order, and sanitize
 
 test("catalog pagination metadata is mandatory", { concurrency: false }, async () => {
   const original = globalThis.fetch;
-  try { globalThis.fetch = async () => new Response(JSON.stringify({ intelligence_index_version: 4.1, data: [] })); const config = { ...baseConfig({}), apiKey: "secret" }; await assert.rejects(fetchCatalog(config), /pagination is invalid/); } finally { globalThis.fetch = original; }
+  try { globalThis.fetch = async () => new Response(JSON.stringify({ intelligence_index_version: Number(METHODOLOGY.version), data: [] })); const config = { ...baseConfig({}), apiKey: "secret" }; await assert.rejects(fetchCatalog(config), /pagination is invalid/); } finally { globalThis.fetch = original; }
 });
 
 test("request timeout remains active while reading a response body and during public throttling", { concurrency: false }, async () => {
   const original = globalThis.fetch;
   try {
     globalThis.fetch = async () => new Response(new ReadableStream<Uint8Array>({})); const config = { ...baseConfig({ PI_AA_REQUEST_TIMEOUT_MS: "5" }), apiKey: "secret" }; await assert.rejects(fetchCatalog(config), /request timed out/);
-    const payload = JSON.stringify({ methodology: "Intelligence Index v4.1.1", currentModel: { id: ID1, slug: "synthetic-model", name: "Synthetic Model" } }); const html = `<script>self.__next_f.push(${JSON.stringify([1, payload])})</script>`;
+    const payload = JSON.stringify({ methodology: `Intelligence Index v${PUBLIC_METHODOLOGY_VERSION}`, currentModel: { id: ID1, slug: "synthetic-model", name: "Synthetic Model" } }); const html = `<script>self.__next_f.push(${JSON.stringify([1, payload])})</script>`;
     globalThis.fetch = async () => new Response(html); const publicConfig = baseConfig({ PI_AA_REQUEST_TIMEOUT_MS: "5", PI_AA_PUBLIC_PAGE_DELAY: "0.02" }); await assert.rejects(fetchPublicModel(publicConfig, "synthetic-model"), /request timed out/);
   } finally { globalThis.fetch = original; }
 });
@@ -123,9 +127,9 @@ test("public client sends no API header and rejects unsafe redirect hops", { con
 });
 
 test("RSC extractor accepts only one exact recognized frame and rejects decoys", () => {
-  const payload = JSON.stringify({ methodology: "Intelligence Index v4.1.1", currentModel: { id: ID1, slug: "synthetic-model", name: "Synthetic Model", nested: { brace: "}" } } }); const frame = JSON.stringify([1, payload]);
+  const payload = JSON.stringify({ methodology: `Intelligence Index v${PUBLIC_METHODOLOGY_VERSION}`, currentModel: { id: ID1, slug: "synthetic-model", name: "Synthetic Model", nested: { brace: "}" } } }); const frame = JSON.stringify([1, payload]);
   const html = `<script>{"currentModel":{"id":"html-decoy"}}</script><script>self.__next_f.push(${frame})</script>`; assert.equal(extractCurrentModel(html).id, ID1);
-  const noisyPayload = `d:["invalid\\x"],"methodology":"Intelligence Index v4.1.1","currentModel":${JSON.stringify({ id: ID1, slug: "synthetic-model", name: "Synthetic Model" })}`;
+  const noisyPayload = `d:["invalid\\x"],"methodology":"Intelligence Index v${PUBLIC_METHODOLOGY_VERSION}","currentModel":${JSON.stringify({ id: ID1, slug: "synthetic-model", name: "Synthetic Model" })}`;
   assert.equal(extractCurrentModel(`<script>self.__next_f.push(${JSON.stringify([1, noisyPayload])})</script>`).id, ID1);
   assert.throws(() => extractCurrentModel(`<script>const x=${JSON.stringify(payload)}</script>`), /exactly one/);
   assert.throws(() => extractCurrentModel(`<script>self.__next_f.push([1,"{\\\"currentModel\\\":{"])</script>`), /malformed/);
@@ -136,13 +140,13 @@ test("public methodology is authenticated to the currentModel frame", { concurre
   const original = globalThis.fetch; const config = baseConfig({ PI_AA_PUBLIC_PAGE_DELAY: "0" });
   const frame = (version: string, withModel = true, decoy?: string) => `<script>self.__next_f.push(${JSON.stringify([1, JSON.stringify({ ...(decoy ? { unrelatedLabel: `Intelligence Index v${decoy}` } : {}), methodology: `Intelligence Index v${version}`, ...(withModel ? { currentModel: { id: ID1, slug: "synthetic-model", name: "Synthetic Model" } } : {}) })])})</script>`;
   try {
-    globalThis.fetch = async () => new Response(`<div>Intelligence Index v4.1.1</div>${frame("4.2.0")}`); await assert.rejects(fetchPublicModel(config, "synthetic-model"), /unsupported public Intelligence Index methodology/);
-    globalThis.fetch = async () => new Response(frame("4.2.0", true, "4.1.1")); await assert.rejects(fetchPublicModel(config, "synthetic-model"), /unsupported public Intelligence Index methodology/);
-    globalThis.fetch = async () => new Response(`${frame("4.1.1", false)}${frame("4.2.0")}`); await assert.rejects(fetchPublicModel(config, "synthetic-model"), /unsupported public Intelligence Index methodology/);
-    globalThis.fetch = async () => new Response(`${frame("4.2.0", false)}${frame("4.1.1")}`); assert.equal((await fetchPublicModel(config, "synthetic-model")).record.id, ID1);
+    globalThis.fetch = async () => new Response(`<div>Intelligence Index v${PUBLIC_METHODOLOGY_VERSION}</div>${frame("9.9.9")}`); await assert.rejects(fetchPublicModel(config, "synthetic-model"), /public Intelligence Index methodology changed/);
+    globalThis.fetch = async () => new Response(frame("9.9.9", true, PUBLIC_METHODOLOGY_VERSION)); await assert.rejects(fetchPublicModel(config, "synthetic-model"), /public Intelligence Index methodology changed/);
+    globalThis.fetch = async () => new Response(`${frame(PUBLIC_METHODOLOGY_VERSION, false)}${frame("9.9.9")}`); await assert.rejects(fetchPublicModel(config, "synthetic-model"), /public Intelligence Index methodology changed/);
+    globalThis.fetch = async () => new Response(`${frame("9.9.9", false)}${frame(PUBLIC_METHODOLOGY_VERSION)}`); assert.equal((await fetchPublicModel(config, "synthetic-model")).record.id, ID1);
     const split = `<script>self.__next_f.push(${JSON.stringify([1, JSON.stringify({ currentModel: { id: ID1, slug: "synthetic-model", name: "Synthetic Model" } })])})</script>`;
-    globalThis.fetch = async () => new Response(`<span>Artificial Analysis Intelligence Index v4.1.1 incorporates 9 evaluations</span>${split}`); assert.equal((await fetchPublicModel(config, "synthetic-model")).record.id, ID1);
-    globalThis.fetch = async () => new Response(`<span>Intelligence Index v4.1.1</span>${split}`); await assert.rejects(fetchPublicModel(config, "synthetic-model"), /unsupported public Intelligence Index methodology/);
+    globalThis.fetch = async () => new Response(`<span>Artificial Analysis Intelligence Index v${PUBLIC_METHODOLOGY_VERSION} incorporates 9 evaluations</span>${split}`); assert.equal((await fetchPublicModel(config, "synthetic-model")).record.id, ID1);
+    globalThis.fetch = async () => new Response(`<span>Intelligence Index v${PUBLIC_METHODOLOGY_VERSION}</span>${split}`); await assert.rejects(fetchPublicModel(config, "synthetic-model"), /unsupported public Intelligence Index methodology/);
   } finally { globalThis.fetch = original; }
 });
 
@@ -154,8 +158,14 @@ test("strict shared mappings, v3 extraction, and producer/consumer validators ha
   assert.equal(validateCanonicalMappings({ version: 1, mappings: [{ ...mappings[0], canonicalId: "canonical/model" }, { ...alias, thinkingLevel: "high" }] }), false);
   assert.equal(validateCanonicalMappings({ version: 1, mappings: [{ ...mappings[0], canonicalId: "canonical/model", extra: true }] }), false);
   const v3 = { version: 3, models: [{ ...mappings[0], file: "legacy.json", capturedAt: 1, contentDigest: HASH }] }; assert.deepEqual(extractStrictV3Mappings(v3), mappings); assert.equal(extractStrictV3Mappings({ ...v3, scores: {} }), null);
-  const invalidManifest = { version: 4, generatedAt: 1, digest: HASH, methodology: { id: "artificial-analysis-intelligence-index", version: "4.1" }, models: [], extra: true }; assert.equal(validateManifest(invalidManifest), false); assert.equal(validManifest(invalidManifest), false);
-  const opaqueManifest = { version: 4, generatedAt: 1, digest: HASH, methodology: { id: "artificial-analysis-intelligence-index", version: "4.1" }, models: [{ provider: "p", model: "m", thinkingLevel: null, modelId: "opaque", file: "x.json", capturedAt: 1, contentDigest: HASH }] }; assert.equal(validateManifest(opaqueManifest), false); assert.equal(validManifest(opaqueManifest), false); assert.equal(validateSnapshot({}), validSnapshot({}));
+  const invalidManifest = { version: 4, generatedAt: 1, digest: HASH, methodology: { id: "artificial-analysis-intelligence-index", version: METHODOLOGY.version }, models: [], extra: true }; assert.equal(validateManifest(invalidManifest), false); assert.equal(validManifest(invalidManifest), false);
+  const opaqueManifest = { version: 4, generatedAt: 1, digest: HASH, methodology: { id: "artificial-analysis-intelligence-index", version: METHODOLOGY.version }, models: [{ provider: "p", model: "m", thinkingLevel: null, modelId: "opaque", file: "x.json", capturedAt: 1, contentDigest: HASH }] }; assert.equal(validateManifest(opaqueManifest), false); assert.equal(validManifest(opaqueManifest), false); assert.equal(validateSnapshot({}), validSnapshot({}));
+  const legacyEntry = { provider: "p", model: "m", thinkingLevel: null, modelId: ID1, file: "x.json", capturedAt: 1, contentDigest: HASH };
+  const legacy = { version: 4, generatedAt: 1, digest: manifestEntriesDigest([legacyEntry]), methodology: { id: METHODOLOGY.id, version: "4.1" }, models: [legacyEntry] };
+  assert.deepEqual(extractLegacyV4Mappings(legacy), [{ provider: "p", model: "m", thinkingLevel: null, aaModelId: ID1 }]);
+  assert.equal(extractLegacyV4Mappings({ ...legacy, digest: "b".repeat(64) }), null);
+  assert.equal(extractLegacyV4Mappings({ ...legacy, methodology: { ...legacy.methodology, version: METHODOLOGY.version } }), null);
+  assert.equal(extractLegacyV4Mappings({ ...legacy, methodology: { ...legacy.methodology, id: "other-methodology" } }), null);
 });
 
 test("writer builds exact v4 scores, remains a semantic no-op, and uses owner-only files", { concurrency: false }, async () => {
@@ -229,9 +239,21 @@ test("separator-normalized advisory matching returns every exact synthetic reaso
   assert.deepEqual(suggestAaCandidates("test-provider/nova4.2-27b", { records, sourceUrl: "https://artificialanalysis.ai/api/v2/language/models/free" }).map((candidate) => candidate.slug), ["nova4-2-27b", "nova4-2-27b-non-reasoning", "nova4-2-27b-low", "nova4-2-27b-medium", "nova4-2-27b-xhigh"]);
 });
 
+test("advisory matching also surfaces quantization variants after one suffix strip", () => {
+  const records = [
+    { id: ID1, slug: "nova5-3", name: "Nova 5.3", openrouter_api_id: "test-vendor/nova-5.3" },
+    { id: ID2, slug: "nova5-3-flash", name: "Nova 5.3 Flash", openrouter_api_id: null },
+    { id: ID3, slug: "nova5-3-low", name: "Nova 5.3 Low", openrouter_api_id: null },
+  ];
+  const source = { records, sourceUrl: "https://artificialanalysis.ai/api/v2/language/models/free" };
+  assert.deepEqual(suggestAaCandidates("test-provider/nova-5.3-nvfp4", source).map((candidate) => candidate.slug), ["nova5-3", "nova5-3-low"]);
+  assert.deepEqual(suggestAaCandidates("test-provider/nova-5.3-q8", source).map((candidate) => candidate.slug), ["nova5-3", "nova5-3-low"]);
+  assert.deepEqual(suggestAaCandidates("test-provider/unrelated-nvfp4", source).map((candidate) => candidate.slug), []);
+});
+
 test("reviewed publications reuse one free catalog and supplement its null metrics from public pages", { concurrency: false }, async () => {
   const item = await fixture(); let calls = 0; const first = structuredClone(catalog().records[0]!); const second = { ...structuredClone(first), id: ID2, name: "Synthetic Model Two", slug: "synthetic-model-two" };
-  (first.evaluations as any).tau_banking = null; (second.evaluations as any).tau_banking = null;
+  (first.evaluations as any).artificial_analysis_intelligence_index = null;
   const service = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async (config) => { calls++; assert.equal(config.apiUrl.pathname, "/api/v2/language/models/free"); return { records: [first, second], sourceUrl: config.apiUrl.href }; }, fetchPublicModel: async (_config, slug) => {
     const page = publicPage(slug === second.slug ? ID2 : ID1); page.record.name = slug === second.slug ? second.name : first.name; page.record.slug = slug; page.provenance.url = `https://artificialanalysis.ai/models/${slug}`; return page;
   } });
@@ -244,15 +266,16 @@ test("reviewed publications reuse one free catalog and supplement its null metri
   const manifest = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8"));
   for (const entry of manifest.models) {
     const snapshot = JSON.parse(await readFile(path.join(item.root, "models", entry.file), "utf8"));
+    assert.equal(snapshot.scores.intelligence, 72);
     assert.equal(snapshot.toolUse.components.tau3Banking.sourceKind, "public-page");
   }
 });
 
 test("public values only supplement API nulls and conflicts abort before publication", { concurrency: false }, async () => {
-  const item = await fixture(); const api = structuredClone(catalog()); (api.records[0]!.evaluations as any).tau_banking = null;
+  const item = await fixture(); const api = structuredClone(catalog()); (api.records[0]!.evaluations as any).artificial_analysis_intelligence_index = null;
   const service = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => api, fetchPublicModel: async () => publicPage() }); await service.add("runtime/model", ID1, null, undefined, item.env);
-  const manifest = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8")); const snapshot = JSON.parse(await readFile(path.join(item.root, "models", manifest.models[0].file), "utf8")); assert.equal(snapshot.toolUse.components.tau3Banking.sourceKind, "public-page");
-  const conflictItem = await fixture(); const conflictPage = publicPage(); conflictPage.record.tauBanking = 0.6; const conflicting = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => catalog(), fetchPublicModel: async () => conflictPage }); await assert.rejects(conflicting.add("runtime/model", ID1, null, undefined, conflictItem.env), /API\/public metric conflict/); await assert.rejects(readFile(path.join(conflictItem.root, "manifest.json")), /ENOENT/);
+  const manifest = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8")); const snapshot = JSON.parse(await readFile(path.join(item.root, "models", manifest.models[0].file), "utf8")); assert.equal(snapshot.scores.intelligence, 72); assert.equal(snapshot.toolUse.components.tau3Banking.sourceKind, "public-page");
+  const conflictItem = await fixture(); const conflictPage = publicPage(); conflictPage.record.intelligenceIndex = 73; const conflicting = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => catalog(), fetchPublicModel: async () => conflictPage }); await assert.rejects(conflicting.add("runtime/model", ID1, null, undefined, conflictItem.env), /API\/public metric conflict: intelligenceIndex/); await assert.rejects(readFile(path.join(conflictItem.root, "manifest.json")), /ENOENT/);
 });
 
 test("refresh-all performs only a strict mapping-only v3 migration and preserves its disabled baseline", { concurrency: false }, async () => {
@@ -262,6 +285,43 @@ test("refresh-all performs only a strict mapping-only v3 migration and preserves
   const service = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() }); const result = await service.refreshAll(undefined, item.env); assert.equal(result.changed, true);
   const manifest = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8")); assert.equal(manifest.version, 4); assert.equal(manifest.models[0].provider, "legacy"); assert.equal(manifest.models[0].modelId, ID1); await service.check(item.env);
   await secureWrite(path.join(item.root, "manifest.json"), { version: 3, models: [], extra: true }); await assert.rejects(service.refreshAll(undefined, item.env), /invalid or unsupported manifest/);
+});
+
+test("methodology mismatch errors name the local pin and the upstream or artifacts version", { concurrency: false }, async () => {
+  const original = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => new Response(JSON.stringify({ intelligence_index_version: "9.9", pagination: { has_more: false }, data: [] }));
+    const config = { ...baseConfig({}), apiKey: "secret" };
+    await assert.rejects(fetchCatalog(config), /Intelligence Index methodology changed: local pin 4\.3, upstream 9\.9/);
+    const frame = `<script>self.__next_f.push(${JSON.stringify([1, JSON.stringify({ methodology: "Intelligence Index v9.9.9", currentModel: { id: ID1, slug: "synthetic-model", name: "Synthetic Model" } })])})</script>`;
+    globalThis.fetch = async () => new Response(frame);
+    await assert.rejects(fetchPublicModel(baseConfig({ PI_AA_PUBLIC_PAGE_DELAY: "0" }), "synthetic-model"), /public Intelligence Index methodology changed: local pin 4\.3\.2, upstream 9\.9\.9/);
+  } finally { globalThis.fetch = original; }
+  const item = await fixture();
+  await secureWrite(path.join(item.root, "manifest.json"), legacyManifest([{ provider: "runtime", model: "model", thinkingLevel: null, aaModelId: ID1 }]));
+  const service = createAaService({ fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() });
+  await assert.rejects(service.check(item.env), /Intelligence Index methodology changed: local pin 4\.3, artifacts pin 4\.1/);
+  await assert.rejects(service.check(item.env), /republish with --refresh-all or \/catalog sync/);
+});
+
+test("legacy-methodology manifests republish wholesale and preserve the mapping set", { concurrency: false }, async () => {
+  const item = await fixture(); await secureWrite(item.env.PI_AA_SETTINGS_CONFIG!, { enabledModels: ["legacy/model", "runtime/model"] });
+  const secondRecord = { ...catalog(ID2).records[0]!, slug: "synthetic-model-two", name: "Synthetic Model Two" };
+  const two = { records: [catalog().records[0]!, secondRecord], sourceUrl: "https://artificialanalysis.ai/api/v2/language/models/free" };
+  const service = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => two, fetchPublicModel: async (_config, slug) => {
+    const second = slug === secondRecord.slug; const page = publicPage(second ? ID2 : ID1); page.record.slug = slug; page.record.name = second ? secondRecord.name : "Synthetic Model"; page.provenance.url = `https://artificialanalysis.ai/models/${slug}`; return page;
+  } });
+  await secureWrite(path.join(item.root, "manifest.json"), legacyManifest([{ provider: "legacy", model: "model", thinkingLevel: null, aaModelId: ID1 }]));
+  assert.equal((await service.refreshAll(undefined, item.env)).changed, true);
+  let manifest = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8")); assert.equal(manifest.methodology.version, METHODOLOGY.version); assert.deepEqual(manifest.models.map((entry: any) => [entry.provider, entry.model, entry.modelId]), [["legacy", "model", ID1]]); await service.check(item.env);
+  await secureWrite(path.join(item.root, "manifest.json"), legacyManifest([{ provider: "legacy", model: "model", thinkingLevel: null, aaModelId: ID1 }]));
+  assert.equal((await service.add("runtime/model", ID2, null, undefined, item.env)).changed, true);
+  manifest = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8")); assert.deepEqual(manifest.models.map((entry: any) => [entry.provider, entry.model, entry.modelId]).sort(), [["legacy", "model", ID1], ["runtime", "model", ID2]].sort()); await service.check(item.env);
+  await secureWrite(path.join(item.root, "manifest.json"), legacyManifest([{ provider: "legacy", model: "model", thinkingLevel: null, aaModelId: ID1 }, { provider: "runtime", model: "model", thinkingLevel: null, aaModelId: ID2 }]));
+  assert.equal((await service.refresh("legacy/model", undefined, item.env)).changed, true);
+  manifest = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8")); assert.deepEqual(manifest.models.map((entry: any) => [entry.provider, entry.model, entry.modelId]).sort(), [["legacy", "model", ID1], ["runtime", "model", ID2]].sort()); await service.check(item.env);
+  const corrupt = legacyManifest([{ provider: "legacy", model: "model", thinkingLevel: null, aaModelId: ID1 }]); corrupt.digest = "b".repeat(64); await secureWrite(path.join(item.root, "manifest.json"), corrupt);
+  await assert.rejects(service.refreshAll(undefined, item.env), /invalid or unsupported manifest/);
 });
 
 test("missing treats only secure, current, digest-verified complete artifacts as present", { concurrency: false }, async () => {
@@ -437,4 +497,119 @@ test("an existing specific native mapping with a provider thinking map does not 
 
   await secureWrite(item.env.PI_CATALOG_STATE!, { version: 2, updatedAt: 1, providers: [], nativeModels: [{ ...nativeModel, supportsReasoningEffort: false }] });
   await assert.rejects(service.add("runtime/model", ID2, null, undefined, item.env), /does not support selectable/);
+});
+
+test("enforceScope drops out-of-scope manifest entries and canonical rows without touching retained snapshots", { concurrency: false }, async () => {
+  const item = await fixture();
+  await secureWrite(item.env.PI_AA_SETTINGS_CONFIG!, { enabledModels: ["runtime/model", "other/model"] });
+  await secureWrite(item.env.PI_AA_MODELS_CONFIG!, { providers: { runtime: { compat: { supportsReasoningEffort: true } }, other: { compat: { supportsReasoningEffort: true } } } });
+  const service = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async (config) => ({ records: [
+    { id: ID1, name: "Synthetic Model", slug: "synthetic-model", openrouter_api_id: "model" },
+    { id: ID2, name: "Scoped Model", slug: "scoped-model", openrouter_api_id: "other/model" },
+  ], sourceUrl: config.apiUrl.href }), fetchPublicModel: async (_config, slug) => {
+    const page = publicPage(slug === "scoped-model" ? ID2 : ID1); page.record.name = slug === "scoped-model" ? "Scoped Model" : "Synthetic Model"; page.record.slug = slug; page.provenance.url = `https://artificialanalysis.ai/models/${slug}`; return page;
+  } });
+  assert.equal((await service.replaceBatch([
+    { provider: "runtime", model: "model", thinkingLevel: null, aaModelId: ID1 },
+    { provider: "other", model: "model", thinkingLevel: "low", aaModelId: ID2 },
+  ], undefined, item.env)).changed, true);
+  await secureWrite(item.env.PI_AA_CANONICAL_MAPPINGS!, { version: 1, mappings: [{ provider: "other", model: "model", canonicalId: "aa/scoped-model", thinkingLevel: "low", aaModelId: ID2 }] });
+  const before = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8"));
+  const retained = before.models.find((entry: any) => entry.provider === "runtime");
+
+  await secureWrite(item.env.PI_AA_SETTINGS_CONFIG!, { enabledModels: ["runtime/model"] });
+  const enforced = await service.enforceScope(undefined, item.env);
+  assert.deepEqual(enforced.removed, ["other/model (low)"]); assert.equal(enforced.changed, true);
+  const manifest = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8"));
+  assert.deepEqual(manifest.models.map((entry: any) => `${entry.provider}/${entry.model}`), ["runtime/model"]);
+  assert.deepEqual(manifest.models[0], retained);
+  assert.deepEqual(JSON.parse(await readFile(item.env.PI_AA_CANONICAL_MAPPINGS!, "utf8")).mappings, []);
+  assert.equal((await readdir(path.join(item.root, "models"))).filter((file) => file.endsWith(".json")).length, 2);
+  assert.deepEqual((await service.enforceScope(undefined, item.env)).removed, []);
+  assert.deepEqual((await service.enforceScope(undefined, item.env)).changed, false);
+  await service.check(item.env);
+  const cleanup = await service.cleanupObsoleteSnapshots(undefined, item.env);
+  assert.equal(cleanup.deleted.length, 1);
+  assert.equal((await readdir(path.join(item.root, "models"))).filter((file) => file.endsWith(".json")).length, 1);
+});
+
+test("enforceScope keeps canonical-identity entries while the scoped runtime enables them and drops both after de-scoping", { concurrency: false }, async () => {
+  const item = await fixture();
+  await secureWrite(item.env.PI_AA_CANONICAL_MAPPINGS!, { version: 1, mappings: [{ provider: "runtime", model: "model", canonicalId: "canonical/model", thinkingLevel: null, aaModelId: ID1 }] });
+  const service = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() });
+  assert.equal((await service.replaceBatch([{ provider: "canonical", model: "model", thinkingLevel: null, aaModelId: ID1 }], undefined, item.env)).changed, true);
+  assert.equal((await service.enforceScope(undefined, item.env)).changed, false);
+  const kept = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8"));
+  assert.deepEqual(kept.models.map((entry: any) => `${entry.provider}/${entry.model}`), ["canonical/model"]);
+
+  await secureWrite(item.env.PI_AA_SETTINGS_CONFIG!, { enabledModels: [] });
+  const enforced = await service.enforceScope(undefined, item.env);
+  assert.deepEqual(enforced.removed, ["canonical/model (generic)"]); assert.equal(enforced.changed, true);
+  assert.deepEqual(JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8")).models, []);
+  assert.deepEqual(JSON.parse(await readFile(item.env.PI_AA_CANONICAL_MAPPINGS!, "utf8")).mappings, []);
+});
+
+test("enforceScope fails closed on missing, corrupt, or legacy-pinned manifests and cleans its lock", { concurrency: false }, async () => {
+  const item = await fixture(); const service = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() });
+  await assert.rejects(service.enforceScope(undefined, item.env), /missing required file: manifest\.json/);
+  await secureWrite(path.join(item.root, "manifest.json"), legacyManifest([{ provider: "legacy", model: "model", thinkingLevel: null, aaModelId: ID1 }]));
+  await assert.rejects(service.enforceScope(undefined, item.env), /methodology changed/);
+  await secureWrite(path.join(item.root, "manifest.json"), { version: 4, generatedAt: 1_700_000_001_000, digest: "0".repeat(64), methodology: { id: METHODOLOGY.id, version: METHODOLOGY.version }, models: [] });
+  await assert.rejects(service.enforceScope(undefined, item.env), /manifest digest mismatch/);
+  assert.deepEqual((await readdir(item.root)).filter((entry) => entry.startsWith(".refresh.lock") || entry.startsWith(".staging-")), []);
+});
+
+function healthPage(id: string, slug: string, scores: Partial<Record<string, number | null>>) {
+  const values: Record<string, number | null> = { agenticIndex: 50, critpt: 40, gdpvalNormalized: 30, gpqa: 60, hle: 55, ifbench: 65, lcr: 50, omniscienceAccuracy: 40, omniscienceHallucinationRate: 20, tau2: 50, tau3Banking: 45, ...scores };
+  const record = { id, slug, name: `Model ${slug}`, methodology: `Intelligence Index v${PUBLIC_METHODOLOGY_VERSION}`, ...values };
+  return `<script>self.__next_f.push(${JSON.stringify([1, JSON.stringify({ methodology: `Intelligence Index v${PUBLIC_METHODOLOGY_VERSION}`, currentModel: record })])})</script>`;
+}
+
+test("benchmark health detection samples dated releases, classifies fields, and rewrites only on change", { concurrency: false }, async () => {
+  const item = await fixture();
+  const service = createAaService();
+  const day = 86_400_000; const newest = Date.UTC(2026, 8, 22);
+  const iso = (days: number) => new Date(newest - days * day).toISOString().slice(0, 10);
+  const records = Array.from({ length: 20 }, (_, index) => ({ id: `${index.toString(16).padStart(8, "0")}-0000-4000-8000-000000000000`, name: `Model ${index}`, slug: `model-${index}`, release_date: iso(index * 4), evaluations: {} }));
+  const original = globalThis.fetch;
+  try {
+    globalThis.fetch = async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname === "/api/v2/language/models/free") return new Response(JSON.stringify({ intelligence_index_version: Number(METHODOLOGY.version), pagination: { has_more: false }, data: records }));
+      const slug = url.pathname.split("/").pop()!;
+      if (slug === "model-1") return new Response("missing", { status: 404 });
+      const index = Number(slug.replace("model-", ""));
+      // ifbench has no scores anywhere in the sample window; gpqa stays live everywhere; hle missing in the newest cohort only.
+      const cohort = index <= 7;
+      return new Response(healthPage(records[index]!.id, slug, { ifbench: null, gpqa: 55, hle: cohort ? null : 50 }));
+    };
+    const result = await service.detectBenchmarkHealth(undefined, item.env);
+    assert.equal(result.changed, true);
+    assert.ok(result.warnings.some((entry) => /unavailable model page/.test(entry)));
+    assert.equal(result.fields.ifbench.status, "retired");
+    assert.equal(result.fields.ifbench.scored, 0);
+    assert.equal(result.fields.ifbench.newestScoredRelease, null);
+    assert.equal(result.fields.gpqa.status, "active");
+    assert.equal(result.fields.hle.status, "lagging");
+    assert.equal(result.fields.tau3Banking.checked, 14);
+    const artifact: any = JSON.parse(await readFile(path.join(item.root, "benchmark-health.json"), "utf8"));
+    assert.equal(artifact.version, 1);
+    assert.match(artifact.digest, /^[0-9a-f]{64}$/);
+    assert.equal((await lstat(path.join(item.root, "benchmark-health.json"))).mode & 0o777, 0o600);
+    const repeat = await service.detectBenchmarkHealth(undefined, item.env);
+    assert.equal(repeat.changed, false);
+    assert.equal(repeat.fields.ifbench.status, "retired");
+  } finally { globalThis.fetch = original; }
+});
+
+test("benchmark health detection fails closed without dated samples or a parseable catalog", { concurrency: false }, async () => {
+  const item = await fixture(); const service = createAaService(); const original = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => new Response(JSON.stringify({ intelligence_index_version: Number(METHODOLOGY.version), pagination: { has_more: false }, data: [{ id: ID1, name: "Undated", slug: "undated", evaluations: {} }] }));
+    await assert.rejects(service.detectBenchmarkHealth(undefined, item.env), /no dated base releases/);
+    globalThis.fetch = async () => new Response(JSON.stringify({ intelligence_index_version: Number(METHODOLOGY.version), pagination: { has_more: false }, data: Array.from({ length: 8 }, (_, index) => ({ id: `${index.toString(16).padStart(8, "0")}-0000-4000-8000-000000000000`, name: `Model ${index}`, slug: `model-${index}`, release_date: "2026-08-01", evaluations: {} })) }));
+    await assert.rejects(service.detectBenchmarkHealth(undefined, item.env), /benchmark health sampling found only \d+ dated base releases/);
+    globalThis.fetch = async () => new Response(JSON.stringify({ error: "API key is required" }), { status: 401 });
+    await assert.rejects(service.detectBenchmarkHealth(undefined, item.env), /401/);
+  } finally { globalThis.fetch = original; }
 });

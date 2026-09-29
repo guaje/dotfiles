@@ -4,18 +4,21 @@ import { copyFile, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFi
 import path from "node:path";
 import { assertSecureDirectory, assertSecureFile, baseConfig, canonicalIdentity, ensureSecureDirectory, loadDiscoverConfig, loadMappings, loadRuntimeConfig, loadWriterConfig, readOptionalSecureJson, readSecureJson, type BaseConfig, type WriterConfig } from "./config.ts";
 import { fetchCatalog, fetchPublicModel, type CatalogRecord, type CatalogResult, type PublicResult } from "./client.ts";
-import { DIMENSIONS, METHODOLOGY, UUID, canonicalDigest, canonicalize, codePointCompare, compareIdentity, extractStrictV3Mappings, isRecord, isThinkingLevel, manifestEntriesDigest, semanticSnapshotDigest, validateBatchMappings, validateCanonicalMappings, validateManifest, validateSnapshot, type BatchMapping, type CanonicalMapping, type ManifestEntry, type ManifestV4, type ThinkingLevel } from "./schema.ts";
+import { AaMethodologyMismatchError, BENCHMARK_HEALTH_FIELDS, DIMENSIONS, METHODOLOGY, PUBLIC_METHODOLOGY_VERSION, UUID, benchmarkHealthDigest, canonicalDigest, canonicalize, codePointCompare, compareIdentity, extractLegacyV4Mappings, extractStrictV3Mappings, isRecord, isThinkingLevel, manifestEntriesDigest, semanticSnapshotDigest, validateBatchMappings, validateBenchmarkHealth, validateCanonicalMappings, validateManifest, validateSnapshot, type BatchMapping, type BenchmarkHealthV1, type CanonicalMapping, type ManifestEntry, type ManifestV4, type ThinkingLevel } from "./schema.ts";
 
 export interface AaCandidate { aaModelId: string; slug: string; name: string; }
 export interface ReviewedVariant extends AaCandidate { thinkingLevel: ThinkingLevel; }
 export interface PublicationOptions { prune?: boolean; }
 export interface PublicationResult { changed: boolean; warnings: string[]; }
 export interface CleanupResult { deleted: string[]; warnings: string[]; }
+export interface ScopeEnforcementResult { changed: boolean; removed: string[]; warnings: string[]; }
+export interface BenchmarkHealthResult { changed: boolean; fields: BenchmarkHealthV1["fields"]; warnings: string[]; }
 export interface ArtifactFingerprint { path: string; targetPath: string; fingerprint: string; }
 export interface ArtifactState {
   snapshotRoot: string;
   manifest: ArtifactFingerprint | null;
   canonicalMappings: ArtifactFingerprint | null;
+  benchmarkHealth: ArtifactFingerprint | null;
   manifestSnapshotFiles: string[];
   generatedSnapshotFiles: string[];
 }
@@ -54,6 +57,7 @@ async function readValidatedManifest(config: BaseConfig): Promise<LoadedManifest
   await assertSecureFile(config.paths.manifest);
   const text = await readFile(config.paths.manifest, "utf8");
   let raw: unknown; try { raw = JSON.parse(text); } catch { throw new Error("invalid JSON in manifest.json"); }
+  if (isRecord(raw) && isRecord(raw.methodology) && raw.methodology.id === METHODOLOGY.id && typeof raw.methodology.version === "string" && raw.methodology.version !== METHODOLOGY.version) throw new AaMethodologyMismatchError(`Artificial Analysis Intelligence Index methodology changed: local pin ${METHODOLOGY.version}, artifacts pin ${raw.methodology.version} — republish with --refresh-all or /catalog sync`);
   if (!validateManifest(raw)) throw new Error("invalid or unsupported manifest");
   if (manifestEntriesDigest(raw.models) !== raw.digest) throw new Error("manifest digest mismatch");
   return { manifest: raw, fingerprint: digestText(text) };
@@ -97,9 +101,12 @@ function validateExternalIdentity(record: CatalogRecord): asserts record is Cata
 const normalized = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
 const suffix = (value: string) => value.split("/").at(-1) ?? value;
 const REASONING_VARIANT_SUFFIXES = ["nonreasoning", "reasoning", "off", "minimal", "low", "medium", "high", "xhigh", "max"];
+const QUANTIZATION_VARIANT_PATTERN = /(?:nvfp4|mxfp4|bf16|fp16|int8|int4|awq|gptq|gguf|q8k|q4k|q8|q4|fp8|fp4)$/;
 function advisoryIdentityMatches(query: string, identity: string): boolean {
+  const quantized = QUANTIZATION_VARIANT_PATTERN.test(query) ? query.replace(QUANTIZATION_VARIANT_PATTERN, "") : null;
+  const bases = quantized !== null && quantized !== "" ? [query, quantized] : [query];
   const values = [normalized(suffix(identity)), normalized(identity)];
-  return values.some((value) => value === query || REASONING_VARIANT_SUFFIXES.some((variant) => value === `${query}${variant}`));
+  return values.some((value) => bases.some((base) => value === base || REASONING_VARIANT_SUFFIXES.some((variant) => value === `${base}${variant}`)));
 }
 /** Candidate matching is advisory only. It never reads or writes reviewed mappings. */
 export function suggestAaCandidates(canonicalId: string, catalog: CatalogResult): AaCandidate[] {
@@ -116,7 +123,6 @@ export function suggestAaCandidates(canonicalId: string, catalog: CatalogResult)
 }
 function numberOrNull(value: unknown): number | null { if (value === null || value === undefined) return null; if (typeof value === "number" && Number.isFinite(value)) return value; throw new Error("Artificial Analysis evaluation field is invalid"); }
 function percent(value: unknown): number | null { const numeric = numberOrNull(value); return numeric === null ? null : numeric >= 0 && numeric <= 1 ? numeric * 100 : numeric; }
-function publicPath(record: Record<string, unknown>, pathParts: string[]): unknown { let current: unknown = record; for (const part of pathParts) { if (!isRecord(current)) return undefined; current = current[part]; } return current; }
 function resolveMetric(apiValue: unknown, pageValue: unknown, field: string, tolerance: number): { api: number | null; page: number | null; score: number | null } {
   const api = percent(apiValue); const page = percent(pageValue);
   if (api !== null && page !== null && Math.abs(api - page) > tolerance) throw new Error(`API/public metric conflict: ${field}`);
@@ -137,21 +143,22 @@ function buildSnapshot(mapping: BatchMapping, api: CatalogRecord, page: PublicRe
   const hle = resolveMetric(evaluations.hle, page.record.hle, "hle", 0.001);
   const gpqa = resolveMetric(evaluations.gpqa_diamond, page.record.gpqa, "gpqa", 0.001);
   const crit = resolveMetric(evaluations.critpt, page.record.critpt, "critpt", 0.001);
-  const knowledge = resolveMetric(evaluations.aa_omniscience_accuracy, publicPath(page.record, ["omniscienceBreakdown", "accuracy"]), "omniscienceBreakdown.accuracy", 0.001);
-  const pageHallucination = percent(publicPath(page.record, ["omniscienceBreakdown", "hallucinationRate"]));
+  const knowledge = resolveMetric(evaluations.aa_omniscience_accuracy, page.record.omniscienceAccuracy, "omniscienceAccuracy", 0.001);
+  const pageHallucination = percent(page.record.omniscienceHallucinationRate);
   const faithPage = pageHallucination === null ? null : 100 - pageHallucination;
   const faithfulness = resolveMetric(evaluations.aa_omniscience_non_hallucination_rate, faithPage, "hallucinationRate", 0.001);
   const apiDigest = canonicalDigest(api);
   const component = (metric: { api: number | null; page: number | null }, apiPath: string, pagePath: string, benchmark: string): Record<string, unknown> | null => {
     const score = metric.api ?? metric.page; if (score === null) return null; const fromApi = metric.api !== null;
-    return { normalizedScore: score, sourceKind: fromApi ? "api" : "public-page", fieldPath: fromApi ? apiPath : pagePath, benchmark: { id: benchmark, version: `AA Intelligence Index v${fromApi ? "4.1" : "4.1.1"}`, status: "current" }, retrievedAt: fromApi ? capturedAt : page.provenance.retrievedAt, sourceUrl: fromApi ? sourceUrl : page.provenance.url, sourceRecordDigest: fromApi ? apiDigest : page.provenance.recordSha256 };
+    return { normalizedScore: score, sourceKind: fromApi ? "api" : "public-page", fieldPath: fromApi ? apiPath : pagePath, benchmark: { id: benchmark, version: `AA Intelligence Index v${fromApi ? METHODOLOGY.version : PUBLIC_METHODOLOGY_VERSION}`, status: "current" }, retrievedAt: fromApi ? capturedAt : page.provenance.retrievedAt, sourceUrl: fromApi ? sourceUrl : page.provenance.url, sourceRecordDigest: fromApi ? apiDigest : page.provenance.recordSha256 };
   };
   const tau3Component = component(tau3, "evaluations.tau_banking", "tauBanking", "tau3-banking"); const gdpComponent = component(gdp, "evaluations.gdpval_aa_normalized", "gdpvalNormalized", "gdpval-aa"); const tau2Component = component(tau2, "evaluations.tau2_telecom", "tau2", "tau2-telecom");
   const derivation = tau3Component && gdpComponent ? { version: "v1", rule: "tau3-banking+gdpval-aa", score: ((tau3Component.normalizedScore as number) + (gdpComponent.normalizedScore as number)) / 2 } : tau2Component ? { version: "v1", rule: "tau2-telecom-fallback", score: tau2Component.normalizedScore } : { version: "v1", rule: "unavailable", score: null };
   const scientific = hle.score !== null && gpqa.score !== null && crit.score !== null ? (hle.score + gpqa.score + crit.score) / 3 : null;
   const scores: Record<string, number | null> = { intelligence: checkedScore(intelligence.score), coding: checkedScore(percent(evaluations.artificial_analysis_coding_index)), agentic: checkedScore(agentic.score), toolUse: checkedScore(derivation.score as number | null), scientificReasoning: checkedScore(scientific), longContext: checkedScore(longContext.score), instructionFollowing: checkedScore(instructions.score), knowledge: checkedScore(knowledge.score), faithfulness: checkedScore(faithfulness.score) };
   const present = DIMENSIONS.filter((dimension) => scores[dimension] !== null).length;
-  return { version: 4, provider: mapping.provider, model: mapping.model, thinkingLevel: mapping.thinkingLevel, modelId: mapping.aaModelId, capturedAt, methodology: { ...METHODOLOGY }, mapping: { status: "mapped", matchBasis: "manual", reviewedAt, thinkingLevel: mapping.thinkingLevel }, source: { name: api.name, slug: api.slug, openrouterApiId: typeof api.openrouter_api_id === "string" ? api.openrouter_api_id : null }, publicPage: page.provenance, scores, toolUse: { components: { tau3Banking: tau3Component, gdpvalAaNormalized: gdpComponent, tau2Telecom: tau2Component }, derivation }, outputTokens: {}, taskTimeMs: {}, coverage: present / DIMENSIONS.length };
+  const subBenchmarks = { ifbench: checkedScore(instructions.score), hle: checkedScore(hle.score), gpqa: checkedScore(gpqa.score), critpt: checkedScore(crit.score) };
+  return { version: 4, provider: mapping.provider, model: mapping.model, thinkingLevel: mapping.thinkingLevel, modelId: mapping.aaModelId, capturedAt, methodology: { ...METHODOLOGY }, mapping: { status: "mapped", matchBasis: "manual", reviewedAt, thinkingLevel: mapping.thinkingLevel }, source: { name: api.name, slug: api.slug, openrouterApiId: typeof api.openrouter_api_id === "string" ? api.openrouter_api_id : null }, publicPage: page.provenance, scores, subBenchmarks, toolUse: { components: { tau3Banking: tau3Component, gdpvalAaNormalized: gdpComponent, tau2Telecom: tau2Component }, derivation }, outputTokens: {}, taskTimeMs: {}, coverage: present / DIMENSIONS.length };
 }
 
 function mappingsFromManifest(manifest: ManifestV4): BatchMapping[] { return manifest.models.map((entry) => ({ provider: entry.provider, model: entry.model, thinkingLevel: entry.thinkingLevel, aaModelId: entry.modelId })); }
@@ -184,7 +191,7 @@ async function acquireLock(config: BaseConfig): Promise<string> {
     return lock;
   } catch (error) { await rm(lock, { recursive: true, force: true }).catch(() => {}); throw error; }
 }
-async function acquire(config: WriterConfig): Promise<{ lock: string; staging: string }> {
+async function acquire(config: BaseConfig): Promise<{ lock: string; staging: string }> {
   await ensureSecureDirectory(config.paths.snapshotRoot); await ensureSecureDirectory(config.paths.modelsDir);
   const lock = await acquireLock(config);
   try {
@@ -194,6 +201,8 @@ async function acquire(config: WriterConfig): Promise<{ lock: string; staging: s
 async function baseline(config: WriterConfig, allowV3: boolean, now: number): Promise<{ manifest: ManifestV4 | null; snapshots: Map<string, unknown>; v3: BatchMapping[] | null; canonicalMappings: CanonicalMapping[] }> {
   const canonicalMappings = await loadMappings(config); const value = await readOptionalSecureJson(config.paths.manifest); if (value === null) return { manifest: null, snapshots: new Map(), v3: null, canonicalMappings };
   if (allowV3) { const v3 = extractStrictV3Mappings(value); if (v3) return { manifest: null, snapshots: new Map(), v3, canonicalMappings }; }
+  // Migration bridge: a digest-verified manifest pinned to a previous methodology yields its mappings so the next publication republishes them under the current pin; snapshots are never trusted across methodology versions.
+  const legacy = extractLegacyV4Mappings(value); if (legacy) return { manifest: null, snapshots: new Map(), v3: legacy, canonicalMappings };
   if (!validateManifest(value) || manifestEntriesDigest(value.models) !== value.digest || value.generatedAt > now + 60_000) throw new Error("invalid or unsupported manifest");
   const snapshots = new Map<string, unknown>();
   for (const entry of value.models) { const snapshot = await secureSnapshot(path.join(config.paths.modelsDir, entry.file)); assertEntrySnapshot(entry, snapshot, value.generatedAt); snapshots.set(entry.file, snapshot); }
@@ -212,12 +221,13 @@ class AaService {
     const snapshotRoot = path.resolve(config.paths.snapshotRoot);
     const manifestTargetPath = path.resolve(config.paths.manifest);
     const mappingsTargetPath = path.resolve(config.paths.mappings);
+    const benchmarkHealthTargetPath = path.resolve(config.paths.benchmarkHealth);
     let manifest: ArtifactFingerprint | null = null; let manifestSnapshotFiles: string[] = [];
     try {
       const loaded = await readValidatedManifest(config);
       manifest = { path: displayArtifactPath(snapshotRoot, manifestTargetPath), targetPath: manifestTargetPath, fingerprint: loaded.fingerprint };
       manifestSnapshotFiles = ordered(loaded.manifest.models.map((entry) => entry.file));
-    } catch (error) { if (!isMissingSnapshot(error)) throw error; }
+    } catch (error) { if (!isMissingSnapshot(error) && !(error instanceof AaMethodologyMismatchError)) throw error; }
     let canonicalMappings: ArtifactFingerprint | null = null;
     try {
       await assertSecureFile(config.paths.mappings); const text = await readFile(config.paths.mappings, "utf8"); let value: unknown;
@@ -225,11 +235,18 @@ class AaService {
       if (!validateCanonicalMappings(value)) throw new Error("invalid canonical mappings");
       canonicalMappings = { path: displayArtifactPath(snapshotRoot, mappingsTargetPath), targetPath: mappingsTargetPath, fingerprint: digestText(text) };
     } catch (error) { if (!isMissingSnapshot(error)) throw error; }
+    let benchmarkHealth: ArtifactFingerprint | null = null;
+    try {
+      await assertSecureFile(config.paths.benchmarkHealth); const text = await readFile(config.paths.benchmarkHealth, "utf8"); let value: unknown;
+      try { value = JSON.parse(text); } catch { throw new Error("invalid JSON in benchmark-health.json"); }
+      if (!validateBenchmarkHealth(value)) throw new Error("invalid benchmark health");
+      benchmarkHealth = { path: displayArtifactPath(snapshotRoot, benchmarkHealthTargetPath), targetPath: benchmarkHealthTargetPath, fingerprint: digestText(text) };
+    } catch (error) { if (!isMissingSnapshot(error)) throw error; }
     const generatedSnapshotFiles: string[] = [];
     for (const file of await readdir(config.paths.modelsDir)) if (GENERATED_SNAPSHOT.test(file)) {
       await assertSecureFile(path.join(config.paths.modelsDir, file)); generatedSnapshotFiles.push(file);
     }
-    return { snapshotRoot, manifest, canonicalMappings, manifestSnapshotFiles, generatedSnapshotFiles: ordered(generatedSnapshotFiles) };
+    return { snapshotRoot, manifest, canonicalMappings, benchmarkHealth, manifestSnapshotFiles, generatedSnapshotFiles: ordered(generatedSnapshotFiles) };
   }
   async cleanupObsoleteSnapshots(signal?: AbortSignal, env: NodeJS.ProcessEnv = process.env): Promise<CleanupResult> {
     const config = baseConfig(env); const lock = await acquireLock(config); const deleted: string[] = []; const warnings: string[] = [];
@@ -246,6 +263,91 @@ class AaService {
       }
       return { deleted: ordered(deleted), warnings: ordered(warnings) };
     } finally { await rm(lock, { recursive: true, force: true }).catch(() => {}); }
+  }
+  /** Enforces /scoped-models as the lifecycle authority for reviewed-AA artifacts: entries and canonical-mapping rows whose runtime and canonical identities are no longer enabled are dropped. Retained snapshots are not re-captured; orphaned files are removed by the final cleanup. */
+  async enforceScope(signal?: AbortSignal, env: NodeJS.ProcessEnv = process.env): Promise<ScopeEnforcementResult> {
+    const config = await loadRuntimeConfig(env); const transaction = await acquire(config); const warnings: string[] = [];
+    try {
+      abort(signal); const loaded = await readValidatedManifest(config); const mappings = await loadMappings(config);
+      const accepted = new Set<string>(); for (const runtime of config.enabledModels) for (const identity of identities(runtime, canonicalIdentity(config, runtime))) accepted.add(identity);
+      const entries = loaded.manifest.models.filter((entry) => accepted.has(idOf(entry)));
+      const removed = loaded.manifest.models.filter((entry) => !accepted.has(idOf(entry))).map((entry) => `${idOf(entry)} (${entry.thinkingLevel ?? "generic"})`);
+      const keptMappings = mappings.filter((mapping) => (accepted.has(idOf(mapping)) || accepted.has(mapping.canonicalId)) && entries.some((entry) => entry.modelId === mapping.aaModelId && entry.thinkingLevel === mapping.thinkingLevel && (idOf(entry) === idOf(mapping) || idOf(entry) === mapping.canonicalId)));
+      if (!removed.length && keptMappings.length === mappings.length) return { changed: false, removed: [], warnings };
+      abort(signal);
+      const next: ManifestV4 = { version: 4, generatedAt: this.deps.now(), digest: manifestEntriesDigest(entries), methodology: { ...METHODOLOGY }, models: entries };
+      if (!validateManifest(next)) throw new Error("scope-enforced manifest failed schema validation");
+      const projections: Array<{ file: string; text: string }> = [];
+      if (mappings.length) {
+        const value = { version: 1 as const, mappings: keptMappings };
+        if (!validateCanonicalMappings(value)) throw new Error("scope-enforced canonical mappings failed schema validation");
+        projections.push({ file: config.paths.mappings, text: jsonPretty(value) });
+      }
+      projections.push({ file: config.paths.manifest, text: jsonPretty(next) });
+      for (const projection of projections) {
+        abort(signal); const stage = path.join(transaction.staging, path.basename(projection.file));
+        await writeFile(stage, projection.text, { mode: 0o600, flag: "wx" }); await chmod(stage, 0o600); await assertSecureFile(stage);
+        await this.deps.fsHooks.beforeManifestRename?.(); await rename(stage, projection.file);
+      }
+      return { changed: true, removed: ordered(removed), warnings };
+    } finally { await rm(transaction.staging, { recursive: true, force: true }).catch(() => {}); await rm(transaction.lock, { recursive: true, force: true }).catch(() => {}); }
+  }
+  /** Classifies AA sub-benchmark availability from the newest dated base releases so reviewed fallback sources can activate only when a primary benchmark is retired upstream. */
+  async detectBenchmarkHealth(signal?: AbortSignal, env: NodeJS.ProcessEnv = process.env): Promise<BenchmarkHealthResult> {
+    const config = await loadDiscoverConfig(env); const warnings: string[] = [];
+    abort(signal);
+    const catalog = await this.deps.fetchCatalog({ ...config, apiUrl: new URL("https://artificialanalysis.ai/api/v2/language/models/free") }, signal);
+    const variantSuffix = /-(low|medium|high|xhigh|max|minimal|non-reasoning|none|thinking|instruct|it|fp\d*|q\d+|think|vl|fin)$/;
+    const dated = catalog.records
+      .map((record) => ({ slug: record.slug, releaseDate: typeof record.release_date === "string" ? record.release_date : "" }))
+      .filter((entry) => entry.slug && !variantSuffix.test(entry.slug) && /^\d{4}-\d{2}-\d{2}$/.test(entry.releaseDate));
+    const newest = dated.reduce((max, entry) => entry.releaseDate > max ? entry.releaseDate : max, "");
+    if (!newest || Number.isNaN(Date.parse(newest))) throw new Error("Artificial Analysis catalog contains no dated base releases to assess");
+    const newestTime = Date.parse(newest);
+    const seen = new Set<string>(); const sample: typeof dated = [];
+    for (const offsetDays of [0, 30, 60]) {
+      const lower = new Date(newestTime - (offsetDays + 30) * 86_400_000).toISOString().slice(0, 10);
+      const upper = new Date(newestTime - offsetDays * 86_400_000).toISOString().slice(0, 10);
+      for (const entry of dated.filter((candidate) => !seen.has(candidate.slug) && candidate.releaseDate > lower && candidate.releaseDate <= upper).sort((a, b) => b.releaseDate.localeCompare(a.releaseDate)).slice(0, 5)) { seen.add(entry.slug); sample.push(entry); }
+    }
+    if (sample.length < 10) throw new Error(`benchmark health sampling found only ${sample.length} dated base releases`);
+    const pages = new Map<string, Record<string, unknown>>();
+    for (const record of sample) {
+      abort(signal);
+      try { pages.set(record.slug, (await this.deps.fetchPublicModel(config, record.slug, signal)).record as unknown as Record<string, unknown>); }
+      catch { warning(warnings, "benchmark health sampling skipped an unavailable model page"); }
+    }
+    const newestCohort = new Date(newestTime - 30 * 86_400_000).toISOString().slice(0, 10);
+    const fields = {} as BenchmarkHealthV1["fields"];
+    for (const field of BENCHMARK_HEALTH_FIELDS) {
+      let checked = 0; let scored = 0; let newestScored: string | null = null; let newestCohortScored = 0;
+      for (const record of sample) {
+        const pageRecord = pages.get(record.slug); if (!pageRecord) continue;
+        checked++;
+        if (typeof pageRecord[field] !== "number" || !Number.isFinite(pageRecord[field])) continue;
+        scored++;
+        if (newestScored === null || record.releaseDate > newestScored) newestScored = record.releaseDate;
+        if (record.releaseDate > newestCohort) newestCohortScored++;
+      }
+      const status = checked < 10 ? "unknown" : scored === 0 ? "retired" : newestCohortScored > 0 ? "active" : "lagging";
+      fields[field] = { checked, scored, status, newestScoredRelease: newestScored };
+    }
+    const digestInput = { version: 1 as const, methodology: { ...METHODOLOGY }, fields };
+    const digest = benchmarkHealthDigest(digestInput);
+    const transaction = await acquire(config);
+    try {
+      abort(signal);
+      const existing = await readOptionalSecureJson(config.paths.benchmarkHealth);
+      if (existing !== null) {
+        if (!validateBenchmarkHealth(existing)) throw new Error("invalid or unsupported benchmark-health.json");
+        if (existing.digest === digest) return { changed: false, fields, warnings };
+      }
+      const next: BenchmarkHealthV1 = { version: 1, generatedAt: this.deps.now(), digest, ...digestInput };
+      const stage = path.join(transaction.staging, "benchmark-health.json");
+      await writeFile(stage, jsonPretty(next), { mode: 0o600, flag: "wx" }); await chmod(stage, 0o600); await assertSecureFile(stage);
+      await rename(stage, config.paths.benchmarkHealth);
+      return { changed: true, fields, warnings };
+    } finally { await rm(transaction.staging, { recursive: true, force: true }).catch(() => {}); await rm(transaction.lock, { recursive: true, force: true }).catch(() => {}); }
   }
   async missing(env: NodeJS.ProcessEnv = process.env): Promise<string[]> {
     const config = await loadRuntimeConfig(env); const mappings = await loadMappings(config); let manifest: ManifestV4 | null = null;
@@ -269,16 +371,16 @@ class AaService {
     return (await this.discoverCatalog(modelIds, signal, env)).candidates;
   }
   async add(runtimeId: string, aaModelId: string, thinkingLevel: ThinkingLevel, signal?: AbortSignal, env: NodeJS.ProcessEnv = process.env): Promise<PublicationResult> {
-    return this.write(signal, env, false, (base, config) => { if (!config.enabledModels.includes(runtimeId)) throw new Error(`model is not enabled: ${runtimeId}`); const canonical = canonicalIdentity(config, runtimeId); const [provider, model] = splitId(canonical); const aliases = identities(runtimeId, canonical); const current = base.manifest ? mappingsFromManifest(base.manifest).filter((entry) => !aliases.has(idOf(entry))) : []; current.push({ provider, model, thinkingLevel, aaModelId }); return current; });
+    return this.write(signal, env, false, (base, config) => { if (!config.enabledModels.includes(runtimeId)) throw new Error(`model is not enabled: ${runtimeId}`); const canonical = canonicalIdentity(config, runtimeId); const [provider, model] = splitId(canonical); const aliases = identities(runtimeId, canonical); const current = (base.manifest ? mappingsFromManifest(base.manifest) : base.v3 ?? []).filter((entry) => !aliases.has(idOf(entry))); current.push({ provider, model, thinkingLevel, aaModelId }); return current; });
   }
   async replaceBatch(mappings: BatchMapping[], signal?: AbortSignal, env: NodeJS.ProcessEnv = process.env): Promise<PublicationResult> { return this.write(signal, env, false, () => mappings); }
   async refresh(modelId: string, signal?: AbortSignal, env: NodeJS.ProcessEnv = process.env): Promise<PublicationResult> {
-    return this.write(signal, env, false, (base, config) => { if (!base.manifest) throw new Error(`no existing mapping for ${modelId}`); const canonical = canonicalIdentity(config, modelId); const aliases = identities(modelId, canonical); const all = mappingsFromManifest(base.manifest); if (!all.some((entry) => aliases.has(idOf(entry)))) throw new Error(`no existing mapping for ${modelId}`); return all; });
+    return this.write(signal, env, false, (base, config) => { const all = base.manifest ? mappingsFromManifest(base.manifest) : base.v3 ?? []; if (!all.length) throw new Error(`no existing mapping for ${modelId}`); const canonical = canonicalIdentity(config, modelId); const aliases = identities(modelId, canonical); if (!all.some((entry) => aliases.has(idOf(entry)))) throw new Error(`no existing mapping for ${modelId}`); return all; });
   }
   async refreshAll(signal?: AbortSignal, env: NodeJS.ProcessEnv = process.env): Promise<PublicationResult> { return this.write(signal, env, true, (base) => base.v3 ?? (base.manifest ? mappingsFromManifest(base.manifest) : (() => { throw new Error("no benchmark manifest"); })())); }
   async replaceReviewedVariants(runtimeId: string, canonicalId: string, variants: ReviewedVariant[], signal?: AbortSignal, env: NodeJS.ProcessEnv = process.env, reviewedCatalog?: CatalogResult, options: PublicationOptions = {}): Promise<PublicationResult> {
     validateReviewedVariants(variants);
-    return this.write(signal, env, false, (base, config) => { if (!config.enabledModels.includes(runtimeId)) throw new Error(`model is not enabled: ${runtimeId}`); const resolved = canonicalIdentity(config, runtimeId); if (resolved !== canonicalId) throw new Error("canonical model identity changed before publication"); const aliases = identities(runtimeId, canonicalId); const [provider, model] = splitId(canonicalId); const next = base.manifest ? mappingsFromManifest(base.manifest).filter((entry) => !aliases.has(idOf(entry))) : []; for (const variant of variants) next.push({ provider, model, thinkingLevel: variant.thinkingLevel, aaModelId: variant.aaModelId }); return next; }, reviewedCatalog, options);
+    return this.write(signal, env, false, (base, config) => { if (!config.enabledModels.includes(runtimeId)) throw new Error(`model is not enabled: ${runtimeId}`); const resolved = canonicalIdentity(config, runtimeId); if (resolved !== canonicalId) throw new Error("canonical model identity changed before publication"); const aliases = identities(runtimeId, canonicalId); const [provider, model] = splitId(canonicalId); const next = (base.manifest ? mappingsFromManifest(base.manifest) : base.v3 ?? []).filter((entry) => !aliases.has(idOf(entry))); for (const variant of variants) next.push({ provider, model, thinkingLevel: variant.thinkingLevel, aaModelId: variant.aaModelId }); return next; }, reviewedCatalog, options);
   }
   async write(
     signal: AbortSignal | undefined,

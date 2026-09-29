@@ -1,5 +1,14 @@
+import { PUBLIC_METHODOLOGY_VERSION } from "../09-catalog/aa/schema.ts";
+
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 export type BenchmarkThinkingLevel = Exclude<ThinkingLevel, "minimal"> | null;
+export type SubBenchmarkField = "critpt" | "gpqa" | "hle" | "ifbench";
+export type BenchmarkHealthStatus = "active" | "lagging" | "retired" | "unknown";
+export type BenchmarkHealth = Partial<Record<string, { checked: number; scored: number; status: BenchmarkHealthStatus; newestScoredRelease: string | null }>>;
+export interface BenchmarkHealthState { generatedAt: number; fields: BenchmarkHealth; }
+
+/** Reviewed substitution source: average of raw sub-benchmark fields, gated on its own floor and on the retirement of the primary upstream field. */
+export interface DimensionFallbackSource { fields: SubBenchmarkField[]; floor: number; healthField: SubBenchmarkField; }
 
 export const BENCHMARK_DIMENSIONS = [
 	"intelligence", "coding", "agentic", "toolUse", "scientificReasoning", "longContext", "instructionFollowing", "knowledge", "faithfulness",
@@ -10,7 +19,7 @@ export type RoutingProfile = "balanced" | "coding" | "agentic" | "research" | "p
 export interface BenchmarkMethodology { id: string; version: string; }
 export interface PublicPageProvenance {
 	url: string; retrievedAt: number; contentSha256: string; recordSha256: string;
-	extractorVersion: "aa-current-model-rsc-v1"; intelligenceIndexMethodologyVersion: "4.1.1";
+	extractorVersion: "aa-current-model-rsc-v1"; intelligenceIndexMethodologyVersion: typeof PUBLIC_METHODOLOGY_VERSION;
 }
 export interface BenchmarkComponent {
 	normalizedScore: number;
@@ -37,6 +46,7 @@ export interface BenchmarkSnapshot {
 	source: { name: string; slug: string; openrouterApiId: string | null };
 	publicPage: PublicPageProvenance;
 	scores: Record<BenchmarkDimension, number | null>;
+	subBenchmarks?: Record<SubBenchmarkField, number | null>;
 	toolUse: ToolUseProvenance;
 	outputTokens: Partial<Record<RoutingProfile, number | null>>;
 	taskTimeMs: Partial<Record<RoutingProfile, number | null>>;
@@ -49,6 +59,7 @@ export interface RoutingProfilePolicy {
 	requiredDimensions: BenchmarkDimension[];
 	minimumCoverage: number;
 	mandatoryFloors: Partial<Record<Exclude<BenchmarkDimension, "faithfulness">, number>>;
+	fallbackSources?: Partial<Record<Exclude<BenchmarkDimension, "faithfulness">, DimensionFallbackSource[]>>;
 	constraints: { requiredInput: "text"; minimumContextWindow: number; minimumMaxTokens: number };
 	outputTokensMetric: RoutingProfile; expectedOutputTokens: number; qualityTolerance: number; defaultThinking: ThinkingLevel;
 }
@@ -62,6 +73,8 @@ export interface RoutingPolicy {
 export interface QualityDiagnostics {
 	A: number; C: number; Q: number; totalWeight: number; availableWeight: number;
 	availableWeightedDimensions: BenchmarkDimension[]; missingWeightedDimensions: BenchmarkDimension[];
+	/** Dimensions whose primary score was null and which qualified through a retired-benchmark fallback source. */
+	substitutions?: Array<{ dimension: BenchmarkDimension; source: string; value: number }>;
 }
 export type BenchmarkGateReason = "missingRequiredDimension" | "mandatoryFloor" | "faithfulnessFloor" | "minimumCoverage" | "invalidBenchmark";
 export type BenchmarkRejectionReason = "noSnapshot" | "unhealthy" | "capability" | BenchmarkGateReason | "speed";

@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseAuthoritativeCatalog } from "../cost-sources.ts";
-import { aaReviewThinkingLevelOptions, discoverAaCandidates, discoverAaCandidatesForModels, finalizeAaSync, hasGenericAaMapping, isCompleteAaCandidateReview, netAaArtifactChanges, publishReviewedAaVariants, syncEnabledModels, validateReviewedAaVariants } from "../sync.ts";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { parseAaReferencePriceCatalog, parseAuthoritativeCatalog } from "../cost-sources.ts";
+import { aaReviewThinkingLevelOptions, detectAaBenchmarkHealth, discoverAaCandidates, discoverAaCandidatesForModels, enforceAaScope, finalizeAaSync, hasGenericAaMapping, isCompleteAaCandidateReview, netAaArtifactChanges, publishReviewedAaVariants, syncEnabledModels, validateReviewedAaVariants } from "../sync.ts";
 
 const customModel = { id: "custom", name: "Custom", canonicalId: "custom-provider/custom", input: ["text"] as ("text" | "image")[], cost: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 }, costProvenance: "provider:/model/info", available: true, active: true };
 const state = {
@@ -50,32 +53,94 @@ test("unique normalized authoritative suffix prices a synthetic model with match
   } as any);
   assert.deepEqual(report.models[0]?.cost, { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 });
   assert.equal(report.models[0]?.costProvenance, "authoritative:openrouter:/api/v1/models:normalized-suffix:test-vendor/nova-4-27b");
-  assert.equal(saved.providers[0].models[0].cost, undefined, "sync reporting must not invent catalog pricing");
+  assert.deepEqual(saved.providers[0].models[0].cost, { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 }, "sync must persist the resolved price so catalog health matches the report");
+  assert.equal(saved.providers[0].models[0].costProvenance, "authoritative:openrouter:/api/v1/models:normalized-suffix:test-vendor/nova-4-27b");
 });
 
-test("pricing resolves provider, OpenRouter, lazy Ollama, then reviewed overrides in order", async () => {
-  let ollamaCalls = 0;
+test("pricing resolves provider, OpenRouter, lazy Ollama, reviewed overrides, then AA reference prices in order", async () => {
+  let ollamaCalls = 0; let aaCalls = 0;
   const pricedState: any = { version: 2, updatedAt: 1, providers: [{ id: "custom-provider", baseUrl: "https://custom.test", api: "openai-completions", models: [
     { id: "provider-priced", name: "Provider", canonicalId: "custom-provider/provider-priced", input: ["text"], cost: { input: 7, output: 8, cacheRead: 0, cacheWrite: 0 }, costProvenance: "provider", active: true, available: true },
     { id: "ollama-priced", name: "Ollama", canonicalId: "custom-provider/ollama-priced", input: ["text"], active: true, available: true },
     { id: "reviewed", name: "Reviewed", canonicalId: "custom-provider/reviewed", input: ["text"], active: true, available: true },
+    { id: "aa-priced", name: "AA Priced", canonicalId: "custom-provider/aa-priced", input: ["text"], active: true, available: true },
+    { id: "quantized-nvfp4", name: "Quantized", canonicalId: "custom-provider/quantized-nvfp4", input: ["text"], active: true, available: true },
+    { id: "ambiguous-nvfp4", name: "Ambiguous", canonicalId: "custom-provider/ambiguous-nvfp4", input: ["text"], active: true, available: true },
   ] }], nativeModels: [] };
-  const models = ["provider-priced", "ollama-priced", "reviewed"].map((id) => ({ provider: "custom-provider", id, input: ["text"] }));
+  const models = ["provider-priced", "ollama-priced", "reviewed", "aa-priced", "quantized-nvfp4", "ambiguous-nvfp4"].map((id) => ({ provider: "custom-provider", id, input: ["text"] }));
+  const aaPricing = parseAaReferencePriceCatalog([
+    { slug: "aa-priced", name: "AA Priced", pricing: { price_1m_input_tokens: 11, price_1m_output_tokens: 12, price_1m_cache_hit_tokens: 1, price_1m_cache_write_tokens: null } },
+    { slug: "quantized", name: "Quantized Base", pricing: { price_1m_input_tokens: 13, price_1m_output_tokens: 14 } },
+    { slug: "reviewed", name: "Reviewed AA Twin", pricing: { price_1m_input_tokens: 99, price_1m_output_tokens: 99 } },
+    { slug: "ambiguous", name: "Ambiguous" },
+    { slug: "ambiguous", name: "Ambiguous Duplicate", openrouter_api_id: "vendor/ambiguous", pricing: { price_1m_input_tokens: 15, price_1m_output_tokens: 16 } },
+  ]);
   const report = await syncEnabledModels({} as any, { scopedModels: models.map((model) => ({ model })), modelRegistry: { getAvailable: () => models } }, {
     reconcileSettings: async () => {}, refreshCatalog: async () => pricedState, loadProviderSettings: async () => [{ id: "custom-provider", baseUrl: "https://custom.test", api: "openai-completions" }], loadCatalogState: async () => pricedState, saveCatalogState: async () => {},
     loadAuthoritativeCatalog: async () => parseAuthoritativeCatalog({ data: [] }),
-    loadOllamaCloudCatalog: async () => { ollamaCalls++; return { provenance: "ollama-cloud:/api/tags", models: new Map([["ollama-priced", { id: "ollama-priced", available: true, cost: { input: 3, output: 4, cacheRead: 0, cacheWrite: 0 } }], ["reviewed", { id: "reviewed", available: true }]]) }; },
-    loadReviewedCosts: async () => new Map([["custom-provider/reviewed", { input: 5, output: 6, cacheRead: 0, cacheWrite: 0 }]]), loadBenchmarkAssets: async () => null, loadAaConfig: () => aaConfig(), loadAaMappings: async () => [],
+    loadOllamaCloudCatalog: async () => { ollamaCalls++; return { provenance: "ollama-cloud:/api/tags", models: new Map([["ollama-priced", { id: "ollama-priced", available: true, cost: { input: 3, output: 4, cacheRead: 0, cacheWrite: 0 } }]]) }; },
+    loadReviewedCosts: async () => new Map([["custom-provider/reviewed", { input: 5, output: 6, cacheRead: 0, cacheWrite: 0 }]]),
+    loadAaReferencePrices: async () => { aaCalls++; return aaPricing; },
+    loadBenchmarkAssets: async () => null, loadAaConfig: () => aaConfig(), loadAaMappings: async () => [],
   } as any);
-  assert.equal(ollamaCalls, 1);
-  assert.deepEqual(report.models.map((model) => model.cost), [{ input: 3, output: 4, cacheRead: 0, cacheWrite: 0 }, { input: 7, output: 8, cacheRead: 0, cacheWrite: 0 }, { input: 5, output: 6, cacheRead: 0, cacheWrite: 0 }]);
-  assert.deepEqual(report.models.map((model) => model.costProvenance), ["ollama-cloud:/api/tags:explicit-numeric-price", "provider", "reviewed-override"]);
+  assert.equal(ollamaCalls, 1); assert.equal(aaCalls, 1);
+  const byId = new Map(report.models.map((model) => [model.id, model] as const));
+  assert.deepEqual(byId.get("custom-provider/provider-priced")?.cost, { input: 7, output: 8, cacheRead: 0, cacheWrite: 0 }); assert.equal(byId.get("custom-provider/provider-priced")?.costProvenance, "provider");
+  assert.deepEqual(byId.get("custom-provider/ollama-priced")?.cost, { input: 3, output: 4, cacheRead: 0, cacheWrite: 0 }); assert.equal(byId.get("custom-provider/ollama-priced")?.costProvenance, "ollama-cloud:/api/tags:explicit-numeric-price");
+  assert.deepEqual(byId.get("custom-provider/reviewed")?.cost, { input: 5, output: 6, cacheRead: 0, cacheWrite: 0 }); assert.equal(byId.get("custom-provider/reviewed")?.costProvenance, "reviewed-override");
+  assert.deepEqual(byId.get("custom-provider/aa-priced")?.cost, { input: 11, output: 12, cacheRead: 1, cacheWrite: 0 }); assert.equal(byId.get("custom-provider/aa-priced")?.costProvenance, "aa-catalog:reference-price:aa-priced");
+  assert.deepEqual(byId.get("custom-provider/quantized-nvfp4")?.cost, { input: 13, output: 14, cacheRead: 0, cacheWrite: 0 }); assert.equal(byId.get("custom-provider/quantized-nvfp4")?.costProvenance, "aa-catalog:reference-price:quantized-variant:quantized");
+  assert.equal(byId.get("custom-provider/ambiguous-nvfp4")?.cost, undefined); assert.equal(byId.get("custom-provider/ambiguous-nvfp4")?.costProvenance, "unknown");
+});
+
+test("sync persists resolved custom-model costs into state without overwriting provider prices and re-resolves AA prices next sync", async () => {
+  let saved: any = null;
+  const pricedState: any = { version: 2, updatedAt: 1, providers: [{ id: "custom-provider", baseUrl: "https://custom.test", api: "openai-completions", models: [
+    { id: "provider-priced", name: "Provider", canonicalId: "custom-provider/provider-priced", input: ["text"], cost: { input: 7, output: 8, cacheRead: 0, cacheWrite: 0 }, costProvenance: "provider", active: true, available: true },
+    { id: "aa-priced", name: "AA Priced", canonicalId: "custom-provider/aa-priced", input: ["text"], active: true, available: true },
+  ] }], nativeModels: [] };
+  const models = ["provider-priced", "aa-priced"].map((id) => ({ provider: "custom-provider", id, input: ["text"] }));
+  const freshAaPrices = [11, 21];
+  const deps = (state: any) => ({
+    reconcileSettings: async () => {}, refreshCatalog: async () => state, loadProviderSettings: async () => [{ id: "custom-provider", baseUrl: "https://custom.test", api: "openai-completions" }], loadCatalogState: async () => state, saveCatalogState: async (value: any) => { saved = value; },
+    loadAuthoritativeCatalog: async () => parseAuthoritativeCatalog({ data: [] }), loadOllamaCloudCatalog: async () => ({ provenance: "ollama-cloud:/api/tags", models: new Map() }), loadReviewedCosts: async () => new Map(),
+    loadAaReferencePrices: async () => parseAaReferencePriceCatalog([{ slug: "aa-priced", name: "AA Priced", pricing: { price_1m_input_tokens: freshAaPrices.shift()!, price_1m_output_tokens: 12 } }]),
+    loadBenchmarkAssets: async () => null, loadAaConfig: () => aaConfig(), loadAaMappings: async () => [],
+  } as any);
+  const ctx = { scopedModels: models.map((model) => ({ model })), modelRegistry: { getAvailable: () => models } } as any;
+  const first = await syncEnabledModels({} as any, ctx, deps(pricedState));
+  const firstAa = first.models.find((model) => model.id === "custom-provider/aa-priced");
+  assert.equal(firstAa?.cost?.input, 11); assert.equal(firstAa?.costProvenance, "aa-catalog:reference-price:aa-priced");
+  const savedAa = saved.providers[0].models.find((model: any) => model.id === "aa-priced");
+  assert.deepEqual(savedAa.cost, firstAa?.cost); assert.equal(savedAa.costProvenance, "aa-catalog:reference-price:aa-priced");
+  const savedProvider = saved.providers[0].models.find((model: any) => model.id === "provider-priced");
+  assert.deepEqual(savedProvider.cost, { input: 7, output: 8, cacheRead: 0, cacheWrite: 0 }); assert.equal(savedProvider.costProvenance, "provider");
+  const second = await syncEnabledModels({} as any, ctx, deps({ ...saved, updatedAt: 2 }));
+  const secondAa = second.models.find((model) => model.id === "custom-provider/aa-priced");
+  assert.equal(secondAa?.cost?.input, 21); assert.equal(secondAa?.costProvenance, "aa-catalog:reference-price:aa-priced");
+  const secondProvider = second.models.find((model) => model.id === "custom-provider/provider-priced");
+  assert.deepEqual(secondProvider?.cost, { input: 7, output: 8, cacheRead: 0, cacheWrite: 0 }); assert.equal(secondProvider?.costProvenance, "provider");
+});
+
+test("AA reference pricing degrades to null without inventing prices", async () => {
+  const unresolvedState: any = { version: 2, updatedAt: 1, providers: [{ id: "test-provider", baseUrl: "https://provider.test", api: "openai-completions", models: [
+    { id: "missing-price", name: "Missing", canonicalId: "test-provider/missing-price", input: ["text"], active: true, available: true },
+  ] }], nativeModels: [] };
+  const models = [{ model: { provider: "test-provider", id: "missing-price", input: ["text"] } }];
+  for (const loadAaReferencePrices of [async () => null, async () => { throw new Error("AA unavailable"); }]) {
+    const report = await syncEnabledModels({} as any, { scopedModels: models, modelRegistry: { getAvailable: () => [] } }, {
+      reconcileSettings: async () => {}, refreshCatalog: async () => unresolvedState, loadProviderSettings: async () => [{ id: "test-provider", baseUrl: "https://provider.test", api: "openai-completions" }], loadCatalogState: async () => unresolvedState, saveCatalogState: async () => {},
+      loadAuthoritativeCatalog: async () => parseAuthoritativeCatalog({ data: [] }), loadOllamaCloudCatalog: async () => ({ provenance: "ollama-cloud:/api/tags", models: new Map() }), loadReviewedCosts: async () => new Map(), loadAaReferencePrices,
+      loadBenchmarkAssets: async () => null, loadAaConfig: () => aaConfig(), loadAaMappings: async () => [],
+    } as any);
+    assert.equal(report.models[0]?.cost, undefined); assert.equal(report.models[0]?.costProvenance, "unknown");
+  }
 });
 
 test("custom provider effort support permits specific AA review without reasoning metadata", async () => {
   const report = await syncEnabledModels({} as any, { scopedModels: [{ model: { provider: "custom-provider", id: "custom", input: ["text"] } }], modelRegistry: { getAvailable: () => [] } }, {
     reconcileSettings: async () => {}, refreshCatalog: async () => state, loadProviderSettings: async () => [{ id: "custom-provider", baseUrl: "https://custom.test", api: "openai-completions", compat: { supportsReasoningEffort: true } }], loadCatalogState: async () => state, saveCatalogState: async () => {},
-    loadAuthoritativeCatalog: async () => parseAuthoritativeCatalog({ data: [] }), loadOllamaCloudCatalog: async () => ({ provenance: "ollama-cloud:/api/tags", models: new Map() }), loadReviewedCosts: async () => new Map(), loadBenchmarkAssets: async () => null, loadAaConfig: () => aaConfig(), loadAaMappings: async () => [],
+    loadAuthoritativeCatalog: async () => parseAuthoritativeCatalog({ data: [] }), loadOllamaCloudCatalog: async () => ({ provenance: "ollama-cloud:/api/tags", models: new Map() }), loadReviewedCosts: async () => new Map(), loadAaReferencePrices: async () => null, loadBenchmarkAssets: async () => null, loadAaConfig: () => aaConfig(), loadAaMappings: async () => [],
   } as any);
   assert.equal(report.models[0]?.variantCapable, true);
 });
@@ -87,7 +152,7 @@ test("native thinking maps persist inferred effort support while explicit false 
   const nativeState = { version: 2 as const, updatedAt: 1, providers: [], nativeModels: [] };
   const report = await syncEnabledModels({} as any, { scopedModels: [{ model: mapped }, { model: fixed }], modelRegistry: { getAvailable: () => [mapped, fixed] } }, {
     reconcileSettings: async () => {}, refreshCatalog: async () => nativeState, loadProviderSettings: async () => [], loadCatalogState: async () => nativeState, saveCatalogState: async (value: any) => { saved = value; },
-    loadAuthoritativeCatalog: async () => parseAuthoritativeCatalog({ data: [] }), loadOllamaCloudCatalog: async () => ({ provenance: "ollama-cloud:/api/tags", models: new Map() }), loadReviewedCosts: async () => new Map(), loadBenchmarkAssets: async () => null, loadAaConfig: () => aaConfig(), loadAaMappings: async () => [],
+    loadAuthoritativeCatalog: async () => parseAuthoritativeCatalog({ data: [] }), loadOllamaCloudCatalog: async () => ({ provenance: "ollama-cloud:/api/tags", models: new Map() }), loadReviewedCosts: async () => new Map(), loadAaReferencePrices: async () => null, loadBenchmarkAssets: async () => null, loadAaConfig: () => aaConfig(), loadAaMappings: async () => [],
   } as any);
   const persisted = new Map(saved.nativeModels.map((model: any) => [model.id, model] as const)); const reports = new Map(report.models.map((model) => [model.id, model] as const));
   assert.equal((persisted.get("native-provider/mapped") as any)?.supportsReasoningEffort, true); assert.equal(reports.get("native-provider/mapped")?.variantCapable, true);
@@ -99,7 +164,7 @@ test("Ollama Cloud availability never implies free pricing", async () => {
   const ollamaState: any = { version: 2, updatedAt: 1, providers: [], nativeModels: [] };
   const report = await syncEnabledModels({} as any, { scopedModels: [{ model: { provider: "ollama", id: "cloud-model", input: ["text"] } }], modelRegistry: { getAvailable: () => [{ provider: "ollama", id: "cloud-model" }] } }, {
     reconcileSettings: async () => {}, refreshCatalog: async () => ollamaState, loadProviderSettings: async () => [], loadCatalogState: async () => ollamaState, saveCatalogState: async (state: any) => { saved = state; },
-    loadAuthoritativeCatalog: async () => parseAuthoritativeCatalog({ data: [] }), loadOllamaCloudCatalog: async () => ({ provenance: "ollama-cloud:/api/tags", models: new Map([["cloud-model", { id: "cloud-model", available: true }]]) }), loadReviewedCosts: async () => new Map(), loadBenchmarkAssets: async () => null, loadAaConfig: () => aaConfig(), loadAaMappings: async () => [],
+    loadAuthoritativeCatalog: async () => parseAuthoritativeCatalog({ data: [] }), loadOllamaCloudCatalog: async () => ({ provenance: "ollama-cloud:/api/tags", models: new Map([["cloud-model", { id: "cloud-model", available: true }]]) }), loadReviewedCosts: async () => new Map(), loadAaReferencePrices: async () => null, loadBenchmarkAssets: async () => null, loadAaConfig: () => aaConfig(), loadAaMappings: async () => [],
   } as any);
   assert.equal(report.models[0]?.cost, undefined); assert.equal(report.models[0]?.costProvenance, "ollama-cloud:price-unpublished");
   assert.equal(report.models[0]?.available, true); assert.equal(saved.nativeModels[0]?.available, true);
@@ -177,24 +242,49 @@ test("AA net artifact changes coalesce metadata, propagate an external mapping t
     snapshotRoot: "/synthetic-before",
     manifest: { path: "manifest.json", targetPath: "/synthetic-before/manifest.json", fingerprint: "before" },
     canonicalMappings: { path: "/reviewed config/canonical-mappings.json", targetPath: "/reviewed config/canonical-mappings.json", fingerprint: "same" },
+    benchmarkHealth: { path: "benchmark-health.json", targetPath: "/synthetic-before/benchmark-health.json", fingerprint: "same-health" },
     manifestSnapshotFiles: ["old.json"], generatedSnapshotFiles: ["old.json", "orphan.json"],
   };
   const after = {
     snapshotRoot: "/synthetic-after",
     manifest: { path: "manifest.json", targetPath: "/synthetic-after/manifest.json", fingerprint: "after" },
     canonicalMappings: { path: "/reviewed config/canonical-mappings.json", targetPath: "/reviewed config/canonical-mappings.json", fingerprint: "changed-map" },
+    benchmarkHealth: { path: "benchmark-health.json", targetPath: "/synthetic-after/benchmark-health.json", fingerprint: "changed-health" },
     manifestSnapshotFiles: ["new.json"], generatedSnapshotFiles: ["new.json"],
   };
   assert.deepEqual(netAaArtifactChanges(before, after, ["z warning", "a warning", "z warning"]), {
     changes: [
       { kind: "M", path: "manifest.json", targetPath: "/synthetic-after/manifest.json" },
       { kind: "M", path: "/reviewed config/canonical-mappings.json", targetPath: "/reviewed config/canonical-mappings.json" },
+      { kind: "M", path: "benchmark-health.json", targetPath: "/synthetic-after/benchmark-health.json" },
       { kind: "A", path: "models/new.json", targetPath: "/synthetic-after/models/new.json" },
       { kind: "D", path: "models/old.json", targetPath: "/synthetic-before/models/old.json" },
       { kind: "D", path: "models/orphan.json", targetPath: "/synthetic-before/models/orphan.json" },
     ],
     warnings: ["a warning", "z warning"],
   });
+});
+
+test("benchmark health detection reruns only when the artifact is absent, stale, corrupt, or future-dated", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "pi-health-wrapper-"));
+  try {
+    const env = { PI_AA_SNAPSHOT_ROOT: directory } as NodeJS.ProcessEnv;
+    const file = path.join(directory, "benchmark-health.json");
+    let calls = 0;
+    const operations = { detectBenchmarkHealth: async () => { calls++; return { changed: true, fields: {}, warnings: [] }; } };
+    assert.equal((await detectAaBenchmarkHealth(undefined, operations, env)).ran, true);
+    assert.equal(calls, 1);
+    await writeFile(file, JSON.stringify({ generatedAt: Date.now() }));
+    assert.equal((await detectAaBenchmarkHealth(undefined, operations, env)).ran, false);
+    assert.equal(calls, 1);
+    assert.deepEqual(await detectAaBenchmarkHealth(undefined, operations, env), { ran: false, changed: false, fields: {}, warnings: [] });
+    await writeFile(file, JSON.stringify({ generatedAt: Date.now() - 30 * 86_400_000 }));
+    assert.equal((await detectAaBenchmarkHealth(undefined, operations, env)).ran, true);
+    await writeFile(file, "{corrupt");
+    assert.equal((await detectAaBenchmarkHealth(undefined, operations, env)).ran, true);
+    await writeFile(file, JSON.stringify({ generatedAt: Date.now() + 3_600_000 }));
+    assert.equal((await detectAaBenchmarkHealth(undefined, operations, env)).ran, true);
+  } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
 test("AA net artifact changes handle absent metadata defensively", () => {
@@ -265,4 +355,17 @@ test("sync preserves historical native observations while marking them inactive"
     loadAaConfig: () => aaConfig(), loadAaMappings: async () => [],
   } as any);
   assert.equal(saved.nativeModels[0].active, false);
+});
+
+test("enforceAaScope forwards the abort signal and fails closed when enforcement is unavailable", async () => {
+  const controller = new AbortController(); let seenSignal: AbortSignal | undefined;
+  const operations = {
+    discover: async () => [],
+    replaceReviewedVariants: async () => { throw new Error("must not publish during scope enforcement"); },
+    enforceScope: async (signal?: AbortSignal) => { seenSignal = signal; return { changed: true, removed: ["legacy/model (generic)"], warnings: ["AA snapshot cleanup remains pending"] }; },
+  };
+  const result = await enforceAaScope(controller.signal, operations as any);
+  assert.equal(seenSignal, controller.signal);
+  assert.deepEqual(result, { changed: true, removed: ["legacy/model (generic)"], warnings: ["AA snapshot cleanup remains pending"] });
+  await assert.rejects(enforceAaScope(undefined, { discover: async () => [], replaceReviewedVariants: async () => ({ changed: false, warnings: [] }) } as any), /AA scope enforcement is unavailable/);
 });

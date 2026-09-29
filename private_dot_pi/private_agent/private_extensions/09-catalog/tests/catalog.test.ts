@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { loadOllamaCloudCatalog, parseAuthoritativeCatalog } from "../cost-sources.ts";
 import { deriveReviewedThinkingLevelMap, discoverProvider, persistReviewedReasoning, providerModels, publishCatalog, refreshCatalog, restoreCatalog } from "../catalog.ts";
@@ -108,12 +109,33 @@ test("catalog sync renders exact grouped AA commands with POSIX quoting and dete
   assert.equal(rendered.includes(commandBlock), true);
 });
 
+test("catalog sync hard-wraps long POSIX arguments without changing their shell value", () => {
+  const targetPath = `/synthetic/${"segment-".repeat(14)}quoted'file.json`;
+  const rendered = renderCatalogSync(emptySyncReport, { changes: [{ kind: "D", path: "models/long.json", targetPath }], warnings: [] });
+  assert.match(rendered, /Long artifact paths use shell-safe continuation fragments; copy the full command group unchanged\./);
+  assert.match(rendered, /`chezmoi forget` applies only to tracked deletions; use `chezmoi status` to filter it\./);
+  const start = rendered.indexOf("chezmoi forget --"), end = rendered.indexOf("\n\nrm -f --", start);
+  assert.ok(start >= 0 && end > start);
+  const command = rendered.slice(start, end).replace("chezmoi forget --", "set --");
+  const fragmentLines = command.split("\n").filter((line) => line.startsWith("  '") || line.startsWith("'"));
+  assert.ok(fragmentLines.length > 1); assert.ok(fragmentLines.every((line) => line.length <= 51));
+  const parsed = spawnSync("sh", ["-c", `${command}\nprintf '<%s>' "$1"`], { encoding: "utf8" });
+  assert.equal(parsed.status, 0, parsed.stderr);
+  assert.equal(parsed.stdout, `<${targetPath}>`);
+});
+
 test("catalog sync omits grouped commands whose artifact category is empty", () => {
   const additionsOnly = renderCatalogSync(emptySyncReport, { changes: [{ kind: "A", path: "models/new.json", targetPath: "/synthetic/models/new.json" }], warnings: [] });
   assert.match(additionsOnly, /chezmoi add --/); assert.doesNotMatch(additionsOnly, /chezmoi forget --|rm -f --/);
   const deletionsOnly = renderCatalogSync(emptySyncReport, { changes: [{ kind: "D", path: "models/old.json", targetPath: "/synthetic/models/old.json" }], warnings: [] });
   assert.doesNotMatch(deletionsOnly, /chezmoi add --/); assert.match(deletionsOnly, /chezmoi forget --[\s\S]*rm -f --/);
   assert.match(deletionsOnly, /rm -f -- \\\n  '\/synthetic\/models\/old\.json'\n\nReview with: chezmoi status/);
+});
+
+test("catalog sync lists outstanding AA mappings with review guidance", () => {
+  const outstanding: any = { models: [], unresolvedCosts: [], missingAa: ["pi/test-model"] };
+  assert.match(renderCatalogSync(outstanding), /AA mappings outstanding: pi\/test-model — \/catalog sync offers interactive review for models with Artificial Analysis candidates\./);
+  assert.doesNotMatch(renderCatalogSync(emptySyncReport), /AA mappings outstanding/);
 });
 
 test("catalog sync reports warnings without commands when there are no captured changes", () => {
@@ -522,4 +544,25 @@ test("catalog state schema rejects secrets and malformed inactive records", () =
   assert.equal(validateCatalogState({ version: 2, updatedAt: 1, nativeModels: [], providers: [{ id: "p", baseUrl: "https://x.test/v1?token=secret", api: "openai-completions", models: [] }] }), false);
   assert.equal(validateCatalogState({ version: 1, updatedAt: 1, providers: [{ id: "p", baseUrl: "https://x", api: "x", models: [{ id: "m" }] }] }), false);
   assert.equal(validateCatalogState({ version: 1, updatedAt: 1, providers: [{ id: "p", baseUrl: "https://x", api: "x", models: [{ ...catalogState().providers[0].models[0], apiKey: "resolved-secret" }] }] }), false);
+});
+
+test("sync output discloses retired-benchmark coverage and fallback substitutions", () => {
+  const entry = (status: string, scored: number, newest: string | null) => ({ checked: 15, scored, status, newestScoredRelease: newest });
+  const health: any = { generatedAt: Date.UTC(2026, 8, 27), fields: Object.fromEntries([
+    ["ifbench", entry("retired", 0, null)], ["gpqa", entry("lagging", 2, "2026-08-20")], ["hle", entry("active", 15, "2026-09-01")], ["critpt", entry("unknown", 0, null)],
+  ]) };
+  const report: any = { ...emptySyncReport, models: [{ id: "openai-codex/test-model", source: "login", canonicalId: "aa/test-model", costProvenance: "unknown", variantCapable: false, available: true, aaMissing: false, aaVariants: [
+    { thinkingLevel: "max", aaModelId: "test-max", qualifiedProfiles: ["planning", "review"], substitutedProfiles: ["planning"] },
+    { thinkingLevel: "low", aaModelId: "test-low", qualifiedProfiles: ["balanced"] },
+  ] }] };
+  const rendered = renderCatalogSync(report, { changes: [{ kind: "M", path: "benchmark-health.json", targetPath: "/synthetic/aa/benchmark-health.json" }], warnings: [] }, health);
+  assert.match(rendered, /max: planning, review \[fallback-substituted on AA data: planning\]/);
+  assert.match(rendered, /low: balanced(?!\[)/);
+  assert.match(rendered, /AA benchmark coverage \(assessed 2026-09-27\):/);
+  assert.match(rendered, /! ifbench: retired upstream \(0\/15 recent releases scored\)/);
+  assert.match(rendered, /! gpqa: lagging upstream \(2\/15 recent releases scored, last 2026-08-20\)/);
+  assert.match(rendered, /! critpt: unknown upstream \(0\/15 recent releases scored\)/);
+  assert.doesNotMatch(rendered, /! hle:/);
+  const additions = rendered.split("chezmoi add")[1] ?? "";
+  assert.match(additions, /benchmark-health/);
 });

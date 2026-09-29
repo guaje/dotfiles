@@ -10,7 +10,7 @@ export const DEFAULT_MANIFEST = path.join(DEFAULT_ROOT, "manifest.json");
 export const DEFAULT_MAPPINGS = path.join(DEFAULT_ROOT, "canonical-mappings.json");
 const CATALOG_PATHS = new Set(["/api/v2/language/models/free"]);
 
-export interface AaPaths { agentDir: string; settings: string; modelsConfig: string; credentials: string; snapshotRoot: string; modelsDir: string; manifest: string; mappings: string; catalogState: string; }
+export interface AaPaths { agentDir: string; settings: string; modelsConfig: string; credentials: string; snapshotRoot: string; modelsDir: string; manifest: string; mappings: string; benchmarkHealth: string; catalogState: string; }
 export interface Limits { apiBytes: number; publicBytes: number; maxAgeMs: number; timeoutMs: number; pageDelayMs: number; publicRedirects: number; }
 export interface BaseConfig { paths: AaPaths; limits: Limits; apiUrl: URL; }
 export interface RuntimeConfig extends BaseConfig { enabledModels: string[]; aliases: Map<string, string>; stateCanonical: Map<string, string>; stateSupportsReasoningEffort: Map<string, boolean>; }
@@ -39,6 +39,7 @@ export function baseConfig(env: NodeJS.ProcessEnv = process.env): BaseConfig {
     modelsDir: path.join(snapshotRoot, "models"),
     manifest: path.join(snapshotRoot, "manifest.json"),
     mappings: envPath(env, "PI_AA_CANONICAL_MAPPINGS", path.join(snapshotRoot, "canonical-mappings.json")),
+    benchmarkHealth: envPath(env, "PI_AA_BENCHMARK_HEALTH", path.join(snapshotRoot, "benchmark-health.json")),
     catalogState: envPath(env, "PI_CATALOG_STATE", path.join(AGENT_DIR, "catalog-state.json")),
   };
   return { paths, apiUrl: validateCatalogUrl(env.PI_AA_API_URL || "https://artificialanalysis.ai/api/v2/language/models/free"), limits: {

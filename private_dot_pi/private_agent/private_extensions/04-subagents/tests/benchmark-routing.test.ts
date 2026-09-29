@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { routeBenchmarkModel } from "../benchmark-routing.ts";
 import { BENCHMARK_DIMENSIONS } from "../benchmark-types.ts";
+import { METHODOLOGY, PUBLIC_METHODOLOGY_VERSION } from "../../09-catalog/aa/schema.ts";
 
-const methodology = { id: "artificial-analysis-intelligence-index", version: "4.1" };
+const methodology = { id: METHODOLOGY.id, version: METHODOLOGY.version };
 const snapshot = (model: string, overrides: Record<string, number | null> = {}, output?: number, capturedAt = 100, thinkingLevel: "off" | "low" | "medium" | "high" | "xhigh" | "max" | null = null): any => ({
 	version: 4,
 	provider: "p",
@@ -14,7 +15,7 @@ const snapshot = (model: string, overrides: Record<string, number | null> = {}, 
 	methodology,
 	mapping: { status: "mapped", matchBasis: "manual", reviewedAt: 1, thinkingLevel },
 	source: { name: `Synthetic ${model}`, slug: `synthetic-${model}`, openrouterApiId: `p/${model}` },
-	publicPage: { url: `https://artificialanalysis.ai/models/synthetic-${model}`, retrievedAt: 100, contentSha256: "a".repeat(64), recordSha256: "b".repeat(64), extractorVersion: "aa-current-model-rsc-v1", intelligenceIndexMethodologyVersion: "4.1.1" },
+	publicPage: { url: `https://artificialanalysis.ai/models/synthetic-${model}`, retrievedAt: 100, contentSha256: "a".repeat(64), recordSha256: "b".repeat(64), extractorVersion: "aa-current-model-rsc-v1", intelligenceIndexMethodologyVersion: PUBLIC_METHODOLOGY_VERSION },
 	scores: { ...Object.fromEntries(BENCHMARK_DIMENSIONS.map((dimension) => [dimension, 60])), ...overrides },
 	toolUse: { components: { tau3Banking: null, gdpvalAaNormalized: null, tau2Telecom: { normalizedScore: 60, sourceKind: "api", fieldPath: "evaluations.tau2_telecom", benchmark: { id: "tau2-telecom", version: "test", status: "current" }, retrievedAt: 100, sourceUrl: "https://artificialanalysis.ai/api/v2/language/models", sourceRecordDigest: "c".repeat(64) } }, derivation: { version: "v1", rule: "tau2-telecom-fallback", score: 60 } },
 	outputTokens: output === undefined ? {} : { coding: output, balanced: output, agentic: output, research: output, planning: output, review: output, "long-context": output },
@@ -37,7 +38,7 @@ test("uses an absolute quality band then the fastest qualifying local endpoint",
 	)!;
 	assert.equal(result.modelId, "p/b");
 	assert.equal(result.diagnostics.outputTokensSource, "profile-default");
-	assert.equal(result.diagnostics.policyVersion, "4");
+	assert.equal(result.diagnostics.policyVersion, "5");
 });
 
 test("mandatory floors reject weak benchmark candidates", () => {
@@ -255,4 +256,17 @@ test("final equal candidates use code-point identity order", () => {
 		"digest",
 	);
 	assert.equal(result.modelId, "p/Z");
+});
+
+test("planning routing accepts retired-benchmark substitutions only with retirement proof", () => {
+	const substituted = snapshot("a", { scientificReasoning: null, instructionFollowing: null });
+	substituted.subBenchmarks = { ifbench: null, hle: 40, gpqa: null, critpt: 40 };
+	// Without a health artifact, today's fail-closed behavior stands.
+	assert.equal(routeBenchmarkModel("planning", candidates, [substituted], health, "digest")!.modelId, undefined);
+	const fields = (status: "retired" | "active"): any => Object.fromEntries(["agenticIndex", "critpt", "gdpvalNormalized", "gpqa", "hle", "omniscienceAccuracy", "omniscienceHallucinationRate", "ifbench", "lcr", "tau2", "tau3Banking"].map((field) => [field, { checked: 15, scored: status === "retired" && ["ifbench", "gpqa"].includes(field) ? 0 : 12, status: ["ifbench", "gpqa"].includes(field) ? status : "active", newestScoredRelease: null }]));
+	const routed = routeBenchmarkModel("planning", candidates, [substituted], health, "digest", undefined, fields("retired"));
+	assert.equal(routed!.modelId, "p/a");
+	assert.equal(routed!.diagnostics.candidates[0]!.quality?.substitutions?.length, 2);
+	// Active upstream coverage never enables substitution.
+	assert.equal(routeBenchmarkModel("planning", candidates, [substituted], health, "digest", undefined, fields("active"))!.modelId, undefined);
 });

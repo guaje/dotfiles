@@ -4,16 +4,16 @@
   "defaultThinkingLevel": "medium",
   "enabledModels": [
     "openai-codex/gpt-6-astra",
-    "openai-codex/gpt-6-sol",
+    "openai-codex/gpt-6.1-sol",
     "openai-codex/gpt-5.6-sol",
     "pi/qwen3.8-flash-next",
+    "reallms-dev/deepseek-v4.1-flash-mi350x-4",
     "openai-codex/gpt-5.6-terra",
     "openai-codex/gpt-6-luna",
     "openai-codex/gpt-5.6-luna",
     "pi/qwen3.8-27b",
     "reallms/glm-5.2",
-    "kelley/Kimi-K2.6",
-    "reallms-dev/Laguna-S-2.1-FP8"
+    "kelley/Kimi-K2.6"
   ],
   "extensions": [
     "extensions/00-hud/index.ts",

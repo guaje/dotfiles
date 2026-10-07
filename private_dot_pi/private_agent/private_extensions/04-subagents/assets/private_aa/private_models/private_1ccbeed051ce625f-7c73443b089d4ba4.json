@@ -1,0 +1,75 @@
+{
+  "capturedAt": 1791295833473,
+  "coverage": 0.4444444444444444,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1791295833473,
+    "status": "mapped",
+    "thinkingLevel": "max"
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.3"
+  },
+  "model": "gpt-6.1-sol",
+  "modelId": "b25ac058-1e33-4c31-bbc9-a20c3ad0717a",
+  "outputTokens": {},
+  "provider": "openai-codex",
+  "publicPage": {
+    "contentSha256": "761cec6fea2f68b16a5553f6c0205b9696a983c84931e7e8ba7fb5478cf43b07",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.3.2",
+    "recordSha256": "649a85867e96837c4f674d7228506a2eb2137ff0c5f0174e9d2be8b52f5ff934",
+    "retrievedAt": 1791295832468,
+    "url": "https://artificialanalysis.ai/models/gpt-6-1-sol"
+  },
+  "scores": {
+    "agentic": null,
+    "coding": null,
+    "faithfulness": 45.73438874230431,
+    "instructionFollowing": null,
+    "intelligence": 51.8,
+    "knowledge": 62.1,
+    "longContext": 83,
+    "scientificReasoning": null,
+    "toolUse": null
+  },
+  "source": {
+    "name": "GPT-6.1 Sol (Max)",
+    "openrouterApiId": null,
+    "slug": "gpt-6-1-sol"
+  },
+  "subBenchmarks": {
+    "critpt": 31.7142857142857,
+    "gpqa": null,
+    "hle": 52.919369786839695,
+    "ifbench": null
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": "max",
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 53.75449999999999,
+        "retrievedAt": 1791295832468,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "649a85867e96837c4f674d7228506a2eb2137ff0c5f0174e9d2be8b52f5ff934",
+        "sourceUrl": "https://artificialanalysis.ai/models/gpt-6-1-sol"
+      },
+      "tau2Telecom": null,
+      "tau3Banking": null
+    },
+    "derivation": {
+      "rule": "unavailable",
+      "score": null,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

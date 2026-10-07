@@ -1,0 +1,75 @@
+{
+  "capturedAt": 1791295832296,
+  "coverage": 0.4444444444444444,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1791295832296,
+    "status": "mapped",
+    "thinkingLevel": "low"
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.3"
+  },
+  "model": "gpt-6.1-sol",
+  "modelId": "e76e0fe5-93ca-4272-9359-2eb1740467d1",
+  "outputTokens": {},
+  "provider": "openai-codex",
+  "publicPage": {
+    "contentSha256": "4e0ce02ec97b9d9597c1cce57e2905dfe2f2bb8ca42fb049f0e3b9cfc68c0f00",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.3.2",
+    "recordSha256": "7e6d2c75d7a3e26a26523cecae11003d6e96dba6a6476818ee41c3a2bfc059be",
+    "retrievedAt": 1791295831291,
+    "url": "https://artificialanalysis.ai/models/gpt-6-1-sol-low"
+  },
+  "scores": {
+    "agentic": null,
+    "coding": null,
+    "faithfulness": 48.379254457050244,
+    "instructionFollowing": null,
+    "intelligence": 42.1,
+    "knowledge": 58.86666666666667,
+    "longContext": 84,
+    "scientificReasoning": null,
+    "toolUse": null
+  },
+  "source": {
+    "name": "GPT-6.1 Sol (Low)",
+    "openrouterApiId": null,
+    "slug": "gpt-6-1-sol-low"
+  },
+  "subBenchmarks": {
+    "critpt": 24.8571428571429,
+    "gpqa": null,
+    "hle": 47.3586654309546,
+    "ifbench": null
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": "low",
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 39.85,
+        "retrievedAt": 1791295831291,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "7e6d2c75d7a3e26a26523cecae11003d6e96dba6a6476818ee41c3a2bfc059be",
+        "sourceUrl": "https://artificialanalysis.ai/models/gpt-6-1-sol-low"
+      },
+      "tau2Telecom": null,
+      "tau3Banking": null
+    },
+    "derivation": {
+      "rule": "unavailable",
+      "score": null,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

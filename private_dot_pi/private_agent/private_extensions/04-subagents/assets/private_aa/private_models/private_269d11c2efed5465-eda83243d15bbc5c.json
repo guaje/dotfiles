@@ -1,0 +1,75 @@
+{
+  "capturedAt": 1791295831050,
+  "coverage": 0.4444444444444444,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1791295831050,
+    "status": "mapped",
+    "thinkingLevel": "high"
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.3"
+  },
+  "model": "gpt-6.1-sol",
+  "modelId": "3b84fee3-b70a-41bc-819e-5fbdef9a0042",
+  "outputTokens": {},
+  "provider": "openai-codex",
+  "publicPage": {
+    "contentSha256": "08175d43b0d4d71e2c0cfb384394a7fce280fef0d346fe679a3d6bbe86e3ebe8",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.3.2",
+    "recordSha256": "19f5909463a02ba7f0d39477f4c5674d86ae892311be1cccb53165cec15dfe29",
+    "retrievedAt": 1791295830047,
+    "url": "https://artificialanalysis.ai/models/gpt-6-1-sol-high"
+  },
+  "scores": {
+    "agentic": null,
+    "coding": null,
+    "faithfulness": 50.63775510204081,
+    "instructionFollowing": null,
+    "intelligence": 50.2,
+    "knowledge": 60.8,
+    "longContext": 82.3333333333333,
+    "scientificReasoning": null,
+    "toolUse": null
+  },
+  "source": {
+    "name": "GPT-6.1 Sol (High)",
+    "openrouterApiId": null,
+    "slug": "gpt-6-1-sol-high"
+  },
+  "subBenchmarks": {
+    "critpt": 30,
+    "gpqa": null,
+    "hle": 51.390176088971295,
+    "ifbench": null
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": "high",
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 49.3205,
+        "retrievedAt": 1791295830047,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "19f5909463a02ba7f0d39477f4c5674d86ae892311be1cccb53165cec15dfe29",
+        "sourceUrl": "https://artificialanalysis.ai/models/gpt-6-1-sol-high"
+      },
+      "tau2Telecom": null,
+      "tau3Banking": null
+    },
+    "derivation": {
+      "rule": "unavailable",
+      "score": null,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

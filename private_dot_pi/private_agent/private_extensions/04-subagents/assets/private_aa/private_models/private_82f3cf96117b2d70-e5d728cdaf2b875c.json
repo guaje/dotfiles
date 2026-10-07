@@ -1,0 +1,87 @@
+{
+  "capturedAt": 1791295810713,
+  "coverage": 0.8888888888888888,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1790350435047,
+    "status": "mapped",
+    "thinkingLevel": "high"
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.3"
+  },
+  "model": "gpt-6-astra",
+  "modelId": "e05a4828-0536-4876-870d-a235023f992b",
+  "outputTokens": {},
+  "provider": "openai-codex",
+  "publicPage": {
+    "contentSha256": "b5a9ddff160929e6fb73431155db62ae8dbb082d8aa52cafdd850d500bd1fbe4",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.3.2",
+    "recordSha256": "796791f0d74cdf4fd8ed855d983f8f230f0177156effaa9aef50d8d3d1f2c094",
+    "retrievedAt": 1791295809711,
+    "url": "https://artificialanalysis.ai/models/gpt-6-astra-high"
+  },
+  "scores": {
+    "agentic": 48.2,
+    "coding": 77.1,
+    "faithfulness": 55.23156089193825,
+    "instructionFollowing": null,
+    "intelligence": 50.9,
+    "knowledge": 61.133333333333326,
+    "longContext": 80,
+    "scientificReasoning": 58.95500840079156,
+    "toolUse": 44.613
+  },
+  "source": {
+    "name": "GPT-6 Astra (High)",
+    "openrouterApiId": null,
+    "slug": "gpt-6-astra-high"
+  },
+  "subBenchmarks": {
+    "critpt": 28.857142857142897,
+    "gpqa": 94.94949494949499,
+    "hle": 53.058387395736794,
+    "ifbench": null
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": "high",
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 49.226,
+        "retrievedAt": 1791295809711,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "796791f0d74cdf4fd8ed855d983f8f230f0177156effaa9aef50d8d3d1f2c094",
+        "sourceUrl": "https://artificialanalysis.ai/models/gpt-6-astra-high"
+      },
+      "tau2Telecom": null,
+      "tau3Banking": {
+        "benchmark": {
+          "id": "tau3-banking",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "tauBanking",
+        "normalizedScore": 40,
+        "retrievedAt": 1791295809711,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "796791f0d74cdf4fd8ed855d983f8f230f0177156effaa9aef50d8d3d1f2c094",
+        "sourceUrl": "https://artificialanalysis.ai/models/gpt-6-astra-high"
+      }
+    },
+    "derivation": {
+      "rule": "tau3-banking+gdpval-aa",
+      "score": 44.613,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

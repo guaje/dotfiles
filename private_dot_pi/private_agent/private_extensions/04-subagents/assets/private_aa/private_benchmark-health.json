@@ -1,5 +1,5 @@
 {
-  "digest": "927157e528fd1d3507a2a17624fa0e6809e51cce1beb8d12ae488d0741b18cf5",
+  "digest": "c685fe23e090c913989e80d67187b1a742cd4e08919b442c2f337d6abe57b3ce",
   "fields": {
     "agenticIndex": {
       "checked": 15,
@@ -9,25 +9,25 @@
     },
     "critpt": {
       "checked": 15,
-      "newestScoredRelease": "2026-09-22",
+      "newestScoredRelease": "2026-10-06",
       "scored": 15,
       "status": "active"
     },
     "gdpvalNormalized": {
       "checked": 15,
-      "newestScoredRelease": "2026-09-22",
-      "scored": 13,
+      "newestScoredRelease": "2026-10-06",
+      "scored": 15,
       "status": "active"
     },
     "gpqa": {
       "checked": 15,
-      "newestScoredRelease": "2026-08-21",
+      "newestScoredRelease": "2026-09-03",
       "scored": 10,
       "status": "lagging"
     },
     "hle": {
       "checked": 15,
-      "newestScoredRelease": "2026-09-22",
+      "newestScoredRelease": "2026-10-06",
       "scored": 15,
       "status": "active"
     },
@@ -39,19 +39,19 @@
     },
     "lcr": {
       "checked": 15,
-      "newestScoredRelease": "2026-09-22",
+      "newestScoredRelease": "2026-10-06",
       "scored": 15,
       "status": "active"
     },
     "omniscienceAccuracy": {
       "checked": 15,
-      "newestScoredRelease": "2026-09-22",
+      "newestScoredRelease": "2026-10-06",
       "scored": 15,
       "status": "active"
     },
     "omniscienceHallucinationRate": {
       "checked": 15,
-      "newestScoredRelease": "2026-09-22",
+      "newestScoredRelease": "2026-10-06",
       "scored": 15,
       "status": "active"
     },
@@ -68,7 +68,7 @@
       "status": "retired"
     }
   },
-  "generatedAt": 1790614217640,
+  "generatedAt": 1791295899848,
   "methodology": {
     "id": "artificial-analysis-intelligence-index",
     "version": "4.3"

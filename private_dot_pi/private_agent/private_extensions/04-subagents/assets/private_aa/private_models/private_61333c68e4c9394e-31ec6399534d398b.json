@@ -1,0 +1,99 @@
+{
+  "capturedAt": 1791295780205,
+  "coverage": 1,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1790278175833,
+    "status": "mapped",
+    "thinkingLevel": null
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.3"
+  },
+  "model": "Kimi-K2.6",
+  "modelId": "0de67206-4d36-4d10-b8f6-cf37fa747a03",
+  "outputTokens": {},
+  "provider": "kelley",
+  "publicPage": {
+    "contentSha256": "e94b99212ed26400fe74a1eb94aceaf924fa00c3f53eeb0453a05d4f96c590ce",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.3.2",
+    "recordSha256": "a1355817f1518c36af5d34c67279c89bea7c4b4ebef998b1d6a65e09a5e41ead",
+    "retrievedAt": 1791295779200,
+    "url": "https://artificialanalysis.ai/models/kimi-k2-6"
+  },
+  "scores": {
+    "agentic": 20.5,
+    "coding": 61.8,
+    "faithfulness": 59.49554896142433,
+    "instructionFollowing": 75.9863945578231,
+    "intelligence": 27,
+    "knowledge": 32.6,
+    "longContext": 81,
+    "scientificReasoning": 45.5331754367899,
+    "toolUse": 25.16523453608245
+  },
+  "source": {
+    "name": "Kimi K2.6 (Reasoning)",
+    "openrouterApiId": null,
+    "slug": "kimi-k2-6"
+  },
+  "subBenchmarks": {
+    "critpt": 8,
+    "gpqa": 91.1111111111111,
+    "hle": 37.488415199258604,
+    "ifbench": 75.9863945578231
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": null,
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 27.0315,
+        "retrievedAt": 1791295779200,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "a1355817f1518c36af5d34c67279c89bea7c4b4ebef998b1d6a65e09a5e41ead",
+        "sourceUrl": "https://artificialanalysis.ai/models/kimi-k2-6"
+      },
+      "tau2Telecom": {
+        "benchmark": {
+          "id": "tau2-telecom",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "tau2",
+        "normalizedScore": 95.906432748538,
+        "retrievedAt": 1791295779200,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "a1355817f1518c36af5d34c67279c89bea7c4b4ebef998b1d6a65e09a5e41ead",
+        "sourceUrl": "https://artificialanalysis.ai/models/kimi-k2-6"
+      },
+      "tau3Banking": {
+        "benchmark": {
+          "id": "tau3-banking",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "tauBanking",
+        "normalizedScore": 23.298969072164898,
+        "retrievedAt": 1791295779200,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "a1355817f1518c36af5d34c67279c89bea7c4b4ebef998b1d6a65e09a5e41ead",
+        "sourceUrl": "https://artificialanalysis.ai/models/kimi-k2-6"
+      }
+    },
+    "derivation": {
+      "rule": "tau3-banking+gdpval-aa",
+      "score": 25.16523453608245,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

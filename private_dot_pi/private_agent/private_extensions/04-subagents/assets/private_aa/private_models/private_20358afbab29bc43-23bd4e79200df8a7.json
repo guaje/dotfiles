@@ -1,0 +1,87 @@
+{
+  "capturedAt": 1791295786796,
+  "coverage": 0.8888888888888888,
+  "mapping": {
+    "matchBasis": "manual",
+    "reviewedAt": 1790278182051,
+    "status": "mapped",
+    "thinkingLevel": "off"
+  },
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "4.3"
+  },
+  "model": "gpt-5.6-luna",
+  "modelId": "dc64f856-3ded-497d-9527-d41d31267ed5",
+  "outputTokens": {},
+  "provider": "openai-codex",
+  "publicPage": {
+    "contentSha256": "c74b71e2237ec669bb093957e4d192de1d88699584eceb6570a86747694ce051",
+    "extractorVersion": "aa-current-model-rsc-v1",
+    "intelligenceIndexMethodologyVersion": "4.3.2",
+    "recordSha256": "d727da69d78bfada384cd94b9c1b6c0505b1afac5e6f80538193ab6e2443bb26",
+    "retrievedAt": 1791295785793,
+    "url": "https://artificialanalysis.ai/models/gpt-5-6-luna-non-reasoning"
+  },
+  "scores": {
+    "agentic": 13.4,
+    "coding": 39.3,
+    "faithfulness": 25,
+    "instructionFollowing": null,
+    "intelligence": 15.5,
+    "knowledge": 28.599999999999998,
+    "longContext": 42.6666666666667,
+    "scientificReasoning": 24.02002816460649,
+    "toolUse": 15.407360824742272
+  },
+  "source": {
+    "name": "GPT-5.6 Luna (Non-reasoning)",
+    "openrouterApiId": null,
+    "slug": "gpt-5-6-luna-non-reasoning"
+  },
+  "subBenchmarks": {
+    "critpt": 0.28571428571428603,
+    "gpqa": 64.54545454545459,
+    "hle": 7.228915662650599,
+    "ifbench": null
+  },
+  "taskTimeMs": {},
+  "thinkingLevel": "off",
+  "toolUse": {
+    "components": {
+      "gdpvalAaNormalized": {
+        "benchmark": {
+          "id": "gdpval-aa",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "gdpvalNormalized",
+        "normalizedScore": 21.124000000000002,
+        "retrievedAt": 1791295785793,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "d727da69d78bfada384cd94b9c1b6c0505b1afac5e6f80538193ab6e2443bb26",
+        "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-luna-non-reasoning"
+      },
+      "tau2Telecom": null,
+      "tau3Banking": {
+        "benchmark": {
+          "id": "tau3-banking",
+          "status": "current",
+          "version": "AA Intelligence Index v4.3.2"
+        },
+        "fieldPath": "tauBanking",
+        "normalizedScore": 9.69072164948454,
+        "retrievedAt": 1791295785793,
+        "sourceKind": "public-page",
+        "sourceRecordDigest": "d727da69d78bfada384cd94b9c1b6c0505b1afac5e6f80538193ab6e2443bb26",
+        "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-luna-non-reasoning"
+      }
+    },
+    "derivation": {
+      "rule": "tau3-banking+gdpval-aa",
+      "score": 15.407360824742272,
+      "version": "v1"
+    }
+  },
+  "version": 4
+}

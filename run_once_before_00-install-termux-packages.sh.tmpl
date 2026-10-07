@@ -19,7 +19,9 @@ clang
 dnsutils
 fd
 fzf
+gh
 git
+glab-cli
 jq
 lsof
 magic-wormhole-rs
@@ -59,7 +61,7 @@ fi
 # These global npm CLIs are part of the current environment and are not managed
 # by apt/chezmoi. npm is provided by the nodejs Termux package.
 if command -v npm >/dev/null 2>&1; then
-  npm install -g @earendil-works/pi-coding-agent @google/gemini-cli
+  npm install -g @earendil-works/pi-coding-agent
 fi
 
 echo "Termux package bootstrap complete."

@@ -10,9 +10,19 @@ TEMPLATE=$SCRIPT_DIR/../run_onchange_before_decrypt-private-key.sh.tmpl
 
 ROOT=$(mktemp -d "${TMPDIR:-/tmp}/bootstrap-test.XXXXXX")
 cleanup() { rm -rf "$ROOT"; }
-trap cleanup EXIT
+trap cleanup EXIT HUP INT TERM
 
-fail() { printf '❌ %s\n' "$*" >&2; exit 1; }
+fail() {
+    printf '❌ %s\n' "$*" >&2
+    if [[ -n ${CASE:-} && -s $CASE/err ]]; then
+        printf '%s\n' '--- hook stderr ---' >&2
+        cat "$CASE/err" >&2
+    elif [[ -n ${CASE:-} && -s $CASE/out ]]; then
+        printf '%s\n' '--- hook output ---' >&2
+        cat "$CASE/out" >&2
+    fi
+    exit 1
+}
 pass() { printf '✅ %s\n' "$*"; }
 
 # Fake age identity files: only the public key comment is verified by the hook.
@@ -32,6 +42,10 @@ new_case() {
     HOME_DIR=$CASE/home
     SOURCE_DIR=$CASE/source
     mkdir -p "$HOME_DIR/.config/chezmoi" "$SOURCE_DIR"
+    MOCK_CALLS=$CASE/chezmoi.calls
+    : > "$MOCK_CALLS"
+    : > "$CASE/out"
+    : > "$CASE/err"
     printf 'recipient = "%s"\n' "$KEY_MATCH" > "$HOME_DIR/.config/chezmoi/chezmoi.toml"
     : > "$SOURCE_DIR/key.txt.age"
     make_identity "$CASE/identity-ok" "$KEY_MATCH"
@@ -47,6 +61,7 @@ new_case() {
     cat > "$CASE/bin/chezmoi" <<'EOF'
 #!/usr/bin/env bash
 set -eu
+printf '%s\n' "$*" >> "$MOCK_CALLS"
 out=
 prev=
 for arg in "$@"; do
@@ -59,7 +74,7 @@ case ${MOCK_DECRYPT:-ok} in
         cp "$MOCK_IDENTITY_FILE" "$out"
         if [[ -n ${MOCK_CONCURRENT_KEY:-} ]]; then
             # Simulate a concurrent installer that wins the race.
-            cp "$MOCK_CONCURRENT_KEY" "$(dirname "$out")/key.txt"
+            cp "$MOCK_CONCURRENT_KEY" "$KEY_PATH"
         fi
         ;;
     fail) exit 97 ;;
@@ -70,6 +85,8 @@ EOF
 
 run_hook() {
     env PATH="$CASE/bin:$PATH" MOCK_IDENTITY_FILE="${MOCK_IDENTITY_FILE:-$CASE/identity-ok}" \
+        MOCK_DECRYPT="${MOCK_DECRYPT:-ok}" MOCK_CONCURRENT_KEY="${MOCK_CONCURRENT_KEY:-}" \
+        MOCK_CALLS="$MOCK_CALLS" KEY_PATH="$HOME_DIR/.config/chezmoi/key.txt" \
         HOME="$HOME_DIR" sh "$CASE/hook.sh"
 }
 
@@ -93,11 +110,14 @@ cmp -s "$CASE/identity-ok" "$HOME_DIR/.config/chezmoi/key.txt" || fail 'installe
 [[ -z $(find "$HOME_DIR/.config/chezmoi" -name '.key.txt.*' -print -quit) ]] || fail 'temporary file leftovers'
 pass 'fresh bootstrap installs a verified identity'
 
-# An existing identity is never replaced.
+# An existing matching identity is never decrypted or normalized.
 new_case
 make_identity "$HOME_DIR/.config/chezmoi/key.txt" "$KEY_MATCH"
-run_hook > "$CASE/out" 2>&1
-cmp -s "$CASE/identity-ok" "$HOME_DIR/.config/chezmoi/key.txt" || fail 'existing key was replaced'
+printf '%s\n' '# local annotation that must be preserved' >> "$HOME_DIR/.config/chezmoi/key.txt"
+EXISTING_SUM=$(cksum "$HOME_DIR/.config/chezmoi/key.txt")
+run_hook > "$CASE/out" 2> "$CASE/err"
+[[ $(cksum "$HOME_DIR/.config/chezmoi/key.txt") == "$EXISTING_SUM" ]] || fail 'existing matching key was modified'
+[[ ! -s $MOCK_CALLS ]] || fail 'existing matching key triggered age decryption'
 pass 'existing matching identity is left untouched'
 
 # An existing identity that contradicts the configured recipient fails closed.

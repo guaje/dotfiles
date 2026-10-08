@@ -118,7 +118,7 @@ function has_strong_pattern(value) {
         strong_label = "DIGITALOCEAN_TOKEN"
         return 1
     }
-    if (value ~ /pma[k]?-([A-Za-z0-9_-]{20,}|v[0-9]+-[A-Za-z0-9_-]{20,})/) {
+    if (value ~ /[pP][mM][aA][kK]-([A-Za-z0-9_-]{20,}|v[0-9]+-[A-Za-z0-9_-]{20,})/) {
         strong_label = "POSTMAN_API_KEY"
         return 1
     }

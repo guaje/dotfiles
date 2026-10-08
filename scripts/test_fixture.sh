@@ -18,15 +18,26 @@ setup_secret_fixture() {
     TEST_FIXTURE=$(mktemp -d "$fixture_parent/chezmoi-secret-tests.XXXXXX")
     TEST_FIXTURE_ROOT=$TEST_FIXTURE
     TEST_FIXTURE_PARENT=$fixture_parent
-    mkdir -p "$TEST_FIXTURE/home" "$TEST_FIXTURE/config/chezmoi" "$TEST_FIXTURE/cache" "$TEST_FIXTURE/state"
-    cp -R -p "$repo/." "$TEST_FIXTURE/source"
+    mkdir -p "$TEST_FIXTURE/home" "$TEST_FIXTURE/config/chezmoi" "$TEST_FIXTURE/cache" "$TEST_FIXTURE/state" "$TEST_FIXTURE/source"
+    cp -R -p "$repo/scripts" "$TEST_FIXTURE/source/scripts" || {
+        printf '❌ fixture input missing\n' >&2
+        return 1
+    }
+    cp -p "$repo/.chezmoi.toml.tmpl" "$repo/.chezmoiignore" "$repo/.sops.yaml" "$TEST_FIXTURE/source/" || {
+        printf '❌ fixture input missing\n' >&2
+        return 1
+    }
     mkdir -p "$TEST_FIXTURE/home/.local/share"
     ln -s "$TEST_FIXTURE/source" "$TEST_FIXTURE/home/.local/share/chezmoi"
     export HOME="$TEST_FIXTURE/home"
+    TEST_ROOT="$HOME/.test"
+    CONFIG_TEST_ROOT="$HOME/.config/test"
+    SOURCE_NAMING_TEST_ROOT="$HOME/.test_dir/test_subdir"
     export XDG_CONFIG_HOME="$TEST_FIXTURE/config"
     export XDG_CACHE_HOME="$TEST_FIXTURE/cache"
     export CHEZMOI_CONFIG_FILE="$XDG_CONFIG_HOME/chezmoi/chezmoi.toml"
     unset CHEZMOI_SOURCE_DIR CHEZMOI_DEST_DIR CHEZMOI_WORKING_TREE CHEZMOI_CACHE_DIR CHEZMOI_ARGS TEST_CHOICE CHECK_SECRETS_BYPASS CHECK_SECRETS_FAILPOINT
+    export CHECK_SECRETS_NO_TTY=true
     key="$HOME/.config/chezmoi/key.txt"
     mkdir -p "$(dirname "$key")"
     age-keygen -o "$key" >/dev/null
@@ -49,33 +60,124 @@ encryption = "age"
 EOF
     export SOPS_AGE_KEY_FILE="$key"
     export TEST_FIXTURE_SOURCE="$TEST_FIXTURE/source"
+    configured_source=$(chezmoi source-path)
+    if [[ ! $configured_source -ef $TEST_FIXTURE_SOURCE ]]; then
+        printf '❌ fixture source-path escaped the isolated source\n' >&2
+        return 1
+    fi
+    # Keep the same spelling returned by chezmoi. Path helpers strip this
+    # prefix when deriving sidecar paths, and the configured source may be the
+    # conventional symlink to the isolated physical fixture directory.
+    SOURCE_DIR=$configured_source
+}
 
-    # Exercise the checked-in config template as TOML, rather than relying
-    # solely on this fixture's intentionally minimal duplicate config.
-    local rendered_config
+assert_hook_launcher_contract() {
+    local rendered_config configured_source
     rendered_config="$TEST_FIXTURE/rendered-chezmoi.toml"
-    chezmoi execute-template < "$TEST_FIXTURE/source/.chezmoi.toml.tmpl" > "$rendered_config"
-    grep -Fq '[hooks.add.pre]' "$rendered_config"
-    grep -Fq 'scripts/check-secrets.sh' "$rendered_config"
-    grep -Fq '[hooks.update.pre]' "$rendered_config"
-    grep -Fq '[hooks.update.post]' "$rendered_config"
+    chezmoi execute-template < "$SOURCE_DIR/.chezmoi.toml.tmpl" > "$rendered_config" || {
+        printf '❌ config template failed to render\n' >&2
+        return 1
+    }
+    if ! grep -Fq '[hooks.add.pre]' "$rendered_config" \
+        || ! grep -Fq '[hooks.update.pre]' "$rendered_config" \
+        || ! grep -Fq '[hooks.update.post]' "$rendered_config"; then
+        printf '❌ required hook is absent from rendered config\n' >&2
+        return 1
+    fi
     # shellcheck disable=SC2016 # These are literal launcher fragments.
-    grep -Fq '$CHEZMOI_SOURCE_DIR/scripts/check-secrets.sh' "$rendered_config"
+    grep -Fq '$CHEZMOI_SOURCE_DIR/scripts/check-secrets.sh' "$rendered_config" || {
+        printf '❌ add hook does not use the exported source path\n' >&2
+        return 1
+    }
     # shellcheck disable=SC2016 # These are literal launcher fragments.
-    grep -Fq '$CHEZMOI_SOURCE_DIR/scripts/check-removed-files.sh' "$rendered_config"
+    grep -Fq '$CHEZMOI_SOURCE_DIR/scripts/check-removed-files.sh' "$rendered_config" || {
+        printf '❌ update hooks do not use the exported source path\n' >&2
+        return 1
+    }
     # shellcheck disable=SC2016 # Detect forbidden literal command substitution.
     if grep -Fq '$(chezmoi source-path)' "$rendered_config"; then
-        printf '❌ hook launcher recursively invokes chezmoi and can deadlock\n' >&2
+        printf '❌ hook launcher recursively invokes chezmoi\n' >&2
         return 1
     fi
-    configured_source=$(chezmoi --config "$rendered_config" --source "$TEST_FIXTURE/source" \
-        --destination "$HOME" source-path)
-    configured_source=$(CDPATH='' cd -- "$configured_source" && pwd -P)
-    if [ "$configured_source" != "$TEST_FIXTURE_SOURCE" ]; then
-        printf '❌ fixture source mismatch: expected %s, got %s\n' \
-            "$TEST_FIXTURE_SOURCE" "$configured_source" >&2
+    configured_source=$(chezmoi --config "$rendered_config" --source "$SOURCE_DIR" \
+        --destination "$HOME" source-path) || return 1
+    configured_source=$(CDPATH='' cd -- "$configured_source" && pwd -P) || return 1
+    [[ $configured_source == "$TEST_FIXTURE_SOURCE" ]] || {
+        printf '❌ rendered config escaped the fixture source\n' >&2
         return 1
-    fi
+    }
+}
+
+run_chezmoi_add() {
+    local choice=$1
+    shift
+    env TEST_CHOICE="$choice" chezmoi add "$@"
+}
+
+prepare_test_dirs() {
+    mkdir -p "$TEST_ROOT" "$CONFIG_TEST_ROOT" "$SOURCE_NAMING_TEST_ROOT"
+}
+
+template_source_path() {
+    chezmoi source-path "$1"
+}
+
+sops_source_path() {
+    local source_file rel_path
+    source_file=$(template_source_path "$1")
+    source_file=${source_file%.tmpl}
+    rel_path=${source_file#"$SOURCE_DIR"/}
+    printf '%s/secrets/%s.sops.yaml\n' "$SOURCE_DIR" "$rel_path"
+}
+
+write_option2_yaml_fixture() {
+    cat <<'EOF' > "$TEST_ROOT/test_data.yaml"
+app_name: MyTestApp
+API_KEY: yaml-secret-key
+port: 8080
+db_password: yaml-db-pass
+EOF
+}
+
+write_option2_json_fixture() {
+    cat <<'EOF' > "$TEST_ROOT/test_data.json"
+{
+  "app_name": "MyTestApp",
+  "apiKey": "json-secret-key",
+  "dbPassword": "json-db-pass",
+  "port": 8080
+}
+EOF
+}
+
+write_option2_toml_fixture() {
+    cat <<'EOF' > "$TEST_ROOT/test_data.toml"
+app_name = "MyTestApp"
+API_KEY = "toml-secret-key"
+port = 8080
+db_password = "toml-db-pass"
+EOF
+}
+
+write_option2_duplicate_fixture() {
+    printf '%s\n' '{"hosts": [{"username": "username1", "password": "password1"}, {"username": "username2", "password": "password2"}]}' > "$TEST_ROOT/test_multi.json"
+}
+
+write_option2_subdirectory_fixture() {
+    cat <<'EOF' > "$CONFIG_TEST_ROOT/test_sub.yaml"
+API_KEY: sub-secret-key
+db_password: sub-db-pass
+EOF
+}
+
+write_option2_source_naming_fixture() {
+    cat <<'EOF' > "$SOURCE_NAMING_TEST_ROOT/test_chezmoi_naming.json"
+{
+  "service": "chezmoi-naming-test",
+  "API_KEY": "chezmoi-naming-secret",
+  "enabled": true
+}
+EOF
 }
 
 prospective_fixture_mapping() {
@@ -93,7 +195,7 @@ prospective_fixture_mapping() {
     mapped=$(chezmoi --config /dev/null --config-format toml --cache "$oracle/cache" --persistent-state "$oracle/state" --source "$source" --destination "$destination" source-path "$target")
     relative=${mapped#"$source"/}
     rm -rf "$oracle"
-    printf '%s/%s\n' "$(chezmoi source-path)" "$relative"
+    printf '%s/%s\n' "$SOURCE_DIR" "$relative"
 }
 
 finish_secret_fixture() {

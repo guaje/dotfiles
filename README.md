@@ -66,11 +66,14 @@ If you modify `scripts/check-secrets.sh` or the `.chezmoi.toml.tmpl` configurati
 
 #### 🏃 Running Tests
 
-Run the following scripts to verify that adding secrets, reusable scanning, and rendering templates works correctly across different file formats and directory structures:
+Run the five CI test suites to verify secret handling, removed-file safety, bootstrap behavior, and rendering across supported platforms:
 
 ```bash
-./scripts/test_check-secrets.sh
-./scripts/test_apply-secrets.sh
+bash ./scripts/test_check-secrets.sh
+bash ./scripts/test_apply-secrets.sh
+bash ./scripts/test_scan-secrets.sh
+bash ./scripts/test_check-removed-files.sh
+bash ./scripts/test_bootstrap.sh
 ```
 
 #### 🔎 Reusable scanning for CI / pre-commit
@@ -99,16 +102,18 @@ Emit GitHub Actions workflow annotations:
 ./scripts/scan-secrets.sh --format gha path/to/file1
 ```
 
-Scan staged git files in a pre-commit hook:
+Scan staged git files in a pre-commit hook (deleted entries are filtered automatically):
 
 ```bash
 ./scripts/scan-secrets.sh --git-staged
 ```
 
-Use it in CI with tracked files:
+Explicit inputs fail closed: every path must name an existing regular file. Missing files—including paths absent from a sparse checkout—print a diagnostic and return status 1, the same status used when a secret is found. When scanning tracked files, filter unavailable paths and preserve unusual filenames with NUL delimiters:
 
 ```bash
-git ls-files | xargs ./scripts/scan-secrets.sh
+git ls-files -z | while IFS= read -r -d '' file; do
+    [ -f "$file" ] && printf '%s\0' "$file"
+done | xargs -0 ./scripts/scan-secrets.sh --
 ```
 
 Run the security-focused test suites:
@@ -118,6 +123,7 @@ bash ./scripts/test_check-secrets.sh
 bash ./scripts/test_apply-secrets.sh
 bash ./scripts/test_scan-secrets.sh
 bash ./scripts/test_check-removed-files.sh
+bash ./scripts/test_bootstrap.sh
 ```
 
 On macOS, install a current version of Bash and the required tools with Homebrew:

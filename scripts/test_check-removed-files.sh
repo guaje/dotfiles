@@ -81,61 +81,32 @@ commit_all() { git -C "$SRC" add -A && git -C "$SRC" commit -qm "$1"; }
 
 run_hook() {
     env PATH="$CASE/bin:$PATH" MOCK_MAP="$MAP" MOCK_MANAGED="$MANAGED" MOCK_CALLS="$CALLS" \
+        CHECK_REMOVED_FILES_NO_TTY=true \
         CHEZMOI_SOURCE_DIR="$SRC" CHEZMOI_DEST_DIR="$DEST" \
         CHEZMOI_WORKING_TREE="$SRC" CHEZMOI_CACHE_DIR="$CACHE" \
         "$HOOK" "$@"
 }
 
-# script(1) supplies a controlling terminal; its stdin becomes the answer to
-# the hook's /dev/tty prompt. BSD script stops relaying and tears down the
-# session as soon as its stdin reaches EOF, so a feeder keeps stdin open until
-# the hook process exits.
 run_post_answer() {
-    local answer=$1
-    if [[ $(uname -s) == Darwin ]]; then
-        # macOS script(1) rejects non-tty stdin, so expect(1) is used purely as
-        # a pty allocator. The answers themselves are preset through the hook's
-        # test-only queue so no input has to cross the pty: macOS script(1)
-        # cannot be fed from a pipe or FIFO. A watchdog kills a stuck hook so a
-        # failure surfaces with diagnostics instead of hanging the job.
-        # shellcheck disable=SC2016 # Tcl references, not shell expansions.
-        if ! CHECK_REMOVED_FILES_ANSWERS="$(printf '%b' "$answer")" SESSION_FILE="$CASE/session.txt" \
-            env PATH="$CASE/bin:$PATH" MOCK_MAP="$MAP" MOCK_MANAGED="$MANAGED" MOCK_CALLS="$CALLS" \
-                HOOK="$HOOK" \
-                CHEZMOI_SOURCE_DIR="$SRC" CHEZMOI_DEST_DIR="$DEST" \
-                CHEZMOI_WORKING_TREE="$SRC" CHEZMOI_CACHE_DIR="$CACHE" \
-                expect -c '
-                    set timeout 90
-                    log_file $env(SESSION_FILE)
-                    spawn $env(HOOK) post
-                    expect {
-                        eof {}
-                        timeout { exec kill -9 [exp_pid]; exit 124 }
-                    }
-                    lassign [wait] _ _ _ status
-                    exit $status
-                ' >/dev/null; then
-            fail 'hook pty session failed or timed out'
-        fi
-        return
-    fi
-    local -a script_args
-    # util-linux script requires -c and does not take extra arguments.
-    script_args=(-qec "'$HOOK' post" "$CASE/session.txt")
-    # script(1) supplies a controlling terminal; its stdin becomes the answer
-    # to the hook's /dev/tty prompt. A FIFO held open by the caller keeps the
-    # session alive until the hook finishes.
-    mkfifo "$CASE/answer-in"
-    env PATH="$CASE/bin:$PATH" MOCK_MAP="$MAP" MOCK_MANAGED="$MANAGED" MOCK_CALLS="$CALLS" \
+    local answer=$1 before_verify=${2:-}
+    if ! env PATH="$CASE/bin:$PATH" MOCK_MAP="$MAP" MOCK_MANAGED="$MANAGED" MOCK_CALLS="$CALLS" \
+        CHECK_REMOVED_FILES_NO_TTY= CHECK_REMOVED_FILES_ANSWERS="$(printf '%b' "$answer")" \
+        CHECK_REMOVED_FILES_TEST_BEFORE_VERIFY="$before_verify" \
         CHEZMOI_SOURCE_DIR="$SRC" CHEZMOI_DEST_DIR="$DEST" \
         CHEZMOI_WORKING_TREE="$SRC" CHEZMOI_CACHE_DIR="$CACHE" \
-        script "${script_args[@]}" < "$CASE/answer-in" >/dev/null &
-    local script_pid=$!
-    exec {ANSWER_FD}> "$CASE/answer-in"
-    printf '%b\n' "$answer" > "$CASE/answer-in" &
-    wait "$script_pid"
-    exec {ANSWER_FD}>&-
-    rm -f "$CASE/answer-in"
+        "$HOOK" post > "$CASE/session.txt" 2>&1; then
+        fail 'answer-injected post hook failed'
+    fi
+}
+
+run_post_no_tty() {
+    if ! env PATH="$CASE/bin:$PATH" MOCK_MAP="$MAP" MOCK_MANAGED="$MANAGED" MOCK_CALLS="$CALLS" \
+        CHECK_REMOVED_FILES_ANSWERS= CHECK_REMOVED_FILES_CHOICE= CHECK_REMOVED_FILES_NO_TTY=true \
+        CHEZMOI_SOURCE_DIR="$SRC" CHEZMOI_DEST_DIR="$DEST" \
+        CHEZMOI_WORKING_TREE="$SRC" CHEZMOI_CACHE_DIR="$CACHE" \
+        "$HOOK" post </dev/null > "$CASE/session.txt" 2>&1; then
+        fail 'non-TTY post hook exited non-zero'
+    fi
 }
 
 prepare_file() {
@@ -159,21 +130,58 @@ new_case
 run_hook post
 pass 'missing state is a no-op'
 
-# The bulk snapshot records both target/source path forms plus deferred type
-# and trusted work-tree provenance metadata.
+# Snapshot records use the production reader shape and carry its schema version.
 new_case
 prepare_file
 run_hook pre
-mapfile -d '' -t SNAPSHOT < "$CACHE/check-removed-files-v1/current/snapshot.nul"
-[[ ${#SNAPSHOT[@]} -eq 7 \
-    && ${SNAPSHOT[0]} == "$TARGET" \
-    && ${SNAPSHOT[1]} == managed-file \
-    && ${SNAPSHOT[2]} == "$SOURCE_FILE" \
-    && ${SNAPSHOT[3]} == managed-file \
-    && ${SNAPSHOT[4]} == managed-file \
-    && ${SNAPSHOT[5]} == file-or-symlink \
-    && ${SNAPSHOT[6]} == worktree ]] || fail 'bulk snapshot schema is incomplete'
-pass 'bulk snapshot stores path and provenance mapping'
+SCRIPT_STATE_VERSION=$(sed -n 's/^STATE_VERSION=//p' "$HOOK")
+[[ $SCRIPT_STATE_VERSION =~ ^[1-9][0-9]*$ ]] || fail 'production state version is not a positive integer'
+SNAPSHOT_RECORDS=0
+while IFS= read -r -d '' snapshot_target \
+    && IFS= read -r -d '' snapshot_target_relative \
+    && IFS= read -r -d '' snapshot_source \
+    && IFS= read -r -d '' snapshot_source_relative \
+    && IFS= read -r -d '' snapshot_git_relative \
+    && IFS= read -r -d '' snapshot_version \
+    && IFS= read -r -d '' snapshot_provenance; do
+    SNAPSHOT_RECORDS=$((SNAPSHOT_RECORDS + 1))
+    [[ $snapshot_target == "$TARGET" \
+        && $snapshot_target_relative == managed-file \
+        && $snapshot_source == "$SOURCE_FILE" \
+        && $snapshot_source_relative == managed-file \
+        && $snapshot_git_relative == managed-file \
+        && $snapshot_version == "$SCRIPT_STATE_VERSION" \
+        && $snapshot_provenance == worktree ]] || fail 'bulk snapshot violated its versioned contract'
+done < "$CACHE/check-removed-files-v1/current/snapshot.nul"
+[[ $SNAPSHOT_RECORDS -eq 1 ]] || fail 'bulk snapshot record count is wrong'
+pass 'bulk snapshot stores a versioned path and provenance mapping'
+
+# A record from an older schema must never authorize deletion, even when the
+# transaction metadata itself is valid for the current reader.
+new_case
+prepare_file
+run_hook pre
+SNAPSHOT="$CACHE/check-removed-files-v1/current/snapshot.nul"
+REWRITTEN_SNAPSHOT="$CASE/snapshot.nul"
+exec 5< "$SNAPSHOT"
+IFS= read -r -d '' old_target <&5 || fail 'could not read snapshot target'
+IFS= read -r -d '' old_target_relative <&5 || fail 'could not read snapshot target-relative path'
+IFS= read -r -d '' old_source <&5 || fail 'could not read snapshot source'
+IFS= read -r -d '' old_source_relative <&5 || fail 'could not read snapshot source-relative path'
+IFS= read -r -d '' old_git_relative <&5 || fail 'could not read snapshot git-relative path'
+IFS= read -r -d '' _old_schema <&5 || fail 'could not read snapshot schema'
+IFS= read -r -d '' old_provenance <&5 || fail 'could not read snapshot provenance'
+exec 5<&-
+STALE_STATE_VERSION=$((SCRIPT_STATE_VERSION - 1))
+printf '%s\0%s\0%s\0%s\0%s\0%s\0%s\0' \
+    "$old_target" "$old_target_relative" "$old_source" "$old_source_relative" \
+    "$old_git_relative" "$STALE_STATE_VERSION" "$old_provenance" > "$REWRITTEN_SNAPSHOT" \
+    || fail 'could not rewrite snapshot schema'
+mv "$REWRITTEN_SNAPSHOT" "$SNAPSHOT" || fail 'could not install mismatched-schema snapshot'
+remove_source
+run_post_answer y
+[[ -f $TARGET ]] || fail 'mismatched snapshot schema allowed deletion'
+pass 'mismatched snapshot schema leaves the target untouched'
 
 # Pre must not turn the managed set into nested chezmoi work. The mock records
 # every invocation; the entry count is intentionally much larger than normal
@@ -192,11 +200,9 @@ set_managed "${MANY_TARGETS[@]}"
 commit_all initial
 : > "$CALLS"
 run_hook pre
-[[ $(grep -c '^managed$' "$CALLS" || true) -eq 1 ]] \
-    || fail 'pre did not use exactly one bulk managed call'
-[[ $(grep -Ec '^(source-path|cat)$' "$CALLS" || true) -eq 0 ]] \
-    || fail 'pre performed per-entry chezmoi mapping/render calls'
-[[ $(wc -l < "$CALLS") -eq 1 ]] || fail 'pre made unexpected chezmoi calls'
+# Performance/fan-out guard: pre must make exactly one bulk managed call.
+[[ $(wc -l < "$CALLS") -eq 1 && $(<"$CALLS") == managed ]] \
+    || fail 'pre did not make exactly one bulk managed call for 320 entries'
 pass 'pre chezmoi invocation count is constant across 320 entries'
 
 # Missing jq or malformed bulk JSON cannot publish deletion state.
@@ -244,7 +250,47 @@ run_hook pre
 remove_source
 run_post_answer y
 [[ ! -e $TARGET ]] || fail 'accepted deleted file remained'
+grep -Fq 'Delete unmanaged target' "$CASE/session.txt" || fail 'deletion prompt contract changed'
 pass 'deleted unchanged file is accepted'
+
+# Keep one real controlling-terminal path so /dev/tty detection and reads are
+# covered independently of the deterministic answer-queue seam.
+if command -v expect >/dev/null 2>&1; then
+    new_case
+    prepare_file
+    run_hook pre
+    remove_source
+    if ! env PATH="$CASE/bin:$PATH" MOCK_MAP="$MAP" MOCK_MANAGED="$MANAGED" MOCK_CALLS="$CALLS" \
+        CHECK_REMOVED_FILES_NO_TTY= CHECK_REMOVED_FILES_ANSWERS= CHECK_REMOVED_FILES_CHOICE= \
+        HOOK="$HOOK" SESSION_FILE="$CASE/session.txt" \
+        CHEZMOI_SOURCE_DIR="$SRC" CHEZMOI_DEST_DIR="$DEST" \
+        CHEZMOI_WORKING_TREE="$SRC" CHEZMOI_CACHE_DIR="$CACHE" \
+        expect -c '
+            set timeout 30
+            log_user 0
+            log_file $env(SESSION_FILE)
+            spawn -noecho $env(HOOK) post
+            expect {
+                -re {Delete unmanaged target .*\[q\]uit: } { send -- "y\r" }
+                eof { exit 98 }
+                timeout { exec kill -9 [exp_pid]; exit 124 }
+            }
+            expect {
+                eof {}
+                timeout { exec kill -9 [exp_pid]; exit 124 }
+            }
+            set result [wait]
+            exit [lindex $result 3]
+        '; then
+        fail 'real PTY prompt case failed or timed out'
+    fi
+    [[ ! -e $TARGET ]] || fail 'real PTY confirmation did not unlink the target'
+    grep -Fq 'Delete unmanaged target' "$CASE/session.txt" \
+        || fail 'real PTY session did not display the deletion prompt'
+    pass 'real PTY prompt accepts an individual deletion'
+else
+    printf '%s\n' '⏭ skipping: expect unavailable'
+fi
 
 # Declining leaves the target in place.
 new_case
@@ -302,8 +348,10 @@ new_case
 prepare_file
 run_hook pre
 remove_source
-run_hook post
+run_post_no_tty
 [[ -f $TARGET ]] || fail 'non-TTY post removed a target'
+grep -Fq "no interactive terminal; leaving $TARGET." "$CASE/session.txt" \
+    || fail 'non-TTY report-only diagnostic changed'
 pass 'no TTY skips deletion'
 
 # Symlink deletion unlinks the managed link, never its referent.
@@ -346,6 +394,9 @@ mkdir "$TARGET"
 remove_source
 run_post_answer y
 [[ -d $TARGET ]] || fail 'directory target was removed'
+grep -Fq "leaving $TARGET (changed, unsafe, or managed again)." "$CASE/session.txt" \
+    || fail 'directory report-only diagnostic changed'
+! grep -Fq 'Delete unmanaged target' "$CASE/session.txt" || fail 'directory report-only case prompted'
 pass 'directory target is report-only'
 
 new_case
@@ -421,7 +472,7 @@ mkdir -m 700 "$parent"
 cp "$parent.replaced/$base" "$parent/$base"
 EOF
 chmod +x "$CASE/mutate-parent"
-CHECK_REMOVED_FILES_TEST_BEFORE_VERIFY="$CASE/mutate-parent" run_post_answer y
+run_post_answer y "$CASE/mutate-parent"
 [[ -f $TARGET ]] || fail 'changed directory identity allowed deletion'
 pass 'changed directory identity is report-only'
 
@@ -490,7 +541,7 @@ args = ["-c", "exec \"$CHEZMOI_SOURCE_DIR/check-removed-files.sh\" pre \"$@\"", 
 command = "bash"
 args = ["-c", "exec \"$CHEZMOI_SOURCE_DIR/check-removed-files.sh\" post \"$@\"", "--"]
 EOF
-E2E_ENV=(env HOME="$E2E/home" XDG_CONFIG_HOME="$E2E/home/.config" XDG_CACHE_HOME="$E2E/home/.cache")
+E2E_ENV=(env HOME="$E2E/home" XDG_CONFIG_HOME="$E2E/home/.config" XDG_CACHE_HOME="$E2E/home/.cache" CHECK_REMOVED_FILES_NO_TTY=true)
 "${E2E_ENV[@]}" chezmoi apply --no-tty
 mkdir -p "$E2E/upstream"
 git clone -q "$E2E/remote.git" "$E2E/upstream"

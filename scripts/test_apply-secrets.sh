@@ -6,35 +6,15 @@ SCRIPT_DIR=$(CDPATH='' cd "$(dirname "$0")" && pwd)
 # shellcheck disable=SC1091 # Sourced dynamically from the script directory.
 . "$SCRIPT_DIR/test_fixture.sh"
 setup_secret_fixture
-SOURCE_DIR=$(chezmoi source-path)
-TEST_ROOT="$HOME/.test"
-CONFIG_TEST_ROOT="$HOME/.config/test"
-SOURCE_NAMING_TEST_ROOT="$HOME/.test_dir/test_subdir"
 export TEST_CHOICE=2
 
 cleanup() {
     echo "Cleaning up test files..."
-
-    rm -f "$TEST_ROOT/test_data.yaml" "$TEST_ROOT/test_data.json" "$TEST_ROOT/test_data.toml" "$TEST_ROOT/test_multi.json" 2>/dev/null || true
-    rm -rf "$CONFIG_TEST_ROOT" "$SOURCE_NAMING_TEST_ROOT" "$HOME/.test_dir" 2>/dev/null || true
-
-    for prefix in test_data test_multi test_sub test_chezmoi_naming; do
-        find "$SOURCE_DIR" -maxdepth 1 \( -name "*${prefix}*" -o -name "private_*${prefix}*" -o -name "encrypted_*${prefix}*" \) -exec rm -rf {} + 2>/dev/null || true
-        if [ -d "$SOURCE_DIR/secrets" ]; then
-            find "$SOURCE_DIR/secrets" -name "*${prefix}*" -exec rm -rf {} + 2>/dev/null || true
-        fi
-    done
-
-    rm -rf "$SOURCE_DIR/dot_test" "$SOURCE_DIR/dot_config/test" "$SOURCE_DIR/dot_config/test_dir" "$SOURCE_DIR/dot_config/private_test_dir" "$SOURCE_DIR/dot_test_dir/test_subdir" "$SOURCE_DIR/dot_test_dir" 2>/dev/null || true
-
-    if [ -d "$SOURCE_DIR/secrets" ]; then
-        find "$SOURCE_DIR/secrets" -depth -mindepth 1 -type d -empty -exec rmdir {} \; 2>/dev/null || true
-    fi
-    finish_secret_fixture
+    finish_secret_fixture || exit 1
 }
 
 fail() {
-    echo "❌ $1"
+    echo "❌ $1" >&2
     exit 1
 }
 
@@ -42,29 +22,17 @@ pass() {
     echo "✅ $1"
 }
 
-run_chezmoi_add() {
-    choice=$1
-    shift
-    TEST_CHOICE=$choice chezmoi add "$@"
-}
-
-prepare_test_dirs() {
-    mkdir -p "$TEST_ROOT" "$CONFIG_TEST_ROOT" "$SOURCE_NAMING_TEST_ROOT"
-}
-
 trap cleanup EXIT HUP INT TERM
 
 echo "Starting apply-rendering tests for check-secrets.sh (Option 2)..."
 
+assert_hook_launcher_contract || fail 'hook launcher contract failed'
+pass "hook configuration passed"
+
 # 1. Test Option 2: SOPS Strategy (YAML)
 echo "Testing Apply Rendering (YAML)..."
 prepare_test_dirs
-cat <<'EOF' > "$TEST_ROOT/test_data.yaml"
-app_name: MyTestApp
-API_KEY: yaml-secret-key
-port: 8080
-db_password: yaml-db-pass
-EOF
+write_option2_yaml_fixture
 
 echo "Running: chezmoi add $TEST_ROOT/test_data.yaml"
 run_chezmoi_add 2 "$TEST_ROOT/test_data.yaml" || true
@@ -83,14 +51,7 @@ fi
 # 2. Test Option 2: SOPS Strategy (JSON)
 echo "Testing Apply Rendering (JSON)..."
 prepare_test_dirs
-cat <<'EOF' > "$TEST_ROOT/test_data.json"
-{
-  "app_name": "MyTestApp",
-  "apiKey": "json-secret-key",
-  "dbPassword": "json-db-pass",
-  "port": 8080
-}
-EOF
+write_option2_json_fixture
 run_chezmoi_add 2 "$TEST_ROOT/test_data.json" || true
 rm -f "$TEST_ROOT/test_data.json"
 
@@ -106,12 +67,7 @@ fi
 # 3. Test Option 2: SOPS Strategy (TOML)
 echo "Testing Apply Rendering (TOML)..."
 prepare_test_dirs
-cat <<'EOF' > "$TEST_ROOT/test_data.toml"
-app_name = "MyTestApp"
-API_KEY = "toml-secret-key"
-port = 8080
-db_password = "toml-db-pass"
-EOF
+write_option2_toml_fixture
 run_chezmoi_add 2 "$TEST_ROOT/test_data.toml" || true
 rm -f "$TEST_ROOT/test_data.toml"
 
@@ -127,9 +83,7 @@ fi
 # 4. Test Option 2: SOPS Strategy (duplicate sensitive keys)
 echo "Testing Apply Rendering (duplicate sensitive keys)..."
 prepare_test_dirs
-cat <<'EOF' > "$TEST_ROOT/test_multi.json"
-{"hosts": [{"username": "username1", "password": "password1"}, {"username": "username2", "password": "password2"}]}
-EOF
+write_option2_duplicate_fixture
 run_chezmoi_add 2 "$TEST_ROOT/test_multi.json" || true
 rm -f "$TEST_ROOT/test_multi.json"
 
@@ -145,10 +99,7 @@ fi
 # 5. Test Option 2: SOPS Strategy (Subdirectory)
 echo "Testing Apply Rendering (Subdirectory)..."
 prepare_test_dirs
-cat <<'EOF' > "$CONFIG_TEST_ROOT/test_sub.yaml"
-API_KEY: sub-secret-key
-db_password: sub-db-pass
-EOF
+write_option2_subdirectory_fixture
 run_chezmoi_add 2 "$CONFIG_TEST_ROOT/test_sub.yaml" || true
 rm -f "$CONFIG_TEST_ROOT/test_sub.yaml"
 
@@ -164,13 +115,7 @@ fi
 # 6. Test Option 2: chezmoi source naming
 echo "Testing Apply Rendering (chezmoi source naming)..."
 prepare_test_dirs
-cat <<'EOF' > "$SOURCE_NAMING_TEST_ROOT/test_chezmoi_naming.json"
-{
-  "service": "chezmoi-naming-test",
-  "API_KEY": "chezmoi-naming-secret",
-  "enabled": true
-}
-EOF
+write_option2_source_naming_fixture
 run_chezmoi_add 2 "$SOURCE_NAMING_TEST_ROOT/test_chezmoi_naming.json" || true
 rm -f "$SOURCE_NAMING_TEST_ROOT/test_chezmoi_naming.json"
 

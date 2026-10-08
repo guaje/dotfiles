@@ -164,7 +164,8 @@ scan_file() {
     [[ $scan_path == -* ]] && scan_path=./$scan_path
 
     if [ ! -f "$scan_path" ]; then
-        return 0
+        printf 'Cannot scan missing or non-regular file: %s\n' "$file" >&2
+        return 1
     fi
 
     files_scanned=$((files_scanned + 1))

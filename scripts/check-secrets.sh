@@ -53,7 +53,8 @@ export SOPS_AGE_KEY_FILE
 AGE_KEY=$(awk -F: '/public key:/ {gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); print $2; exit}' "$SOPS_AGE_KEY_FILE" 2>/dev/null)
 
 TTY_AVAILABLE=false
-if ( : </dev/tty >/dev/tty ) 2>/dev/null; then
+# Test-only seam keeps diagnostics capturable and prompt behavior deterministic.
+if [[ ${CHECK_SECRETS_NO_TTY:-} != true ]] && ( : </dev/tty >/dev/tty ) 2>/dev/null; then
     exec 3</dev/tty 4>/dev/tty
     TTY_AVAILABLE=true
 fi
@@ -326,6 +327,12 @@ extract_sensitive_values() {
         "$input_file"
 }
 
+sort_secret_ids() {
+    local input_file=$1 output_file=$2 failpoint=$3
+    [[ ${CHECK_SECRETS_FAILPOINT:-} == "$failpoint" ]] && return 70
+    LC_ALL=C sort "$input_file" > "$output_file"
+}
+
 managed_by_generated_template() {
     local target=$1 candidate
     prospective_source_path "$target" || return 1
@@ -479,7 +486,10 @@ while IFS= read -r -d '' file; do
             fi
             [[ -s $TMP_SECRETS_FILE && -s $TMP_IDS_FILE ]] || exit 1
             TMP_SORTED_IDS_FILE=$(mktemp "${TMPDIR:-/tmp}/check-secrets.sorted-ids.XXXXXX") || exit 1
-            LC_ALL=C sort "$TMP_IDS_FILE" > "$TMP_SORTED_IDS_FILE" || exit 1
+            sort_secret_ids "$TMP_IDS_FILE" "$TMP_SORTED_IDS_FILE" identifier-compare || {
+                log 'Secret identifier comparison failed; aborting.'
+                exit 1
+            }
 
             if [[ $TEMPLATE_EXISTS == true ]]; then
                 # Canonical regeneration proves that the version marker was not
@@ -504,7 +514,10 @@ while IFS= read -r -d '' file; do
                     log 'Existing generated template/ciphertext pair is malformed or incompatible; aborting.'
                     exit 1
                 fi
-                LC_ALL=C sort "$TMP_OLD_IDS_FILE" > "$TMP_OLD_SORTED_IDS_FILE" || exit 1
+                sort_secret_ids "$TMP_OLD_IDS_FILE" "$TMP_OLD_SORTED_IDS_FILE" identifier-compare-existing || {
+                    log 'Secret identifier comparison failed; aborting.'
+                    exit 1
+                }
                 if ! cmp -s "$TMP_SORTED_IDS_FILE" "$TMP_OLD_SORTED_IDS_FILE"; then
                     log 'Secret identifiers changed; migrate the template and ciphertext manually.'
                     exit 1

@@ -11,7 +11,7 @@ if (( BASH_VERSINFO[0] < 4 )); then
     exit 1
 fi
 
-STATE_VERSION=2
+STATE_VERSION=3
 # Keep the directory stable across schema upgrades so a post-hook running the
 # new script can quarantine state written by the pre-update script.
 STATE_DIRECTORY_VERSION=1
@@ -27,7 +27,14 @@ log() {
 
 open_tty() {
     TTY_AVAILABLE=false
-    if [[ -r /dev/tty && -w /dev/tty ]] && (: </dev/tty >/dev/tty) 2>/dev/null; then
+    # Test-only seam for deterministic report-only coverage on every platform.
+    [[ ${CHECK_REMOVED_FILES_NO_TTY:-} == true ]] && return
+    # Tests inject an answer queue without allocating a platform-specific PTY.
+    # Keep the normal terminal requirement unchanged when the queue is absent.
+    if [[ -n ${CHECK_REMOVED_FILES_ANSWERS:-} || -n ${CHECK_REMOVED_FILES_CHOICE:-} ]]; then
+        exec 3</dev/null 4>&2
+        TTY_AVAILABLE=true
+    elif [[ -r /dev/tty && -w /dev/tty ]] && (: </dev/tty >/dev/tty) 2>/dev/null; then
         exec 3</dev/tty 4>/dev/tty
         TTY_AVAILABLE=true
     fi
@@ -217,6 +224,7 @@ is_confidently_unmanaged() {
 
 prompt_delete() {
     local target=$1 answer=${CHECK_REMOVED_FILES_CHOICE:-}
+    printf 'Delete unmanaged target %q? [y]es/[N]o/[s]kip all/[q]uit: ' "$target" >&4
     # Test-only answer queue: one answer per prompt, popped in order. When the
     # queue is exhausted or unset, the interactive read below runs.
     if [[ -z $answer && -n ${CHECK_REMOVED_FILES_ANSWERS:-} ]]; then
@@ -228,7 +236,6 @@ prompt_delete() {
         fi
     fi
     if [[ -z $answer ]]; then
-        printf 'Delete unmanaged target %q? [y]es/[N]o/[s]kip all/[q]uit: ' "$target" >&4
         IFS= read -r answer <&3 || answer=q
     fi
     case $answer in
@@ -287,8 +294,8 @@ pre() {
     # render, or hash each target here: most updates remove no source files.
     # The final fields record whether both source path representations agree
     # with the trusted source/work tree and the corresponding git-relative
-    # path. Target type remains deliberately unknown until post finds a source
-    # deletion or rename candidate.
+    # path. The record carries the state schema version; target type remains
+    # deliberately unknown until post finds a source deletion or rename candidate.
     while IFS= read -r -d '' target_relative \
         && IFS= read -r -d '' target \
         && IFS= read -r -d '' source \
@@ -304,7 +311,7 @@ pre() {
         fi
         printf '%s\0%s\0%s\0%s\0%s\0%s\0%s\0' \
             "$target" "$target_relative" "$source" "$source_relative" \
-            "$git_relative" file-or-symlink "$provenance"
+            "$git_relative" "$STATE_VERSION" "$provenance"
     done < "$managed_file" >> "$TX/snapshot.nul"
     rm -f "$managed_file"
     printf '%s\n' complete > "$TX/complete"
@@ -315,7 +322,7 @@ pre() {
 
 post() {
     local token old_head source_dir dest_dir work_tree current_head diff_file status old_path new_path
-    local target _ignored git_relative managed_type provenance
+    local target _ignored git_relative schema_version provenance
     local type fingerprint change decision malformed_diff=false
     local skip_all=false
     local -A changes=() managed_now=()
@@ -413,9 +420,9 @@ post() {
         && IFS= read -r -d '' _ignored \
         && IFS= read -r -d '' _ignored \
         && IFS= read -r -d '' git_relative \
-        && IFS= read -r -d '' managed_type \
+        && IFS= read -r -d '' schema_version \
         && IFS= read -r -d '' provenance; do
-        [[ $provenance == worktree && $managed_type == file-or-symlink ]] || {
+        [[ $schema_version == "$STATE_VERSION" && $provenance == worktree ]] || {
             log "check-removed-files: leaving ambiguous target $target (external or unmapped source)."
             continue
         }

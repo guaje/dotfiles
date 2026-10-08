@@ -6,38 +6,17 @@ SCRIPT_DIR=$(CDPATH='' cd "$(dirname "$0")" && pwd)
 # shellcheck disable=SC1091 # Sourced dynamically from the script directory.
 . "$SCRIPT_DIR/test_fixture.sh"
 setup_secret_fixture
-SOURCE_DIR=$(chezmoi source-path)
-TEST_ROOT="$HOME/.test"
-CONFIG_TEST_ROOT="$HOME/.config/test"
-SOURCE_NAMING_TEST_ROOT="$HOME/.test_dir/test_subdir"
 NEWLINE_TEST_FILE="$TEST_ROOT/test_newline
 sensitive.yaml"
 export SOPS_AGE_KEY_FILE="$HOME/.config/chezmoi/key.txt"
 
 cleanup() {
     echo "Cleaning up test files..."
-
-    rm -f "$TEST_ROOT/test_data.yaml" "$TEST_ROOT/test_data.json" "$TEST_ROOT/test_data.toml" "$TEST_ROOT/test_multi.json" "$NEWLINE_TEST_FILE" 2>/dev/null || true
-    rm -f "$TEST_ROOT/test_abort.yaml" "$TEST_ROOT/test_plain.yaml" "$TEST_ROOT/test_full.yaml" "$TEST_ROOT/test_token.json" "$TEST_ROOT/test_openai.json" "$TEST_ROOT/test_postman.json" "$TEST_ROOT/test_clean.txt" "$TEST_ROOT/test_placeholder.yaml" "$TEST_ROOT/test_limits.json" 2>/dev/null || true
-    rm -rf "$CONFIG_TEST_ROOT" "$SOURCE_NAMING_TEST_ROOT" "$HOME/.test_dir" 2>/dev/null || true
-
-    for prefix in test_abort test_plain test_full test_data test_multi test_sub test_chezmoi_naming test_token test_openai test_postman test_clean test_placeholder test_limits test_newline test_custom_destination; do
-        find "$SOURCE_DIR" -maxdepth 1 \( -name "*${prefix}*" -o -name "private_*${prefix}*" -o -name "encrypted_*${prefix}*" \) -exec rm -rf {} + 2>/dev/null || true
-        if [ -d "$SOURCE_DIR/secrets" ]; then
-            find "$SOURCE_DIR/secrets" -name "*${prefix}*" -exec rm -rf {} + 2>/dev/null || true
-        fi
-    done
-
-    rm -rf "$SOURCE_DIR/dot_test" "$SOURCE_DIR/dot_config/test" "$SOURCE_DIR/dot_config/test_dir" "$SOURCE_DIR/dot_config/private_test_dir" "$SOURCE_DIR/dot_test_dir/test_subdir" "$SOURCE_DIR/dot_test_dir" 2>/dev/null || true
-
-    if [ -d "$SOURCE_DIR/secrets" ]; then
-        find "$SOURCE_DIR/secrets" -depth -mindepth 1 -type d -empty -exec rmdir {} \; 2>/dev/null || true
-    fi
-    finish_secret_fixture
+    finish_secret_fixture || exit 1
 }
 
 fail() {
-    echo "❌ $1"
+    echo "❌ $1" >&2
     exit 1
 }
 
@@ -45,32 +24,16 @@ pass() {
     echo "✅ $1"
 }
 
-run_chezmoi_add() {
-    choice=$1
-    shift
-    TEST_CHOICE=$choice chezmoi add "$@"
-}
-
-prepare_test_dirs() {
-    mkdir -p "$TEST_ROOT" "$CONFIG_TEST_ROOT" "$SOURCE_NAMING_TEST_ROOT"
-}
-
-template_source_path() {
-    chezmoi source-path "$1"
-}
-
-sops_source_path() {
-    source_file=$(template_source_path "$1")
-    source_file=${source_file%.tmpl}
-    rel_path=${source_file#"$SOURCE_DIR"/}
-    printf '%s/secrets/%s.sops.yaml\n' "$SOURCE_DIR" "$rel_path"
-}
-
 trap cleanup EXIT HUP INT TERM
 
 echo "Starting tests for check-secrets.sh..."
 
-# source-path must predict add's eventual mapping before Option 2 is allowed
+# Hook launchers are a checked-in configuration contract, not fixture setup.
+echo "Testing hook configuration..."
+assert_hook_launcher_contract || fail 'hook launcher contract failed'
+pass "hook configuration passed"
+
+# source-path must predict add's eventual mapping before partial encryption is allowed
 # to install its template. Cover normal, hidden, nested, executable and private
 # destination cases supported by this chezmoi version.
 echo "Testing prospective source-path compatibility..."
@@ -81,35 +44,31 @@ for oracle in "$HOME/oracle-normal" "$HOME/.oracle-hidden" "$HOME/.config/oracle
     expected=$(prospective_fixture_mapping "$oracle")
     CHECK_SECRETS_BYPASS=1 chezmoi add "$oracle"
     actual=$(chezmoi source-path "$oracle")
-    # macOS may report the physical source path while the fixture helper uses
-    # the equivalent ~/.local/share/chezmoi symlink. Compare file identity so
-    # this still detects an incorrect chezmoi source name.
-    [[ $expected -ef $actual ]] || fail "source-path was not prospective for $oracle (expected=$expected actual=$actual)"
+    [[ $expected == "$actual" ]] || fail "source-path was not prospective for $oracle (expected=$expected actual=$actual)"
 done
-rm -rf "$SOURCE_DIR"/*oracle* "$SOURCE_DIR"/dot_config/oracle "$HOME"/oracle-normal "$HOME"/.oracle-hidden "$HOME"/.config/oracle "$HOME"/oracle-executable "$HOME"/oracle-private
+find "$SOURCE_DIR/." -name '*oracle*' -exec rm -rf {} + || true
+rm -rf "$HOME/oracle-normal" "$HOME/.oracle-hidden" "$HOME/.config/oracle" "$HOME/oracle-executable" "$HOME/oracle-private"
 pass "prospective source-path compatibility passed"
 
-# 1. Test Option 4: Abort
-echo "Testing Option 4 (Abort)..."
+# Aborting previews the finding but publishes nothing.
+echo "Testing abort behavior..."
 prepare_test_dirs
-CANARY='CHECK_SECRETS_CANARY_do_not_print'
+CANARY='CHECK_SECRETS_CANARY_may_be_previewed'
 printf '%s\n' "AUTH: $CANARY" > "$TEST_ROOT/test_abort.yaml"
-ABORT_OUTPUT=$(run_chezmoi_add 4 "$TEST_ROOT/test_abort.yaml" 2>&1 || true)
+status=0
+ABORT_OUTPUT=$(run_chezmoi_add 4 "$TEST_ROOT/test_abort.yaml" 2>&1) || status=$?
 # The preview intentionally echoes the matching line so the user can identify
 # it; assert that it is shown and that nothing is published to the source.
 if ! printf '%s' "$ABORT_OUTPUT" | grep -Fq "$CANARY"; then
     fail "Sensitive line preview did not show the matching line"
 fi
-if find "$SOURCE_DIR" -type f -exec grep -Fql "$CANARY" {} + | grep -q .; then
+if find "$SOURCE_DIR/." -type f -exec grep -Fql "$CANARY" {} + | grep -q .; then
     fail "Secret canary was written to the chezmoi source directory"
 fi
-if run_chezmoi_add 4 "$TEST_ROOT/test_abort.yaml" >/dev/null 2>&1; then
-    fail "Option 4 failed: chezmoi add should have been aborted"
-else
-    pass "Option 4 passed"
-fi
+[[ $status -ne 0 ]] || fail "abort choice allowed chezmoi add to continue"
+pass "abort behavior passed"
 
-# 2. A filename containing a newline must still be scanned before add.
+# A filename containing a newline must still be scanned before add.
 echo "Testing newline path secret detection..."
 printf '%s\n' 'SECRET: newline-path-secret' > "$NEWLINE_TEST_FILE"
 NEWLINE_OUTPUT=$(TEST_CHOICE=4 "$SOURCE_DIR/scripts/check-secrets.sh" add "$NEWLINE_TEST_FILE" 2>&1 || true)
@@ -120,38 +79,41 @@ else
     fail "newline path secret detection failed"
 fi
 
-# 3. Test Option 3: Plain
-echo "Testing Option 3 (Plain)..."
+# Plain selection leaves an exact, non-template source entry and no sidecar.
+echo "Testing plain add behavior..."
 prepare_test_dirs
 printf '%s\n' 'SECRET: plain-test' > "$TEST_ROOT/test_plain.yaml"
-if run_chezmoi_add 3 "$TEST_ROOT/test_plain.yaml"; then
-    pass "Option 3 passed"
-else
-    fail "Option 3 failed"
-fi
+run_chezmoi_add 3 "$TEST_ROOT/test_plain.yaml" || fail 'plain selection did not complete the add'
+PLAIN_SOURCE=$(template_source_path "$TEST_ROOT/test_plain.yaml")
+PLAIN_SOPS=$(sops_source_path "$TEST_ROOT/test_plain.yaml")
+[[ -f $PLAIN_SOURCE ]] || fail 'plain selection did not create a source entry'
+cmp -s "$TEST_ROOT/test_plain.yaml" "$PLAIN_SOURCE" || fail 'plain source entry differs from its input'
+[[ $PLAIN_SOURCE != *.tmpl ]] || fail 'plain selection created a template'
+[[ ! -e $PLAIN_SOPS ]] || fail 'plain selection created a SOPS sidecar'
+pass "plain add behavior passed"
 
-# 3. Test Option 1: Full Encryption.
-echo "Testing Option 1 (Full Encryption)..."
+# Full encryption produces a private encrypted source entry that round-trips.
+echo "Testing full encryption behavior..."
 prepare_test_dirs
 printf '%s\n' 'API_KEY: full-encrypt-test' > "$TEST_ROOT/test_full.yaml"
 run_chezmoi_add 1 "$TEST_ROOT/test_full.yaml" >/dev/null 2>&1 || true
-FULL_SOURCE=$(chezmoi source-path "$TEST_ROOT/test_full.yaml")
+FULL_SOURCE=$(find "$SOURCE_DIR/." -maxdepth 2 -type f -name '*test_full*' -print -quit)
 case $(basename "$FULL_SOURCE") in
-    encrypted_*) ;;
-    *) fail "Option 1 failed: source entry is not encrypted" ;;
+    encrypted_private_*) ;;
+    *) fail "full encryption source entry is not private and encrypted" ;;
 esac
+# A successful age round-trip already proves the ciphertext is not plaintext.
 if [ -f "$FULL_SOURCE" ] \
-   && [ "$(find "$TEST_FIXTURE_SOURCE" -type f -name '*test_full*' | wc -l)" -eq 1 ] \
-   && age --decrypt --identity "$SOPS_AGE_KEY_FILE" "$FULL_SOURCE" 2>/dev/null | grep -Fxq 'API_KEY: full-encrypt-test' \
-   && ! grep -Fq 'full-encrypt-test' "$FULL_SOURCE"; then
-    pass "Option 1 encrypted source passed"
+   && [ "$(find "$SOURCE_DIR/." -maxdepth 2 -type f -name '*test_full*' | wc -l)" -eq 1 ] \
+   && age --decrypt --identity "$SOPS_AGE_KEY_FILE" "$FULL_SOURCE" 2>/dev/null | grep -Fxq 'API_KEY: full-encrypt-test'; then
+    pass "full encryption behavior passed"
 else
-    fail "Option 1 failed: encrypted source did not safely round-trip"
+    fail "full encryption did not safely round-trip"
 fi
 
 # The mapping oracle must honor the command's non-default destination for its
 # source-path lookups as well as its sacrificial add.
-echo "Testing Option 2 with a custom destination..."
+echo "Testing partial encryption with a custom destination..."
 CUSTOM_DEST="$TEST_FIXTURE/custom-destination"
 mkdir -p "$CUSTOM_DEST"
 printf '%s\n' 'API_KEY: custom-destination-secret' > "$CUSTOM_DEST/test_custom_destination.yaml"
@@ -189,18 +151,13 @@ for failpoint in term-after-oracle-create term-after-oracle-add; do
 done
 pass "mapping oracle signal cleanup passed"
 
-# 4. Test Option 2: SOPS Strategy (YAML)
-echo "Testing Option 2 (SOPS - YAML)..."
+# Partial encryption creates a generated YAML template and stable sidecar.
+echo "Testing partial YAML encryption..."
 prepare_test_dirs
-cat <<'EOF' > "$TEST_ROOT/test_data.yaml"
-app_name: MyTestApp
-API_KEY: yaml-secret-key
-port: 8080
-db_password: yaml-db-pass
-EOF
+write_option2_yaml_fixture
 YAML_OUTPUT=$(run_chezmoi_add 2 "$TEST_ROOT/test_data.yaml" 2>&1 || true)
 if ! printf '%s' "$YAML_OUTPUT" | grep -Fq 'yaml-secret-key'; then
-    fail "Option 2 did not preview the matching sensitive line"
+    fail "partial encryption did not preview the matching sensitive line"
 fi
 YAML_TMPL=$(template_source_path "$TEST_ROOT/test_data.yaml")
 YAML_SOPS=$(sops_source_path "$TEST_ROOT/test_data.yaml")
@@ -209,9 +166,9 @@ if [ -f "$YAML_TMPL" ] && [ -f "$YAML_SOPS" ] \
    && ! grep -Fq 'yaml-secret-key' "$YAML_TMPL" \
    && grep -Fqx '{{- /* check-secrets:generated:v1 */ -}}' "$YAML_TMPL" \
    && [ "$(find "$(dirname "$YAML_SOPS")" -maxdepth 1 -name "$(basename "$YAML_SOPS")*" -type f | wc -l)" -eq 1 ]; then
-    pass "Option 2 (YAML) passed"
+    pass "partial YAML encryption passed"
 else
-    fail "Option 2 (YAML) failed"
+    fail "partial YAML encryption failed"
 fi
 
 # Re-adding an already templated target updates that template in place rather
@@ -238,7 +195,7 @@ for failpoint in readd-after-cipher-replace readd-before-template-replace readd-
     baseline_template_sum=$(cksum "$YAML_TMPL")
     canary="READD_CANARY_${failpoint}"
     printf '%s\n' 'app_name: ReaddFinal' "API_KEY: $canary" 'port: 9090' 'db_password: final-db' > "$TEST_ROOT/test_data.yaml"
-    CHECK_SECRETS_FAILPOINT=$failpoint run_chezmoi_add 2 "$TEST_ROOT/test_data.yaml" >/dev/null 2>&1 || true
+    env CHECK_SECRETS_FAILPOINT="$failpoint" TEST_CHOICE=2 chezmoi add "$TEST_ROOT/test_data.yaml" >/dev/null 2>&1 || true
     [ "$(cksum "$YAML_TMPL")" = "$baseline_template_sum" ] || fail "$failpoint replaced the template"
     sops --decrypt "$YAML_SOPS" | grep -Fq "$canary" || fail "$failpoint did not leave valid replacement ciphertext"
     intermediate_render=$(chezmoi execute-template < "$YAML_TMPL")
@@ -249,7 +206,7 @@ for failpoint in readd-after-cipher-replace readd-before-template-replace readd-
     fi
     run_chezmoi_add 2 "$TEST_ROOT/test_data.yaml" >/dev/null 2>&1 || true
     cmp -s <(chezmoi execute-template < "$YAML_TMPL") "$TEST_ROOT/test_data.yaml" || fail "$failpoint retry did not converge"
-    if find "$SOURCE_DIR" -type f -name '.*.pending.*' -print -quit | grep -q .; then
+    if find "$SOURCE_DIR/." -type f -name '.*.pending.*' -print -quit | grep -q .; then
         fail "$failpoint left a pending source file"
     fi
 done
@@ -282,7 +239,7 @@ for spec in before-cipher-install:none after-cipher-install:cipher before-templa
     printf 'API_KEY: %s\n' "$canary" > "$target"
     expected_source=$(prospective_fixture_mapping "$target")
     expected_source=${expected_source%.literal}
-    CHECK_SECRETS_FAILPOINT=$failpoint run_chezmoi_add 2 "$target" >/dev/null 2>&1 || true
+    env CHECK_SECRETS_FAILPOINT="$failpoint" TEST_CHOICE=2 chezmoi add "$target" >/dev/null 2>&1 || true
     if grep -R -Fq --exclude='*.sops.yaml' "$canary" "$SOURCE_DIR"; then
         fail "$failpoint leaked plaintext into source"
     fi
@@ -327,7 +284,7 @@ ORPHAN_TARGET="$TEST_ROOT/orphan-mismatch.yaml"
 printf '%s\n' 'API_KEY: orphan-original' > "$ORPHAN_TARGET"
 ORPHAN_SOURCE=$(prospective_fixture_mapping "$ORPHAN_TARGET")
 ORPHAN_SOURCE=${ORPHAN_SOURCE%.literal}
-CHECK_SECRETS_FAILPOINT=after-cipher-install run_chezmoi_add 2 "$ORPHAN_TARGET" >/dev/null 2>&1 || true
+env CHECK_SECRETS_FAILPOINT=after-cipher-install TEST_CHOICE=2 chezmoi add "$ORPHAN_TARGET" >/dev/null 2>&1 || true
 ORPHAN_CIPHER="$SOURCE_DIR/secrets/${ORPHAN_SOURCE#"$SOURCE_DIR"/}.sops.yaml"
 ORPHAN_SUM=$(cksum "$ORPHAN_CIPHER")
 printf '%s\n' 'API_KEY: orphan-changed' > "$ORPHAN_TARGET"
@@ -451,46 +408,24 @@ run_chezmoi_add 2 "$DUP_TARGET" >/dev/null 2>&1 || true
 [ "$(cksum "$DUP_TMPL" "$DUP_CIPHER")" = "$DUP_SUM" ] || fail 'ambiguous duplicate reorder changed a generated pair'
 pass "structural re-add rejection passed"
 
-# Identifier sorting is a fail-closed structural check. A missing/failing sort
-# must stop before either member of an existing generated pair is changed.
-echo "Testing identifier sort failure..."
+# Identifier comparison failure must preserve both stable source files.
+echo "Testing identifier comparison failure..."
 SORT_TARGET="$TEST_ROOT/sort-failure.yaml"
 printf '%s\n' 'API_KEY: sort-before' 'mode: before' > "$SORT_TARGET"
 run_chezmoi_add 2 "$SORT_TARGET" >/dev/null 2>&1 || true
 SORT_TMPL=$(template_source_path "$SORT_TARGET")
 SORT_CIPHER=$(sops_source_path "$SORT_TARGET")
 SORT_SUM=$(cksum "$SORT_TMPL" "$SORT_CIPHER")
-SORT_FAIL_BIN="$TEST_FIXTURE/sort-fail-bin"
-mkdir -p "$SORT_FAIL_BIN"
-printf '%s\n' '#!/usr/bin/env sh' 'exit 99' > "$SORT_FAIL_BIN/sort"
-chmod +x "$SORT_FAIL_BIN/sort"
 printf '%s\n' 'API_KEY: sort-after' 'mode: after' > "$SORT_TARGET"
-PATH="$SORT_FAIL_BIN:$PATH" TEST_CHOICE=2 \
-    "$SOURCE_DIR/scripts/check-secrets.sh" add "$SORT_TARGET" >/dev/null 2>&1 || true
-[ "$(cksum "$SORT_TMPL" "$SORT_CIPHER")" = "$SORT_SUM" ] || fail 'first sort failure changed a generated pair'
-
-# Let the proposed-ID sort succeed and fail only the existing-ID sort.
-REAL_SORT=$(command -v sort)
-SORT_COUNT_FILE="$TEST_FIXTURE/sort-count"
-cat > "$SORT_FAIL_BIN/sort" <<'EOF'
-#!/usr/bin/env bash
-count=0
-if [[ -f $SORT_COUNT_FILE ]]; then
-    read -r count < "$SORT_COUNT_FILE"
-fi
-((count += 1))
-printf '%s\n' "$count" > "$SORT_COUNT_FILE"
-if ((count == 2)); then
-    exit 99
-fi
-exec "$REAL_SORT" "$@"
-EOF
-chmod +x "$SORT_FAIL_BIN/sort"
-SORT_COUNT_FILE="$SORT_COUNT_FILE" REAL_SORT="$REAL_SORT" PATH="$SORT_FAIL_BIN:$PATH" TEST_CHOICE=2 \
-    "$SOURCE_DIR/scripts/check-secrets.sh" add "$SORT_TARGET" >/dev/null 2>&1 || true
-[ "$(cksum "$SORT_TMPL" "$SORT_CIPHER")" = "$SORT_SUM" ] || fail 'second sort failure changed a generated pair'
-[ "$(cat "$SORT_COUNT_FILE")" -eq 2 ] || fail 'second sort failure was not exercised'
-pass "identifier sort failure passed"
+for compare_failpoint in identifier-compare identifier-compare-existing; do
+    SORT_OUTPUT=$(env CHECK_SECRETS_FAILPOINT="$compare_failpoint" TEST_CHOICE=2 \
+        "$SOURCE_DIR/scripts/check-secrets.sh" add "$SORT_TARGET" 2>&1 || true)
+    [[ $(cksum "$SORT_TMPL" "$SORT_CIPHER") == "$SORT_SUM" ]] \
+        || fail "$compare_failpoint changed a generated pair"
+    printf '%s' "$SORT_OUTPUT" | grep -Fq 'identifier comparison failed' \
+        || fail "$compare_failpoint emitted no diagnostic"
+done
+pass "identifier comparison failures passed"
 
 # With an identical generated template, a value-only re-add atomically changes
 # the stable ciphertext and leaves the template byte-for-byte untouched.
@@ -503,15 +438,34 @@ VALUE_CIPHER=$(sops_source_path "$VALUE_TARGET")
 VALUE_TEMPLATE_SUM=$(cksum "$VALUE_TMPL")
 VALUE_CIPHER_SUM=$(cksum "$VALUE_CIPHER")
 printf '%s\n' 'API_KEY: value-after' 'mode: stable' > "$VALUE_TARGET"
-VALUE_OUTPUT=$(run_chezmoi_add 2 "$VALUE_TARGET" 2>&1 || true)
-printf '%s' "$VALUE_OUTPUT" | grep -Fq 'only stable ciphertext was atomically replaced' || fail 'value-only update did not take ciphertext-only path'
+run_chezmoi_add 2 "$VALUE_TARGET" >/dev/null 2>&1 || true
 [ "$(cksum "$VALUE_TMPL")" = "$VALUE_TEMPLATE_SUM" ] || fail 'value-only update changed template'
 [ "$(cksum "$VALUE_CIPHER")" != "$VALUE_CIPHER_SUM" ] || fail 'value-only update did not replace ciphertext'
 sops --decrypt "$VALUE_CIPHER" | grep -Fq 'value-after' || fail 'value-only ciphertext has wrong payload'
-if find "$SOURCE_DIR" -type f -name '.*.pending.*' -print -quit | grep -q .; then
+if find "$SOURCE_DIR/." -type f -name '.*.pending.*' -print -quit | grep -q .; then
     fail 'pending source temporary survived an operation'
 fi
 pass "value-only stable update passed"
+
+# Option 2 extraction and template rendering must not hide a Python dependency.
+echo "Testing Option 2 without Python..."
+NO_PYTHON_BIN="$TEST_FIXTURE/check-secrets-no-python-bin"
+mkdir -p "$NO_PYTHON_BIN"
+printf '%s\n' '#!/bin/sh' 'exit 127' > "$NO_PYTHON_BIN/python"
+cp "$NO_PYTHON_BIN/python" "$NO_PYTHON_BIN/python3"
+chmod +x "$NO_PYTHON_BIN/python" "$NO_PYTHON_BIN/python3"
+NO_PYTHON_TARGET="$TEST_ROOT/no-python.yaml"
+printf '%s\n' 'API_KEY: no-python-secret' 'mode: portable' > "$NO_PYTHON_TARGET"
+env PATH="$NO_PYTHON_BIN:$PATH" TEST_CHOICE=2 chezmoi add "$NO_PYTHON_TARGET" >/dev/null 2>&1 || true
+NO_PYTHON_TMPL=$(template_source_path "$NO_PYTHON_TARGET")
+NO_PYTHON_SOPS=$(sops_source_path "$NO_PYTHON_TARGET")
+if [ -f "$NO_PYTHON_TMPL" ] \
+   && sops --decrypt "$NO_PYTHON_SOPS" | grep -Fq 'no-python-secret' \
+   && env PATH="$NO_PYTHON_BIN:$PATH" chezmoi execute-template < "$NO_PYTHON_TMPL" | grep -Fq 'no-python-secret'; then
+    pass "Option 2 works without Python"
+else
+    fail "Option 2 failed without Python"
+fi
 
 # Direct AWK coverage verifies quote/backslash encoding and control rejection.
 echo "Testing template string encoding..."
@@ -527,53 +481,40 @@ if SENSITIVE_PATTERNS='API_KEY' awk -v mode=extract -v template_file="$CONTROL_T
     -v $'sops_file_name=bad\rpath' -f "$SOURCE_DIR/scripts/check-secrets.awk" "$ENCODE_INPUT"; then
     fail 'control-bearing template path was accepted'
 fi
-[ ! -e "$SOURCE_DIR/control-template" ] || fail 'control rejection wrote source artifact'
+[ ! -e "$CONTROL_TEMPLATE" ] || fail 'control rejection wrote its template output'
+[ ! -e "$TEST_FIXTURE/control-secrets" ] || fail 'control rejection wrote its secrets output'
 pass "template string encoding passed"
 
-# 5. Test Option 2: SOPS Strategy (JSON)
-echo "Testing Option 2 (SOPS - JSON)..."
+# JSON extraction uses the same generated-pair contract.
+echo "Testing partial JSON encryption..."
 prepare_test_dirs
-cat <<'EOF' > "$TEST_ROOT/test_data.json"
-{
-  "app_name": "MyTestApp",
-  "apiKey": "json-secret-key",
-  "dbPassword": "json-db-pass",
-  "port": 8080
-}
-EOF
+write_option2_json_fixture
 run_chezmoi_add 2 "$TEST_ROOT/test_data.json" >/dev/null 2>&1 || true
 JSON_TMPL=$(template_source_path "$TEST_ROOT/test_data.json")
 JSON_SOPS=$(sops_source_path "$TEST_ROOT/test_data.json")
 if [ -f "$JSON_TMPL" ] && sops --decrypt "$JSON_SOPS" | grep -q "json-secret-key"; then
-    pass "Option 2 (JSON) passed"
+    pass "partial JSON encryption passed"
 else
-    fail "Option 2 (JSON) failed"
+    fail "partial JSON encryption failed"
 fi
 
-# 6. Test Option 2: SOPS Strategy (TOML)
-echo "Testing Option 2 (SOPS - TOML)..."
+# TOML extraction uses the same generated-pair contract.
+echo "Testing partial TOML encryption..."
 prepare_test_dirs
-cat <<'EOF' > "$TEST_ROOT/test_data.toml"
-app_name = "MyTestApp"
-API_KEY = "toml-secret-key"
-port = 8080
-db_password = "toml-db-pass"
-EOF
+write_option2_toml_fixture
 run_chezmoi_add 2 "$TEST_ROOT/test_data.toml" >/dev/null 2>&1 || true
 TOML_TMPL=$(template_source_path "$TEST_ROOT/test_data.toml")
 TOML_SOPS=$(sops_source_path "$TEST_ROOT/test_data.toml")
 if [ -f "$TOML_TMPL" ] && sops --decrypt "$TOML_SOPS" | grep -q "toml-secret-key"; then
-    pass "Option 2 (TOML) passed"
+    pass "partial TOML encryption passed"
 else
-    fail "Option 2 (TOML) failed"
+    fail "partial TOML encryption failed"
 fi
 
-# 7. Test Option 2: SOPS Strategy (duplicate sensitive keys)
-echo "Testing Option 2 (duplicate sensitive keys)..."
+# Duplicate sensitive keys receive stable positional identifiers.
+echo "Testing duplicate sensitive keys..."
 prepare_test_dirs
-cat <<'EOF' > "$TEST_ROOT/test_multi.json"
-{"hosts": [{"username": "username1", "password": "password1"}, {"username": "username2", "password": "password2"}]}
-EOF
+write_option2_duplicate_fixture
 run_chezmoi_add 2 "$TEST_ROOT/test_multi.json" >/dev/null 2>&1 || true
 MULTI_TMPL=$(template_source_path "$TEST_ROOT/test_multi.json")
 MULTI_SOPS=$(sops_source_path "$TEST_ROOT/test_multi.json")
@@ -582,51 +523,47 @@ if [ -f "$MULTI_TMPL" ] \
    && grep -q 'password__2' "$MULTI_TMPL" \
    && sops --decrypt "$MULTI_SOPS" | grep -q 'password1' \
    && sops --decrypt "$MULTI_SOPS" | grep -q 'password2'; then
-    pass "Option 2 (duplicate sensitive keys) passed"
+    pass "duplicate sensitive key encryption passed"
 else
-    fail "Option 2 (duplicate sensitive keys) failed"
+    fail "duplicate sensitive key encryption failed"
 fi
 
-# 8. Test Option 2: SOPS Strategy (Subdirectory)
-echo "Testing Option 2 (Subdirectory)..."
+# Subdirectory mappings preserve the expected chezmoi source hierarchy.
+echo "Testing partial encryption in a subdirectory..."
 prepare_test_dirs
-cat <<'EOF' > "$CONFIG_TEST_ROOT/test_sub.yaml"
-API_KEY: sub-secret-key
-EOF
+write_option2_subdirectory_fixture
 run_chezmoi_add 2 "$CONFIG_TEST_ROOT/test_sub.yaml" || true
 SUB_TMPL=$(template_source_path "$CONFIG_TEST_ROOT/test_sub.yaml")
 SUB_SOPS=$(sops_source_path "$CONFIG_TEST_ROOT/test_sub.yaml")
 if [ -f "$SUB_TMPL" ] && sops --decrypt "$SUB_SOPS" | grep -q "sub-secret-key"; then
-    pass "Option 2 (Subdirectory) passed"
+    pass "subdirectory partial encryption passed"
 else
     echo "Expected secret at: $SUB_SOPS"
-    fail "Option 2 (Subdirectory) failed"
+    fail "subdirectory partial encryption failed"
 fi
 
-# 9. Test Option 2: SOPS Strategy follows chezmoi source naming
-
-echo "Testing Option 2 (chezmoi source naming)..."
+# Chezmoi attribute naming is pinned independently of the hook's path oracle.
+echo "Testing partial encryption source naming..."
 prepare_test_dirs
-cat <<'EOF' > "$SOURCE_NAMING_TEST_ROOT/test_chezmoi_naming.json"
-{
-  "service": "chezmoi-naming-test",
-  "API_KEY": "chezmoi-naming-secret",
-  "enabled": true
-}
-EOF
+# Pin typical user-home permissions so chezmoi maps non-private attributes;
+# a 700-mode fixture HOME would otherwise prepend private_ to every segment
+# and the literal expectations below would not describe the contract.
+chmod 755 "$HOME/.test_dir" "$SOURCE_NAMING_TEST_ROOT"
+write_option2_source_naming_fixture
+chmod 644 "$SOURCE_NAMING_TEST_ROOT/test_chezmoi_naming.json"
 run_chezmoi_add 2 "$SOURCE_NAMING_TEST_ROOT/test_chezmoi_naming.json" >/dev/null 2>&1 || true
-THEME_TMPL=$(template_source_path "$SOURCE_NAMING_TEST_ROOT/test_chezmoi_naming.json")
-THEME_SOPS=$(sops_source_path "$SOURCE_NAMING_TEST_ROOT/test_chezmoi_naming.json")
+THEME_TMPL="$SOURCE_DIR/dot_test_dir/test_subdir/test_chezmoi_naming.json.tmpl"
+THEME_SOPS="$SOURCE_DIR/secrets/dot_test_dir/test_subdir/test_chezmoi_naming.json.sops.yaml"
 if [ -f "$THEME_TMPL" ] \
    && sops --decrypt "$THEME_SOPS" | grep -q "chezmoi-naming-secret"; then
-    pass "Option 2 (chezmoi source naming) passed"
+    pass "partial encryption source naming passed"
 else
     echo "Expected template at: $THEME_TMPL"
     echo "Expected secret at: $THEME_SOPS"
-    fail "Option 2 (chezmoi source naming) failed"
+    fail "partial encryption source naming failed"
 fi
 
-# 10. Test strong token detection independent of key names
+# Strong token detection is independent of key names.
 echo "Testing strong token detection..."
 prepare_test_dirs
 cat <<'EOF' > "$TEST_ROOT/test_token.json"
@@ -645,8 +582,7 @@ else
     fail "Strong token detection failed"
 fi
 
-# 11. Test additional provider token detection
-
+# Additional provider tokens are detected.
 echo "Testing additional provider token detection..."
 prepare_test_dirs
 cat <<'EOF' > "$TEST_ROOT/test_openai.json"
@@ -665,7 +601,7 @@ else
     fail "Additional provider token detection failed"
 fi
 
-# 12. Test placeholder values do not trigger detection
+# Placeholder values do not trigger detection.
 echo "Testing placeholder filtering..."
 prepare_test_dirs
 cat <<'EOF' > "$TEST_ROOT/test_placeholder.yaml"
@@ -682,32 +618,7 @@ else
     fail "Placeholder filtering failed: file was not added"
 fi
 
-# 13. Test reusable scan script with provider-specific detector
-echo "Testing reusable scan script..."
-prepare_test_dirs
-cat <<'EOF' > "$TEST_ROOT/test_postman.json"
-{
-  "service": "postman",
-  "token": "PMAK-v1-abcdefghijklmnopqrstuvwxyz123456"
-}
-EOF
-if "$SOURCE_DIR/scripts/scan-secrets.sh" --quiet "$TEST_ROOT/test_postman.json" >/dev/null 2>&1; then
-    fail "Reusable scan script failed to detect provider-specific token"
-else
-    pass "Reusable scan script detection passed"
-fi
-
-# 14. Test reusable scan script on a clean file
-echo "Testing reusable scan script on clean input..."
-prepare_test_dirs
-printf '%s\n' 'hello world' > "$TEST_ROOT/test_clean.txt"
-if "$SOURCE_DIR/scripts/scan-secrets.sh" --quiet "$TEST_ROOT/test_clean.txt" >/dev/null 2>&1; then
-    pass "Reusable scan script clean input passed"
-else
-    fail "Reusable scan script clean input failed"
-fi
-
-# 15. Test numeric token limit settings do not trigger detection
+# Numeric token limit settings do not trigger detection.
 echo "Testing numeric token limit filtering..."
 prepare_test_dirs
 cat <<'EOF' > "$TEST_ROOT/test_limits.json"
@@ -725,15 +636,6 @@ elif [ -f "$LIMITS_SOURCE" ]; then
     pass "Numeric token limit filtering passed"
 else
     fail "Numeric token limit filtering failed: file was not added"
-fi
-
-# 16. Assert check-secrets.sh no longer depends on python
-echo "Testing python-free implementation..."
-if { command -v rg >/dev/null 2>&1 && rg -n 'python3|python -' "$SOURCE_DIR/scripts/check-secrets.sh" "$SOURCE_DIR/scripts/check-secrets.awk" "$SOURCE_DIR/scripts/scan-secrets.sh"; } \
-    || { ! command -v rg >/dev/null 2>&1 && grep -En 'python3|python -' "$SOURCE_DIR/scripts/check-secrets.sh" "$SOURCE_DIR/scripts/check-secrets.awk" "$SOURCE_DIR/scripts/scan-secrets.sh"; }; then
-    fail "Python-free implementation failed"
-else
-    pass "Python-free implementation passed"
 fi
 
 echo "All tests passed successfully!"

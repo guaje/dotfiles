@@ -349,7 +349,7 @@ function scan_line(line, line_no,    rest, base, segment, key, value_part, first
                 preview_found = 1
                 if (!preview_printed[line_no]) {
                     preview_printed[line_no] = 1
-                    print line_no "\t" normalize((strong_label != "" ? strong_label : key)) "\t[REDACTED]"
+                    print line_no "\t" normalize((strong_label != "" ? strong_label : key)) "\t" lines[line_no]
                 }
             } else {
                 add_occurrence(line_no, key, secret_value, replace_start, replace_len)
@@ -434,7 +434,7 @@ BEGIN {
             preview_found = 1
             if (!preview_printed[line_count]) {
                 preview_printed[line_count] = 1
-                print line_count "\t" normalize(strong_label) "\t[REDACTED]"
+                print line_count "\t" normalize(strong_label) "\t" $0
             }
         }
     }

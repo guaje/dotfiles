@@ -38,6 +38,8 @@ When you run `chezmoi add <file>`, the script triggers and provides several opti
 
 Options 1 and 2 safely finish the conversion and then stop the original `chezmoi add` command. Add sensitive files one at a time so each choice can be reviewed.
 
+Before the menu, the hook prints a preview of every matching line (`line<TAB>detector<TAB>source line`) to your terminal so you can confirm exactly what was detected. The values are shown verbatim and are never written to the source directory, so do not run `chezmoi add` on a secret file over a shared or logged terminal session.
+
 The hook marks the templates it creates, so it will not overwrite templates maintained by hand. Normal value changes are updated automatically. If secret fields are added, removed, or renamed, the hook stops without changing anything and asks for a manual migration.
 
 #### 🔑 Age identity bootstrap and `.sops.yaml`
@@ -117,8 +119,6 @@ bash ./scripts/test_apply-secrets.sh
 bash ./scripts/test_scan-secrets.sh
 bash ./scripts/test_check-removed-files.sh
 ```
-
-The tests use temporary directories and test-only secrets, so they do not touch the real source directory or reveal real values. CI runs the same Bash tests and ShellCheck on Linux and macOS.
 
 On macOS, install a current version of Bash and the required tools with Homebrew:
 

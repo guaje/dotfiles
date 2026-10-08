@@ -362,8 +362,8 @@ while IFS= read -r -d '' file; do
 
     MATCHED_DETECTOR=$(printf '%s\n' "$MATCHED_PATTERN" | awk -F '\t' 'NR == 1 { print $1 }')
     MATCHED_LINE=$(printf '%s\n' "$MATCHED_PATTERN" | awk -F '\t' 'NR == 1 { print $2 }')
-    log "⚠️  Sensitive information detected: $file:${MATCHED_LINE:-0}:${MATCHED_DETECTOR:-UNKNOWN}: [REDACTED]"
-    log 'Sensitive locations (redacted):'
+    log "⚠️  Sensitive information detected: $file:${MATCHED_LINE:-0}:${MATCHED_DETECTOR:-UNKNOWN}"
+    log 'Sensitive lines:'
     if PREVIEW_LINES=$(preview_sensitive_lines "$file" 2>/dev/null || true) && [ -n "$PREVIEW_LINES" ]; then
         printf '%s\n' "$PREVIEW_LINES" | while IFS= read -r preview_line; do
             [ -n "$preview_line" ] || continue

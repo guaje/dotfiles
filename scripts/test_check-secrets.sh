@@ -95,8 +95,13 @@ prepare_test_dirs
 CANARY='CHECK_SECRETS_CANARY_do_not_print'
 printf '%s\n' "AUTH: $CANARY" > "$TEST_ROOT/test_abort.yaml"
 ABORT_OUTPUT=$(run_chezmoi_add 4 "$TEST_ROOT/test_abort.yaml" 2>&1 || true)
-if printf '%s' "$ABORT_OUTPUT" | grep -Fq "$CANARY"; then
-    fail "Secret canary leaked through check-secrets output"
+# The preview intentionally echoes the matching line so the user can identify
+# it; assert that it is shown and that nothing is published to the source.
+if ! printf '%s' "$ABORT_OUTPUT" | grep -Fq "$CANARY"; then
+    fail "Sensitive line preview did not show the matching line"
+fi
+if find "$SOURCE_DIR" -type f -exec grep -Fql "$CANARY" {} + | grep -q .; then
+    fail "Secret canary was written to the chezmoi source directory"
 fi
 if run_chezmoi_add 4 "$TEST_ROOT/test_abort.yaml" >/dev/null 2>&1; then
     fail "Option 4 failed: chezmoi add should have been aborted"
@@ -194,8 +199,8 @@ port: 8080
 db_password: yaml-db-pass
 EOF
 YAML_OUTPUT=$(run_chezmoi_add 2 "$TEST_ROOT/test_data.yaml" 2>&1 || true)
-if printf '%s' "$YAML_OUTPUT" | grep -Fq 'yaml-secret-key'; then
-    fail "Option 2 leaked a secret through hook output"
+if ! printf '%s' "$YAML_OUTPUT" | grep -Fq 'yaml-secret-key'; then
+    fail "Option 2 did not preview the matching sensitive line"
 fi
 YAML_TMPL=$(template_source_path "$TEST_ROOT/test_data.yaml")
 YAML_SOPS=$(sops_source_path "$TEST_ROOT/test_data.yaml")

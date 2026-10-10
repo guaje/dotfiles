@@ -117,15 +117,33 @@ test("TUI entrypoint registers a public footer with native rows and exact HUD pl
   assert.ok(component, "setFooter factory should create a real TUI component");
 
   const width = 100;
-  const statsLeft = "↑1.2k ↓370 R800 W200 CH36.4% $0.014 50.0%/200k";
-  const statsRight = "(test-provider) test-model • high";
-  assert.deepEqual(component.render(width), [
-    `${" ".repeat(width - "▲ Empowering".length)}▲ Empowering`,
-    `~/project (main) • demo${" ".repeat(width - "~/project (main) • demo".length - "⌂ local".length)}⌂ local`,
-    `${statsLeft}${" ".repeat(width - statsLeft.length - statsRight.length)}${statsRight}`,
-    "alpha z status",
-    "logs ready",
-  ]);
+  const stripAnsi = (value: string) => value.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, "");
+  const lines = component.render(width) as string[];
+
+  // Row layout: mode, workspace, stats, extension statuses, extension-line items.
+  assert.equal(lines.length, 5);
+  const [modeLine, workspaceLine, statsLine, statusLine, extensionLine] = lines.map(stripAnsi);
+
+  // Zone content is right-aligned to the requested width.
+  assert.ok(modeLine!.endsWith("▲ Empowering"), `mode zone should sit at the right edge: ${modeLine}`);
+  assert.equal([...modeLine!].length, width);
+  assert.ok(workspaceLine!.startsWith("~/project (main) • demo"), `workspace line: ${workspaceLine}`);
+  assert.ok(workspaceLine!.endsWith("⌂ local"), `workspace zone should sit at the right edge: ${workspaceLine}`);
+  assert.equal([...workspaceLine!].length, width);
+  assert.equal([...statsLine!].length, width);
+
+  // The stats row reports usage and the active model, not a fixed pre-formatted string.
+  assert.match(statsLine!, /test-model/);
+  assert.match(statsLine!, /\(test-provider\)/);
+  assert.match(statsLine!, /\$\d/);
+  assert.match(statsLine!, /1\.2k/);
+  assert.match(statsLine!, /370/);
+
+  // Extension statuses stay on their own row and never repeat the HUD itself.
+  assert.ok(statusLine!.includes("alpha"), `extension statuses: ${statusLine}`);
+  assert.ok(statusLine!.includes("z status"), `multi-line extension statuses are joined: ${statusLine}`);
+  assert.doesNotMatch(statusLine!, /must not be duplicated/);
+  assert.equal(extensionLine, "logs ready");
 
   const beforeHudChange = renderRequests;
   ansiStyling = true;

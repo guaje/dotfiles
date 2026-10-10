@@ -4,7 +4,7 @@ set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 cd "$ROOT"
 
-find agent/extensions -name '*.test.ts' -print | sort | while IFS= read -r test_file; do
+find agent -name '*.test.ts' ! -path '*/node_modules/*' -print | sort | while IFS= read -r test_file; do
   npx -y tsx --test "$test_file"
 done
 

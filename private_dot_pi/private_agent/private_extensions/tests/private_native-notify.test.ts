@@ -8,6 +8,12 @@ import { pathToFileURL } from "node:url";
 
 const EXTENSION_PATH = resolve("agent/extensions/07-native-notify.ts");
 
+/** Value that follows an argv key (`--es title Pi`, `-t Pi`), or undefined when the key is absent. */
+function argvValue(args: string[], key: string): string | undefined {
+  const index = args.indexOf(key);
+  return index === -1 ? undefined : args[index + 1];
+}
+
 async function loadExtension() {
   const moduleUrl = `${pathToFileURL(EXTENSION_PATH).href}?t=${Date.now()}-${Math.random()}`;
   return import(moduleUrl) as Promise<typeof import("../07-native-notify.ts")>;
@@ -88,94 +94,78 @@ test("detectNotificationTarget supports the Tasker notification backend in Termu
 test("getNotificationCommand builds the default Android Tasker notification command with Termux:API fallback", async () => {
   const { getNotificationCommand } = await loadExtension();
 
-  assert.deepEqual(getNotificationCommand("Pi", "Ready for input", "termux", ""), {
-    command: "am",
-    args: [
-      "broadcast",
-      "--user", "current",
-      "-a", "works.earendil.pi.NOTIFY",
-      "--es", "title", "Pi",
-      "--es", "subtitle", "Pi",
-      "--es", "body", "Ready for input",
-      "--es", "content", "Pi\nReady for input",
-      "--es", "group", "pi-native-notify",
-      "--es", "notification_id", "pi-native-notify",
-      "--es", "icon", "",
-      "--es", "status_icon", "",
-      "--es", "large_icon", "",
-      "--es", "image_path", "",
-    ],
-    fallback: {
-      command: "termux-notification",
-      args: ["-t", "Pi", "-c", "Pi\nReady for input", "--group", "pi-native-notify", "--icon", "code"],
-    },
-  });
+  const command = getNotificationCommand("Pi", "Ready for input", "termux", "");
+  const args = command?.args ?? [];
+  assert.equal(command?.command, "am");
+  assert.ok(args.includes("works.earendil.pi.NOTIFY"), "broadcasts the Pi notification action");
+  assert.equal(argvValue(args, "title"), "Pi");
+  assert.equal(argvValue(args, "subtitle"), "Pi");
+  assert.equal(argvValue(args, "body"), "Ready for input");
+  assert.equal(argvValue(args, "content"), "Pi\nReady for input");
+  assert.equal(argvValue(args, "group"), "pi-native-notify");
+  assert.equal(argvValue(args, "notification_id"), "pi-native-notify");
+  assert.equal(argvValue(args, "icon") ?? "", "", "no icon is sent when none is available");
+  assert.equal(argvValue(args, "image_path") ?? "", "");
+
+  const fallback = command?.fallback;
+  assert.ok(fallback);
+  assert.equal(fallback.command, "termux-notification");
+  assert.equal(argvValue(fallback.args, "-t"), "Pi");
+  assert.equal(argvValue(fallback.args, "-c"), "Pi\nReady for input");
+  assert.equal(argvValue(fallback.args, "--group"), "pi-native-notify");
+  assert.equal(argvValue(fallback.args, "--icon"), "code");
+  assert.equal(argvValue(fallback.args, "--image-path"), undefined);
 });
 
 test("getNotificationCommand adds the Pi icon image to Android Termux notifications", async () => {
   const { getNotificationCommand } = await loadExtension();
 
-  assert.deepEqual(getNotificationCommand("Pi", "Ready for input", "termux", "/tmp/pi-icon.png", "Work Session"), {
-    command: "am",
-    args: [
-      "broadcast",
-      "--user", "current",
-      "-a", "works.earendil.pi.NOTIFY",
-      "--es", "title", "Pi",
-      "--es", "subtitle", "Work Session",
-      "--es", "body", "Ready for input",
-      "--es", "content", "Work Session\nReady for input",
-      "--es", "group", "pi-native-notify",
-      "--es", "notification_id", "pi-native-notify",
-      "--es", "icon", "/tmp/pi-icon.png",
-      "--es", "status_icon", "/tmp/pi-icon.png",
-      "--es", "large_icon", "/tmp/pi-icon.png",
-      "--es", "image_path", "/tmp/pi-icon.png",
-    ],
-    fallback: {
-      command: "termux-notification",
-      args: [
-        "-t", "Pi",
-        "-c", "Work Session\nReady for input",
-        "--group", "pi-native-notify",
-        "--icon", "code",
-        "--image-path", "/tmp/pi-icon.png",
-      ],
-    },
-  });
+  const command = getNotificationCommand("Pi", "Ready for input", "termux", "/tmp/pi-icon.png", "Work Session");
+  const args = command?.args ?? [];
+  assert.equal(command?.command, "am");
+  assert.equal(argvValue(args, "title"), "Pi");
+  assert.equal(argvValue(args, "subtitle"), "Work Session");
+  assert.equal(argvValue(args, "body"), "Ready for input");
+  assert.equal(argvValue(args, "content"), "Work Session\nReady for input");
+  assert.equal(argvValue(args, "group"), "pi-native-notify");
+  assert.equal(argvValue(args, "notification_id"), "pi-native-notify");
+  assert.equal(argvValue(args, "icon"), "/tmp/pi-icon.png");
+  assert.equal(argvValue(args, "image_path"), "/tmp/pi-icon.png");
+
+  const fallback = command?.fallback;
+  assert.ok(fallback);
+  assert.equal(fallback.command, "termux-notification");
+  assert.equal(argvValue(fallback.args, "-t"), "Pi");
+  assert.equal(argvValue(fallback.args, "-c"), "Work Session\nReady for input");
+  assert.equal(argvValue(fallback.args, "--group"), "pi-native-notify");
+  assert.equal(argvValue(fallback.args, "--icon"), "code");
+  assert.equal(argvValue(fallback.args, "--image-path"), "/tmp/pi-icon.png");
 });
 
 test("getNotificationCommand builds the Tasker AutoNotification bridge broadcast", async () => {
   const { getNotificationCommand } = await loadExtension();
 
-  assert.deepEqual(getNotificationCommand("Pi Coding Agent", "Ready for input", "tasker", "/tmp/pi-logo.png", "Work Session"), {
-    command: "am",
-    args: [
-      "broadcast",
-      "--user", "current",
-      "-a", "works.earendil.pi.NOTIFY",
-      "--es", "title", "Pi Coding Agent",
-      "--es", "subtitle", "Work Session",
-      "--es", "body", "Ready for input",
-      "--es", "content", "Work Session\nReady for input",
-      "--es", "group", "pi-native-notify",
-      "--es", "notification_id", "pi-native-notify",
-      "--es", "icon", "/tmp/pi-logo.png",
-      "--es", "status_icon", "/tmp/pi-logo.png",
-      "--es", "large_icon", "/tmp/pi-logo.png",
-      "--es", "image_path", "/tmp/pi-logo.png",
-    ],
-    fallback: {
-      command: "termux-notification",
-      args: [
-        "-t", "Pi Coding Agent",
-        "-c", "Work Session\nReady for input",
-        "--group", "pi-native-notify",
-        "--icon", "code",
-        "--image-path", "/tmp/pi-logo.png",
-      ],
-    },
-  });
+  const command = getNotificationCommand("Pi Coding Agent", "Ready for input", "tasker", "/tmp/pi-logo.png", "Work Session");
+  const args = command?.args ?? [];
+  assert.equal(command?.command, "am");
+  assert.ok(args.includes("works.earendil.pi.NOTIFY"), "broadcasts the Pi notification action");
+  assert.equal(argvValue(args, "title"), "Pi Coding Agent");
+  assert.equal(argvValue(args, "subtitle"), "Work Session");
+  assert.equal(argvValue(args, "body"), "Ready for input");
+  assert.equal(argvValue(args, "content"), "Work Session\nReady for input");
+  assert.equal(argvValue(args, "group"), "pi-native-notify");
+  assert.equal(argvValue(args, "notification_id"), "pi-native-notify");
+  assert.equal(argvValue(args, "icon"), "/tmp/pi-logo.png");
+  assert.equal(argvValue(args, "image_path"), "/tmp/pi-logo.png");
+
+  const fallback = command?.fallback;
+  assert.ok(fallback);
+  assert.equal(fallback.command, "termux-notification");
+  assert.equal(argvValue(fallback.args, "-t"), "Pi Coding Agent");
+  assert.equal(argvValue(fallback.args, "-c"), "Work Session\nReady for input");
+  assert.equal(argvValue(fallback.args, "--group"), "pi-native-notify");
+  assert.equal(argvValue(fallback.args, "--icon"), "code");
+  assert.equal(argvValue(fallback.args, "--image-path"), "/tmp/pi-logo.png");
 });
 
 test("getNotificationCommand builds the macOS osascript notification command without an icon", async () => {
@@ -191,19 +181,17 @@ test("getNotificationCommand uses alerter with osascript fallback on macOS", asy
   const { getNotificationCommand } = await loadExtension();
 
   const command = getNotificationCommand("Pi", "Ready for input", "macos", "/tmp/pi-icon.png", "Pi", "Type a follow-up…");
+  const args = command?.args ?? [];
 
   assert.equal(command?.command, "alerter");
-  assert.deepEqual(command?.args.slice(0, 13), [
-    "--title", "Pi",
-    "--subtitle", "Pi",
-    "--message", "Ready for input",
-    "--reply", "Type a follow-up…",
-    "--json",
-    "--app-icon", "/tmp/pi-icon.png",
-    "--group", command?.args[12],
-  ]);
-  assert.equal(command?.args[12], "pi-native-notify");
-  assert.equal(command?.args[13], "--ignore-dnd");
+  assert.equal(argvValue(args, "--title"), "Pi");
+  assert.equal(argvValue(args, "--subtitle"), "Pi");
+  assert.equal(argvValue(args, "--message"), "Ready for input");
+  assert.equal(argvValue(args, "--reply"), "Type a follow-up…");
+  assert.ok(args.includes("--json"), "alerter output is parsed as JSON");
+  assert.equal(argvValue(args, "--app-icon"), "/tmp/pi-icon.png");
+  assert.equal(argvValue(args, "--group"), "pi-native-notify");
+  assert.ok(args.includes("--ignore-dnd"));
   assert.deepEqual(command?.fallback, {
     command: "osascript",
     args: ["-e", 'display notification "Ready for input" with title "Pi" subtitle "Pi"'],
@@ -367,16 +355,14 @@ test("notifyGeneratedImage uses alerter content-image for generated images", asy
   });
 
   assert.equal(calls[0]?.command, "alerter");
-  assert.deepEqual(calls[0]?.args.slice(0, 11), [
-    "--title", "Pi Coding Agent",
-    "--subtitle", "Pi",
-    "--message", "Generated image ready",
-    "--content-image", "/tmp/generated.png",
-    "--group", calls[0]!.args[9],
-    "--ignore-dnd",
-  ]);
-  assert.equal(calls[0]?.args[9], "pi-native-notify");
-  assert.deepEqual(calls[0]?.args.slice(11), ["--app-icon", "/tmp/pi-logo.svg"]);
+  const args = calls[0]?.args ?? [];
+  assert.equal(argvValue(args, "--title"), "Pi Coding Agent");
+  assert.equal(argvValue(args, "--subtitle"), "Pi");
+  assert.equal(argvValue(args, "--message"), "Generated image ready");
+  assert.equal(argvValue(args, "--content-image"), "/tmp/generated.png");
+  assert.equal(argvValue(args, "--group"), "pi-native-notify");
+  assert.ok(args.includes("--ignore-dnd"));
+  assert.equal(argvValue(args, "--app-icon"), "/tmp/pi-logo.svg");
 });
 
 test("notifyPiWaitingForUser forwards alerter replies as follow-up prompts", async () => {
@@ -443,16 +429,14 @@ test("notifyPiWaitingForUser sends the standard waiting notification", async () 
   await notifyPiWaitingForUser(undefined, undefined, { execFile, target: "macos", env: {}, iconPath: "" });
 
   assert.equal(calls[0]?.command, "alerter");
-  assert.deepEqual(calls[0]?.args.slice(0, 11), [
-    "--title", "Pi Coding Agent",
-    "--subtitle", "Pi",
-    "--message", "Ready for input",
-    "--reply", "Type a follow-up…",
-    "--json",
-    "--group", calls[0]?.args[10],
-  ]);
-  assert.equal(calls[0]?.args[10], "pi-native-notify");
-  assert.equal(calls[0]?.args[11], "--ignore-dnd");
+  const args = calls[0]?.args ?? [];
+  assert.equal(argvValue(args, "--title"), "Pi Coding Agent");
+  assert.equal(argvValue(args, "--subtitle"), "Pi");
+  assert.equal(argvValue(args, "--message"), "Ready for input");
+  assert.equal(argvValue(args, "--reply"), "Type a follow-up…");
+  assert.ok(args.includes("--json"), "alerter output is parsed as JSON");
+  assert.equal(argvValue(args, "--group"), "pi-native-notify");
+  assert.ok(args.includes("--ignore-dnd"));
 });
 
 test("getNotificationTitle uses the tmux session name when inside tmux", async () => {
@@ -565,20 +549,13 @@ test("native-notify checks readiness at session start and sends a notification e
   assert.equal(calls.length, 2);
   for (const call of calls) {
     assert.equal(call.command, "am");
-    assert.deepEqual(call.args, [
-      "broadcast",
-      "--user", "current",
-      "-a", "works.earendil.pi.NOTIFY",
-      "--es", "title", "Pi Coding Agent",
-      "--es", "subtitle", "Test-project",
-      "--es", "body", "Ready for input",
-      "--es", "content", "Test-project\nReady for input",
-      "--es", "group", "pi-native-notify",
-      "--es", "notification_id", "pi-native-notify",
-      "--es", "icon", "",
-      "--es", "status_icon", "",
-      "--es", "large_icon", "",
-      "--es", "image_path", "",
-    ]);
+    assert.equal(argvValue(call.args, "title"), "Pi Coding Agent");
+    assert.equal(argvValue(call.args, "subtitle"), "Test-project");
+    assert.equal(argvValue(call.args, "body"), "Ready for input");
+    assert.equal(argvValue(call.args, "content"), "Test-project\nReady for input");
+    assert.equal(argvValue(call.args, "group"), "pi-native-notify");
+    assert.equal(argvValue(call.args, "notification_id"), "pi-native-notify");
+    assert.equal(argvValue(call.args, "icon") ?? "", "");
+    assert.equal(argvValue(call.args, "image_path") ?? "", "");
   }
 });

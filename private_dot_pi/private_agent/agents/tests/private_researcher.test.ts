@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 
-const researcher = readFileSync("agent/agents/researcher.md", "utf8");
-const prompt = readFileSync("agent/prompts/prompt:research.md", "utf8");
+const researcher = readFileSync(new URL("../researcher.md", import.meta.url), "utf8");
+const prompt = readFileSync(new URL("../../prompts/prompt:research.md", import.meta.url), "utf8");
 
 test("researcher is retrieval-only, bounded, and treats web data as untrusted", () => {
 	assert.match(researcher, /^tools: web_retrieval$/m);

@@ -168,33 +168,6 @@ jobs:
           mv "$dst/agent/settings.config.json.tmp" "$dst/agent/settings.config.json"
           cp -p "$dst/agent/settings.config.json" "$dst/agent/settings.json"
 
-      - name: Add deterministic pi stub for live invocation test
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/bin"
-          cat > "$RUNNER_TEMP/bin/pi" <<'SH'
-          #!/bin/sh
-          cat <<'JSON'
-          {
-            "depths": {
-              "fast": {"recommendedDepth": "fast", "scenario": "single focused low-latency lookup", "reason": "use for one specific fact"},
-              "standard": {"recommendedDepth": "standard", "scenario": "parallel snippets or one URL", "reason": "use for balanced source gathering"},
-              "deep": {"recommendedDepth": "deep", "scenario": "sequential chain to find then scrape multiple URLs", "reason": "use for iterative research"}
-            },
-            "outputTypes": {
-              "searchResults": {"outputType": "searchResults", "useWhen": "raw sources need agent-side processing"},
-              "sourcedAnswer": {"outputType": "sourcedAnswer", "useWhen": "user-facing answer with citations"},
-              "structured": {"outputType": "structured", "useWhen": "JSON schema parsing for a pipeline or CRM"}
-            },
-            "fetch": {"endpoint": "/fetch", "renderJs": true, "useWhen": "known exact single specific URL"},
-            "dateFiltering": {"fromDate": "2025-01-01", "toDate": "2025-03-31", "useWhen": "date time window range"},
-            "domainFiltering": {"includeDomains": ["sec.gov"], "excludeDomains": ["example.com"], "useWhen": "domain source focus and noise removal"}
-          }
-          JSON
-          SH
-          chmod +x "$RUNNER_TEMP/bin/pi"
-
       - name: Run deterministic Pi test suite
         shell: bash
         env:
@@ -214,6 +187,5 @@ jobs:
           mkdir -p "$fake_pi_package"
           printf '{"name":"@earendil-works/pi-coding-agent"}\n' > "$fake_pi_package/package.json"
           export PI_CODING_AGENT_PACKAGE_ROOT="$fake_pi_package"
-          export PATH="$RUNNER_TEMP/bin:$PATH"
           cd "$HOME/.pi"
           sh agent/scripts/run-extension-tests.sh

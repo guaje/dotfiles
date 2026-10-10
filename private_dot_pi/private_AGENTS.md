@@ -9,7 +9,8 @@
 
 Run from `~/.pi` unless noted.
 
-- TypeScript tests: `npx -y tsx --test <path>` (CI auto-discovers every `*.test.ts` via `find agent -name '*.test.ts'`)
+- TypeScript tests: `npx -y tsx --test <path>`
+- Full suite (what CI runs): `sh agent/scripts/run-extension-tests.sh` — discovers `agent/**/*.test.ts` (excluding `*/node_modules/*`) via tsx, `agent/**/*.test.mjs` via `node --test`, `agent/extensions/02-handoff/tests/test_*.py` via unittest, `agent/**/*.test.sh` via sh. Steps run in that order and the runner stops on the first failure, so a new test anywhere under `agent/` runs in CI as soon as it matches one of those patterns.
 - Native AA TypeScript tests: `node --test agent/extensions/09-catalog/tests/aa.test.ts`
 - Direct AA CLI: `node agent/extensions/09-catalog/aa/cli.ts --check`
 - Shell tests: `sh agent/scripts/tests/merge-settings.test.sh`
@@ -40,10 +41,41 @@ Avoid hardcoding absolute paths, version numbers, and model/provider IDs in scri
 
 ## Testing
 
-- Match the test language to the implementation language (TypeScript ↔ TypeScript, shell ↔ shell). Do not substitute a different language unless the user asks.
-- Test behavior, not just registration: verify updates, previews, request payloads, error paths, and final returned content.
-- Stub package imports with temporary modules in `agent/extensions/node_modules/`. If needed for loading, create a temporary `agent/extensions/.<name>.testable.ts` and clean it up in `test.after()`.
-- Mock network calls with `globalThis.fetch` and always restore originals.
+Keep a test only if it can fail for a reason a caller or user would care about. A test that breaks on a pure refactor, or that survives a real bug, is the wrong test.
+
+What to assert, in priority order:
+
+1. Observable outcomes: returned values, rendered text, written files, exec'd argv, emitted notifications, exit codes.
+2. Boundary contracts: wire protocol frames and call ordering, cross-language constants (`02-handoff` TS ↔ `assets/pi-handoff-gate.py`), published file shapes (`catalog-state.json`), CLI flags, env overrides.
+3. Fail-closed and error paths: rejected input, path traversal, redacted secrets, stale/missing fixtures. These are this repo's highest-value tests — keep them exact.
+4. Persisted side effects and idempotence (re-run, atomic publish, restored state).
+
+Do not write:
+
+- Mirrors/tautologies: a constant asserted against its own literal, or `join`/`resolve` output compared against the same composition the implementation uses.
+- Source-text greps (`assert.match(source, /identifier/)` / `doesNotMatch` on banned identifiers) as a stand-in for behavior. Allow only as an architecture guard for a *named* decision, and pair it with a test that proves the decision (e.g. "no LLM in model selection" → install a throwing completion mock and show selection still resolves).
+- Interaction-only assertions (`registerTool`/`registerCommand` was called). Register, then drive the handler and assert its output.
+- Private helpers tested directly when the same behavior is reachable through the public entry point. Test behaviors, not methods.
+- Exact UI strings or whole argv arrays where the contract is "these fields are present and placed" (`00-hud/tests/adapter.test.ts`, `extensions/tests/native-notify.test.ts`) — assert the meaningful keys/order and let cosmetics move.
+- Tests for glue, re-exports, and type-only modules with no logic.
+
+One test = one behavior, titled as a sentence about observable behavior ("unknown routing profiles fall back to balanced"), not a function name.
+
+Determinism:
+
+- Match the test language to the implementation language (TypeScript ↔ TypeScript, shell ↔ shell, `.mjs` ↔ `.mjs`, Python ↔ Python). Do not substitute a different language unless the user asks.
+- No live model, network, SSH, or real timer unless the test is explicitly for that integration; gate on an env var and `skip:` with a reason (see `02-handoff/tests/live-handoff.test.ts`). CI has no model credentials and no network tokens.
+- Mock time and `globalThis.fetch`; for HTTP-backed scripts stand up a local `http.createServer` on port 0 and read the bound port.
+- Restore every mutation per test (in `finally`, or in `beforeEach`) — `globalThis.fetch`, `process.env.*` (delete keys that were originally undefined), `globalThis.__*` hooks, timers, tmp dirs. File-level `test.after` alone is not enough: one failing test must not leak its mocks into the next.
+- Build fixtures under `os.tmpdir()` / `mktemp -d`; derive in-test paths from `import.meta.dirname` (or `$0` in shell), never the caller's cwd. Never write generated or stub files into the source tree — `04-subagents/tests/index.test.ts`'s `.index.testable.ts` is the only sanctioned exception.
+
+Structure:
+
+- Import the unit directly (`import { fn } from "../module.ts"`) whenever it is pure. Use `agent/extensions/tests/helpers/package-stubs.ts` (`installPackageStubs`/`releasePackageStubs`) only when the module imports bare `@earendil-works/*` or `typebox`.
+- One file per unit under test, in `<extension>/tests/<unit>.test.ts`; reserve `index.test.ts` for entry-point wiring and assert the wiring by invoking the registered handler.
+- Stub package imports with temporary modules in `agent/extensions/node_modules/` via the shared helper (reference-counted; release in `after`).
+- Any new test must be reachable by `sh agent/scripts/run-extension-tests.sh`; if it lives outside the discovery scopes, extend that runner in the same change.
+- Change tests with behavior: add or repoint the covering test in the same change, and delete tests whose code is gone. Prefer repointing an implementation-coupled test to the behavior it meant to protect over deleting coverage outright.
 
 Extension tests use the lightweight Node-native style: `node:test` with `assert/strict`, run via `npx -y tsx --test <path>`, focused tests in `agent/extensions/tests/` or co-located `tests/` dirs.
 
@@ -89,6 +121,8 @@ Pi files tracked in chezmoi are validated by the `Pi tests` workflow at `~/.loca
 - `gh run list --repo guaje/dotfiles --limit 10`
 - `gh run view <run-id> --repo guaje/dotfiles --log-failed`
 - If changing package scopes, test fixtures, model/provider assumptions, or skill invocation behavior, update both local tests and `pi-tests.yml` as needed.
+- Keep stub payloads inside the test that owns them (see `agent/scripts/tests/pi-launch.test.sh`), not in the workflow. No test currently consumes a PATH `pi` stub (`grep -rn recommendedDepth agent --include='*.test.*'` returns nothing); verify that before adding one to the workflow.
+- CI pins `actions/checkout@v5`, `actions/setup-node@v5` (Node 22), `actions/setup-python@v6`; it exports `PI_CODING_AGENT_PACKAGE_ROOT` pointing at a versionless fake package root, which is what `getPiPackageRoot()`'s env-var candidate path relies on.
 
 ## Workflow
 

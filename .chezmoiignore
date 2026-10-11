@@ -14,6 +14,14 @@
 .config/swiftbar/**
 {{ end }}
 
+# Termux:Widget shortcuts only exist on Android/Termux, where the desktop
+# launcher reads ~/.shortcuts. Ignoring the directory keeps it unmanaged on
+# every other host.
+{{ if ne .chezmoi.os "android" }}
+.shortcuts
+.shortcuts/**
+{{ end }}
+
 # Ignore the age private key backup (if any)
 key.txt.age
 

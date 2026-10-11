@@ -1,0 +1,331 @@
+#!/data/data/com.termux/files/usr/bin/bash
+#
+# ~/.shortcuts/system-update.shortcut
+#
+# Termux:Widget shortcut that updates everything and then reports *what*
+# actually changed:
+#
+#   1. pkg update
+#   2. pkg upgrade -y
+#   3. pkg autoclean
+#   4. npm update -g
+#   5. pi update
+#   6. chezmoi update
+#
+# Report delivery:
+#   - always: every step streams to stdout, the report is printed at the end,
+#     and ~/.cache/termux-update/latest.log holds the full transcript
+#   - plus a termux-notification (tap "Log" to open that log)
+#
+# Notes:
+#   - Managed by chezmoi and applied on Android/Termux only (see the .shortcuts
+#     entries in .chezmoiignore). Edit it with:
+#       chezmoi edit ~/.shortcuts/system-update.shortcut
+#   - Termux:Widget chooses the runner from the DIRECTORY, not the filename:
+#     ~/.shortcuts/<name>            -> a real terminal session (live output)
+#     ~/.shortcuts/tasks/<name>      -> background, notification is the output
+#     A `:.shortcut` suffix is folklore and does nothing; the widget label is the
+#     filename verbatim. Press the widget REFRESH button after adding/renaming.
+#     Keep this file executable (chmod 700).
+#   - On Android 10+ a widget tap may open the session in the background until
+#     you grant Termux the "Display over other apps" permission.
+#   - Test without touching anything:  bash ~/.shortcuts/system-update.shortcut --dry-run
+#
+set -uo pipefail
+
+# ---------------------------------------------------------------- environment
+# Termux:Widget background runs get a minimal environment; make it explicit.
+export PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
+export HOME="${HOME:-/data/data/com.termux/files/home}"
+export PATH="$PREFIX/bin:$PATH"
+export TMPDIR="${TMPDIR:-$PREFIX/tmp}"
+cd "$HOME" || exit 1
+
+# This file is chezmoi-managed and step 6 (`chezmoi update`) can rewrite it while
+# it is still running; bash reads scripts lazily, so re-exec a private copy.
+if [[ -z ${SELF_COPY:-} && -f ${0:-} ]]; then
+  SELF_COPY=$(mktemp "${TMPDIR:-$PREFIX/tmp}/system-update.run.XXXXXX") || exit 1
+  cp -f -- "$0" "$SELF_COPY" || exit 1
+  chmod 700 -- "$SELF_COPY"
+  export SELF_COPY
+  exec bash "$SELF_COPY" "$@"
+fi
+
+# --------------------------------------------------------------------- config
+PI_UPDATE_ARGS=()                                        # e.g. (--all) for pi + extensions
+NPM_UPDATE_ARGS=(--no-audit --no-fund)
+CHEZMOI_UPDATE_ARGS=(--verbose --no-tty --progress=false)
+TIMEOUT_UPDATE=900       # pkg update
+TIMEOUT_UPGRADE=3600     # pkg upgrade / npm update -g
+TIMEOUT_STEP=900         # everything else
+KEEP_LOGS=10
+STATE_DIR="$HOME/.cache/termux-update"
+
+DRY_RUN="${DRY_RUN:-0}"
+for arg in "$@"; do
+  case "$arg" in
+    -n | --dry-run) DRY_RUN=1 ;;
+  esac
+done
+
+# ------------------------------------------------------------------ state/logs
+mkdir -p "$STATE_DIR"
+STAMP=$(date +%Y%m%d-%H%M%S)
+RUN_LOG="$STATE_DIR/update-$STAMP.log"
+LATEST_LOG="$STATE_DIR/latest.log"
+LOCK_DIR="$STATE_DIR/running"
+STEP_DIR=$(mktemp -d "$STATE_DIR/steps.XXXXXX") || exit 1
+: >"$RUN_LOG"
+
+# Single instance: a second widget tap must not run a parallel upgrade.
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  running_pid=$(cat "$LOCK_DIR/pid" 2>/dev/null || echo "")
+  if [[ -n ${running_pid:-} ]] && kill -0 "$running_pid" 2>/dev/null; then
+    printf 'Update already running (pid %s) - skipping this tap\n' "$running_pid" >&2
+    rm -rf "$STEP_DIR"
+    exit 0
+  fi
+  rm -f "$LOCK_DIR/pid"
+  rmdir "$LOCK_DIR" 2>/dev/null || true
+  mkdir -p "$LOCK_DIR"
+fi
+echo $$ >"$LOCK_DIR/pid"
+
+cleanup() {
+  rm -rf "$LOCK_DIR" "$STEP_DIR"
+  [[ -n ${SELF_COPY:-} ]] && rm -f "$SELF_COPY"
+}
+trap cleanup EXIT
+
+log() { printf '%s\n' "$*" >>"$RUN_LOG"; }
+
+# Termux:API CLI tools exit 0 even when the matching Android app is missing or
+# mismatched (they print {"error": ...} instead), so the output is inspected.
+notify() { # notify <title> <body>
+  local title=$1 body=$2 out short rc
+  if [[ -x "$PREFIX/bin/termux-notification" ]]; then
+    out=$("$PREFIX/bin/termux-notification" \
+      --title "$title" --content "$body" \
+      --group termux-update \
+      --button1 "Log" --button1-action "$PREFIX/bin/termux-open $LATEST_LOG" 2>&1)
+    rc=$?
+    [[ -n $out ]] && log "termux-notification: $out"
+    if ((rc == 0)) && [[ $out != *'"error"'* ]]; then return 0; fi
+    log "termux-notification did not deliver (Termux:API app missing or outdated?)"
+  fi
+  if [[ -x "$PREFIX/bin/termux-toast" ]]; then
+    # Toasts are tiny: title + first lines only, the log has the rest.
+    short=$(printf '%s' "$body" | head -n 5 | tr '\n' ' ' | cut -c1-160)
+    out=$(printf '%s: %s' "$title" "$short" | "$PREFIX/bin/termux-toast" 2>&1)
+    rc=$?
+    [[ -n $out ]] && log "termux-toast: $out"
+    if ((rc == 0)) && [[ $out != *'"error"'* ]]; then return 0; fi
+    log "termux-toast did not deliver (Termux:Toast app missing or outdated?)"
+  fi
+  log "NOTHING DELIVERED - install the Termux:API app to get notifications"
+  log "REPORT: $title | $body"
+  return 1
+}
+
+LAST_RC=0
+LAST_LOG=""
+run_step() { # run_step <step-name> <timeout-seconds> <command> [args...]
+  local name=$1 tmo=$2
+  shift 2
+  local step_log="$STEP_DIR/$name.log"
+  LAST_LOG=$step_log
+  : >"$step_log"
+  log ""
+  log "===== $name ===== \$ $* < /dev/null"
+  if [[ $DRY_RUN == 1 ]]; then
+    LAST_RC=0
+    log "[dry-run] skipped"
+    return 0
+  fi
+  # In a terminal session (a tap on a ~/.shortcuts entry) stream the step live;
+  # in a background run (tasks/) there is no tty and everything goes to logs.
+  if [[ -t 1 ]]; then
+    printf '\n===== %s =====\n' "$name"
+    timeout "$tmo" "$@" </dev/null 2>&1 | tee "$step_log"
+    LAST_RC=${PIPESTATUS[0]}
+  else
+    timeout "$tmo" "$@" </dev/null >"$step_log" 2>&1
+    LAST_RC=$?
+  fi
+  cat "$step_log" >>"$RUN_LOG"
+  if [[ $LAST_RC -ne 0 ]]; then
+    local reason="exit $LAST_RC"
+    [[ $LAST_RC == 124 ]] && reason="timed out after ${tmo}s"
+    log "[step $name failed: $reason]"
+    FAILURES+=("$name ($reason): $(tr '\n' ' ' <"$step_log" | tail -c 200)")
+  fi
+  return 0
+}
+
+PKG_ITEMS=()
+NPM_ITEMS=()
+CHEZ_ITEMS=()
+FAILURES=()
+PI_NOTE=""
+PI_COUNT=0
+
+# ------------------------------------------------------------------- 1-3: apt
+HIST="$PREFIX/var/log/apt/history.log"
+hist_before=$(wc -l <"$HIST" 2>/dev/null || echo 0)
+
+run_step pkg-update $TIMEOUT_UPDATE pkg update -y
+run_step pkg-upgrade $TIMEOUT_UPGRADE pkg upgrade -y
+run_step pkg-autoclean $TIMEOUT_STEP pkg autoclean
+
+# apt's own history gives name + old/new version, which stdout does not.
+apt_report() { # apt_report <history-file> <lines-before>
+  local hist=$1 skip=$2 total
+  total=$(wc -l <"$hist" 2>/dev/null || echo 0)
+  ((total < skip)) && skip=0
+  tail -n +$((skip + 1)) "$hist" 2>/dev/null |
+    sed -n 's/^\(Upgrade\|Install\|Reinstall\): //p' |
+    sed 's/), /)\
+/g' |
+    while IFS= read -r item; do
+      [[ $item =~ ^([^\ :]+)(:[^[:space:]]*)?\ \(([^\)]*)\)$ ]] || continue
+      local name=${BASH_REMATCH[1]} vers=${BASH_REMATCH[3]}
+      case $vers in
+        *,\ automatic | *,\ manual) vers=${vers%%,*} ;;
+      esac
+      if [[ $vers == *","* ]]; then
+        printf '%s: %s -> %s\n' "$name" "${vers%%,*}" "${vers#*, }"
+      else
+        printf '%s: %s (new)\n' "$name" "$vers"
+      fi
+    done
+}
+
+mapfile -t PKG_ITEMS < <(apt_report "$HIST" "$hist_before")
+
+# Fallback: parse dpkg progress output if history gave us nothing.
+if ((${#PKG_ITEMS[@]} == 0)) && grep -qE '[0-9]+ upgraded' "$STEP_DIR/pkg-upgrade.log" 2>/dev/null; then
+  mapfile -t PKG_ITEMS < <(grep -oE '^Setting up [^ ]+ \([^)]*\)' "$STEP_DIR/pkg-upgrade.log" 2>/dev/null |
+    sed -e 's/^Setting up //' -e 's/ (/: /' -e 's/)$//' | sed 's/^\([^:]*\): \(.*\)$/\1: \2/')
+fi
+
+# ---------------------------------------------------------------------- 4: npm
+npm_snapshot() {
+  npm ls -g --depth=0 --json 2>/dev/null |
+    node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const d=JSON.parse(s).dependencies||{};for(const k of Object.keys(d).sort())console.log(k+" "+d[k].version)}catch(e){}})'
+}
+
+npm_before=$(npm_snapshot)
+run_step npm-update $TIMEOUT_UPGRADE npm update -g "${NPM_UPDATE_ARGS[@]}"
+npm_after=$(npm_snapshot)
+
+declare -A NPM_OLD=()
+while IFS=' ' read -r name ver; do
+  [[ -n ${name:-} ]] && NPM_OLD["$name"]=$ver
+done <<<"$npm_before"
+while IFS=' ' read -r name ver; do
+  [[ -n ${name:-} ]] || continue
+  old=${NPM_OLD["$name"]:-}
+  if [[ -z $old ]]; then
+    NPM_ITEMS+=("$name: $ver (new)")
+  elif [[ $old != "$ver" ]]; then
+    NPM_ITEMS+=("$name: $old -> $ver")
+  fi
+done <<<"$npm_after"
+
+# ----------------------------------------------------------------------- 5: pi
+pi_before=$(pi --version 2>/dev/null | head -n1 | tr -d '[:space:]')
+run_step pi-update $TIMEOUT_STEP pi update "${PI_UPDATE_ARGS[@]}"
+pi_after=$(pi --version 2>/dev/null | head -n1 | tr -d '[:space:]')
+if [[ -z $pi_after ]]; then
+  PI_NOTE="pi: version unknown"
+elif [[ $pi_before != "$pi_after" ]]; then
+  PI_NOTE="pi: $pi_before -> $pi_after"
+  PI_COUNT=1
+else
+  PI_NOTE="pi: $pi_after (already latest)"
+fi
+
+# ------------------------------------------------------------------ 6: chezmoi
+chez_src=$(chezmoi source-path 2>/dev/null)
+chez_before=$(git -C "$chez_src" rev-parse --short HEAD 2>/dev/null)
+run_step chezmoi-update $TIMEOUT_STEP chezmoi update "${CHEZMOI_UPDATE_ARGS[@]}"
+chez_after=$(git -C "$chez_src" rev-parse --short HEAD 2>/dev/null)
+
+chez_updated=0
+if [[ -n $chez_after && -n $chez_before && $chez_before != "$chez_after" ]]; then
+  chez_updated=1
+fi
+
+if [[ -f "$STEP_DIR/chezmoi-update.log" ]]; then
+  mapfile -t CHEZ_ITEMS < <(grep -aoE '^(created|modified|modifying|removing|replacing) .*' "$STEP_DIR/chezmoi-update.log" 2>/dev/null |
+    awk '{print $1 " " $NF}' | sed "s|$HOME|~|" | sort -u)
+fi
+
+# --------------------------------------------------------------------- summary
+log ""
+log "===== SUMMARY ====="
+
+summary_lines=()
+summary_lines+=("apt: ${#PKG_ITEMS[@]} upgraded")
+summary_lines+=("npm: ${#NPM_ITEMS[@]} upgraded")
+summary_lines+=("$PI_NOTE")
+if ((chez_updated == 1)); then
+  chez_commits=$(git -C "$chez_src" rev-list --count "$chez_before..$chez_after" 2>/dev/null || echo "?")
+  summary_lines+=("chezmoi: repo $chez_before -> $chez_after ($chez_commits commits), ${#CHEZ_ITEMS[@]} file(s) applied")
+else
+  summary_lines+=("chezmoi: repo unchanged, ${#CHEZ_ITEMS[@]} file(s) applied")
+fi
+
+total=$(( ${#PKG_ITEMS[@]} + ${#NPM_ITEMS[@]} + PI_COUNT + ${#CHEZ_ITEMS[@]} + chez_updated ))
+
+body=""
+for line in "${summary_lines[@]}"; do
+  log "$line"
+  body+="$line"$'\n'
+done
+for item in "${PKG_ITEMS[@]}" "${NPM_ITEMS[@]}"; do
+  log "  - $item"
+  body+="  - $item"$'\n'
+done
+for item in "${CHEZ_ITEMS[@]}"; do
+  log "  - chezmoi ${item}"
+done
+if ((${#FAILURES[@]} > 0)); then
+  log ""
+  log "FAILED STEPS:"
+  body+=$'\n'"FAILED:"$'\n'
+  for f in "${FAILURES[@]}"; do
+    log "  ! $f"
+    body+="  ! $f"$'\n'
+  done
+fi
+log ""
+log "apt: ${#PKG_ITEMS[@]} | npm: ${#NPM_ITEMS[@]} | pi: $PI_COUNT | chezmoi: $chez_updated | failed steps: ${#FAILURES[@]}"
+log "full log: $RUN_LOG"
+
+# Keep the notification short; the log has everything.
+short_body=$(printf '%s' "$body" | head -c 850)
+if ((${#short_body} >= 850)); then short_body+=$'\n'"..."; fi
+short_body+=$'\n'"log: $LATEST_LOG"
+
+if ((${#FAILURES[@]} > 0)); then
+  title="Update: $total upgraded, ${#FAILURES[@]} step(s) failed"
+elif ((total > 0)); then
+  title="Update: $total upgraded"
+else
+  title="Update: nothing to do"
+fi
+[[ $DRY_RUN == 1 ]] && title="[dry-run] $title"
+
+cp -f "$RUN_LOG" "$LATEST_LOG" 2>/dev/null || true
+# Notify in both modes: in a terminal session Android 10+ may still start it in
+# the background, so the notification is the only guarantee the run is finished.
+notify "$title" "$short_body"
+cp -f "$RUN_LOG" "$LATEST_LOG" 2>/dev/null || true
+
+# Prune old logs.
+ls -1t "$STATE_DIR"/update-*.log 2>/dev/null | tail -n +$((KEEP_LOGS + 1)) | xargs -r rm -f
+
+printf '%s\n' "$title"
+printf '%s' "$body"
+exit 0

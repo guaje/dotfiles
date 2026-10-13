@@ -29,7 +29,9 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y zsh fish age curl jq
+          # expect: without it test_check-removed-files.sh skips its real PTY prompt
+          # contract, which the macOS runner and Termux both execute.
+          sudo apt-get install -y zsh fish age curl jq expect
           mkdir -p "$HOME/.local/bin"
           # Install chezmoi
           sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"

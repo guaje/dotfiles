@@ -31,6 +31,9 @@ key.txt.age
 # Ignore documentation
 README.md
 
-# Ignore internal scripts and secret source files
+# Ignore internal scripts, secret source files, and the repository-only test
+# suite for the Termux shortcut. Patterns are target paths, and ignoring the
+# directory covers everything beneath it.
 scripts/
 secrets/
+.config/termux/

@@ -1,0 +1,60 @@
+name: Termux tests
+
+# Behavior tests for the content chezmoi applies only on Android/Termux: the system
+# update widget shortcut. Nothing here needs chezmoi, sops, or age, because the suite
+# exercises the shortcut by stubbing pkg, npm, pi, chezmoi, and the termux-* tools, so
+# this is a plain bash plus node job. Real Termux behavior (apt history, $PREFIX,
+# termux-notification and its toast fallback) cannot be checked on a hosted runner and
+# is verified on the device by running the same suite:
+#
+#   bash dot_config/termux/tests/test_system-update-shortcut.sh
+
+on:
+  push:
+    paths:
+      - 'private_dot_shortcuts/**'
+      - 'dot_config/termux/**'
+      - '.chezmoiignore'
+      - '.github/workflows/termux-tests.yml'
+  pull_request:
+    paths:
+      - 'private_dot_shortcuts/**'
+      - 'dot_config/termux/**'
+      - '.chezmoiignore'
+      - '.github/workflows/termux-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Install ShellCheck
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          # Keep this version in step with the one CI installs.
+          SHELLCHECK_VERSION=0.11.0
+          curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
+            | tar -xJ -C /tmp
+          mv "/tmp/shellcheck-v${SHELLCHECK_VERSION}/shellcheck" "$HOME/.local/bin/shellcheck"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Test system update shortcut
+        shell: bash
+        run: |
+          cd "$HOME"
+          bash "$GITHUB_WORKSPACE/dot_config/termux/tests/test_system-update-shortcut.sh"
+
+      - name: Run ShellCheck
+        shell: bash
+        run: |
+          shellcheck "$GITHUB_WORKSPACE"/dot_config/termux/tests/*.sh
+          shellcheck "$GITHUB_WORKSPACE"/private_dot_shortcuts/*.shortcut

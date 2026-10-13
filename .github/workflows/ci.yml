@@ -1,15 +1,21 @@
 name: CI
 
+# The ubuntu half of the host-independent test matrix: the chezmoi hooks, the secret
+# tooling, and rendering. Platform components keep their own files: macOS in
+# macos-tests.yml, the Termux shortcut in termux-tests.yml, Pi in pi-tests.yml.
+
 on:
   push:
     paths:
       - 'scripts/**'
       - '.chezmoi.toml.tmpl'
+      - '.chezmoiignore'
       - '.github/workflows/ci.yml'
   pull_request:
     paths:
       - 'scripts/**'
       - '.chezmoi.toml.tmpl'
+      - '.chezmoiignore'
       - '.github/workflows/ci.yml'
       - 'README.md'
   workflow_dispatch:
@@ -100,115 +106,5 @@ jobs:
 
       - name: Run ShellCheck
         shell: bash
-        run: shellcheck "$GITHUB_WORKSPACE"/scripts/*.sh
-
-  test-macos:
-    runs-on: macos-latest
-    env:
-      HOMEBREW_NO_AUTO_UPDATE: 1
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Install macOS dependencies
-        shell: bash
         run: |
-          brew install bash chezmoi sops age jq shellcheck
-          BREW_PREFIX=$(brew --prefix)
-          echo "$BREW_PREFIX/bin" >> "$GITHUB_PATH"
-          echo "BREW_BASH=$BREW_PREFIX/bin/bash" >> "$GITHUB_ENV"
-
-      - name: Verify modern Bash
-        shell: bash
-        run: |
-          "$BREW_BASH" --version
-          "$BREW_BASH" -c '(( BASH_VERSINFO[0] >= 4 ))'
-          test "$(command -v bash)" = "$BREW_BASH"
-
-      - name: Setup macOS environment and age key
-        shell: bash
-        run: |
-          mkdir -p "$HOME/.config/chezmoi"
-          age-keygen -o "$HOME/.config/chezmoi/key.txt"
-          PUBKEY=$(grep "public key:" "$HOME/.config/chezmoi/key.txt" | cut -d: -f2 | xargs)
-          echo "CI_PUBKEY=$PUBKEY" >> "$GITHUB_ENV"
-
-      - name: Initialize chezmoi on macOS
-        shell: bash
-        run: |
-          set -euo pipefail
-          chezmoi init --source .
-          mkdir -p "$HOME/.local/share"
-          rm -rf "$HOME/.local/share/chezmoi"
-          ln -s "$PWD" "$HOME/.local/share/chezmoi"
-          sed -i '' "s/recipient = \".*\"/recipient = \"$CI_PUBKEY\"/" "$HOME/.config/chezmoi/chezmoi.toml"
-          export SOPS_AGE_KEY_FILE="$HOME/.config/chezmoi/key.txt"
-          echo "test: value" > test_sops.yaml
-          sops --encrypt --age "$CI_PUBKEY" test_sops.yaml > test_sops.enc.yaml
-          sops --decrypt test_sops.enc.yaml | grep -q "test: value"
-          test "$(chezmoi source-path)" = "$HOME/.local/share/chezmoi"
-
-      - name: Test secret add hook on macOS
-        timeout-minutes: 15
-        shell: bash
-        run: |
-          cd "$HOME"
-          log="$RUNNER_TEMP/test-check-secrets.log"
-          set +e
-          "$BREW_BASH" "$GITHUB_WORKSPACE/scripts/test_check-secrets.sh" 2>&1 | tee "$log"
-          status=${PIPESTATUS[0]}
-          set -e
-          if (( status != 0 )); then
-            details=$(grep -E '❌' "$log" | tail -n 10 || true)
-            if [[ -z $details ]]; then
-              details=$(tail -n 20 "$log" | cut -c1-300)
-            fi
-            details=${details//'%'/'%25'}
-            details=${details//$'\r'/'%0D'}
-            details=${details//$'\n'/'%0A'}
-            printf '::error file=scripts/test_check-secrets.sh,title=macOS secret-hook test failed::%s\n' "$details"
-            exit "$status"
-          fi
-
-      - name: Test removed-file update hook on macOS
-        timeout-minutes: 15
-        shell: bash
-        run: |
-          cd "$HOME"
-          log="$RUNNER_TEMP/test-check-removed-files.log"
-          set +e
-          "$BREW_BASH" "$GITHUB_WORKSPACE/scripts/test_check-removed-files.sh" 2>&1 | tee "$log"
-          status=${PIPESTATUS[0]}
-          set -e
-          if (( status != 0 )); then
-            details=$(grep -E 'check-removed-files:|❌' "$log" | tail -n 12 || true)
-            if [[ -z $details ]]; then
-              details=$(tail -n 20 "$log" | cut -c1-300)
-            fi
-            details=${details//'%'/'%25'}
-            details=${details//$'\r'/'%0D'}
-            details=${details//$'\n'/'%0A'}
-            printf '::error file=scripts/test_check-removed-files.sh,title=macOS removed-file test failed::%s\n' "$details"
-            exit "$status"
-          fi
-
-      - name: Test bootstrap hook on macOS
-        shell: bash
-        run: |
-          cd "$HOME"
-          "$BREW_BASH" "$GITHUB_WORKSPACE/scripts/test_bootstrap.sh"
-
-      - name: Test secret rendering on macOS
-        shell: bash
-        run: |
-          cd "$HOME"
-          "$BREW_BASH" "$GITHUB_WORKSPACE/scripts/test_apply-secrets.sh"
-
-      - name: Test reusable secret scanner on macOS
-        shell: bash
-        run: |
-          cd "$HOME"
-          "$BREW_BASH" "$GITHUB_WORKSPACE/scripts/test_scan-secrets.sh"
-
-      - name: Run ShellCheck on macOS
-        shell: bash
-        run: shellcheck "$GITHUB_WORKSPACE"/scripts/*.sh
+          shellcheck "$GITHUB_WORKSPACE"/scripts/*.sh

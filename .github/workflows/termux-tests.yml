@@ -7,19 +7,19 @@ name: Termux tests
 # termux-notification and its toast fallback) cannot be checked on a hosted runner and
 # is verified on the device by running the same suite:
 #
-#   bash dot_config/termux/tests/test_system-update-shortcut.sh
+#   bash dot_termux/tests/test_system-update-shortcut.sh
 
 on:
   push:
     paths:
       - 'private_dot_shortcuts/**'
-      - 'dot_config/termux/**'
+      - 'dot_termux/**'
       - '.chezmoiignore'
       - '.github/workflows/termux-tests.yml'
   pull_request:
     paths:
       - 'private_dot_shortcuts/**'
-      - 'dot_config/termux/**'
+      - 'dot_termux/**'
       - '.chezmoiignore'
       - '.github/workflows/termux-tests.yml'
   workflow_dispatch:
@@ -51,10 +51,10 @@ jobs:
         shell: bash
         run: |
           cd "$HOME"
-          bash "$GITHUB_WORKSPACE/dot_config/termux/tests/test_system-update-shortcut.sh"
+          bash "$GITHUB_WORKSPACE/dot_termux/tests/test_system-update-shortcut.sh"
 
       - name: Run ShellCheck
         shell: bash
         run: |
-          shellcheck "$GITHUB_WORKSPACE"/dot_config/termux/tests/*.sh
+          shellcheck "$GITHUB_WORKSPACE"/dot_termux/tests/*.sh
           shellcheck "$GITHUB_WORKSPACE"/private_dot_shortcuts/*.shortcut

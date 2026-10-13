@@ -7,7 +7,7 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(CDPATH='' cd "$(dirname "$0")" && pwd)
-SUBJECT="$SCRIPT_DIR/../../../private_dot_shortcuts/private_executable_system-update.shortcut"
+SUBJECT="$SCRIPT_DIR/../../private_dot_shortcuts/private_executable_system-update.shortcut"
 [[ -f $SUBJECT ]] || { printf 'missing shortcut source\n' >&2; exit 1; }
 ROOT=$(mktemp -d "${TMPDIR:-/tmp}/system-update-shortcut-test.XXXXXX")
 # macOS reports /tmp as /private/tmp, so compare against the physical path.

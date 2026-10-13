@@ -9,17 +9,19 @@
 .zshrc
 {{ end }}
 
-# SwiftBar is macOS-only
+# macOS-only. Ignoring the directory keeps it unmanaged on
+# every other host.
 {{ if ne .chezmoi.os "darwin" }}
 .config/swiftbar/**
 {{ end }}
 
-# Termux:Widget shortcuts only exist on Android/Termux, where the desktop
-# launcher reads ~/.shortcuts. Ignoring the directory keeps it unmanaged on
+# Android/Termux-only. Ignoring the directory keeps it unmanaged on
 # every other host.
 {{ if ne .chezmoi.os "android" }}
 .shortcuts
 .shortcuts/**
+.termux
+.termux/**
 {{ end }}
 
 # Ignore the age private key backup (if any)
@@ -31,9 +33,10 @@ key.txt.age
 # Ignore documentation
 README.md
 
-# Ignore internal scripts, secret source files, and the repository-only test
-# suite for the Termux shortcut. Patterns are target paths, and ignoring the
-# directory covers everything beneath it.
+# Ignore internal scripts, secret source files, and the repository-only test suite
+# for the Termux shortcut, which stays out of ~/.termux on every host including
+# Android. Patterns are target paths.
 scripts/
 secrets/
-.config/termux/
+.termux/tests
+.termux/tests/**

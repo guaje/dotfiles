@@ -1,18 +1,22 @@
 {
+  "$schema": "https://pi.dev/schemas/settings.schema.json",
   "defaultModel": "qwen3.8-flash-next",
   "defaultProvider": "pi",
   "defaultThinkingLevel": "medium",
+  "defaultTools": [
+    "+codemode"
+  ],
   "enabledModels": [
     "openai-codex/gpt-6-astra",
     "openai-codex/gpt-6.1-sol",
     "openai-codex/gpt-5.6-sol",
+    "reallms-dev/qwen3.8-2.4t-mi350x-8",
     "pi/qwen3.8-flash-next",
-    "reallms-dev/deepseek-v4.1-flash-mi350x-4",
     "openai-codex/gpt-5.6-terra",
     "openai-codex/gpt-6-luna",
     "openai-codex/gpt-5.6-luna",
     "pi/qwen3.8-27b",
-    "reallms/glm-5.2",
+    "reallms/qwen3.8-27b",
     "kelley/Kimi-K2.6"
   ],
   "extensions": [
@@ -60,7 +64,7 @@
   },
   "health": {
     "cacheTtlMs": 900000,
-    "probeConcurrency": 3
+    "probeConcurrency": 8
   },
   "imageGenerationProviders": {
     "reallms-dev": {
@@ -81,6 +85,7 @@
     "managementStyleForwardHotkey": "ctrl+;",
     "managementStyleBackwardHotkey": "shift+ctrl+;"
   },
+  "quietStartup": "header",
   "subagents": {
     "rosterCap": 10,
     "rosterScope": "user",

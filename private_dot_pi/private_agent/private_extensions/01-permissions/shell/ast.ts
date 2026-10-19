@@ -13,7 +13,7 @@ export interface AstWord {
 
 export interface AstRedirection {
   kind: "redirection";
-  operator: ">" | ">>" | "<" | "<<" | "<<<" | "fd";
+  operator: ">" | ">>" | "<" | "<<" | "<<<" | "&>" | "fd";
   target?: AstWord;
   span: Span;
   supported: boolean;

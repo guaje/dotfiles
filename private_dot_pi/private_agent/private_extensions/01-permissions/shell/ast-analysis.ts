@@ -106,7 +106,7 @@ function prepareCommand(node: AstCommand, inheritedContext: ShellContext, depth:
       complete = false;
       continue;
     }
-    if ((redirection.operator === ">" || redirection.operator === ">>") && redirection.target.value !== "/dev/null") {
+    if ((redirection.operator === ">" || redirection.operator === ">>" || redirection.operator === "&>") && redirection.target.value !== "/dev/null") {
       dependencyEffect = combine(dependencyEffect, "mutating");
       reasons.push("output redirection writes a file");
     }

@@ -9,7 +9,6 @@ import { canAutoAllowHandoffFile, canAutoAllowLocalFile, invalidateAccessPolicyC
 import { chooseBashApproval, confirmFileMutation, editPreview, writePreview } from "./approval-ui.ts";
 import { MANAGING_STYLE_LABELS, nextManagingStyle } from "./management-style.ts";
 import { clearSessionManagingStyle, currentManagingStyle, empowermentDisposableRoots, permissionsSessionApprovalMaxRules, refreshManagingStyleCache, restoreManagingStyleAfterYolo, setManagingStyle, setSessionManagingStyle } from "./management-settings.ts";
-import { injectPromptGuidance, BASH_PROMPT_GUIDANCE } from "./prompt-guidance.ts";
 import { patchBuiltInSettingsMenu } from "./settings-ui.ts";
 import { getCachedBackwardHotkey, getCachedForwardHotkey } from "./shortcuts.ts";
 import { verifyAutoAllowIdentity } from "./shell/executable-identity.ts";
@@ -85,7 +84,6 @@ export default async function permissions(pi: ExtensionAPI) {
     });
   };
   watchRemoteRoute();
-  pi.on("before_agent_start", (event: { systemPrompt?: string }) => ({ systemPrompt: injectPromptGuidance(event.systemPrompt) }));
   pi.on("session_start", async (event: any, ctx: any) => {
     watchRemoteRoute();
     if (!preservesApprovals(event)) clearSessionApprovals();
@@ -120,8 +118,7 @@ export default async function permissions(pi: ExtensionAPI) {
     }) as any,
   });
   const originalBash = createBashTool(process.cwd());
-  const originalGuidelines = Array.isArray((originalBash as any).promptGuidelines) ? (originalBash as any).promptGuidelines : [];
-  pi.registerTool({ ...originalBash, promptGuidelines: [...originalGuidelines, BASH_PROMPT_GUIDANCE], async execute(toolCallId: any, params: any, signal: any, onUpdate: any, ctx: any) { const authorization = consumeRemoteRouteForToolCall(toolCallId); if (authorization.required && !authorization.route) throw new Error("Remote Handoff route changed after YOLO authorization"); const operations = authorization.route?.backend ?? getBashBackend(); return createBashTool(ctx.cwd, operations ? { operations } : undefined).execute(toolCallId, params, signal, onUpdate, ctx); }, renderCall(args: { command?: string }, theme: any) { return new Text(renderShell(args.command, theme), 0, 0); } });
+  pi.registerTool({ ...originalBash, async execute(toolCallId: any, params: any, signal: any, onUpdate: any, ctx: any) { const authorization = consumeRemoteRouteForToolCall(toolCallId); if (authorization.required && !authorization.route) throw new Error("Remote Handoff route changed after YOLO authorization"); const operations = authorization.route?.backend ?? getBashBackend(); return createBashTool(ctx.cwd, operations ? { operations } : undefined).execute(toolCallId, params, signal, onUpdate, ctx); }, renderCall(args: { command?: string }, theme: any) { return new Text(renderShell(args.command, theme), 0, 0); } });
   pi.on("tool_execution_end", (event: any) => { if (typeof event.toolCallId === "string") clearRemoteRouteForToolCall(event.toolCallId); });
   pi.on("tool_call", async (event: any, ctx: any) => {
     const style = await activeStyle(); updateHud(style);
@@ -151,7 +148,9 @@ export default async function permissions(pi: ExtensionAPI) {
         identityVeto = true;
         approvalAnalysis = { ...inspection.analysis, reasons: [...new Set([...inspection.analysis.reasons, identity.reason])] };
       }
-      // Structural authorization is final: identity checks can only veto; grants never override Micromanagement or split blocks.
+      // Structural authorization is final: identity checks can only veto, and a remembered or
+      // one-time grant never overrides Micromanagement. Mixed read-only and mutating units reach
+      // the human as one approval request for the command exactly as submitted.
       if (!identityVeto && !decision.needsApproval) return { block: true, reason: decision.reason };
       if (style !== "Empowerment") {
         if (!hasBashUi(ctx)) return { block: true, reason: "Bash command blocked (no UI available for confirmation)" };

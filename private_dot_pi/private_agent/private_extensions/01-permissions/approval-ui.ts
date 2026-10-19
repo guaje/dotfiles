@@ -1,4 +1,5 @@
 import { notifyPiWaitingForUser } from "../07-native-notify.ts";
+import { extractProgramsForDisplay } from "./shell/presentation-programs.ts";
 import type { SessionApprovalTemplateStrength, ShellAnalysis, ShellEffect } from "./types.ts";
 import type { RenderTheme } from "./shell/render.ts";
 
@@ -59,8 +60,11 @@ export function formatFileApproval(ui: Ui, path: string, summary: string) {
 
 export function formatBashApproval(ui: Ui, analysis: ShellAnalysis, remoteLabel?: string) {
   const theme = themeFor(ui);
-  const programs = analysis.commands.length
-    ? analysis.commands.map((command, index) => `${theme.fg("mdCode", `${index + 1})`)} ${theme.fg("syntaxFunction", command.name)}`).join(", ")
+  // Authorization reads analysis.commands only; when the strict parser fails closed the
+  // display-only extractor keeps the human-facing list informative without weakening policy.
+  const names = analysis.commands.length ? analysis.commands.map((command) => command.name) : extractProgramsForDisplay(analysis.source);
+  const programs = names.length
+    ? names.map((name, index) => `${theme.fg("mdCode", `${index + 1})`)} ${theme.fg("syntaxFunction", name)}`).join(", ")
     : theme.fg("muted", "No supported command detected.");
   const reasons = analysis.reasons.length
     ? `\n\n${label(theme, "Approval reasons:")} ${[...new Set(analysis.reasons)].map((reason) => formatApprovalReason(theme, analysis, reason)).join(theme.fg("dim", "; "))}`

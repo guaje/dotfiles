@@ -40,6 +40,18 @@ test("approval formatters apply semantic Catppuccin theme roles", () => {
   assert.doesNotMatch(gitCommit, /not a reviewed query/);
   const qualifiedGitCommit = formatBashApproval(ui, analyzeBash("/usr/bin/git -C repo commit -m message"));
   assert.match(qualifiedGitCommit, /<warning>path-qualified executables require approval<\/warning>/);
+  const gradle = formatBashApproval(ui, analyzeBash(`cd /x && export A=1 && ./gradlew test 2>&1 | grep FAILED | head -12`));
+  for (const program of ["cd", "export", "./gradlew", "grep", "head"]) assert.match(gradle, new RegExp(`<syntaxFunction>${program.replace(".", "\\.")}<\\/syntaxFunction>`));
+});
+
+test("fail-closed analyses still list apparent programs and only truly empty ones say none detected", () => {
+  const ui = { confirm: async () => true, theme: markerTheme };
+  const heredoc = formatBashApproval(ui, analyzeBash("cat <<DONE\nrm -rf /\nDONE"));
+  assert.match(heredoc, /<syntaxFunction>cat<\/syntaxFunction>/);
+  assert.doesNotMatch(heredoc, /No supported command detected\./);
+  assert.doesNotMatch(heredoc, /<syntaxFunction>rm<\/syntaxFunction>/);
+  const empty = formatBashApproval(ui, analyzeBash(""));
+  assert.match(empty, /No supported command detected\./);
 });
 
 test("file confirmation restores editor and working state after rejection", async () => {

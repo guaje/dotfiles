@@ -19,16 +19,6 @@ export function decideAnalysis(analysis: ShellAnalysis, style: "Micromanagement"
   if (style === "Micromanagement") {
     return { allow: false, needsApproval: true, analysis, reason: "Micromanagement asks before every Bash call" };
   }
-  const hasReadOnlyUnit = analysis.executionUnits.some((unit) => unit.effect === "read-only");
-  const hasNonReadOnlyUnit = analysis.executionUnits.some((unit) => unit.effect !== "read-only");
-  if (analysis.complete && hasReadOnlyUnit && hasNonReadOnlyUnit) {
-    return {
-      allow: false,
-      needsApproval: false,
-      analysis,
-      reason: "Split read-only top-level inspection units from mutations or unknown units, preserving any &&/|| condition; Pi will not split shell text automatically.",
-    };
-  }
   if (analysis.complete && analysis.executionUnits.length > 0 && analysis.executionUnits.every((unit) => unit.effect === "read-only")) {
     return { allow: true, needsApproval: false, analysis };
   }

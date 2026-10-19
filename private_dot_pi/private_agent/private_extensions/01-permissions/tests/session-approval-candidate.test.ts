@@ -129,6 +129,26 @@ test("conservative rules vary only high-confidence paths and fix operations", as
   finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
+test("a command with several mandatory execution units is never offered as a remembered rule", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "approval-multi-unit-"));
+  try {
+    for (const command of [
+      "git status && git add file.txt",
+      "git status || rm file.txt",
+      "git status; git add file.txt; adb shell true",
+    ]) {
+      const inspection = inspectBash(command);
+      assert.ok(inspection.analysis.executionUnits.length > 1, command);
+      assert.equal(await approvalCandidate(inspection, cwd), undefined, command);
+    }
+    const redirected = inspectBash("cd repo && export JAVA_HOME=/tmp/a && ./gradlew test 2>&1 | grep FAILED | head -12");
+    assert.ok(redirected.analysis.executionUnits.length > 1, redirected.analysis.source);
+    assert.equal(await approvalCandidate(redirected, cwd), undefined, redirected.analysis.source);
+    assert.ok(await approvalCandidate(inspectBash("git frobnicate task.js"), cwd));
+  }
+  finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
 test("relative PATH, workspace executables, and path-qualified aliases cannot create remembered rules", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "approval-relative-path-"));
   const originalPath = process.env.PATH;

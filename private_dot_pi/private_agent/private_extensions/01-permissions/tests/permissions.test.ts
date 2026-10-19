@@ -8,7 +8,6 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { canAutoAllowLocalFile } from "../access-policy.ts";
 import { normalizeManagingStyle, nextManagingStyle } from "../management-style.ts";
-import { injectPromptGuidance } from "../prompt-guidance.ts";
 import { parseShell } from "../shell/parser.ts";
 import { analyzeBash, decideBash } from "../shell/policy.ts";
 import { renderShell } from "../shell/render.ts";
@@ -31,6 +30,21 @@ test("parser authorizes fully classified read-only lists, pipelines, substitutio
     assert.equal(parseShell(command).effect, "read-only", command);
   }
 });
+test("descriptor duplication stays read-only while file redirects of any form stay non-read-only", () => {
+  assert.equal(parseShell("cat file >&2").effect, "read-only");
+  assert.equal(parseShell("echo hi &>/dev/null").effect, "read-only");
+  assert.equal(parseShell("echo hi &> out.txt").effect, "mutating");
+  assert.equal(parseShell("git status 2>/dev/null").effect, "read-only");
+  const gradle = parseShell("cd /x && ./gradlew test 2>&1 | grep FAILED | head -12");
+  assert.equal(gradle.complete, true);
+  assert.deepEqual(gradle.commands.map((command) => command.name), ["cd", "./gradlew", "grep", "head"]);
+  assert.equal(decideBash(gradle.source, "Empowerment").needsApproval, true);
+  const fdPrefix = parseShell("git status 2>/dev/null").commands[0]?.argv;
+  assert.ok(!fdPrefix?.includes("2"));
+  assert.ok(parseShell("echo 2 > out.txt").commands[0]?.argv.includes("2"));
+  assert.equal(parseShell("echo done >& $FD").complete, false);
+  assert.equal(parseShell("sleep 1 & echo bg").complete, false);
+});
 test("parser makes writes, dynamic syntax, interpreters, wrappers, and output redirects non-read-only", () => {
   assert.equal(parseShell("rg x > out.txt").effect, "mutating");
   assert.equal(parseShell("eval 'rm x'").effect, "unknown");
@@ -50,7 +64,7 @@ test("parser makes writes, dynamic syntax, interpreters, wrappers, and output re
   assert.equal(parseShell("git diff --output=patch.txt").effect, "mutating");
   assert.equal(parseShell("git cat-file --filters HEAD:file").effect, "unknown");
 });
-test("coupled command substitutions do not trigger split guidance for one mutating action", () => {
+test("one mutating action with a coupled read-only substitution needs one approval, not a rewrite", () => {
   const command = "glab issue create -t \"Analysis\" -d \"$(cat /tmp/issue_analysis.md)\" -l \"analysis,tech-debt,monitoring\" --linked-mr 19";
   const analysis = parseShell(command);
   assert.equal(analysis.effect, "mutating");
@@ -63,8 +77,11 @@ test("coupled command substitutions do not trigger split guidance for one mutati
   const decision = decideBash(command, "Empowerment");
   assert.equal(decision.allow, false);
   assert.equal(decision.needsApproval, true);
-  assert.doesNotMatch(decision.reason ?? "", /Split read-only/);
-  assert.match(decideBash("cat /tmp/issue_analysis.md && glab issue create -t Analysis", "Empowerment").reason ?? "", /Split read-only/);
+  assert.doesNotMatch(decision.reason ?? "", /split/i);
+  const mixedPair = decideBash("cat /tmp/issue_analysis.md && glab issue create -t Analysis", "Empowerment");
+  assert.equal(mixedPair.allow, false);
+  assert.equal(mixedPair.needsApproval, true);
+  assert.doesNotMatch(mixedPair.reason ?? "", /split/i);
 });
 
 test("parser does not merge newline, background, or heredoc execution into a read-only command", () => {
@@ -132,23 +149,30 @@ test("Handoff transport remains metadata and does not change a read-only verdict
   assert.equal(analysis.commands[0]?.context.target, "host:/repo");
 });
 
-test("Empowerment blocks mixed commands immediately and Micromanagement approves every Bash call", () => {
+test("Empowerment sends a mixed read-only and mutating chain to approval without demanding a split", () => {
   const mixed = decideBash("git status && rm file", "Empowerment");
-  assert.equal(mixed.allow, false); assert.equal(mixed.needsApproval, false); assert.match(mixed.reason!, /Split read-only/);
-  const micro = decideBash("git status", "Micromanagement"); assert.equal(micro.needsApproval, true);
-  assert.equal(decideBash("ssh host 'git status'", "Empowerment").allow, true);
+  assert.equal(mixed.allow, false);
+  assert.equal(mixed.needsApproval, true);
+  assert.doesNotMatch(mixed.reason ?? "", /split/i);
 });
-test("prompt guidance limits splitting to complete direct units and protects compound control flow", () => {
-  const once = injectPromptGuidance("base");
-  assert.equal(injectPromptGuidance(once), once);
-  assert.match(once, /independently parsed direct top-level commands/);
-  assert.match(once, /read-only inspections from mutating or unknown commands/);
-  assert.match(once, /only when structural analysis is complete/);
-  assert.match(once, /Unsupported compound control flow/);
-  assert.match(once, /do not restructure it merely to avoid approval/);
-  assert.match(once, /never automatically rewrites or splits shell text/);
-  assert.match(once, /&&.*\|\|.*preserved/);
-  assert.doesNotMatch(once, /read-only\/non-read-only/);
+test("Empowerment still auto-allows every fully classified read-only chain", () => {
+  for (const command of [
+    "git status --short && rg todo . | sort",
+    "nl README.md; command ls",
+    "cat README.md && printf '%s\\n' ok",
+    "ssh host 'git status'",
+  ]) {
+    const decision = decideBash(command, "Empowerment");
+    assert.equal(decision.allow, true, command);
+    assert.equal(decision.needsApproval, false, command);
+  }
+});
+test("Micromanagement asks before every Bash call whatever its effects", () => {
+  for (const command of ["git status", "git status && rm file", "ssh host 'git status'"]) {
+    const decision = decideBash(command, "Micromanagement");
+    assert.equal(decision.allow, false, command);
+    assert.equal(decision.needsApproval, true, command);
+  }
 });
 test("canonical local roots reject prefix and symlink escapes", async () => {
   const root = await mkdtemp(join(tmpdir(), "permissions-test-"));

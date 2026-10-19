@@ -8,7 +8,7 @@ import type { ShellAnalysis } from "../types.ts";
 
 const unknownUnit = (source: string) => ({ id: 0, effect: "unknown" as const, span: { start: 0, end: source.length } });
 
-test("complete direct outer read/non-read sequences receive split guidance with operator metadata", () => {
+test("complete direct outer read/non-read sequences are approved as one submitted command", () => {
   for (const operator of [";", "\n", "&&", "||"] as const) {
     const command = `git status ${operator} git add file`;
     const analysis = analyzeBash(command);
@@ -17,17 +17,19 @@ test("complete direct outer read/non-read sequences receive split guidance with 
     assert.deepEqual(analysis.executionUnits.map((unit) => unit.effect), ["read-only", "mutating"], operator);
     assert.equal(analysis.executionUnits[0]?.operatorAfter, operator, operator);
     assert.equal(decision.allow, false, operator);
-    assert.equal(decision.needsApproval, false, operator);
-    assert.match(decision.reason ?? "", /Split read-only/, operator);
+    assert.equal(decision.needsApproval, true, operator);
+    assert.doesNotMatch(decision.reason ?? "", /split/i, operator);
   }
 });
 
-test("split eligibility is generic and includes complete unknown top-level siblings", () => {
+test("complete mixed sequences with mutating or unknown siblings require one approval", () => {
   const cases: Array<[string, Array<"read-only" | "mutating" | "unknown">]> = [
     ["ls; rm file", ["read-only", "mutating"]],
     ["chezmoi status; chezmoi add file", ["read-only", "mutating"]],
     ["curl -I https://example.test; curl -X POST https://example.test", ["read-only", "mutating"]],
     ["git status; adb shell true", ["read-only", "unknown"]],
+    ["git status && adb shell true", ["read-only", "unknown"]],
+    ["git status || adb shell true", ["read-only", "unknown"]],
     ["git status; git add file; adb shell true", ["read-only", "mutating", "unknown"]],
     ["git status; git add file; adb devices", ["read-only", "mutating", "read-only"]],
   ];
@@ -36,8 +38,9 @@ test("split eligibility is generic and includes complete unknown top-level sibli
     const decision = decideAnalysis(analysis, "Empowerment");
     assert.equal(analysis.complete, true, command);
     assert.deepEqual(analysis.executionUnits.map((unit) => unit.effect), effects, command);
-    assert.equal(decision.needsApproval, false, command);
-    assert.match(decision.reason ?? "", /Split read-only/, command);
+    assert.equal(decision.allow, false, command);
+    assert.equal(decision.needsApproval, true, command);
+    assert.doesNotMatch(decision.reason ?? "", /split/i, command);
   }
 });
 
@@ -57,7 +60,6 @@ test("incomplete compound syntax remains one whole-command approval even when ap
     assert.equal(analysis.complete, false, command);
     assert.equal(decision.allow, false, command);
     assert.equal(decision.needsApproval, true, command);
-    assert.doesNotMatch(decision.reason ?? "", /Split read-only/, command);
   }
 });
 
@@ -68,7 +70,6 @@ test("complete non-read-only sequences without a read-only sibling remain whole-
     assert.equal(analysis.complete, true, command);
     assert.equal(analysis.executionUnits.some((unit) => unit.effect === "read-only"), false, command);
     assert.equal(decision.needsApproval, true, command);
-    assert.doesNotMatch(decision.reason ?? "", /Split read-only/, command);
   }
 });
 
@@ -83,7 +84,6 @@ test("pipelines, substitutions, wrappers, groups, redirections, and SSH payloads
   ]) {
     const decision = decideBash(command, "Empowerment");
     assert.equal(decision.needsApproval, true, command);
-    assert.doesNotMatch(decision.reason ?? "", /Split read-only/, command);
     assert.equal(decision.analysis?.executionUnits.length, 1, command);
   }
 });

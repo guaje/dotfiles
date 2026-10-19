@@ -49,6 +49,7 @@ function lex(source: string, depth: number, offset: number): { tokens: Token[]; 
     const triple = source.slice(index, index + 3);
     if (triple === "<<<" || pair === "<<") { errors.push("heredoc and here-string input is not reviewed"); break; }
     if (["&&", "||", ">>"].includes(pair)) { pushOp(pair, index); index += 2; continue; }
+    if (pair === ">&" || pair === "&>") { pushOp(pair, index); index += 2; continue; }
     if (";|&()<>".includes(source[index]!)) { pushOp(source[index]!, index); index++; continue; }
 
     const start = index;
@@ -192,12 +193,15 @@ class Parser {
     while (this.peek()) {
       const token = this.peek()!;
       if (token.kind === "op" && [";", "\n", "&&", "||", "|", "&", ")", "("].includes(token.text)) break;
-      if (token.kind === "op" && [">", ">>", "<", "<<", "<<<"].includes(token.text)) {
+      if (token.kind === "op" && [">", ">>", "<", "<<", "<<<", ">&", "&>"].includes(token.text)) {
         const operator = this.take()!;
         const target = this.peek()?.kind === "word" ? this.take()!.word : undefined;
+        // A digit-only word glued to a file redirection is a file-descriptor prefix (2>file), not an argument.
+        const previous = words.at(-1);
+        if ([">", ">>", ">&"].includes(operator.text) && previous && /^\d+$/.test(previous.value) && previous.span.end === operator.span.start) words.pop();
         const heredoc = operator.text === "<<" || operator.text === "<<<";
         const reason = heredoc ? "heredoc and here-string input is not reviewed" : !target ? "redirection target is missing or dynamic" : undefined;
-        redirections.push({ kind: "redirection", operator: operator.text as AstRedirection["operator"], target, span: { start: operator.span.start, end: target?.span.end ?? operator.span.end }, supported: !reason, reason });
+        redirections.push({ kind: "redirection", operator: (operator.text === ">&" ? "fd" : operator.text) as AstRedirection["operator"], target, span: { start: operator.span.start, end: target?.span.end ?? operator.span.end }, supported: !reason, reason });
         end = target?.span.end ?? operator.span.end;
         continue;
       }

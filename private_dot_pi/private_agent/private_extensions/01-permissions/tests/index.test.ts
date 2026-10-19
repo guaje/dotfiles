@@ -55,6 +55,7 @@ function harness() {
       registerTool(tool: any) { if (tool.name === "bash") bashTool = tool; },
     },
     handler(name: string) { const value = handlers.get(name); assert.ok(value, `missing ${name} handler`); return value!; },
+    hasHandler(name: string) { return handlers.has(name); },
     shortcuts,
     commands,
     bashTool: () => bashTool,
@@ -110,7 +111,7 @@ test("/hotkeys combines the currently configured management-style bindings", asy
   assert.equal(shortcuts.get("ctrl+1 / shift+ctrl+2").description, "Cycle management style");
 });
 
-test("entry registers one Bash owner and injects split guidance once", async () => {
+test("entry registers one Bash owner and leaves the model's Bash guidance untouched", async () => {
   const extension = (await import("../index.ts")).default;
   const app = harness();
   await extension(app.pi as any);
@@ -118,14 +119,11 @@ test("entry registers one Bash owner and injects split guidance once", async () 
   assert.ok(tool);
   assert.ok(app.shortcuts.has("ctrl+;"));
   assert.ok(app.shortcuts.has("shift+ctrl+;"));
-  assert.deepEqual(tool.promptGuidelines.slice(0, 1), ["original guideline"]);
-  assert.match(tool.promptGuidelines.at(-1), /one Bash call per top-level side-effect class/);
-  const first = await app.handler("before_agent_start")({ systemPrompt: "base" });
-  const second = await app.handler("before_agent_start")({ systemPrompt: first.systemPrompt });
-  assert.equal(second.systemPrompt, first.systemPrompt);
+  assert.deepEqual(tool.promptGuidelines, ["original guideline"]);
+  assert.equal(app.hasHandler("before_agent_start"), false);
 });
 
-test("Empowerment auto-allows complete reads, splits complete mixed units, and keeps compound syntax whole", async () => {
+test("Empowerment auto-allows complete reads and approves mixed and coupled commands as submitted", async () => {
   const extension = (await import("../index.ts")).default;
   const app = harness();
   try {
@@ -154,19 +152,48 @@ test("Empowerment auto-allows complete reads, splits complete mixed units, and k
       "ls; rm file",
     ]) {
       const mixed = await invoke(command);
-      assert.match(mixed.reason, /Split read-only/, command);
+      assert.equal(mixed.block, true, command);
+      assert.match(mixed.reason, /no UI/, command);
+      assert.doesNotMatch(mixed.reason, /split/i, command);
     }
 
     const reportedLoop = "for pid in 13653 13755 13810; do printf '%s ' \"$pid\"; adb shell cat /proc/$pid/cmdline 2>/dev/null | tr '\\0' ' '; echo; done";
     for (const command of [reportedLoop, "cat file | tee out", "glab issue create -d \"$(cat body)\"", "rm file"]) {
       const coupled = await invoke(command);
       assert.match(coupled.reason, /no UI/, command);
-      assert.doesNotMatch(coupled.reason, /Split read-only/, command);
+      assert.doesNotMatch(coupled.reason, /split/i, command);
     }
     assert.equal(listSessionApprovals().length, 0);
     await app.handler("session_shutdown")();
   } finally {
     delete process.env.PI_TEST_SHELL_PATH;
+  }
+});
+
+test("a mixed command is approved once for the whole call and never becomes a remembered rule", async () => {
+  resetSessionApprovalsForTests();
+  const extension = (await import("../index.ts")).default;
+  const app = harness(); await extension(app.pi as any);
+  const cwd = mkdtempSync(join(tmpdir(), "permissions-mixed-once-"));
+  try {
+    await app.handler("session_start")({ reason: "startup" }, { cwd, ui: {} });
+    setSessionManagingStyle("Empowerment");
+    const choices: string[][] = [];
+    const command = "git status && git add file.txt";
+    const event = { toolName: "bash", input: { command } };
+    const result = await app.handler("tool_call")(event, { cwd, hasUI: true, ui: {
+      confirm: async () => true,
+      select: async (_prompt: string, items: string[]) => { choices.push(items); return "Allow once"; },
+      notify() {},
+    } });
+    assert.equal(result, undefined);
+    assert.equal(event.input.command, command);
+    assert.deepEqual(choices, [["Allow once", "Deny"]]);
+    assert.deepEqual(listSessionApprovals(), []);
+    await app.handler("session_shutdown")({ reason: "quit" });
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+    resetSessionApprovalsForTests();
   }
 });
 

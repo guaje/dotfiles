@@ -1,0 +1,19 @@
+# Shell history configuration.
+# Keeps a large, timestamped, de-duplicated history that is appended rather than
+# rewritten, so parallel sessions do not clobber each other's commands.
+{{- if eq .shell "zsh" }}
+setopt EXTENDED_HISTORY SHARE_HISTORY
+setopt HIST_IGNORE_DUPS HIST_IGNORE_SPACE
+HISTSIZE=100000
+SAVEHIST=100000
+{{- else }}
+# HISTTIMEFORMAT is the bash analogue of zsh's EXTENDED_HISTORY timestamps,
+# HISTCONTROL=ignoreboth covers HIST_IGNORE_DUPS plus HIST_IGNORE_SPACE, and
+# histappend with "history -a" gives bash the live sharing of SHARE_HISTORY.
+HISTSIZE=100000
+HISTFILESIZE=100000
+HISTCONTROL=ignoreboth
+HISTTIMEFORMAT='%F %T  '
+shopt -s histappend
+PROMPT_COMMAND="history -a;${PROMPT_COMMAND}"
+{{- end }}

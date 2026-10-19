@@ -417,6 +417,30 @@ async function probeImageGenerationModel(metadata: ModelMetadata): Promise<Model
   }
 }
 
+/** Probe-only target that switches reasoning off for reasoning models, so the fixed
+ * token budget is spent on visible text instead of reasoning tokens. openai-completions models
+ * carry the toggle in a cloned compat block (`chat_template_kwargs`); openai-responses models
+ * carry it as probe options (`reasoning_effort: none`). Endpoints that reject the toggle make
+ * this attempt fail, and the probe retries with the plain model. */
+function withThinkingDisabledForProbe(model: any): { target: any; options?: { reasoningEffort?: "off" } } {
+  if (model.api === "openai-completions" && model.reasoning) {
+    return {
+      target: {
+        ...model,
+        compat: {
+          ...(model.compat ?? {}),
+          thinkingFormat: "chat-template",
+          chatTemplateKwargs: { ...(model.compat?.chatTemplateKwargs ?? {}), enable_thinking: false },
+        },
+      },
+    };
+  }
+  if (model.api === "openai-responses" && model.reasoning) {
+    return { target: model, options: { reasoningEffort: "off" } };
+  }
+  return { target: model };
+}
+
 async function probeModel(metadata: ModelMetadata, ctx: ProbeContext): Promise<ModelHealthResult> {
   if (metadata.service === "imageGeneration") {
     return probeImageGenerationModel(metadata);
@@ -438,20 +462,41 @@ async function probeModel(metadata: ModelMetadata, ctx: ProbeContext): Promise<M
       return modelHealthResult(metadata, "auth-missing", auth.ok ? "No API key or request headers available" : (auth.error || "Authentication unavailable"));
     }
 
-    const t0 = Date.now();
-    const response = await completeSimple(
-      model as never,
-      {
-        messages: [{ role: "user", content: "Reply with OK.", timestamp: Date.now() }],
-      },
-      {
-        apiKey: auth.apiKey,
-        headers: auth.headers,
-        maxTokens: 8,
-        signal: AbortSignal.timeout(10000),
-      },
-    );
-    const latencyMs = Date.now() - t0;
+    const request = {
+      messages: [{ role: "user", content: "Write exactly one short sentence about the sea.", timestamp: Date.now() }],
+    };
+    const runProbe = async (target: unknown, extraOptions: { reasoningEffort?: "off" }) => {
+      const start = Date.now();
+      const response = await completeSimple(
+        target as never,
+        request,
+        {
+          apiKey: auth.apiKey,
+          headers: auth.headers,
+          maxTokens: 128,
+          signal: AbortSignal.timeout(8000),
+          ...extraOptions,
+        },
+      );
+      return { response, latencyMs: Date.now() - start };
+    };
+    const { target: thinkingOffTarget, options: thinkingOffOptions } = withThinkingDisabledForProbe(model);
+    let probe: Awaited<ReturnType<typeof runProbe>>;
+    if (thinkingOffTarget !== model || thinkingOffOptions) {
+      try {
+        probe = await runProbe(thinkingOffTarget, thinkingOffOptions ?? {});
+        if (probe.response.stopReason === "error" || probe.response.stopReason === "aborted") {
+          throw new Error(probe.response.errorMessage || `model stopped: ${probe.response.stopReason}`);
+        }
+      }
+      catch {
+        probe = await runProbe(model, {});
+      }
+    }
+    else {
+      probe = await runProbe(model, {});
+    }
+    const { response, latencyMs } = probe;
 
     // completeSimple does not throw on model-level errors; a non-ok stopReason
     // means the request reached the API but the model is not usable (e.g. it

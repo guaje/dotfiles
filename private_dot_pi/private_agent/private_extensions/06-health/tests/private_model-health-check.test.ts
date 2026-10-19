@@ -695,6 +695,139 @@ test("probeModelHealth returns not-found for an unknown model", async () => {
   assert.equal(result.status, "not-found");
 });
 
+test("probes reasoning openai-completions models with thinking switched off", async () => {
+  writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
+  const mod = await loadExtension();
+  rmSync(CACHE_PATH, { force: true });
+
+  const seen: any[] = [];
+  (globalThis as any).__completeSimpleMock = async (model: any) => {
+    seen.push(model);
+    return { stopReason: "stop", usage: { output: 2 }, content: [{ type: "text", text: "OK" }] };
+  };
+  try {
+    const result = await mod.probeModelHealth("test-provider/fast-model", {
+      modelRegistry: {
+        find: () => ({ provider: "test-provider", id: "fast-model", api: "openai-completions", reasoning: true, compat: { supportsReasoningEffort: true } }),
+        async getApiKeyAndHeaders() { return { ok: true, apiKey: "fixture-key" }; },
+      },
+    });
+    assert.equal(result.status, "ok");
+    assert.equal(seen.length, 1, "thinking-off probe must not retry on success");
+    assert.equal(seen[0].compat.thinkingFormat, "chat-template");
+    assert.equal(seen[0].compat.chatTemplateKwargs.enable_thinking, false);
+    assert.equal(seen[0].compat.supportsReasoningEffort, true, "existing compat flags survive the probe clone");
+  } finally {
+    delete (globalThis as any).__completeSimpleMock;
+  }
+});
+
+test("falls back to a plain probe when the endpoint rejects the thinking toggle", async () => {
+  const mod = await loadExtension();
+  rmSync(CACHE_PATH, { force: true });
+
+  const seen: any[] = [];
+  (globalThis as any).__completeSimpleMock = async (model: any) => {
+    seen.push(model);
+    if (seen.length === 1) return { stopReason: "error", errorMessage: "unknown parameter: chat_template_kwargs" };
+    return { stopReason: "stop", usage: { output: 2 }, content: [{ type: "text", text: "OK" }] };
+  };
+  try {
+    const result = await mod.probeModelHealth("test-provider/fast-model", {
+      modelRegistry: {
+        find: () => ({ provider: "test-provider", id: "fast-model", api: "openai-completions", reasoning: true, compat: { supportsReasoningEffort: true } }),
+        async getApiKeyAndHeaders() { return { ok: true, apiKey: "fixture-key" }; },
+      },
+    });
+    assert.equal(result.status, "ok");
+    assert.equal(seen.length, 2);
+    assert.equal(seen[0].compat.chatTemplateKwargs.enable_thinking, false);
+    assert.equal(seen[1].compat.thinkingFormat, undefined, "fallback probe uses the registered model unchanged");
+  } finally {
+    delete (globalThis as any).__completeSimpleMock;
+  }
+});
+
+test("probes openai-responses reasoning models with reasoning effort off", async () => {
+  const mod = await loadExtension();
+  rmSync(CACHE_PATH, { force: true });
+
+  const seen: Array<{ model: any; options: any }> = [];
+  (globalThis as any).__completeSimpleMock = async (model: any, _context: any, options: any) => {
+    seen.push({ model, options });
+    return { stopReason: "stop", usage: { output: 10 }, content: [{ type: "text", text: "OK" }] };
+  };
+  try {
+    const registered = { provider: "openai-codex", id: "test-built-in", api: "openai-responses", reasoning: true };
+    const result = await mod.probeModelHealth("openai-codex/test-built-in", {
+      modelRegistry: {
+        find: () => registered,
+        async getApiKeyAndHeaders() { return { ok: true, apiKey: "fixture-key" }; },
+      },
+    });
+    assert.equal(result.status, "ok");
+    assert.equal(seen.length, 1, "effort-off probe must not retry on success");
+    assert.equal(seen[0].model, registered, "openai-responses probes use the registered model unchanged");
+    assert.equal(seen[0].options.reasoningEffort, "off");
+  } finally {
+    delete (globalThis as any).__completeSimpleMock;
+  }
+});
+
+test("falls back to a plain probe when the reasoning effort toggle is rejected", async () => {
+  const mod = await loadExtension();
+  rmSync(CACHE_PATH, { force: true });
+
+  const seen: Array<{ model: any; options: any }> = [];
+  (globalThis as any).__completeSimpleMock = async (model: any, _context: any, options: any) => {
+    seen.push({ model, options });
+    if (seen.length === 1) throw new Error("400: unsupported value for reasoning_effort");
+    return { stopReason: "stop", usage: { output: 10 }, content: [{ type: "text", text: "OK" }] };
+  };
+  try {
+    const result = await mod.probeModelHealth("openai-codex/test-built-in", {
+      modelRegistry: {
+        find: () => ({ provider: "openai-codex", id: "test-built-in", api: "openai-responses", reasoning: true }),
+        async getApiKeyAndHeaders() { return { ok: true, apiKey: "fixture-key" }; },
+      },
+    });
+    assert.equal(result.status, "ok");
+    assert.equal(seen.length, 2);
+    assert.equal(seen[0].options.reasoningEffort, "off");
+    assert.equal(seen[1].options.reasoningEffort, undefined, "fallback probe uses plain options");
+  } finally {
+    delete (globalThis as any).__completeSimpleMock;
+  }
+});
+
+test("non-reasoning models are probed without a thinking toggle", async () => {
+  const mod = await loadExtension();
+  rmSync(CACHE_PATH, { force: true });
+
+  const registered = { provider: "test-provider", id: "fast-model", api: "openai-completions", reasoning: false };
+  const seen: Array<{ model: any; options: any }> = [];
+  (globalThis as any).__completeSimpleMock = async (model: any, _context: any, options: any) => {
+    seen.push({ model, options });
+    return { stopReason: "stop", usage: { output: 2 }, content: [{ type: "text", text: "OK" }] };
+  };
+  try {
+    const result = await mod.probeModelHealth("test-provider/fast-model", {
+      modelRegistry: {
+        find: () => registered,
+        async getApiKeyAndHeaders() { return { ok: true, apiKey: "fixture-key" }; },
+      },
+    });
+    assert.equal(result.status, "ok");
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0].model, registered);
+    assert.equal(seen[0].options.reasoningEffort, undefined);
+    assert.equal(seen[0].model.compat?.chatTemplateKwargs?.enable_thinking, undefined);
+  } finally {
+    delete (globalThis as any).__completeSimpleMock;
+  }
+});
+
 test("registers a model-health command", async () => {
   const mod = await loadExtension();
   const extension = mod.default;

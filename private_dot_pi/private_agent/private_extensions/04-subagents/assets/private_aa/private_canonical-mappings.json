@@ -27,13 +27,6 @@
       "model": "gpt-5.6-terra",
       "provider": "openai-codex",
       "thinkingLevel": "high"
-    },
-    {
-      "aaModelId": "f7a4ea75-e548-4069-80d4-9be8bc7c009b",
-      "canonicalId": "aa/glm-5-2",
-      "model": "glm-5.2",
-      "provider": "reallms",
-      "thinkingLevel": null
     }
   ],
   "version": 1

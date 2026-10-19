@@ -1,6 +1,6 @@
 {
-  "digest": "740cec9166d8b87013b48c81777de0b277dac77ab2396aba627fc92c503adac7",
-  "generatedAt": 1791295844462,
+  "digest": "5dcf021329744f469bfc40245d83e40c7b83bc0441272804afaa25dc1afc9f9f",
+  "generatedAt": 1792418231340,
   "methodology": {
     "id": "artificial-analysis-intelligence-index",
     "version": "4.3"
@@ -365,15 +365,6 @@
       "modelId": "b01dee41-c62b-48ed-8d16-984adc405e5c",
       "provider": "qwen",
       "thinkingLevel": "xhigh"
-    },
-    {
-      "capturedAt": 1791295844434,
-      "contentDigest": "c0f6a3a518af28255e9c97699ab87b531ac40995cc7d6ddf1fcfa50513314069",
-      "file": "8331d42d473cf534-9a1f865caafc34ca.json",
-      "model": "glm-5.2",
-      "modelId": "f7a4ea75-e548-4069-80d4-9be8bc7c009b",
-      "provider": "reallms",
-      "thinkingLevel": null
     }
   ],
   "version": 4

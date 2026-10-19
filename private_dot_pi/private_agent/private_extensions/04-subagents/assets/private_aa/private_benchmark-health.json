@@ -1,74 +1,74 @@
 {
-  "digest": "c685fe23e090c913989e80d67187b1a742cd4e08919b442c2f337d6abe57b3ce",
+  "digest": "da2b807bd7f06469e85d846ab67fe7216b57e8265c24c82e7f41374c5b0ec9c9",
   "fields": {
     "agenticIndex": {
-      "checked": 15,
+      "checked": 11,
       "newestScoredRelease": null,
       "scored": 0,
       "status": "retired"
     },
     "critpt": {
-      "checked": 15,
-      "newestScoredRelease": "2026-10-06",
-      "scored": 15,
+      "checked": 11,
+      "newestScoredRelease": "2026-10-12",
+      "scored": 11,
       "status": "active"
     },
     "gdpvalNormalized": {
-      "checked": 15,
-      "newestScoredRelease": "2026-10-06",
-      "scored": 15,
+      "checked": 11,
+      "newestScoredRelease": "2026-10-12",
+      "scored": 9,
       "status": "active"
     },
     "gpqa": {
-      "checked": 15,
-      "newestScoredRelease": "2026-09-03",
-      "scored": 10,
+      "checked": 11,
+      "newestScoredRelease": "2026-09-07",
+      "scored": 6,
       "status": "lagging"
     },
     "hle": {
-      "checked": 15,
-      "newestScoredRelease": "2026-10-06",
-      "scored": 15,
+      "checked": 11,
+      "newestScoredRelease": "2026-10-12",
+      "scored": 11,
       "status": "active"
     },
     "ifbench": {
-      "checked": 15,
+      "checked": 11,
       "newestScoredRelease": null,
       "scored": 0,
       "status": "retired"
     },
     "lcr": {
-      "checked": 15,
-      "newestScoredRelease": "2026-10-06",
-      "scored": 15,
+      "checked": 11,
+      "newestScoredRelease": "2026-10-12",
+      "scored": 11,
       "status": "active"
     },
     "omniscienceAccuracy": {
-      "checked": 15,
-      "newestScoredRelease": "2026-10-06",
-      "scored": 15,
+      "checked": 11,
+      "newestScoredRelease": "2026-10-12",
+      "scored": 11,
       "status": "active"
     },
     "omniscienceHallucinationRate": {
-      "checked": 15,
-      "newestScoredRelease": "2026-10-06",
-      "scored": 15,
+      "checked": 11,
+      "newestScoredRelease": "2026-10-12",
+      "scored": 11,
       "status": "active"
     },
     "tau2": {
-      "checked": 15,
+      "checked": 11,
       "newestScoredRelease": null,
       "scored": 0,
       "status": "retired"
     },
     "tau3Banking": {
-      "checked": 15,
+      "checked": 11,
       "newestScoredRelease": null,
       "scored": 0,
       "status": "retired"
     }
   },
-  "generatedAt": 1791295899848,
+  "generatedAt": 1791999811499,
   "methodology": {
     "id": "artificial-analysis-intelligence-index",
     "version": "4.3"

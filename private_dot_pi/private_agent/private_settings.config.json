@@ -10,7 +10,6 @@
     "openai-codex/gpt-6-astra",
     "openai-codex/gpt-6.1-sol",
     "openai-codex/gpt-5.6-sol",
-    "reallms-dev/qwen3.8-2.4t-mi350x-8",
     "pi/qwen3.8-flash-next",
     "openai-codex/gpt-5.6-terra",
     "openai-codex/gpt-6-luna",

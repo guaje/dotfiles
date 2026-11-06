@@ -1,4 +1,4 @@
-import mappingsJson from "./assets/aa/canonical-mappings.json" with { type: "json" };
+import mappingsJson from "./assets/aa-canonical-mappings.json" with { type: "json" };
 import { validateCanonicalMappings, type CanonicalMapping } from "../09-catalog/aa/schema.ts";
 import type { BenchmarkThinkingLevel } from "./benchmark-types.ts";
 

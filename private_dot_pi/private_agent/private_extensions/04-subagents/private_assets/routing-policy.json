@@ -1,0 +1,60 @@
+{
+  "version": "8",
+  "methodology": {
+    "id": "delegation-routing-percentiles",
+    "version": "1"
+  },
+  "anchors": {
+    "coding": { "minimum": 0, "maximum": 100 },
+    "agentic": { "minimum": 0, "maximum": 100 },
+    "toolUse": { "minimum": 0, "maximum": 100 },
+    "reasoning": { "minimum": 0, "maximum": 100 },
+    "math": { "minimum": 0, "maximum": 100 },
+    "longContext": { "minimum": 0, "maximum": 100 },
+    "instructionFollowing": { "minimum": 0, "maximum": 100 },
+    "knowledge": { "minimum": 0, "maximum": 100 },
+    "faithfulness": { "minimum": 0, "maximum": 100 }
+  },
+  "profiles": {
+    "balanced": {
+      "weights": { "coding": 0.30, "agentic": 0.15, "toolUse": 0, "reasoning": 0.30, "math": 0, "longContext": 0, "instructionFollowing": 0, "knowledge": 0.25, "faithfulness": 0 },
+      "constraints": { "requiredInput": "text", "minimumContextWindow": 0, "minimumMaxTokens": 0, "requiresTools": false },
+      "outputTokensMetric": "balanced", "expectedOutputTokens": 900, "qualityTolerance": 3, "defaultThinking": "medium"
+    },
+    "coding": {
+      "weights": { "coding": 0.75, "agentic": 0, "toolUse": 0, "reasoning": 0.25, "math": 0, "longContext": 0, "instructionFollowing": 0, "knowledge": 0, "faithfulness": 0 },
+      "constraints": { "requiredInput": "text", "minimumContextWindow": 0, "minimumMaxTokens": 0, "requiresTools": false },
+      "outputTokensMetric": "coding", "expectedOutputTokens": 1400, "qualityTolerance": 3, "defaultThinking": "high"
+    },
+    "agentic": {
+      "weights": { "coding": 0, "agentic": 0.75, "toolUse": 0, "reasoning": 0.25, "math": 0, "longContext": 0, "instructionFollowing": 0, "knowledge": 0, "faithfulness": 0 },
+      "constraints": { "requiredInput": "text", "minimumContextWindow": 0, "minimumMaxTokens": 0, "requiresTools": true },
+      "outputTokensMetric": "agentic", "expectedOutputTokens": 1100, "qualityTolerance": 3, "defaultThinking": "high"
+    },
+    "research": {
+      "weights": { "coding": 0, "agentic": 0, "toolUse": 0, "reasoning": 0.225, "math": 0.075, "longContext": 0.20, "instructionFollowing": 0, "knowledge": 0.30, "faithfulness": 0.20 },
+      "constraints": { "requiredInput": "text", "minimumContextWindow": 131072, "minimumMaxTokens": 0, "requiresTools": false },
+      "outputTokensMetric": "research", "expectedOutputTokens": 1200, "qualityTolerance": 3, "defaultThinking": "medium"
+    },
+    "planning": {
+      "weights": { "coding": 0, "agentic": 0, "toolUse": 0, "reasoning": 0.45, "math": 0.15, "longContext": 0, "instructionFollowing": 0.40, "knowledge": 0, "faithfulness": 0 },
+      "constraints": { "requiredInput": "text", "minimumContextWindow": 0, "minimumMaxTokens": 0, "requiresTools": false },
+      "outputTokensMetric": "planning", "expectedOutputTokens": 900, "qualityTolerance": 2.5, "defaultThinking": "high"
+    },
+    "review": {
+      "weights": { "coding": 0, "agentic": 0, "toolUse": 0, "reasoning": 0, "math": 0, "longContext": 0, "instructionFollowing": 0.50, "knowledge": 0, "faithfulness": 0.50 },
+      "constraints": { "requiredInput": "text", "minimumContextWindow": 32768, "minimumMaxTokens": 0, "requiresTools": false },
+      "outputTokensMetric": "review", "expectedOutputTokens": 750, "qualityTolerance": 2.5, "defaultThinking": "high"
+    },
+    "long-context": {
+      "weights": { "coding": 0, "agentic": 0, "toolUse": 0, "reasoning": 0.40, "math": 0, "longContext": 0.60, "instructionFollowing": 0, "knowledge": 0, "faithfulness": 0 },
+      "constraints": { "requiredInput": "text", "minimumContextWindow": 131072, "minimumMaxTokens": 0, "requiresTools": false },
+      "outputTokensMetric": "long-context", "expectedOutputTokens": 1800, "qualityTolerance": 3, "defaultThinking": "high"
+    }
+  },
+  "interim": {
+    "stableDimensions": ["coding", "agentic", "reasoning", "longContext", "knowledge", "faithfulness", "instructionFollowing"],
+    "maxAssetAgeMs": 15552000000,
+    "basis": "AA fallback columns measured unchanged or rank-preserving across the reviewed methodology move; BenchLM is the primary archived source."
+  }
+}

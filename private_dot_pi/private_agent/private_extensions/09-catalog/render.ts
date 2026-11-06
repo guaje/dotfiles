@@ -1,11 +1,22 @@
 import path from "node:path";
 import type { BenchmarkHealthState } from "../04-subagents/benchmark-types.ts";
+import type { AssetCleanupResult } from "./asset-cleanup.ts";
 import type { AaArtifactChangeSummary, CatalogSyncReport } from "./sync.ts";
+import type { BenchLmSyncSummary } from "./benchlm-report.ts";
 import type { CatalogState } from "./types.ts";
 
 export interface CatalogOverview {
   text: string;
   level: "info" | "warning";
+}
+
+/**
+ * `/catalog refresh` returns two independent results: the catalog/cost overview and the methodology audit.
+ * UI notifications replace one another, so they render as one notice instead of two back-to-back calls.
+ */
+export function renderCatalogRefresh(overview: CatalogOverview, methodology: CatalogOverview | null): CatalogOverview {
+  const text = [overview.text, methodology?.text].filter(Boolean).join("\n");
+  return { text, level: overview.level === "warning" || methodology?.level === "warning" ? "warning" : "info" };
 }
 
 export function renderCatalogOverview(
@@ -89,15 +100,31 @@ function isSafeArtifactTarget(targetPath: unknown): targetPath is string {
   return typeof targetPath === "string" && path.isAbsolute(targetPath) && !CONTROL_CHARACTER.test(targetPath);
 }
 
-export function renderCatalogSync(report: CatalogSyncReport, aaArtifacts?: AaArtifactChangeSummary, benchmarkHealth?: BenchmarkHealthState | null): string {
-  const lines = ["Catalog sync completed"];
+export function renderCatalogSync(report: CatalogSyncReport, aaArtifacts?: AaArtifactChangeSummary, benchmarkHealth?: BenchmarkHealthState | null, benchLm?: BenchLmSyncSummary | null, benchLmReport?: { unmapped: string[]; warnings: string[] } | null, assetCleanup?: AssetCleanupResult, durationSeconds?: number): string {
+  const benchById = new Map((benchLm?.models ?? []).flatMap((entry) => [entry.runtimeId, ...(entry.modelAliases ?? [])].map((id) => [id, entry] as const)));
+  const lines = [durationSeconds === undefined ? "Catalog sync completed" : `Catalog sync completed in ${durationSeconds.toFixed(1)}s`];
   for (const model of report.models) {
     lines.push("", `${model.id} [${model.source}]`, `  availability: ${model.available ? "available" : "unavailable"}`, `  pricing: ${model.cost ? `${model.cost.input} input / ${model.cost.output} output USD per 1M (${model.costProvenance})` : model.costProvenance === "ollama-cloud:price-unpublished" ? "unpublished (Ollama Cloud did not publish explicit numeric token pricing)" : "unresolved"}`);
+    const capabilities = model.capabilities ?? { input: ["text"] as const } as SyncedModelCapabilities;
+    lines.push(`  capabilities: ${capabilities.input.join(", ")}${capabilities.provenance ? ` (input declared by ${capabilities.provenance})` : " (no source declared input modalities)"}${capabilities.reasoning === undefined ? ", reasoning undeclared" : capabilities.reasoning ? ", reasoning" : ", fixed reasoning"}`);
     if (model.aaVariants.length) {
-      lines.push("  AA variants:");
-      for (const variant of model.aaVariants) lines.push(`    ${variant.thinkingLevel ?? "generic"}: ${variant.qualifiedProfiles.length ? variant.qualifiedProfiles.join(", ") : "no benchmark-qualified profiles"}${variant.substitutedProfiles?.length ? ` [fallback-substituted on AA data: ${variant.substitutedProfiles.join(", ")}]` : ""}`);
+      const aaUrls = [...new Set(model.aaVariants.map((variant) => variant.sourceUrl).filter((url): url is string => typeof url === "string"))];
+      lines.push(`  AA variants${aaUrls.length === 1 ? ` (${aaUrls[0]})` : ""}:`);
+      for (const variant of model.aaVariants) lines.push(`    ${variant.thinkingLevel ?? "generic"}: ${variant.qualifiedProfiles.length ? variant.qualifiedProfiles.join(", ") : "no benchmark-qualified profiles"}${variant.substitutedProfiles?.length ? ` [fallback-substituted on AA data: ${variant.substitutedProfiles.join(", ")}]` : ""}${aaUrls.length > 1 && variant.sourceUrl ? ` (${variant.sourceUrl})` : ""}`);
     } else lines.push("  AA: unresolved — no exact reviewed mapping");
+    const bench = benchById.get(model.id);
+    if (bench) {
+      const figures = bench.categories.map((entry) => `${entry.key} ${entry.score.toFixed(1)}`).join(" · ") || "no published category figures";
+      const verified = bench.categories.reduce((total, entry) => total + entry.independentlyVerified, 0);
+      lines.push(`  BenchLM${bench.sourceUrl ? ` (${bench.sourceUrl})` : ""}:`);
+      lines.push(`    ${figures}${bench.unusedCategories ? ` (+${bench.unusedCategories} archived, not routed on)` : ""}`);
+      lines.push(`    ${bench.detailRows} benchmark rows on its page, ${verified} of the scored ones independently reproduced${bench.profiles.length ? `; eligible on evidence for: ${bench.profiles.join(", ")}` : "; below the evidence floor for every job type"}`);
+    } else if (benchLm) lines.push("  BenchLM: no reviewed row for this endpoint — add it to assets/benchlm-mappings.json and sync again");
   }
+  if (benchLm) lines.push("", `BenchLM generation: ${benchLm.models.length} models, methodology ${benchLm.methodologyVersion}, snapshot ${benchLm.sourceSnapshotId}, upstream data ${benchLm.lastUpdated}, ${benchLm.license} (non-commercial)`);
+  else lines.push("", "BenchLM: no reviewed generation on disk — routing is using Artificial Analysis columns alone.");
+  if (benchLmReport?.unmapped.length) lines.push(`  BenchLM unmapped for review: ${benchLmReport.unmapped.join(", ")} — add a reviewed row to 04-subagents/assets/benchlm-mappings.json and sync again to publish.`);
+  for (const message of benchLmReport?.warnings ?? []) lines.push(`  NOTE: ${message}`);
   if (report.missingAa.length) lines.push("", `AA mappings outstanding: ${report.missingAa.join(", ")} — /catalog sync offers interactive review for models with Artificial Analysis candidates.`);
   if (benchmarkHealth) {
     const concerns = Object.entries(benchmarkHealth.fields).filter(([, entry]) => entry && entry.status !== "active");
@@ -117,13 +144,11 @@ export function renderCatalogSync(report: CatalogSyncReport, aaArtifacts?: AaArt
       const deletions = aaArtifacts.changes.filter((change) => change.kind === "D").map((change) => change.targetPath);
       lines.push("");
       if ([...additions, ...deletions].some((targetPath) => quotePosixShellArgumentFragments(targetPath).length > 1)) lines.push("  Long artifact paths use shell-safe continuation fragments; copy the full command group unchanged.");
-      if (deletions.length) lines.push("  `chezmoi forget` applies only to tracked deletions; use `chezmoi status` to filter it.");
       if (additions.length) appendPosixCommand(lines, "chezmoi add", additions);
       if (deletions.length) {
         if (additions.length) lines.push("");
-        appendPosixCommand(lines, "chezmoi forget", deletions);
-        lines.push("");
-        appendPosixCommand(lines, "rm -f", deletions);
+        if (assetCleanup?.removed.length) lines.push(`  Removed ${assetCleanup.removed.length} deleted shared-asset path(s) automatically (chezmoi forget and rm -f under 04-subagents/assets).`);
+        for (const warning of assetCleanup?.warnings ?? []) lines.push(`  ! ${CONTROL_CHARACTER.test(warning) ? "unsafe cleanup warning omitted" : warning}`);
       }
     } else {
       lines.push("", "  ! Exact artifact commands omitted because a target path is unsafe or non-absolute.");

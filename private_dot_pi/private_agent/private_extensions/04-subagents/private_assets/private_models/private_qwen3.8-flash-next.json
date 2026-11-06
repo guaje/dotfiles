@@ -1,0 +1,579 @@
+{
+  "version": 2,
+  "model": "qwen3.8-flash-next",
+  "aa": {
+    "variants": [
+      {
+        "version": 4,
+        "provider": "model-testing",
+        "model": "qwen3.8-flash-next",
+        "thinkingLevel": "xhigh",
+        "modelId": "9ac3908c-9eb2-44db-8c01-3ec7da6fc2ae",
+        "capturedAt": 1793820804585,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793723417141,
+          "thinkingLevel": "xhigh"
+        },
+        "source": {
+          "name": "Qwen3.8-Flash-Next",
+          "slug": "qwen3-8-flash-next",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/qwen3-8-flash-next",
+          "retrievedAt": 1793820804329,
+          "contentSha256": "fa64f8d2bb5c693635cb6c77937f5565e0786aa6df7bfeb771b36237d0baccfb",
+          "recordSha256": "c86afe70a3b23ae8982f8ba5be57431efe4f243fdf83822bd165a1c81d635927",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": null,
+          "coding": null,
+          "agentic": null,
+          "toolUse": 45.360824742268,
+          "scientificReasoning": 47.17019170031217,
+          "longContext": 79.6666666666667,
+          "instructionFollowing": null,
+          "knowledge": 23.533333333333335,
+          "faithfulness": 53.225806451612904
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 38.044485634847106,
+          "gpqa": 92.32323232323229,
+          "critpt": 11.1428571428571
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": {
+              "normalizedScore": 45.360824742268,
+              "sourceKind": "public-page",
+              "fieldPath": "tauBanking",
+              "benchmark": {
+                "id": "tau3-banking",
+                "version": "AA Intelligence Index v5.0.1",
+                "status": "current"
+              },
+              "retrievedAt": 1793820804329,
+              "sourceUrl": "https://artificialanalysis.ai/models/qwen3-8-flash-next",
+              "sourceRecordDigest": "c86afe70a3b23ae8982f8ba5be57431efe4f243fdf83822bd165a1c81d635927"
+            },
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "tau3-banking-single",
+            "score": 45.360824742268
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.5555555555555556,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      }
+    ]
+  },
+  "benchlm": {
+    "version": 1,
+    "runtimeId": "model-testing/qwen3.8-flash-next",
+    "canonicalId": "qwen/qwen3.8-flash-next",
+    "model": "Qwen3.8-Flash-Next",
+    "creator": "Alibaba",
+    "capturedAt": 1793907107528,
+    "lastUpdated": "2026-11-05",
+    "methodologyVersion": "bench-align-v5.8-2026-09-30",
+    "sourceSnapshotId": "2026-11-05-3904bad35f77cff7",
+    "attribution": "Data from BenchLM.ai",
+    "license": "CC BY-NC 4.0",
+    "categoryScores": {
+      "coding": 50.52,
+      "agentic": 63.4,
+      "instructionFollowing": 91.2,
+      "knowledge": 56.58,
+      "reasoning": 79.8,
+      "multimodalGrounded": 85.7
+    },
+    "categoryProvenance": {
+      "coding": "leaderboard",
+      "agentic": "leaderboard",
+      "instructionFollowing": "leaderboard",
+      "knowledge": "leaderboard",
+      "reasoning": "leaderboard",
+      "multimodalGrounded": "leaderboard"
+    },
+    "categoryEvidence": {
+      "coding": {
+        "rows": 5,
+        "independentlyVerified": 0
+      },
+      "agentic": {
+        "rows": 6,
+        "independentlyVerified": 0
+      },
+      "instructionFollowing": {
+        "rows": 1,
+        "independentlyVerified": 0
+      },
+      "knowledge": {
+        "rows": 4,
+        "independentlyVerified": 0
+      },
+      "multimodalGrounded": {
+        "rows": 9,
+        "independentlyVerified": 1
+      }
+    },
+    "categories": [
+      {
+        "key": "agentic",
+        "label": "Agentic",
+        "score": 63.4,
+        "rank": 19,
+        "total": 135
+      },
+      {
+        "key": "coding",
+        "label": "Coding",
+        "score": 50.5,
+        "rank": 44,
+        "total": 156
+      },
+      {
+        "key": "reasoning",
+        "label": "Reasoning",
+        "score": null,
+        "rank": null,
+        "total": 26
+      },
+      {
+        "key": "multimodalGrounded",
+        "label": "Multimodal",
+        "score": 85.7,
+        "rank": 13,
+        "total": 58
+      },
+      {
+        "key": "knowledge",
+        "label": "Knowledge",
+        "score": 56.6,
+        "rank": 56,
+        "total": 177
+      },
+      {
+        "key": "multilingual",
+        "label": "Multilingual",
+        "score": null,
+        "rank": null,
+        "total": 17
+      },
+      {
+        "key": "instructionFollowing",
+        "label": "Instruction following",
+        "score": 91.2,
+        "rank": 24,
+        "total": 157
+      },
+      {
+        "key": "math",
+        "label": "Math",
+        "score": null,
+        "rank": null,
+        "total": 12
+      }
+    ],
+    "details": [
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "coworkBench",
+        "name": "CoWorkBench",
+        "value": 73.9,
+        "formatted": "73.9%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "jobBench",
+        "name": "JobBench",
+        "value": 55.7,
+        "formatted": "55.7%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "agentsLastExam",
+        "name": "Agents' Last Exam",
+        "value": 51.2,
+        "formatted": "51.2%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "toolathlonVerified",
+        "name": "Toolathlon-Verified",
+        "value": 73.5,
+        "formatted": "73.5%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "androidWorld",
+        "name": "AndroidWorld",
+        "value": 84.5,
+        "formatted": "84.5%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "osWorld2",
+        "name": "OSWorld 2.0",
+        "value": 19.4,
+        "formatted": "19.4%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "swePro",
+        "name": "SWE-bench Pro",
+        "value": 62.5,
+        "formatted": "62.5%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "sweMultilingual",
+        "name": "SWE Multilingual",
+        "value": 81,
+        "formatted": "81%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "nl2Repo",
+        "name": "NL2Repo",
+        "value": 48.1,
+        "formatted": "48.1%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "deepSwe",
+        "name": "DeepSWE",
+        "value": 58.7,
+        "formatted": "58.7%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "liveCodeBenchV6",
+        "name": "LiveCodeBench v6",
+        "value": 91.9,
+        "formatted": "91.9%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "extractBenchLlamaIndex",
+        "name": "ExtractBench (LlamaIndex)",
+        "value": 89.88,
+        "formatted": "89.88%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ExtractBench leaderboard, November 5, 2026 snapshot (LlamaIndex)",
+          "url": "https://www.extractbench.ai/#leaderboard",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "vision2Web",
+        "name": "Vision2Web",
+        "value": 64,
+        "formatted": "64.0%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "erqa",
+        "name": "ERQA",
+        "value": 72.3,
+        "formatted": "72.3%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "lvBench",
+        "name": "LVBench",
+        "value": 76.6,
+        "formatted": "76.6%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "realWorldQa",
+        "name": "RealWorldQA",
+        "value": 88.5,
+        "formatted": "88.5%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "mathVision",
+        "name": "MathVision",
+        "value": 90.6,
+        "formatted": "90.6%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "mathVisionPython",
+        "name": "MathVision w/ Python",
+        "value": 95.7,
+        "formatted": "95.7%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "charxivNoTools",
+        "name": "CharXiv w/o tools",
+        "value": 84.6,
+        "formatted": "84.6%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "charxiv",
+        "name": "CharXiv",
+        "value": 90.6,
+        "formatted": "90.6%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "gpqa",
+        "name": "GPQA",
+        "value": 91.7,
+        "formatted": "91.7%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "gpqaDiamond",
+        "name": "GPQA-D",
+        "value": 91.7,
+        "formatted": "91.7%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "hle",
+        "name": "HLE",
+        "value": 35.9,
+        "formatted": "35.9%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "hleNoTools",
+        "name": "HLE w/o tools",
+        "value": 35.9,
+        "formatted": "35.9%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "instructionFollowing",
+        "categoryLabel": "Instruction following",
+        "key": "ifBench",
+        "name": "IFBench",
+        "value": 81.3,
+        "formatted": "81.3%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-Flash-Next model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next",
+          "retrievedAt": null
+        }
+      }
+    ],
+    "modelAliases": [
+      "model-testing/qwen3.8-flash-next"
+    ]
+  }
+}

@@ -1,0 +1,1227 @@
+{
+  "version": 2,
+  "model": "qwen3.8-27b",
+  "aa": {
+    "variants": [
+      {
+        "version": 4,
+        "provider": "qwen",
+        "model": "qwen3.8-27b",
+        "thinkingLevel": "low",
+        "modelId": "7e30585f-fad7-40df-a8cb-03c1d96df38a",
+        "capturedAt": 1793820826584,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793723459711,
+          "thinkingLevel": "low"
+        },
+        "source": {
+          "name": "Qwen3.8 27B (Low)",
+          "slug": "qwen3-8-27b-low",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/qwen3-8-27b-low",
+          "retrievedAt": 1793820826331,
+          "contentSha256": "c0146d0439765eca5ffe895ecfe0f6930af2145695d57a7ad470069957088b91",
+          "recordSha256": "9b1eb6282ce1c9dc4efba84a3b256b95508097d5b76660ffddf732c5e41558e2",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 15.7,
+          "coding": null,
+          "agentic": null,
+          "toolUse": 32.1649484536082,
+          "scientificReasoning": 32.86207768135477,
+          "longContext": 77.3333333333333,
+          "instructionFollowing": null,
+          "knowledge": 18.3,
+          "faithfulness": 51.325989392084864
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 14.040778498609798,
+          "gpqa": 84.5454545454545,
+          "critpt": 0
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": {
+              "normalizedScore": 32.1649484536082,
+              "sourceKind": "public-page",
+              "fieldPath": "tauBanking",
+              "benchmark": {
+                "id": "tau3-banking",
+                "version": "AA Intelligence Index v5.0.1",
+                "status": "current"
+              },
+              "retrievedAt": 1793820826331,
+              "sourceUrl": "https://artificialanalysis.ai/models/qwen3-8-27b-low",
+              "sourceRecordDigest": "9b1eb6282ce1c9dc4efba84a3b256b95508097d5b76660ffddf732c5e41558e2"
+            },
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "tau3-banking-single",
+            "score": 32.1649484536082
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.6666666666666666,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      },
+      {
+        "version": 4,
+        "provider": "qwen",
+        "model": "qwen3.8-27b",
+        "thinkingLevel": "medium",
+        "modelId": "6657d7de-a2a9-40bc-a32f-86e80ad63698",
+        "capturedAt": 1793820827056,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793723460808,
+          "thinkingLevel": "medium"
+        },
+        "source": {
+          "name": "Qwen3.8 27B (Medium)",
+          "slug": "qwen3-8-27b-medium",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/qwen3-8-27b-medium",
+          "retrievedAt": 1793820826803,
+          "contentSha256": "81b17f84862ee32e241b79577e425ff3f1bfe863b0654d55165c2dadc796cf8a",
+          "recordSha256": "a2207ddfe882b4337df660b9515d6571da710fa6e38863feeefd9c1575bff597",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 17.5,
+          "coding": null,
+          "agentic": null,
+          "toolUse": 47.4226804123711,
+          "scientificReasoning": 32.877524082343335,
+          "longContext": 79.6666666666667,
+          "instructionFollowing": null,
+          "knowledge": 17.866666666666667,
+          "faithfulness": 34.57792207792207
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 14.0871177015755,
+          "gpqa": 84.5454545454545,
+          "critpt": 0
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": {
+              "normalizedScore": 47.4226804123711,
+              "sourceKind": "public-page",
+              "fieldPath": "tauBanking",
+              "benchmark": {
+                "id": "tau3-banking",
+                "version": "AA Intelligence Index v5.0.1",
+                "status": "current"
+              },
+              "retrievedAt": 1793820826803,
+              "sourceUrl": "https://artificialanalysis.ai/models/qwen3-8-27b-medium",
+              "sourceRecordDigest": "a2207ddfe882b4337df660b9515d6571da710fa6e38863feeefd9c1575bff597"
+            },
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "tau3-banking-single",
+            "score": 47.4226804123711
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.6666666666666666,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      },
+      {
+        "version": 4,
+        "provider": "qwen",
+        "model": "qwen3.8-27b",
+        "thinkingLevel": "off",
+        "modelId": "353c92f3-2148-4c2d-9231-aa7e1322a1fd",
+        "capturedAt": 1793820827562,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793723461889,
+          "thinkingLevel": "off"
+        },
+        "source": {
+          "name": "Qwen3.8 27B (Non-reasoning)",
+          "slug": "qwen3-8-27b-non-reasoning",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/qwen3-8-27b-non-reasoning",
+          "retrievedAt": 1793820827309,
+          "contentSha256": "aa12160b049f84507f16f0539510f4929b43667d267611e8bd1040cad6d8bc60",
+          "recordSha256": "5a17c2068eba3ad44aa6e08d5b59dde6aa5766883cc46f00946d3f93c90f3b49",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 10,
+          "coding": null,
+          "agentic": null,
+          "toolUse": 20,
+          "scientificReasoning": 31.41492242697063,
+          "longContext": 69.3333333333333,
+          "instructionFollowing": null,
+          "knowledge": 9.1,
+          "faithfulness": 81.99486615328199
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 12.1408711770158,
+          "gpqa": 81.8181818181818,
+          "critpt": 0.28571428571428603
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": {
+              "normalizedScore": 20,
+              "sourceKind": "public-page",
+              "fieldPath": "tauBanking",
+              "benchmark": {
+                "id": "tau3-banking",
+                "version": "AA Intelligence Index v5.0.1",
+                "status": "current"
+              },
+              "retrievedAt": 1793820827309,
+              "sourceUrl": "https://artificialanalysis.ai/models/qwen3-8-27b-non-reasoning",
+              "sourceRecordDigest": "5a17c2068eba3ad44aa6e08d5b59dde6aa5766883cc46f00946d3f93c90f3b49"
+            },
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "tau3-banking-single",
+            "score": 20
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.6666666666666666,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": false
+        }
+      },
+      {
+        "version": 4,
+        "provider": "qwen",
+        "model": "qwen3.8-27b",
+        "thinkingLevel": "xhigh",
+        "modelId": "b01dee41-c62b-48ed-8d16-984adc405e5c",
+        "capturedAt": 1793820827919,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793723462988,
+          "thinkingLevel": "xhigh"
+        },
+        "source": {
+          "name": "Qwen3.8 27B (Xhigh)",
+          "slug": "qwen3-8-27b",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/qwen3-8-27b",
+          "retrievedAt": 1793820827667,
+          "contentSha256": "be9f9a1625e1d81d0e79e49e829129b938d8a38124e51fa1d20112bda1f32058",
+          "recordSha256": "443627df4ea94a48e36f9a2a8021620d96e708cd42dfa7c7443a4764c08e4da2",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 20.1,
+          "coding": null,
+          "agentic": null,
+          "toolUse": 48.041237113402104,
+          "scientificReasoning": 43.28463950150697,
+          "longContext": 82,
+          "instructionFollowing": null,
+          "knowledge": 17.299999999999997,
+          "faithfulness": 71.38250705360741
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 33.920296570899,
+          "gpqa": 90.5050505050505,
+          "critpt": 5.42857142857143
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": {
+              "normalizedScore": 48.041237113402104,
+              "sourceKind": "public-page",
+              "fieldPath": "tauBanking",
+              "benchmark": {
+                "id": "tau3-banking",
+                "version": "AA Intelligence Index v5.0.1",
+                "status": "current"
+              },
+              "retrievedAt": 1793820827667,
+              "sourceUrl": "https://artificialanalysis.ai/models/qwen3-8-27b",
+              "sourceRecordDigest": "443627df4ea94a48e36f9a2a8021620d96e708cd42dfa7c7443a4764c08e4da2"
+            },
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "tau3-banking-single",
+            "score": 48.041237113402104
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.6666666666666666,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      }
+    ]
+  },
+  "benchlm": {
+    "version": 1,
+    "runtimeId": "model-testing/qwen3.8-27b",
+    "canonicalId": "qwen/qwen3.8-27b",
+    "model": "Qwen3.8-27B",
+    "creator": "Alibaba",
+    "capturedAt": 1793907107528,
+    "lastUpdated": "2026-11-05",
+    "methodologyVersion": "bench-align-v5.8-2026-09-30",
+    "sourceSnapshotId": "2026-11-05-3904bad35f77cff7",
+    "attribution": "Data from BenchLM.ai",
+    "license": "CC BY-NC 4.0",
+    "categoryScores": {
+      "coding": 45.96,
+      "agentic": 63.05,
+      "instructionFollowing": 86.9,
+      "knowledge": 48.82,
+      "reasoning": 81.3,
+      "multimodalGrounded": 82.5
+    },
+    "categoryProvenance": {
+      "coding": "leaderboard",
+      "agentic": "leaderboard",
+      "instructionFollowing": "leaderboard",
+      "knowledge": "leaderboard",
+      "reasoning": "leaderboard",
+      "multimodalGrounded": "leaderboard"
+    },
+    "categoryEvidence": {
+      "coding": {
+        "rows": 9,
+        "independentlyVerified": 4
+      },
+      "agentic": {
+        "rows": 9,
+        "independentlyVerified": 2
+      },
+      "instructionFollowing": {
+        "rows": 1,
+        "independentlyVerified": 0
+      },
+      "knowledge": {
+        "rows": 6,
+        "independentlyVerified": 2
+      },
+      "multimodalGrounded": {
+        "rows": 12,
+        "independentlyVerified": 2
+      }
+    },
+    "categories": [
+      {
+        "key": "agentic",
+        "label": "Agentic",
+        "score": 63.1,
+        "rank": 20,
+        "total": 135
+      },
+      {
+        "key": "coding",
+        "label": "Coding",
+        "score": 46,
+        "rank": 56,
+        "total": 156
+      },
+      {
+        "key": "reasoning",
+        "label": "Reasoning",
+        "score": 81.3,
+        "rank": 7,
+        "total": 26
+      },
+      {
+        "key": "multimodalGrounded",
+        "label": "Multimodal",
+        "score": 82.5,
+        "rank": 16,
+        "total": 58
+      },
+      {
+        "key": "knowledge",
+        "label": "Knowledge",
+        "score": 48.8,
+        "rank": 85,
+        "total": 177
+      },
+      {
+        "key": "multilingual",
+        "label": "Multilingual",
+        "score": null,
+        "rank": null,
+        "total": 17
+      },
+      {
+        "key": "instructionFollowing",
+        "label": "Instruction following",
+        "score": 86.9,
+        "rank": 44,
+        "total": 157
+      },
+      {
+        "key": "math",
+        "label": "Math",
+        "score": null,
+        "rank": null,
+        "total": 12
+      }
+    ],
+    "details": [
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "terminalBench21",
+        "name": "Terminal-Bench 2.1",
+        "value": 73,
+        "formatted": "73.0%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "coworkBench",
+        "name": "CoWorkBench",
+        "value": 70.7,
+        "formatted": "70.7%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "jobBench",
+        "name": "JobBench",
+        "value": 33.4,
+        "formatted": "33.4%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "agentsLastExam",
+        "name": "Agents' Last Exam",
+        "value": 42.9,
+        "formatted": "42.9%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "osWorldVerified",
+        "name": "OSWorld-Verified",
+        "value": 84.3,
+        "formatted": "84.3%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "webArenaVerified",
+        "name": "WebArena-Verified",
+        "value": 64.8,
+        "formatted": "64.8%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "androidWorld",
+        "name": "AndroidWorld",
+        "value": 81.9,
+        "formatted": "81.9%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "valsTerminalBench21",
+        "name": "Terminal-Bench 2.1 (Vals)",
+        "value": 58.4,
+        "formatted": "58.4%",
+        "verificationStatus": "aggregator_verified",
+        "verificationLabel": "Verified",
+        "source": {
+          "label": "Vals AI: Terminal-Bench 2.1 leaderboard",
+          "url": "https://www.vals.ai/models/alibaba_qwen3.8-27b",
+          "retrievedAt": null,
+          "publisher": "Vals AI",
+          "publisherUrl": "https://www.vals.ai/",
+          "sourceLabel": "Vals AI",
+          "sourceRole": "published-evaluation-results",
+          "scope": "Published leaderboard aggregates and evaluation settings only. Dataset contents are not included.",
+          "datasetContentsIncluded": false,
+          "licenseGrantIncluded": false,
+          "benchmarkUrl": "https://www.vals.ai/benchmarks/terminal-bench-2-1"
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "mazeBench",
+        "name": "MazeBench",
+        "value": 0,
+        "formatted": "0%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "MazeBench AI leaderboard (ASCII mode)",
+          "url": "https://mazebench.com/leaderboard/ai?mode=ascii&tools=0&metric=gems&run=run-2026-10-23T21-38-28-532Z-e2a66a",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "terminalBench21",
+        "name": "Terminal-Bench 2.1",
+        "value": 73,
+        "formatted": "73.0%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "swePro",
+        "name": "SWE-bench Pro",
+        "value": 61.7,
+        "formatted": "61.7%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "nl2Repo",
+        "name": "NL2Repo",
+        "value": 42.3,
+        "formatted": "42.3%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "deepSwe",
+        "name": "DeepSWE",
+        "value": 42.2,
+        "formatted": "42.2%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "liveCodeBenchV6",
+        "name": "LiveCodeBench v6",
+        "value": 90.3,
+        "formatted": "90.3%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "vulcanBench",
+        "name": "VulcanBench v3",
+        "value": 82.6,
+        "formatted": "82.6%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "VulcanBench Eval Suite 3 leaderboard",
+          "url": "https://vulcanbench.com/leaderboard.html",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "valsLiveCodeBench",
+        "name": "LiveCodeBench (Vals)",
+        "value": 84,
+        "formatted": "84.0%",
+        "verificationStatus": "aggregator_verified",
+        "verificationLabel": "Verified",
+        "source": {
+          "label": "Vals AI: LiveCodeBench leaderboard",
+          "url": "https://www.vals.ai/models/alibaba_qwen3.8-27b",
+          "retrievedAt": null,
+          "publisher": "Vals AI",
+          "publisherUrl": "https://www.vals.ai/",
+          "sourceLabel": "Vals AI",
+          "sourceRole": "published-evaluation-results",
+          "scope": "Published leaderboard aggregates and evaluation settings only. Dataset contents are not included.",
+          "datasetContentsIncluded": false,
+          "licenseGrantIncluded": false,
+          "benchmarkUrl": "https://www.vals.ai/benchmarks/lcb"
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "valsSweBench",
+        "name": "SWE-bench (Vals)",
+        "value": 86,
+        "formatted": "86.0%",
+        "verificationStatus": "aggregator_verified",
+        "verificationLabel": "Verified",
+        "source": {
+          "label": "Vals AI: SWE-bench leaderboard",
+          "url": "https://www.vals.ai/models/alibaba_qwen3.8-27b",
+          "retrievedAt": null,
+          "publisher": "Vals AI",
+          "publisherUrl": "https://www.vals.ai/",
+          "sourceLabel": "Vals AI",
+          "sourceRole": "published-evaluation-results",
+          "scope": "Published leaderboard aggregates and evaluation settings only. Dataset contents are not included.",
+          "datasetContentsIncluded": false,
+          "licenseGrantIncluded": false,
+          "benchmarkUrl": "https://www.vals.ai/benchmarks/swebench"
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "bug-hunt-bench",
+        "name": "Bug Hunt Bench",
+        "value": 15,
+        "formatted": "15.0 fixes",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Bug Hunt Bench public data",
+          "url": "https://bughunt.productcompass.pm/data/benchmark.json",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "extractBenchLlamaIndex",
+        "name": "ExtractBench (LlamaIndex)",
+        "value": 89.75,
+        "formatted": "89.75%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ExtractBench leaderboard, November 5, 2026 snapshot (LlamaIndex)",
+          "url": "https://www.extractbench.ai/#leaderboard",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "parseBenchLlamaIndex",
+        "name": "ParseBench",
+        "value": 69.03,
+        "formatted": "69.03%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ParseBench leaderboard, November 5, 2026 snapshot (LlamaIndex)",
+          "url": "https://www.parsebench.ai/#leaderboard",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "mathVision",
+        "name": "MathVision",
+        "value": 90,
+        "formatted": "90.0%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "mathVisionPython",
+        "name": "MathVision w/ Python",
+        "value": 94.6,
+        "formatted": "94.6%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "babyVision",
+        "name": "BabyVision",
+        "value": 65.7,
+        "formatted": "65.7%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "babyVisionPython",
+        "name": "BabyVision w/ Python",
+        "value": 85.6,
+        "formatted": "85.6%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "vision2Web",
+        "name": "Vision2Web",
+        "value": 62.9,
+        "formatted": "62.9%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "charxivNoTools",
+        "name": "CharXiv w/o tools",
+        "value": 83.7,
+        "formatted": "83.7%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "charxiv",
+        "name": "CharXiv",
+        "value": 90.2,
+        "formatted": "90.2%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "omniDocBench15",
+        "name": "OmniDocBench 1.5",
+        "value": 91.1,
+        "formatted": "91.1%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "realWorldQa",
+        "name": "RealWorldQA",
+        "value": 85.9,
+        "formatted": "85.9%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "erqa",
+        "name": "ERQA",
+        "value": 65.5,
+        "formatted": "65.5%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "gpqa",
+        "name": "GPQA",
+        "value": 89.2,
+        "formatted": "89.2%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "gpqaDiamond",
+        "name": "GPQA-D",
+        "value": 89.2,
+        "formatted": "89.2%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "hle",
+        "name": "HLE",
+        "value": 30.8,
+        "formatted": "30.8%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "hleNoTools",
+        "name": "HLE w/o tools",
+        "value": 30.8,
+        "formatted": "30.8%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "valsGpqaDiamond",
+        "name": "GPQA Diamond (Vals)",
+        "value": 88.9,
+        "formatted": "88.9%",
+        "verificationStatus": "aggregator_verified",
+        "verificationLabel": "Verified",
+        "source": {
+          "label": "Vals AI: GPQA Diamond leaderboard",
+          "url": "https://www.vals.ai/models/alibaba_qwen3.8-27b",
+          "retrievedAt": null,
+          "publisher": "Vals AI",
+          "publisherUrl": "https://www.vals.ai/",
+          "sourceLabel": "Vals AI",
+          "sourceRole": "published-evaluation-results",
+          "scope": "Published leaderboard aggregates and evaluation settings only. Dataset contents are not included.",
+          "datasetContentsIncluded": false,
+          "licenseGrantIncluded": false,
+          "benchmarkUrl": "https://www.vals.ai/benchmarks/gpqa"
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "valsMmluPro",
+        "name": "MMLU-Pro (Vals)",
+        "value": 84.3,
+        "formatted": "84.3%",
+        "verificationStatus": "aggregator_verified",
+        "verificationLabel": "Verified",
+        "source": {
+          "label": "Vals AI: MMLU Pro leaderboard",
+          "url": "https://www.vals.ai/models/alibaba_qwen3.8-27b",
+          "retrievedAt": null,
+          "publisher": "Vals AI",
+          "publisherUrl": "https://www.vals.ai/",
+          "sourceLabel": "Vals AI",
+          "sourceRole": "published-evaluation-results",
+          "scope": "Published leaderboard aggregates and evaluation settings only. Dataset contents are not included.",
+          "datasetContentsIncluded": false,
+          "licenseGrantIncluded": false,
+          "benchmarkUrl": "https://www.vals.ai/benchmarks/mmlu_pro"
+        }
+      },
+      {
+        "category": "instructionFollowing",
+        "categoryLabel": "Instruction following",
+        "key": "ifBench",
+        "name": "IFBench",
+        "value": 79.5,
+        "formatted": "79.5%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Qwen3.8-27B model card",
+          "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "Decision Models",
+        "key": "perplexityDecisionWinoGrande",
+        "name": "WinoGrande (Perplexity panel)",
+        "value": 73.1,
+        "formatted": "73.10%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Perplexity decision panel: WinoGrande",
+          "url": "https://huggingface.co/perplexity-ai/pplx-decider-v1-27b/blob/9ce1abcf1f00209405376b5bcc81225c8f8cf514/README.md",
+          "retrievedAt": "2026-10-01"
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "Decision Models",
+        "key": "perplexityDecisionFinancialPhraseBank",
+        "name": "FinancialPhraseBank (Perplexity panel)",
+        "value": 75.68,
+        "formatted": "75.68%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Perplexity decision panel: FinancialPhraseBank",
+          "url": "https://huggingface.co/perplexity-ai/pplx-decider-v1-27b/blob/9ce1abcf1f00209405376b5bcc81225c8f8cf514/README.md",
+          "retrievedAt": "2026-10-01"
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "Decision Models",
+        "key": "perplexityDecisionRagTruth",
+        "name": "RAGTruth (Perplexity panel)",
+        "value": 61.53,
+        "formatted": "61.53%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Perplexity decision panel: RAGTruth",
+          "url": "https://huggingface.co/perplexity-ai/pplx-decider-v1-27b/blob/9ce1abcf1f00209405376b5bcc81225c8f8cf514/README.md",
+          "retrievedAt": "2026-10-01"
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "Decision Models",
+        "key": "perplexityDecisionJudgeBench",
+        "name": "JudgeBench (Perplexity panel)",
+        "value": 68.86,
+        "formatted": "68.86%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Perplexity decision panel: JudgeBench",
+          "url": "https://huggingface.co/perplexity-ai/pplx-decider-v1-27b/blob/9ce1abcf1f00209405376b5bcc81225c8f8cf514/README.md",
+          "retrievedAt": "2026-10-01"
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "Decision Models",
+        "key": "perplexityDecisionBbh",
+        "name": "BBH (Perplexity panel)",
+        "value": 72.8,
+        "formatted": "72.80%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Perplexity decision panel: BBH",
+          "url": "https://huggingface.co/perplexity-ai/pplx-decider-v1-27b/blob/9ce1abcf1f00209405376b5bcc81225c8f8cf514/README.md",
+          "retrievedAt": "2026-10-01"
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "Decision Models",
+        "key": "perplexityDecisionJevBenchPublicHard",
+        "name": "JevBench public hard (Perplexity panel)",
+        "value": 72.28,
+        "formatted": "72.28%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Perplexity decision panel: JevBench public hard",
+          "url": "https://huggingface.co/perplexity-ai/pplx-decider-v1-27b/blob/9ce1abcf1f00209405376b5bcc81225c8f8cf514/README.md",
+          "retrievedAt": "2026-10-01"
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "Decision Models",
+        "key": "perplexityDecisionTabFact",
+        "name": "TabFact (Perplexity panel)",
+        "value": 78.6,
+        "formatted": "78.60%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Perplexity decision panel: TabFact",
+          "url": "https://huggingface.co/perplexity-ai/pplx-decider-v1-27b/blob/9ce1abcf1f00209405376b5bcc81225c8f8cf514/README.md",
+          "retrievedAt": "2026-10-01"
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "Decision Models",
+        "key": "perplexityDecisionContractNli",
+        "name": "ContractNLI (Perplexity panel)",
+        "value": 80.78,
+        "formatted": "80.78%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Perplexity decision panel: ContractNLI",
+          "url": "https://huggingface.co/perplexity-ai/pplx-decider-v1-27b/blob/9ce1abcf1f00209405376b5bcc81225c8f8cf514/README.md",
+          "retrievedAt": "2026-10-01"
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "Decision Models",
+        "key": "perplexityDecisionCirca",
+        "name": "Circa (Perplexity panel)",
+        "value": 87,
+        "formatted": "87.00%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Perplexity decision panel: Circa",
+          "url": "https://huggingface.co/perplexity-ai/pplx-decider-v1-27b/blob/9ce1abcf1f00209405376b5bcc81225c8f8cf514/README.md",
+          "retrievedAt": "2026-10-01"
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "Decision Models",
+        "key": "perplexityDecisionBelebele",
+        "name": "Belebele (Perplexity panel)",
+        "value": 93.2,
+        "formatted": "93.20%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Perplexity decision panel: Belebele",
+          "url": "https://huggingface.co/perplexity-ai/pplx-decider-v1-27b/blob/9ce1abcf1f00209405376b5bcc81225c8f8cf514/README.md",
+          "retrievedAt": "2026-10-01"
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "Decision Models",
+        "key": "perplexityDecisionTruthfulQaBinary",
+        "name": "TruthfulQA binary (Perplexity panel)",
+        "value": 82.8,
+        "formatted": "82.80%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Perplexity decision panel: TruthfulQA binary",
+          "url": "https://huggingface.co/perplexity-ai/pplx-decider-v1-27b/blob/9ce1abcf1f00209405376b5bcc81225c8f8cf514/README.md",
+          "retrievedAt": "2026-10-01"
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "Decision Models",
+        "key": "perplexityDecisionPanel",
+        "name": "Perplexity Decision Panel",
+        "value": 74.76,
+        "formatted": "74.76%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Perplexity decision panel: Overall",
+          "url": "https://huggingface.co/perplexity-ai/pplx-decider-v1-27b/blob/9ce1abcf1f00209405376b5bcc81225c8f8cf514/README.md",
+          "retrievedAt": "2026-10-01"
+        }
+      }
+    ],
+    "modelAliases": [
+      "model-testing/qwen3.8-27b",
+      "qwen/qwen3.8-27b",
+      "reallms/qwen3.8-27b"
+    ]
+  }
+}

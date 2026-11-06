@@ -2,9 +2,10 @@ import { constants as fsConstants } from "node:fs";
 import { createHash } from "node:crypto";
 import { copyFile, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile, chmod } from "node:fs/promises";
 import path from "node:path";
-import { assertSecureDirectory, assertSecureFile, baseConfig, canonicalIdentity, ensureSecureDirectory, loadDiscoverConfig, loadMappings, loadRuntimeConfig, loadWriterConfig, readOptionalSecureJson, readSecureJson, type BaseConfig, type WriterConfig } from "./config.ts";
+import { assertSecureDirectory, assertSecureFile, baseConfig, canonicalIdentity, ensureSecureDirectory, loadDiscoverConfig, loadMappings, loadRuntimeConfig, loadWriterConfig, readOptionalSecureJson, type BaseConfig, type WriterConfig } from "./config.ts";
 import { fetchCatalog, fetchPublicModel, type CatalogRecord, type CatalogResult, type PublicResult } from "./client.ts";
-import { AaMethodologyMismatchError, BENCHMARK_HEALTH_FIELDS, DIMENSIONS, METHODOLOGY, PUBLIC_METHODOLOGY_VERSION, UUID, benchmarkHealthDigest, canonicalDigest, canonicalize, codePointCompare, compareIdentity, extractLegacyV4Mappings, extractStrictV3Mappings, isRecord, isThinkingLevel, manifestEntriesDigest, semanticSnapshotDigest, validateBatchMappings, validateBenchmarkHealth, validateCanonicalMappings, validateManifest, validateSnapshot, type BatchMapping, type BenchmarkHealthV1, type CanonicalMapping, type ManifestEntry, type ManifestV4, type ThinkingLevel } from "./schema.ts";
+import { assertNameCollisionSafe, compositeFileName, compositeModelKey, extractAaVariants, readComposite, writeCompositeBlock } from "../../04-subagents/asset-composite.ts";
+import { AaMethodologyMismatchError, BENCHMARK_HEALTH_FIELDS, BENCHMARK_HEALTH_SOURCE_KEYS, DIMENSIONS, METHODOLOGY, PUBLIC_METHODOLOGY_VERSION, UUID, benchmarkHealthDigest, canonicalDigest, canonicalize, codePointCompare, compareIdentity, extractLegacyV4Mappings, extractStrictV3Mappings, isRecord, isThinkingLevel, manifestEntriesDigest, semanticSnapshotDigest, validateBatchMappings, validateBenchmarkHealth, validateCanonicalMappings, validateManifest, validateSnapshot, type BatchMapping, type BenchmarkHealthV1, type CanonicalMapping, type ManifestEntry, type ManifestV4, type ThinkingLevel } from "./schema.ts";
 
 export interface AaCandidate { aaModelId: string; slug: string; name: string; }
 export interface ReviewedVariant extends AaCandidate { thinkingLevel: ThinkingLevel; }
@@ -26,7 +27,12 @@ export interface FileSystemHooks { beforeInstall?(file: string): void | Promise<
 export interface ServiceDependencies { fetchCatalog: typeof fetchCatalog; fetchPublicModel: typeof fetchPublicModel; now(): number; fsHooks: FileSystemHooks; }
 
 const PRUNE_GRACE_MS = 300_000;
-const GENERATED_SNAPSHOT = /^[a-f0-9]{16}-[a-f0-9]{16}\.json$/;
+const GENERATED_SNAPSHOT = /^(?:[a-f0-9]{16}-[a-f0-9]{16}|[A-Za-z0-9][A-Za-z0-9._-]*)\.json$/;
+async function isGeneratedSnapshot(target: string, file: string): Promise<boolean> {
+  if (/^[a-f0-9]{16}-[a-f0-9]{16}\.json$/.test(file)) return true;
+  const composite = await readComposite(target);
+  return composite !== null && composite.version === 2 && compositeFileName(composite.model) === file;
+}
 const digestText = (value: string) => createHash("sha256").update(value).digest("hex");
 const ordered = (values: Iterable<string>) => [...new Set(values)].sort(codePointCompare);
 function displayArtifactPath(snapshotRoot: string, targetPath: string): string {
@@ -67,9 +73,12 @@ async function validateArtifactsForManifest(config: BaseConfig, loaded: LoadedMa
   if (manifest.generatedAt > now + 60_000 || (requireFresh && now - manifest.generatedAt > config.limits.maxAgeMs)) throw new Error("benchmark manifest is not current");
   const snapshots = new Map<string, unknown>();
   for (const entry of manifest.models) {
-    const file = path.join(config.paths.modelsDir, entry.file); const snapshot = await secureSnapshot(file, beforeSnapshotRead); assertEntrySnapshot(entry, snapshot, manifest.generatedAt);
+    const file = path.join(config.paths.modelsDir, entry.file); const parsed = await secureSnapshot(file, beforeSnapshotRead); const variants = extractAaVariants(parsed);
+    const snapshot = variants.find((variant) => isRecord(variant) && variant.modelId === entry.modelId && canonicalDigest(variant) === entry.contentDigest) ?? (variants.length === 1 && !("aa" in (parsed as object)) ? variants[0] : undefined);
+    if (snapshot === undefined) throw new Error(`missing referenced benchmark snapshot: ${entry.file}`);
+    assertEntrySnapshot(entry, snapshot, manifest.generatedAt);
     if (requireFresh && (now - entry.capturedAt > config.limits.maxAgeMs || entry.capturedAt > now + 60_000)) throw new Error(`stale snapshot: ${entry.file}`);
-    snapshots.set(entry.file, snapshot);
+    snapshots.set(entry.modelId, snapshot);
   }
   const mappings = await readOptionalSecureJson(config.paths.mappings);
   if (mappings !== null) {
@@ -129,6 +138,19 @@ function resolveMetric(apiValue: unknown, pageValue: unknown, field: string, tol
   return { api, page, score: api ?? page };
 }
 function checkedScore(score: number | null): number | null { if (score !== null && (!Number.isFinite(score) || score < 0 || score > 100)) throw new Error("AA evaluation value is outside the routing scale"); return score; }
+/**
+ * Capability evidence read off the same exact-identity public page record as the
+ * scores. Only modalities pi can express are recorded (text, image); speech and
+ * video are intentionally absent because pi cannot route them, and an absent key
+ * means "not evidenced" rather than "not supported".
+ */
+function pageCapabilities(record: Record<string, unknown>): Record<string, unknown> | undefined {
+  const capabilities: Record<string, unknown> = {};
+  if (record.inputModalityText === true || record.inputModalityImage === true) capabilities.input = ["text", "image"].filter((modality) => record[`inputModality${modality === "text" ? "Text" : "Image"}`] === true);
+  if (typeof record.isReasoning === "boolean") capabilities.reasoning = record.isReasoning;
+  return Object.keys(capabilities).length ? capabilities : undefined;
+}
+
 function buildSnapshot(mapping: BatchMapping, api: CatalogRecord, page: PublicResult, sourceUrl: string, capturedAt: number, reviewedAt: number): Record<string, unknown> {
   validateExternalIdentity(api);
   if (page.record.id !== api.id || page.record.slug !== api.slug || page.record.name !== api.name) throw new Error("public currentModel identity does not exactly match catalog");
@@ -153,12 +175,25 @@ function buildSnapshot(mapping: BatchMapping, api: CatalogRecord, page: PublicRe
     return { normalizedScore: score, sourceKind: fromApi ? "api" : "public-page", fieldPath: fromApi ? apiPath : pagePath, benchmark: { id: benchmark, version: `AA Intelligence Index v${fromApi ? METHODOLOGY.version : PUBLIC_METHODOLOGY_VERSION}`, status: "current" }, retrievedAt: fromApi ? capturedAt : page.provenance.retrievedAt, sourceUrl: fromApi ? sourceUrl : page.provenance.url, sourceRecordDigest: fromApi ? apiDigest : page.provenance.recordSha256 };
   };
   const tau3Component = component(tau3, "evaluations.tau_banking", "tauBanking", "tau3-banking"); const gdpComponent = component(gdp, "evaluations.gdpval_aa_normalized", "gdpvalNormalized", "gdpval-aa"); const tau2Component = component(tau2, "evaluations.tau2_telecom", "tau2", "tau2-telecom");
-  const derivation = tau3Component && gdpComponent ? { version: "v1", rule: "tau3-banking+gdpval-aa", score: ((tau3Component.normalizedScore as number) + (gdpComponent.normalizedScore as number)) / 2 } : tau2Component ? { version: "v1", rule: "tau2-telecom-fallback", score: tau2Component.normalizedScore } : { version: "v1", rule: "unavailable", score: null };
+  // Reviewed 2026-10 tool-use ladder. AA retired gdpval-aa upstream while still publishing tau-banking and,
+  // for older releases, tau2-telecom, so the reviewed component set is averaged over whatever AA still publishes
+  // for this exact model, richest set first. Every branch records the rule it used, and no routing floor changed.
+  const componentScore = (component: Record<string, unknown> | null) => component!.normalizedScore as number;
+  const derivation = tau3Component && gdpComponent
+    ? { version: "v2" as const, rule: "tau3-banking+gdpval-aa", score: (componentScore(tau3Component) + componentScore(gdpComponent)) / 2 }
+    : tau3Component && tau2Component
+      ? { version: "v2" as const, rule: "tau3-banking+tau2-telecom", score: (componentScore(tau3Component) + componentScore(tau2Component)) / 2 }
+      : tau3Component
+        ? { version: "v2" as const, rule: "tau3-banking-single", score: componentScore(tau3Component) }
+        : tau2Component
+          ? { version: "v2" as const, rule: "tau2-telecom-fallback", score: componentScore(tau2Component) }
+          : { version: "v2" as const, rule: "unavailable", score: null };
   const scientific = hle.score !== null && gpqa.score !== null && crit.score !== null ? (hle.score + gpqa.score + crit.score) / 3 : null;
   const scores: Record<string, number | null> = { intelligence: checkedScore(intelligence.score), coding: checkedScore(percent(evaluations.artificial_analysis_coding_index)), agentic: checkedScore(agentic.score), toolUse: checkedScore(derivation.score as number | null), scientificReasoning: checkedScore(scientific), longContext: checkedScore(longContext.score), instructionFollowing: checkedScore(instructions.score), knowledge: checkedScore(knowledge.score), faithfulness: checkedScore(faithfulness.score) };
   const present = DIMENSIONS.filter((dimension) => scores[dimension] !== null).length;
   const subBenchmarks = { ifbench: checkedScore(instructions.score), hle: checkedScore(hle.score), gpqa: checkedScore(gpqa.score), critpt: checkedScore(crit.score) };
-  return { version: 4, provider: mapping.provider, model: mapping.model, thinkingLevel: mapping.thinkingLevel, modelId: mapping.aaModelId, capturedAt, methodology: { ...METHODOLOGY }, mapping: { status: "mapped", matchBasis: "manual", reviewedAt, thinkingLevel: mapping.thinkingLevel }, source: { name: api.name, slug: api.slug, openrouterApiId: typeof api.openrouter_api_id === "string" ? api.openrouter_api_id : null }, publicPage: page.provenance, scores, subBenchmarks, toolUse: { components: { tau3Banking: tau3Component, gdpvalAaNormalized: gdpComponent, tau2Telecom: tau2Component }, derivation }, outputTokens: {}, taskTimeMs: {}, coverage: present / DIMENSIONS.length };
+  const capabilities = pageCapabilities(page.record);
+  return { version: 4, provider: mapping.provider, model: mapping.model, thinkingLevel: mapping.thinkingLevel, modelId: mapping.aaModelId, capturedAt, methodology: { ...METHODOLOGY }, mapping: { status: "mapped", matchBasis: "manual", reviewedAt, thinkingLevel: mapping.thinkingLevel }, source: { name: api.name, slug: api.slug, openrouterApiId: typeof api.openrouter_api_id === "string" ? api.openrouter_api_id : null }, publicPage: page.provenance, scores, subBenchmarks, toolUse: { components: { tau3Banking: tau3Component, gdpvalAaNormalized: gdpComponent, tau2Telecom: tau2Component }, derivation }, outputTokens: {}, taskTimeMs: {}, coverage: present / DIMENSIONS.length, ...(capabilities ? { capabilities } : {}) };
 }
 
 function mappingsFromManifest(manifest: ManifestV4): BatchMapping[] { return manifest.models.map((entry) => ({ provider: entry.provider, model: entry.model, thinkingLevel: entry.thinkingLevel, aaModelId: entry.modelId })); }
@@ -205,7 +240,7 @@ async function baseline(config: WriterConfig, allowV3: boolean, now: number): Pr
   const legacy = extractLegacyV4Mappings(value); if (legacy) return { manifest: null, snapshots: new Map(), v3: legacy, canonicalMappings };
   if (!validateManifest(value) || manifestEntriesDigest(value.models) !== value.digest || value.generatedAt > now + 60_000) throw new Error("invalid or unsupported manifest");
   const snapshots = new Map<string, unknown>();
-  for (const entry of value.models) { const snapshot = await secureSnapshot(path.join(config.paths.modelsDir, entry.file)); assertEntrySnapshot(entry, snapshot, value.generatedAt); snapshots.set(entry.file, snapshot); }
+  for (const entry of value.models) { const parsed = await secureSnapshot(path.join(config.paths.modelsDir, entry.file)); const variants = extractAaVariants(parsed); const snapshot = variants.find((variant) => isRecord(variant) && variant.modelId === entry.modelId && canonicalDigest(variant) === entry.contentDigest) ?? (variants.length === 1 && !("aa" in (parsed as object)) ? variants[0] : undefined); if (snapshot === undefined) throw new Error(`missing referenced benchmark snapshot: ${entry.file}`); assertEntrySnapshot(entry, snapshot, value.generatedAt); snapshots.set(entry.modelId, snapshot); }
   for (const mapping of canonicalMappings) if (!value.models.some((entry) => entry.modelId === mapping.aaModelId && entry.thinkingLevel === mapping.thinkingLevel && (idOf(entry) === idOf(mapping) || idOf(entry) === mapping.canonicalId))) throw new Error(`canonical mapping references a mismatched AA snapshot: ${mapping.aaModelId}`);
   return { manifest: value, snapshots, v3: null, canonicalMappings };
 }
@@ -243,8 +278,9 @@ class AaService {
       benchmarkHealth = { path: displayArtifactPath(snapshotRoot, benchmarkHealthTargetPath), targetPath: benchmarkHealthTargetPath, fingerprint: digestText(text) };
     } catch (error) { if (!isMissingSnapshot(error)) throw error; }
     const generatedSnapshotFiles: string[] = [];
-    for (const file of await readdir(config.paths.modelsDir)) if (GENERATED_SNAPSHOT.test(file)) {
-      await assertSecureFile(path.join(config.paths.modelsDir, file)); generatedSnapshotFiles.push(file);
+    for (const file of await readdir(config.paths.modelsDir)) {
+      const target = path.join(config.paths.modelsDir, file);
+      if (await isGeneratedSnapshot(target, file)) { await assertSecureFile(target); generatedSnapshotFiles.push(file); }
     }
     return { snapshotRoot, manifest, canonicalMappings, benchmarkHealth, manifestSnapshotFiles, generatedSnapshotFiles: ordered(generatedSnapshotFiles) };
   }
@@ -255,10 +291,10 @@ class AaService {
       for (const file of await readdir(config.paths.modelsDir)) {
         if (signal?.aborted) { warning(warnings, "snapshot cleanup was interrupted"); break; }
         if (!file.endsWith(".json")) continue;
-        if (!GENERATED_SNAPSHOT.test(file)) { warning(warnings, "snapshot cleanup skipped an unexpected file"); continue; }
+        if (!(await isGeneratedSnapshot(path.join(config.paths.modelsDir, file), file))) { warning(warnings, "snapshot cleanup skipped an unexpected file"); continue; }
         if (keep.has(file)) continue;
         const target = path.join(config.paths.modelsDir, file);
-        try { await assertSecureFile(target); await this.deps.fsHooks.beforePrune?.(file); await rm(target); deleted.push(`models/${file}`); }
+        try { await assertSecureFile(target); const composite = await readComposite(target); if (composite?.benchlm) continue; await this.deps.fsHooks.beforePrune?.(file); await rm(target); deleted.push(`models/${file}`); }
         catch { warning(warnings, "snapshot cleanup was incomplete after successful publication"); }
       }
       return { deleted: ordered(deleted), warnings: ordered(warnings) };
@@ -299,7 +335,7 @@ class AaService {
     const catalog = await this.deps.fetchCatalog({ ...config, apiUrl: new URL("https://artificialanalysis.ai/api/v2/language/models/free") }, signal);
     const variantSuffix = /-(low|medium|high|xhigh|max|minimal|non-reasoning|none|thinking|instruct|it|fp\d*|q\d+|think|vl|fin)$/;
     const dated = catalog.records
-      .map((record) => ({ slug: record.slug, releaseDate: typeof record.release_date === "string" ? record.release_date : "" }))
+      .map((record) => ({ id: record.id, name: record.name, slug: record.slug, releaseDate: typeof record.release_date === "string" ? record.release_date : "", evaluations: isRecord(record.evaluations) ? record.evaluations : {} }))
       .filter((entry) => entry.slug && !variantSuffix.test(entry.slug) && /^\d{4}-\d{2}-\d{2}$/.test(entry.releaseDate));
     const newest = dated.reduce((max, entry) => entry.releaseDate > max ? entry.releaseDate : max, "");
     if (!newest || Number.isNaN(Date.parse(newest))) throw new Error("Artificial Analysis catalog contains no dated base releases to assess");
@@ -314,22 +350,28 @@ class AaService {
     const pages = new Map<string, Record<string, unknown>>();
     for (const record of sample) {
       abort(signal);
-      try { pages.set(record.slug, (await this.deps.fetchPublicModel(config, record.slug, signal)).record as unknown as Record<string, unknown>); }
+      try { pages.set(record.slug, (await this.deps.fetchPublicModel(config, record.slug, signal, { id: record.id, slug: record.slug, name: record.name })).record as unknown as Record<string, unknown>); }
       catch { warning(warnings, "benchmark health sampling skipped an unavailable model page"); }
     }
     const newestCohort = new Date(newestTime - 30 * 86_400_000).toISOString().slice(0, 10);
     const fields = {} as BenchmarkHealthV1["fields"];
     for (const field of BENCHMARK_HEALTH_FIELDS) {
-      let checked = 0; let scored = 0; let newestScored: string | null = null; let newestCohortScored = 0;
+      const keys = BENCHMARK_HEALTH_SOURCE_KEYS[field];
+      let checked = 0; let scored = 0; let carried = 0; let newestScored: string | null = null; let newestCohortScored = 0;
       for (const record of sample) {
         const pageRecord = pages.get(record.slug); if (!pageRecord) continue;
         checked++;
-        if (typeof pageRecord[field] !== "number" || !Number.isFinite(pageRecord[field])) continue;
+        // A metric counts when either surface AA publishes it on scores it: publication reads the
+        // authenticated API first, so a page-only view would misreport live metrics as retired.
+        const pageScored = keys.page.some((key) => typeof pageRecord[key] === "number" && Number.isFinite(pageRecord[key]));
+        const apiScored = keys.api.some((key) => typeof record.evaluations[key] === "number" && Number.isFinite(record.evaluations[key]));
+        if (keys.page.some((key) => key in pageRecord) || keys.api.some((key) => key in record.evaluations)) carried++;
+        if (!pageScored && !apiScored) continue;
         scored++;
         if (newestScored === null || record.releaseDate > newestScored) newestScored = record.releaseDate;
         if (record.releaseDate > newestCohort) newestCohortScored++;
       }
-      const status = checked < 10 ? "unknown" : scored === 0 ? "retired" : newestCohortScored > 0 ? "active" : "lagging";
+      const status = checked < 10 ? "unknown" : scored === 0 ? carried === 0 ? "retired" : "lagging" : newestCohortScored > 0 ? "active" : "lagging";
       fields[field] = { checked, scored, status, newestScoredRelease: newestScored };
     }
     const digestInput = { version: 1 as const, methodology: { ...METHODOLOGY }, fields };
@@ -339,10 +381,17 @@ class AaService {
       abort(signal);
       const existing = await readOptionalSecureJson(config.paths.benchmarkHealth);
       if (existing !== null) {
-        if (!validateBenchmarkHealth(existing)) throw new Error("invalid or unsupported benchmark-health.json");
-        if (existing.digest === digest) return { changed: false, fields, warnings };
+        // After a methodology pin move the published artifact legitimately describes the previous
+        // generation. Requiring it to validate against the new pin would make the pin impossible to
+        // complete, so a superseded sibling of the same artifact family is replaced, while a malformed or
+        // foreign artifact remains a hard failure.
+        const prior = isRecord(existing) && isRecord(existing.methodology) && existing.methodology.id === METHODOLOGY.id && typeof existing.methodology.version === "string" ? existing.methodology.version : undefined;
+        const superseded = prior !== undefined && prior !== METHODOLOGY.version;
+        if (!superseded && !validateBenchmarkHealth(existing)) throw new Error(`invalid or unsupported benchmark-health.json (saw ${JSON.stringify(isRecord(existing) ? existing.methodology ?? "no methodology" : typeof existing)})`);
+        if (superseded) warnings.push(`benchmark-health.json described Artificial Analysis ${prior}; regenerated for ${METHODOLOGY.version}`);
+        else if (existing.digest === digest) return { changed: false, fields, warnings };
       }
-      const next: BenchmarkHealthV1 = { version: 1, generatedAt: this.deps.now(), digest, ...digestInput };
+      const next: BenchmarkHealthV1 = { ...digestInput, version: 1, generatedAt: this.deps.now(), digest };
       const stage = path.join(transaction.staging, "benchmark-health.json");
       await writeFile(stage, jsonPretty(next), { mode: 0o600, flag: "wx" }); await chmod(stage, 0o600); await assertSecureFile(stage);
       await rename(stage, config.paths.benchmarkHealth);
@@ -390,30 +439,40 @@ class AaService {
     reviewedCatalog?: CatalogResult,
     options: PublicationOptions = {},
   ): Promise<PublicationResult> {
-    const config = await loadWriterConfig(env); const transaction = await acquire(config); const installed: string[] = []; let committed = false; const warnings: string[] = [];
+    const config = await loadWriterConfig(env); const transaction = await acquire(config); const installed: Array<{ file: string; previous: string | null }> = []; let committed = false; const warnings: string[] = [];
     try {
       abort(signal); const base = await baseline(config, allowV3, this.deps.now()); const mappings = derive(base, config); const baselineMappings = base.manifest ? mappingsFromManifest(base.manifest) : base.v3 ?? []; validateConfiguredBatch(config, mappings, baselineMappings); const canonicalMappings = base.canonicalMappings;
       const catalog = reviewedCatalog ?? await this.deps.fetchCatalog({ ...config, apiUrl: new URL("https://artificialanalysis.ai/api/v2/language/models/free") }, signal);
       assertFreeCatalog(catalog);
       const records = new Map<string, CatalogRecord[]>(); for (const record of catalog.records) { const list = records.get(record.id) ?? []; list.push(record); records.set(record.id, list); }
-      const entries: ManifestEntry[] = []; const stagedFiles = new Map<string, string>();
+      const entries: ManifestEntry[] = []; const composites = new Map<string, { file: string; modelId: string; variants: unknown[] }>();
       for (const mapping of [...mappings].sort(compareIdentity)) {
         abort(signal); const matches = records.get(mapping.aaModelId) ?? []; if (matches.length !== 1) throw new Error(`reviewed AA model id is absent or ambiguous: ${mapping.aaModelId}`); const api = matches[0]!; validateExternalIdentity(api);
         const publicConfig: BaseConfig = { paths: config.paths, limits: config.limits, apiUrl: config.apiUrl };
-        const publicResult = await this.deps.fetchPublicModel(publicConfig, api.slug, signal); const capturedAt = this.deps.now();
-        const old = base.manifest?.models.find((entry) => entry.provider === mapping.provider && entry.model === mapping.model && entry.thinkingLevel === mapping.thinkingLevel && entry.modelId === mapping.aaModelId); const oldSnapshot = old ? base.snapshots.get(old.file) : undefined; const reviewedAt = oldSnapshot && isRecord(oldSnapshot) && isRecord(oldSnapshot.mapping) && typeof oldSnapshot.mapping.reviewedAt === "number" ? oldSnapshot.mapping.reviewedAt : capturedAt;
+        const publicResult = await this.deps.fetchPublicModel(publicConfig, api.slug, signal, { id: api.id, slug: api.slug, name: api.name }); const capturedAt = this.deps.now();
+        const old = base.manifest?.models.find((entry) => entry.provider === mapping.provider && entry.model === mapping.model && entry.thinkingLevel === mapping.thinkingLevel && entry.modelId === mapping.aaModelId); const oldSnapshot = old ? base.snapshots.get(old.modelId) : undefined; const reviewedAt = oldSnapshot && isRecord(oldSnapshot) && isRecord(oldSnapshot.mapping) && typeof oldSnapshot.mapping.reviewedAt === "number" ? oldSnapshot.mapping.reviewedAt : capturedAt;
         const snapshot = buildSnapshot(mapping, api, publicResult, catalog.sourceUrl, capturedAt, reviewedAt); if (!validateSnapshot(snapshot)) throw new Error("constructed snapshot failed schema validation"); abort(signal);
-        if (old && oldSnapshot && capturedAt - old.capturedAt <= config.limits.maxAgeMs && semanticSnapshotDigest(snapshot) === semanticSnapshotDigest(oldSnapshot)) { entries.push(old); continue; }
-        const identityHash = canonicalDigest(`${mapping.provider}/${mapping.model}/${mapping.thinkingLevel ?? "null"}`).slice(0, 16); const stable = structuredClone(snapshot); delete (stable as Record<string, unknown>).capturedAt; const file = `${identityHash}-${canonicalDigest(stable).slice(0, 16)}.json`; const stage = path.join(transaction.staging, file); await writeFile(stage, jsonPretty(snapshot), { mode: 0o600, flag: "wx" }); await chmod(stage, 0o600); await assertSecureFile(stage); const contentDigest = canonicalDigest(snapshot); entries.push({ provider: mapping.provider, model: mapping.model, thinkingLevel: mapping.thinkingLevel, modelId: mapping.aaModelId, file, capturedAt, contentDigest }); stagedFiles.set(file, stage);
+        const runtimeId = `${mapping.provider}/${mapping.model}`; const modelKey = compositeModelKey(runtimeId); const file = compositeFileName(runtimeId); const group = composites.get(modelKey) ?? { file, modelId: modelKey, variants: [] as unknown[] };
+        if (old && oldSnapshot && capturedAt - old.capturedAt <= config.limits.maxAgeMs && semanticSnapshotDigest(snapshot) === semanticSnapshotDigest(oldSnapshot)) { entries.push({ ...old, file }); group.variants.push(oldSnapshot); composites.set(modelKey, group); continue; }
+        if (oldSnapshot && old) group.variants.push(oldSnapshot);
+        group.variants.push(snapshot); composites.set(modelKey, group); const contentDigest = canonicalDigest(snapshot); entries.push({ provider: mapping.provider, model: mapping.model, thinkingLevel: mapping.thinkingLevel, modelId: mapping.aaModelId, file, capturedAt, contentDigest });
       }
       entries.sort(compareIdentity); const digest = manifestEntriesDigest(entries); const now = this.deps.now(); const manifestChanged = !base.manifest || base.manifest.digest !== digest || now - base.manifest.generatedAt > config.limits.maxAgeMs;
       if (!manifestChanged) return { changed: false, warnings };
       const next: ManifestV4 = { version: 4, generatedAt: now, digest, methodology: { ...METHODOLOGY }, models: entries }; if (!validateManifest(next)) throw new Error("constructed manifest failed schema validation");
       for (const mapping of canonicalMappings) if (!entries.some((entry) => entry.modelId === mapping.aaModelId && entry.thinkingLevel === mapping.thinkingLevel && (idOf(entry) === idOf(mapping) || idOf(entry) === mapping.canonicalId))) throw new Error(`canonical mapping references a mismatched AA snapshot: ${mapping.aaModelId}`);
-      for (const [file, stage] of stagedFiles) {
-        abort(signal); await this.deps.fsHooks.beforeInstall?.(file); const destination = path.join(config.paths.modelsDir, file);
-        try { await copyFile(stage, destination, fsConstants.COPYFILE_EXCL); installed.push(destination); await chmod(destination, 0o600); await assertSecureFile(destination); }
-        catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; await assertSecureFile(destination); const collision = await readJsonFile(destination); const expected = entries.find((entry) => entry.file === file)!; if (!validateSnapshot(collision) || canonicalDigest(collision) !== expected.contentDigest) throw new Error(`snapshot filename collision: ${file}`); }
+      assertNameCollisionSafe([...composites.values()].map((group) => ({ modelId: group.modelId, target: group.file })));
+      for (const group of composites.values()) {
+        abort(signal); await this.deps.fsHooks.beforeInstall?.(group.file); const destination = path.join(config.paths.modelsDir, group.file);
+        let prior: ReturnType<typeof readComposite> extends Promise<infer R> ? R : never; prior = await readComposite(destination);
+        let existed = false;
+        try { await lstat(destination); existed = true; if (prior === null) throw new Error(`snapshot filename collision: ${group.file}`); }
+        catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT" && !String((error as Error).message).startsWith("snapshot filename collision")) throw error; if (String((error as Error).message).startsWith("snapshot filename collision")) throw error; }
+        const previous = existed ? await readFile(destination, "utf8") : null;
+        const priorVariants = Array.isArray(prior?.aa?.variants) ? prior.aa.variants : [];
+        const mergedVariants = [...priorVariants.filter((variant) => !isRecord(variant) || !group.variants.some((kept) => isRecord(kept) && kept.modelId === variant.modelId)), ...group.variants];
+        await writeCompositeBlock(destination, group.modelId, "aa", { variants: mergedVariants });
+        installed.push({ file: destination, previous });
       }
       const stagedManifest = path.join(transaction.staging, "manifest.json");
       await writeFile(stagedManifest, jsonPretty(next), { mode: 0o600, flag: "wx" }); await chmod(stagedManifest, 0o600); await assertSecureFile(stagedManifest);
@@ -423,13 +482,18 @@ class AaService {
         try {
           for (const file of await readdir(config.paths.modelsDir)) if (file.endsWith(".json") && !keep.has(file) && !priorGeneration.has(file)) {
             const target = path.join(config.paths.modelsDir, file); const info = await lstat(target); await assertSecureFile(target); if (info.mtimeMs > pruneBefore) continue;
+            const composite = await readComposite(target); if (composite?.benchlm) continue;
             await this.deps.fsHooks.beforePrune?.(file); await rm(target);
           }
         } catch { warnings.push("snapshot cleanup was incomplete after successful publication"); }
       }
       return { changed: true, warnings: ordered(warnings) };
     } catch (error) {
-      if (!committed) for (const file of installed) await rm(file, { force: true }).catch(() => {}); throw error;
+      if (!committed) for (const { file, previous } of installed) {
+        if (previous === null) await rm(file, { force: true }).catch(() => {});
+        else await writeFile(file, previous, { mode: 0o600 }).catch(() => {});
+      }
+      throw error;
     } finally { await rm(transaction.staging, { recursive: true, force: true }).catch(() => {}); await rm(transaction.lock, { recursive: true, force: true }).catch(() => {}); }
   }
 }

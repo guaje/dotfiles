@@ -1,11 +1,16 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { persistReviewedReasoning, refreshCatalog, restoreCatalog } from "./catalog.ts";
-import { renderCatalogOverview, renderCatalogSync } from "./render.ts";
+import { auditMethodology, describeMethodologyDrift } from "./aa/methodology.ts";
+import { renderCatalogRefresh, renderCatalogOverview, renderCatalogSync, type CatalogOverview } from "./render.ts";
 import { loadCatalogSettings, loadEnabledModels } from "./provider-settings.ts";
 import { loadCatalogState } from "./state.ts";
 import { aaReviewThinkingLevelOptions, captureAaArtifactState, detectAaBenchmarkHealth, enforceAaScope, finalizeAaSync, hasGenericAaMapping, isCompleteAaCandidateReview, loadAaBenchmarkHealth, prepareAaCandidateReview, publishReviewedAaVariants, syncEnabledModels, type AaCandidate, type ReviewedAaVariant } from "./sync.ts";
 import type { CatalogResult } from "./aa/client.ts";
 import type { BenchmarkThinkingLevel } from "../04-subagents/benchmark-types.ts";
+import { syncBenchLm } from "./benchlm/service.ts";
+import { executeTrackedAssetDeletions } from "./asset-cleanup.ts";
+import { loadCatalogRequestDelays } from "./catalog-settings.ts";
+import { collectBenchLmSummary } from "./benchlm-report.ts";
 
 /** Runtime-only custom provider catalog. It never changes enabledModels or Pi-native providers. */
 export default async function catalogExtension(pi: ExtensionAPI) {
@@ -44,7 +49,16 @@ export default async function catalogExtension(pi: ExtensionAPI) {
           const enabled = await loadEnabledModels();
           const runtimeAvailable = ctx.modelRegistry.getAvailable().map((model: any) => `${model.provider}/${model.id}`);
           const overview = renderCatalogOverview(state, enabled, runtimeAvailable);
-          ctx.ui.notify(overview.text, overview.level);
+          // A methodology move is reported, never repaired: publication stays pinned until the change is
+          // reviewed, so the operator needs to hear about it here rather than from a routing outage.
+          // Notifications replace one another in the TUI, so the cost overview and the audit share one notice.
+          let methodology: CatalogOverview | null = null;
+          try {
+            const audit = await auditMethodology(ctx.signal);
+            methodology = describeMethodologyDrift(audit.drift);
+          } catch { /* An unreachable upstream is not a catalog refresh failure. */ }
+          const refresh = renderCatalogRefresh(overview, methodology);
+          ctx.ui.notify(refresh.text, refresh.level);
         } catch (error) {
           // The persisted state is deliberately not changed by a failed refresh.
           ctx.ui.notify(`Catalog refresh failed; retained last-known-good state: ${error instanceof Error ? error.message : String(error)}`, "error");
@@ -57,17 +71,32 @@ export default async function catalogExtension(pi: ExtensionAPI) {
           return;
         }
         try {
+          const syncStartedAt = Date.now();
+          ctx.ui.notify("Catalog sync started: inventory, then BenchLM, then Artificial Analysis.", "info");
           const aaWarnings: string[] = []; let aaBefore: Awaited<ReturnType<typeof captureAaArtifactState>> | null = null;
           try { aaBefore = await captureAaArtifactState(); }
           catch { aaWarnings.push("AA artifact state capture was unavailable"); ctx.ui.notify("AA artifact state capture was unavailable; AA net changes may not be listed.", "warning"); }
           let report = await syncEnabledModels(pi, ctx as never);
+          ctx.ui.notify(`Catalog inventory ready (${report.models.length} enabled models); refreshing BenchLM.`, "info");
+          const enabledForBenchLm = [...await loadEnabledModels()];
+          // BenchLM cannot abort the sync: a methodology move, feed surprise or network failure leaves the
+          // previous reviewed generation serving while catalog and AA work continue, with the reason reported.
+          ctx.ui.notify("BenchLM: pulling the reviewed generation (primary benchmark source)…", "info");
+          const benchLmReport = await syncBenchLm({ enabledModels: enabledForBenchLm, signal: ctx.signal, requestDelayMs: loadCatalogRequestDelays().benchlm })
+            .then((entry) => ({ unmapped: entry.unmapped, warnings: entry.warnings }))
+            .catch((error: unknown) => ({ unmapped: [] as string[], warnings: [`BenchLM unavailable: ${error instanceof Error ? error.message : String(error)} — the previously published generation routes meanwhile.`] }));
           let publishedAaSucceeded = false; let changedAaGeneration = false;
           const reviewable = report.models.filter((model) => model.aaMissing || model.variantCapable);
           let suggestions = new Map<string, AaCandidate[]>();
           let reviewedCatalog: CatalogResult | undefined;
+          ctx.ui.notify(`Artificial Analysis: reviewing ${reviewable.length} candidate model(s)…`, "info");
           try { ({ suggestions, catalog: reviewedCatalog } = await prepareAaCandidateReview(reviewable.map((model) => model.id), ctx.signal)); }
           catch (error) { ctx.ui.notify(`AA discovery unavailable: ${error instanceof Error ? error.message : String(error)}`, "warning"); }
+          let aaProgress = 0;
           for (const modelReport of reviewable) {
+            aaProgress += 1;
+            // One notification per model, so a long AA scan is visibly alive without flooding the feed.
+            ctx.ui.notify(`AA catalog scan ${aaProgress}/${reviewable.length}: ${modelReport.id}`, "info");
             const modelId = modelReport.id;
             const known = new Set(modelReport.aaVariants.map((variant) => variant.aaModelId));
             const candidates = (suggestions.get(modelId) ?? []).filter((candidate) => !known.has(candidate.aaModelId));
@@ -113,7 +142,17 @@ export default async function catalogExtension(pi: ExtensionAPI) {
               publishedAaSucceeded = true; changedAaGeneration ||= publication.changed; aaWarnings.push(...publication.warnings);
               if (modelReport.source === "custom" && completeReviewed.every((variant) => variant.thinkingLevel !== null)) {
                 try {
-                  if (await persistReviewedReasoning(modelId, completeReviewed.map((variant) => variant.thinkingLevel))) await restoreCatalog(pi);
+                  const outcome = await persistReviewedReasoning(modelId, completeReviewed.map((variant) => variant.thinkingLevel));
+                  if (outcome === "persisted") await restoreCatalog(pi);
+                  else if (outcome === "provider-declares-no-effort-support") {
+                    const reason = `${modelId} has reviewed AA thinking levels, but its provider declares no reasoning-effort support, so Pi offers no effort selector for it.`;
+                    aaWarnings.push(reason);
+                    ctx.ui.notify(reason, "warning");
+                  } else {
+                    const reason = `${modelId} has reviewed AA thinking levels that could not be recorded as Pi reasoning metadata.`;
+                    aaWarnings.push(reason);
+                    ctx.ui.notify(reason, "warning");
+                  }
                 } catch (error) { ctx.ui.notify(`AA mapping published for ${modelId}, but reasoning metadata was not persisted: ${error instanceof Error ? error.message : String(error)}`, "warning"); }
               }
             } catch (error) {
@@ -128,6 +167,7 @@ export default async function catalogExtension(pi: ExtensionAPI) {
           });
           aaWarnings.push(...scoped.warnings);
           if (scoped.removed.length) aaWarnings.push(`Removed out-of-scope AA mappings: ${scoped.removed.join(", ")}`);
+          ctx.ui.notify("Artificial Analysis: detecting benchmark health…", "info");
           const benchmarkHealthRun = await detectAaBenchmarkHealth(ctx.signal).catch((error: unknown) => {
             aaWarnings.push(`AA benchmark health detection was skipped: ${error instanceof Error ? error.message : String(error)}`);
             return { ran: false, changed: false, fields: {}, warnings: [] as string[] };
@@ -139,7 +179,12 @@ export default async function catalogExtension(pi: ExtensionAPI) {
           );
           report = finalized.report;
           const benchmarkHealthReport = await loadAaBenchmarkHealth();
-          ctx.ui.notify(renderCatalogSync(report, finalized.aaArtifacts, benchmarkHealthReport), report.unresolvedCosts.length || report.missingAa.length || !!finalized.aaArtifacts?.warnings.length ? "warning" : "info");
+          const benchLmSummary = await collectBenchLmSummary();
+          ctx.ui.notify(benchLmSummary ? `BenchLM: reviewed generation is on disk (${benchLmSummary.models.length} model(s)).` : "BenchLM: no reviewed generation on disk — routing is using Artificial Analysis columns alone.", benchLmSummary ? "info" : "warning");
+          const cleanupResult = await executeTrackedAssetDeletions(finalized.aaArtifacts?.changes ?? []);
+          for (const warning of cleanupResult.warnings) ctx.ui.notify(warning, "warning");
+          const summary = renderCatalogSync(report, finalized.aaArtifacts, benchmarkHealthReport, benchLmSummary, benchLmReport, cleanupResult, (Date.now() - syncStartedAt) / 1000);
+          ctx.ui.notify(summary, report.unresolvedCosts.length || report.missingAa.length || !!finalized.aaArtifacts?.warnings.length ? "warning" : "info");
         } catch (error) {
           ctx.ui.notify(`Catalog sync failed: ${error instanceof Error ? error.message : String(error)}`, "error");
         }

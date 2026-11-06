@@ -1,8 +1,9 @@
 // Run with: npx -y tsx --test agent/extensions/04-subagents/tests/index.test.ts
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { writePackageStubs } from "./_stubs.ts";
 
@@ -36,9 +37,9 @@ async function loadModule() {
 	writeFileSync(
 		SPAWN_STUB,
 		[
-			"export async function runSingleAgent(defaultCwd, agents, agentName, task, cwd, step, signal, onUpdate, makeDetails) {",
+			"export async function runSingleAgent(defaultCwd, agents, agentName, task, cwd, step, signal, onUpdate, makeDetails, models, sessionModelId) {",
 			"  const h = globalThis.__subagentRunHandler;",
-			"  if (h) return h({ defaultCwd, agents, agentName, task, cwd, step, signal, onUpdate, makeDetails });",
+			"  if (h) return h({ defaultCwd, agents, agentName, task, cwd, step, signal, onUpdate, makeDetails, models, sessionModelId });",
 			"  return { agent: agentName, agentSource: 'user', task, exitCode: 0, stopReason: 'end', messages: [], stderr: '', usage: { input:0,output:0,cacheRead:0,cacheWrite:0,cost:0,contextTokens:0,turns:0 } };",
 			"}",
 		].join("\n"),
@@ -271,6 +272,28 @@ test("execute parallel mode summarizes task outcomes", async () => {
 	}
 });
 
+test("every delegation mode forwards the model the session is actively using", async () => {
+	const mod = await loadModule();
+	const tool = captureTool(mod);
+	(globalThis as any).__subagentDiscovery = { agents: [], projectAgentsDir: null };
+	const forwarded: (string | undefined)[] = [];
+	(globalThis as any).__subagentRunHandler = ({ agentName, sessionModelId }: any) => {
+		forwarded.push(sessionModelId);
+		return okResult(agentName, "find", "done");
+	};
+	const ctx = { cwd: "/cwd", hasUI: false, ui: {}, model: { provider: "prov", id: "session-model" } };
+	try {
+		await tool.execute("id", { agent: "scout", task: "find" }, undefined, undefined, ctx);
+		await tool.execute("id", { chain: [{ agent: "scout", task: "look" }, { agent: "planner", task: "plan" }] }, undefined, undefined, ctx);
+		await tool.execute("id", { tasks: [{ agent: "scout", task: "look" }, { agent: "worker", task: "build" }] }, undefined, undefined, ctx);
+		// single (1) + chain (2 steps) + parallel (2 tasks)
+		assert.equal(forwarded.length, 5, "every delegation mode must be able to inherit the session model");
+		assert.deepEqual([...new Set(forwarded)], ["prov/session-model"]);
+	} finally {
+		cleanup();
+	}
+});
+
 test("execute with no mode returns an invalid-parameters error", async () => {
 	const mod = await loadModule();
 	const tool = captureTool(mod);
@@ -289,6 +312,33 @@ test("execute with no mode returns an invalid-parameters error", async () => {
 		assert.match(out.content[0].text, /Invalid parameters/);
 		assert.equal(runCalled, false);
 	} finally {
+		cleanup();
+	}
+});
+
+test("session start blames the policy generation when the policy file and code disagree", async () => {
+	const previousRoot = process.env.PI_AA_SNAPSHOT_ROOT;
+	const previousPolicy = process.env.PI_AA_ROUTING_POLICY;
+	const root = mkdtempSync(join(tmpdir(), "pi-policy-warning-"));
+	const policyPath = join(root, "routing-policy.json");
+	writeFileSync(policyPath, JSON.stringify({ version: "6" }));
+	process.env.PI_AA_ROUTING_POLICY = policyPath;
+	try {
+		const mod = await loadModule();
+		const handlers: Record<string, Function> = {};
+		const notifications: string[] = [];
+		mod.default({ on: (name: string, handler: Function) => { handlers[name] = handler; }, registerTool: () => {} });
+		const ctx = { hasUI: true, ui: { notify: (message: string) => notifications.push(message), setWidget: () => {} } };
+		await handlers.session_start?.({}, ctx);
+		await handlers.session_start?.({}, ctx);
+		assert.equal(notifications.length, 1);
+		assert.match(notifications[0], /generation 6/);
+		assert.match(notifications[0], /model serving this conversation/);
+		assert.doesNotMatch(notifications[0], /--missing/, "the snapshots are not the problem here");
+	} finally {
+		if (previousRoot === undefined) delete process.env.PI_AA_SNAPSHOT_ROOT; else process.env.PI_AA_SNAPSHOT_ROOT = previousRoot;
+		if (previousPolicy === undefined) delete process.env.PI_AA_ROUTING_POLICY; else process.env.PI_AA_ROUTING_POLICY = previousPolicy;
+		rmSync(root, { recursive: true, force: true });
 		cleanup();
 	}
 });

@@ -1,17 +1,19 @@
+
 import { lstat, mkdir, readFile, chmod } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { isRecord, validateCanonicalMappings, type CanonicalMapping } from "./schema.ts";
+import { loadCatalogRequestDelays } from "../catalog-settings.ts";
 
 const AA_DIR = path.dirname(fileURLToPath(import.meta.url));
 export const AGENT_DIR = path.resolve(AA_DIR, "../../..");
-export const DEFAULT_ROOT = path.join(AGENT_DIR, "extensions/04-subagents/assets/aa");
-export const DEFAULT_MANIFEST = path.join(DEFAULT_ROOT, "manifest.json");
-export const DEFAULT_MAPPINGS = path.join(DEFAULT_ROOT, "canonical-mappings.json");
+export const DEFAULT_ROOT = path.join(AGENT_DIR, "extensions/04-subagents/assets");
+export const DEFAULT_MANIFEST = path.join(DEFAULT_ROOT, "aa-manifest.json");
+export const DEFAULT_MAPPINGS = path.join(DEFAULT_ROOT, "aa-canonical-mappings.json");
 const CATALOG_PATHS = new Set(["/api/v2/language/models/free"]);
 
 export interface AaPaths { agentDir: string; settings: string; modelsConfig: string; credentials: string; snapshotRoot: string; modelsDir: string; manifest: string; mappings: string; benchmarkHealth: string; catalogState: string; }
-export interface Limits { apiBytes: number; publicBytes: number; maxAgeMs: number; timeoutMs: number; pageDelayMs: number; publicRedirects: number; }
+export interface Limits { apiBytes: number; publicBytes: number; maxAgeMs: number; timeoutMs: number; requestDelayMs: number; publicRedirects: number; }
 export interface BaseConfig { paths: AaPaths; limits: Limits; apiUrl: URL; }
 export interface RuntimeConfig extends BaseConfig { enabledModels: string[]; aliases: Map<string, string>; stateCanonical: Map<string, string>; stateSupportsReasoningEffort: Map<string, boolean>; }
 export interface WriterConfig extends RuntimeConfig { providerSupportsReasoningEffort: Map<string, boolean>; apiKey: string; }
@@ -37,8 +39,8 @@ export function baseConfig(env: NodeJS.ProcessEnv = process.env): BaseConfig {
     credentials: envPath(env, "PI_CREDENTIALS_CONFIG", path.join(AGENT_DIR, "credentials.json")),
     snapshotRoot,
     modelsDir: path.join(snapshotRoot, "models"),
-    manifest: path.join(snapshotRoot, "manifest.json"),
-    mappings: envPath(env, "PI_AA_CANONICAL_MAPPINGS", path.join(snapshotRoot, "canonical-mappings.json")),
+    manifest: path.join(snapshotRoot, "aa-manifest.json"),
+    mappings: envPath(env, "PI_AA_CANONICAL_MAPPINGS", path.join(snapshotRoot, "aa-canonical-mappings.json")),
     benchmarkHealth: envPath(env, "PI_AA_BENCHMARK_HEALTH", path.join(snapshotRoot, "benchmark-health.json")),
     catalogState: envPath(env, "PI_CATALOG_STATE", path.join(AGENT_DIR, "catalog-state.json")),
   };
@@ -47,7 +49,7 @@ export function baseConfig(env: NodeJS.ProcessEnv = process.env): BaseConfig {
     publicBytes: bounded(env, "PI_AA_PUBLIC_MAX_BYTES", 8_388_608, 1, 64 * 1024 * 1024, 1, true),
     maxAgeMs: bounded(env, "PI_AA_SNAPSHOT_MAX_AGE_MS", 2_592_000_000, 1, 31_536_000_000, 1, true),
     timeoutMs: bounded(env, "PI_AA_REQUEST_TIMEOUT_MS", 30_000, 1, 300_000, 1, true),
-    pageDelayMs: bounded(env, "PI_AA_PUBLIC_PAGE_DELAY", 1_000, 0, 60_000, 1_000),
+    requestDelayMs: loadCatalogRequestDelays(env).artificialAnalysis,
     publicRedirects: bounded(env, "PI_AA_PUBLIC_PAGE_MAX_REDIRECTS", 2, 0, 10, 1, true),
   }};
 }

@@ -38,6 +38,8 @@ test("sync reconciles enabled custom and login models with exact pricing and saf
   assert.deepEqual(report.models.map((model) => [model.id, model.source]), [["custom-provider/custom", "custom"], ["openai-codex/native", "login"]]);
   assert.deepEqual(report.models[1]?.cost, { input: 3, output: 9, cacheRead: 0, cacheWrite: 0 });
   assert.equal(report.models[1]?.costProvenance, "authoritative:openrouter:/api/v1/models");
+  assert.deepEqual(report.models[0]?.capabilities, { input: ["text"] }, "an unevidenced row reports the text default with no provenance claim");
+  assert.deepEqual(report.models[1]?.capabilities, { input: ["text", "image"], reasoning: true, provenance: "runtime-registry" });
   assert.equal(saved.nativeModels[0].id, "openai-codex/native");
   assert.equal(saved.nativeModels[0].supportsReasoningEffort, false); assert.equal(report.models[1]?.variantCapable, false);
   assert.doesNotMatch(JSON.stringify(saved), /authorization|secret/i);

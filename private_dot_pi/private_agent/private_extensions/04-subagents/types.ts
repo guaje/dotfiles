@@ -42,11 +42,17 @@ export interface SingleResult {
 	errorMessage?: string;
 	step?: number;
 	/** How the model was chosen. heuristic/llm remain for historical session rendering only. */
-	modelSelector?: "explicit" | "benchmark" | "default" | "heuristic" | "llm";
+	/** `"session"` means benchmark routing did not resolve and the child inherited the parent session's model. */
+	/** `interim` ranked on methodology-stable metrics only; `session` reused the model serving this conversation. */
+	modelSelector?: "explicit" | "benchmark" | "interim" | "session" | "default" | "heuristic" | "llm";
 	/** Thinking level passed to the child (reasoning models only). */
 	thinkingLevel?: ThinkingLevel;
 	/** Bounded benchmark decision metadata, when automatic routing succeeded. */
 	benchmarkRoute?: BenchmarkRouteDiagnostics;
+	/** Wall-clock measurements used by local outcome-based ETA. */
+	startedAt?: number;
+	durationMs?: number;
+	ttftMs?: number;
 }
 
 export interface SubagentDetails {

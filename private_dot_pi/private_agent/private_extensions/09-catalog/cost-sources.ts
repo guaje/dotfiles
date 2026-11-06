@@ -49,6 +49,8 @@ export interface AuthoritativeModelMetadata {
   id: string;
   name?: string;
   input?: ("text" | "image")[];
+  /** Declared reasoning support. Only an affirmative declaration counts; absence stays unknown. */
+  reasoning?: boolean;
   contextWindow?: number;
   maxTokens?: number;
   cost?: CostRates;
@@ -79,6 +81,23 @@ function inputFrom(raw: RecordValue): ("text" | "image")[] | undefined {
   return input.length ? input : undefined;
 }
 
+/**
+ * Reasoning support is read only from a declaration in the authoritative record.
+ * A missing or negative declaration is not evidence of incapability: a route may
+ * support effort even where the public catalog does not advertise it.
+ */
+function reasoningFrom(raw: RecordValue): boolean | undefined {
+  if (raw.reasoning === true) return true;
+  if (record(raw.reasoning)) {
+    const efforts = raw.reasoning.supported_efforts;
+    if (Array.isArray(efforts) && efforts.some((entry) => typeof entry === "string" && entry !== "none")) return true;
+    if (raw.reasoning.default_enabled === true || raw.reasoning.mandatory === true) return true;
+  }
+  const parameters = raw.supported_parameters;
+  if (Array.isArray(parameters) && parameters.some((entry) => entry === "reasoning" || entry === "reasoning_effort")) return true;
+  return undefined;
+}
+
 /** Parse only exact source identities; names and fuzzy matches are never safe price mappings. */
 export function parseAuthoritativeCatalog(body: unknown, provenance = AUTHORITATIVE_COST_PROVENANCE): AuthoritativeCatalog {
   const data = Array.isArray(body) ? body : record(body) && Array.isArray(body.data) ? body.data : [];
@@ -94,6 +113,7 @@ export function parseAuthoritativeCatalog(body: unknown, provenance = AUTHORITAT
       id: raw.id,
       ...(typeof raw.name === "string" ? { name: raw.name } : {}),
       ...(input ? { input } : {}),
+      ...(reasoningFrom(raw) ? { reasoning: true } : {}),
       ...(contextWindow !== undefined ? { contextWindow } : {}),
       ...(maxTokens !== undefined ? { maxTokens } : {}),
       ...(cost ? { cost } : {}),
@@ -132,7 +152,7 @@ export function parseAaReferencePriceCatalog(records: readonly unknown[]): AaRef
   for (const raw of records) {
     if (!record(raw) || typeof raw.slug !== "string" || !raw.slug) continue;
     const cost = aaReferenceCost(raw.pricing);
-    models.push({ slug: raw.slug, ...(typeof raw.name === "string" ? { name: raw.name } : {}), ...(typeof raw.openrouter_api_id === "string" ? { openrouterApiId: raw.openrouter_api_id } : {}), ...(cost ? { cost } : {}) });
+    models.push({ slug: raw.slug, name: typeof raw.name === "string" ? raw.name : null, openrouterApiId: typeof raw.openrouter_api_id === "string" ? raw.openrouter_api_id : null, ...(cost ? { cost } : {}) });
   }
   return { provenance: "aa-catalog:reference-price", models };
 }

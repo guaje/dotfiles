@@ -1,8 +1,9 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { loadReviewedCapabilities, type ReviewedModelCapabilities } from "./aa-capabilities.ts";
 import { type AuthoritativeCatalog, loadAuthoritativeCatalog, loadReviewedCosts, normalizeCost, uniqueNormalizedAuthoritativeMatch } from "./cost-sources.ts";
 import { loadCatalogSettings, loadEnabledModels, loadProviderSettings, resolveProviderApiKey } from "./provider-settings.ts";
 import { loadCatalogState, saveCatalogState } from "./state.ts";
-import type { CatalogModel, CatalogProvider, CatalogState, CostRates, ProviderSettings, ThinkingLevelMap, ThinkingLevelMapProvenance } from "./types.ts";
+import type { CapabilitiesProvenance, CatalogModel, CatalogProvider, CatalogState, CostRates, ProviderSettings, ThinkingLevelMap, ThinkingLevelMapProvenance } from "./types.ts";
 
 const REQUEST_TIMEOUT_MS = 10_000;
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
@@ -84,9 +85,8 @@ function derivedThinkingLevelMap(efforts: string[]): ThinkingLevelMap | undefine
 
 function supportedReasoningEffortsMapFrom(sources: Record<string, unknown>[]): ThinkingLevelMap | undefined {
   for (const source of sources) {
-    const key = Object.hasOwn(source, "supported_reasoning_efforts") ? "supported_reasoning_efforts"
-      : Object.hasOwn(source, "supportedReasoningEfforts") ? "supportedReasoningEfforts"
-      : undefined;
+    const key = ["supported_reasoning_efforts", "supportedReasoningEfforts", "reasoning_effort_levels"]
+      .find((candidate) => Object.hasOwn(source, candidate));
     if (!key) continue;
     const value = source[key];
     if (!Array.isArray(value) || !value.length || value.some((effort) => typeof effort !== "string" || !RECOGNIZED_REASONING_EFFORTS.has(effort)) || new Set(value).size !== value.length) continue;
@@ -121,7 +121,8 @@ function thinkingLevelMapFrom(sources: Record<string, unknown>[]): ExtractedThin
   return flags ? { map: flags, provenance: "provider-inferred" } : undefined;
 }
 
-function inputFrom(sources: Record<string, unknown>[]): ("text" | "image")[] {
+/** Declared input modalities only. An unannotated inventory stays unknown rather than claiming text-only. */
+function inputFrom(sources: Record<string, unknown>[]): ("text" | "image")[] | undefined {
   for (const source of sources) {
     const value = Array.isArray(source.input) ? source.input
       : Array.isArray(source.input_modalities) ? source.input_modalities
@@ -134,7 +135,30 @@ function inputFrom(sources: Record<string, unknown>[]): ("text" | "image")[] {
     if (record(source.capabilities) && source.capabilities.vision === true) return ["text", "image"];
     if (source.supports_vision === true) return ["text", "image"];
   }
-  return ["text"];
+  // An explicit `false` is the route declaring that it cannot take images, which is evidence in its own
+  // right; LiteLLM reports unset capability metadata as null, and null correctly stays unknown.
+  if (sources.some((source) => source.supports_vision === false || (record(source.capabilities) && source.capabilities.vision === false))) return ["text"];
+  return undefined;
+}
+
+const CAPABILITY_RANKS = { "provider-inventory": 3, "aa-review": 2, authoritative: 1, "last-known-good": 0 } as const;
+
+/**
+ * Which evidence set declared this route's input modalities. Reasoning support is deliberately not
+ * folded in: a provider that declares reasoning while saying nothing about modalities must not make a
+ * defaulted text-only input list look declared.
+ */
+function capabilityProvenance(
+  providerInput: ("text" | "image")[] | undefined,
+  reviewed: ReviewedModelCapabilities | undefined,
+  fallback: AuthoritativeModelMetadata | undefined,
+  input: ("text" | "image")[] | undefined,
+): CapabilitiesProvenance | undefined {
+  const sources: CapabilitiesProvenance[] = [];
+  if (providerInput && input === providerInput) sources.push("provider-inventory");
+  else if (reviewed?.input && input === reviewed.input) sources.push("aa-review");
+  else if (fallback?.input && input === fallback.input) sources.push("authoritative");
+  return sources.sort((left, right) => CAPABILITY_RANKS[right] - CAPABILITY_RANKS[left])[0];
 }
 
 function providerCost(sources: Record<string, unknown>[]): { cost?: CostRates; provenance?: string } {
@@ -207,6 +231,7 @@ function modelFromApi(
   provider: string,
   enabled: Set<string>,
   authoritative: AuthoritativeCatalog | null,
+  reviewedCapabilities?: ReadonlyMap<string, ReviewedModelCapabilities>,
 ): CatalogModel | null {
   if (typeof raw.id !== "string" || !raw.id) return null;
   const id = raw.id;
@@ -227,8 +252,15 @@ function modelFromApi(
   const name = firstString(sources, ["name", "display_name", "label"]) ?? fallback?.name ?? id;
   const inferredReasoning = sources.some((source) => record(source.capabilities) && (source.capabilities.reasoning === true || source.capabilities.thinking === true));
   const thinking = thinkingLevelMapFrom(sources);
-  const reasoning = firstBoolean(sources, ["reasoning", "supports_reasoning"]) ?? (inferredReasoning || (thinking ? true : undefined));
-  const input = inputFrom(sources);
+  const providerReasoning = firstBoolean(sources, ["reasoning", "supports_reasoning"]) ?? (inferredReasoning || (thinking ? true : undefined));
+  const providerInput = inputFrom(sources);
+  // Capability precedence: what this exact route declares wins, then the reviewed
+  // Artificial Analysis capture for this runtime identity, then the authoritative
+  // public catalog for the same model. Nothing here infers a capability from a name.
+  const reviewed = reviewedCapabilities?.get(`${provider}/${id}`);
+  const input = providerInput ?? reviewed?.input ?? fallback?.input;
+  const reasoning = providerReasoning ?? reviewed?.reasoning ?? fallback?.reasoning;
+  const capabilitiesProvenance = capabilityProvenance(providerInput, reviewed, fallback, input);
 
   return {
     id,
@@ -236,7 +268,8 @@ function modelFromApi(
     canonicalId: externalId ?? fallback?.id ?? `${provider}/${id}`,
     ...(reasoning !== undefined ? { reasoning } : {}),
     ...(thinking ? { thinkingLevelMap: thinking.map, thinkingLevelMapProvenance: thinking.provenance } : {}),
-    input: input.length ? input : fallback?.input ?? ["text"],
+    input: input ?? ["text"],
+    ...(capabilitiesProvenance ? { capabilitiesProvenance } : {}),
     ...(contextWindow !== undefined && contextWindow > 0 ? { contextWindow } : {}),
     ...(maxTokens !== undefined && maxTokens > 0 ? { maxTokens } : {}),
     ...(cost ? { cost, costProvenance: foundCost.cost ? foundCost.provenance : authoritativeProvenance } : { costProvenance: "unknown" }),
@@ -253,7 +286,7 @@ async function resolveAuthoritativeCatalog(source: AuthoritativeSource | undefin
   }
 }
 
-export async function discoverProvider(provider: ProviderSettings, enabled: Set<string>, signal?: AbortSignal, source?: AuthoritativeSource, requestTimeoutMs = REQUEST_TIMEOUT_MS): Promise<CatalogProvider> {
+export async function discoverProvider(provider: ProviderSettings, enabled: Set<string>, signal?: AbortSignal, source?: AuthoritativeSource, requestTimeoutMs = REQUEST_TIMEOUT_MS, reviewedCapabilities?: ReadonlyMap<string, ReviewedModelCapabilities>): Promise<CatalogProvider> {
   const apiKey = await resolveProviderApiKey(provider.apiKey);
   const headers = apiKey ? { authorization: `Bearer ${apiKey}`, accept: "application/json" } : { accept: "application/json" };
   const controller = new AbortController();
@@ -271,7 +304,7 @@ export async function discoverProvider(provider: ProviderSettings, enabled: Set<
     const discovered = (await Promise.all(records.map(async (raw) => {
       const runtimeId = `${provider.id}/${raw.id as string}`;
       const info = enabled.has(runtimeId) ? await fetchModelInfo(provider, raw.id as string, headers, controller.signal) : undefined;
-      return modelFromApi(raw, info, provider.id, enabled, authoritative);
+      return modelFromApi(raw, info, provider.id, enabled, authoritative, reviewedCapabilities);
     }))).filter((model): model is CatalogModel => !!model);
     const byId = new Map(discovered.map((model) => [model.id, model]));
     const enabledPrefix = `${provider.id}/`;
@@ -285,7 +318,7 @@ export async function discoverProvider(provider: ProviderSettings, enabled: Set<
       // synthesize safe baseline metadata; no per-model settings are required.
       const raw = { id };
       const info = await fetchModelInfo(provider, id, headers, controller.signal);
-      const model = modelFromApi(raw, info, provider.id, enabled, authoritative);
+      const model = modelFromApi(raw, info, provider.id, enabled, authoritative, reviewedCapabilities);
       if (model) byId.set(id, model);
     }
     return {
@@ -315,6 +348,9 @@ function mergeLastKnownGood(current: CatalogProvider[], previous: CatalogState |
         ...(reviewedPrior ? { thinkingLevelMap: reviewedPrior.thinkingLevelMap, thinkingLevelMapProvenance: "reviewed" as const } : !model.thinkingLevelMap && prior?.thinkingLevelMap ? { thinkingLevelMap: prior.thinkingLevelMap, ...(prior.thinkingLevelMapProvenance ? { thinkingLevelMapProvenance: prior.thinkingLevelMapProvenance } : {}) } : {}),
         ...(!model.contextWindow && prior?.contextWindow ? { contextWindow: prior.contextWindow } : {}),
         ...(!model.maxTokens && prior?.maxTokens ? { maxTokens: prior.maxTokens } : {}),
+        // Capabilities are evidenced once and rarely re-declared, so a refresh whose inventory lost the
+        // annotation must not silently downgrade a model to text-only: carry the evidenced set instead.
+        ...(!model.capabilitiesProvenance && prior?.capabilitiesProvenance && prior.input.length ? { input: prior.input, capabilitiesProvenance: "last-known-good" as const } : {}),
         ...(!model.cost && prior?.cost ? { cost: prior.cost, costProvenance: prior.costProvenance } : {}),
         available: true,
         active: enabled.has(`${provider.id}/${model.id}`),
@@ -384,17 +420,19 @@ export interface CatalogDependencies {
   loadCatalogState: typeof loadCatalogState;
   saveCatalogState: typeof saveCatalogState;
   loadAuthoritativeCatalog: typeof loadAuthoritativeCatalog;
+  loadReviewedCapabilities: typeof loadReviewedCapabilities;
   loadReviewedCosts: typeof loadReviewedCosts;
 }
 
-const defaultDependencies: CatalogDependencies = { loadProviderSettings, loadEnabledModels, loadCatalogSettings, loadCatalogState, saveCatalogState, loadAuthoritativeCatalog, loadReviewedCosts };
+const defaultDependencies: CatalogDependencies = { loadProviderSettings, loadEnabledModels, loadCatalogSettings, loadCatalogState, saveCatalogState, loadAuthoritativeCatalog, loadReviewedCapabilities, loadReviewedCosts };
 
 /** Failure leaves the in-memory and persisted last-known-good catalog untouched. */
 export async function refreshCatalog(pi: ExtensionAPI, signal?: AbortSignal, dependencies: Partial<CatalogDependencies> = {}): Promise<CatalogState> {
   const deps = { ...defaultDependencies, ...dependencies };
   const [settings, enabled, catalogSettings, previous, reviewed] = await Promise.all([deps.loadProviderSettings(), deps.loadEnabledModels(), deps.loadCatalogSettings(), deps.loadCatalogState(), deps.loadReviewedCosts()]);
   const source = deps.loadAuthoritativeCatalog(signal).catch(() => null);
-  const discovered = await Promise.all(settings.map((provider) => discoverProvider(provider, enabled, signal, source, catalogSettings.requestTimeoutMs)));
+  const reviewedCapabilities = await deps.loadReviewedCapabilities().catch(() => new Map<string, ReviewedModelCapabilities>());
+  const discovered = await Promise.all(settings.map((provider) => discoverProvider(provider, enabled, signal, source, catalogSettings.requestTimeoutMs, reviewedCapabilities)));
   const providers = applyReviewedCosts(mergeLastKnownGood(discovered, previous, enabled), reviewed);
   const state: CatalogState = { version: 2, updatedAt: Date.now(), providers, nativeModels: previous?.nativeModels ?? [] };
   await deps.saveCatalogState(state);
@@ -420,26 +458,34 @@ export function deriveReviewedThinkingLevelMap(levels: readonly ("off" | "low" |
   return map;
 }
 
+/** Persisted outcome, so a skipped capability is reported instead of silently dropped. */
+export type ReviewedReasoningOutcome = "persisted" | "provider-declares-no-effort-support" | "rejected";
+
 /** Persist a reviewed complete specific set as Pi reasoning support for custom models only. */
-export async function persistReviewedReasoning(runtimeId: string, levels: readonly ("off" | "low" | "medium" | "high" | "xhigh" | "max" | null)[], dependencies: Pick<CatalogDependencies, "loadProviderSettings" | "loadCatalogState" | "saveCatalogState"> = defaultDependencies): Promise<boolean> {
-  if (!levels.length || levels.some((level) => level === null) || new Set(levels).size !== levels.length) return false;
-  const slash = runtimeId.indexOf("/"); if (slash <= 0 || slash === runtimeId.length - 1) return false;
+export async function persistReviewedReasoning(runtimeId: string, levels: readonly ("off" | "low" | "medium" | "high" | "xhigh" | "max" | null)[], dependencies: Pick<CatalogDependencies, "loadProviderSettings" | "loadCatalogState" | "saveCatalogState"> = defaultDependencies): Promise<ReviewedReasoningOutcome> {
+  if (!levels.length || levels.some((level) => level === null) || new Set(levels).size !== levels.length) return "rejected";
+  const slash = runtimeId.indexOf("/"); if (slash <= 0 || slash === runtimeId.length - 1) return "rejected";
   const providerId = runtimeId.slice(0, slash); const modelId = runtimeId.slice(slash + 1);
   const [settings, state] = await Promise.all([dependencies.loadProviderSettings(), dependencies.loadCatalogState()]);
-  if (!state || settings.find((provider) => provider.id === providerId)?.compat?.supportsReasoningEffort !== true) return false;
+  const providerSettings = settings.find((provider) => provider.id === providerId);
+  if (!state || providerSettings === undefined) return "rejected";
   const providerIndex = state.providers.findIndex((provider) => provider.id === providerId);
   const modelIndex = state.providers[providerIndex]?.models.findIndex((model) => model.id === modelId) ?? -1;
-  if (providerIndex < 0 || modelIndex < 0) return false;
+  if (providerIndex < 0 || modelIndex < 0) return "rejected";
   const model = state.providers[providerIndex]!.models[modelIndex]!;
   const providerMap = model.thinkingLevelMap && (model.thinkingLevelMapProvenance === "provider" || model.thinkingLevelMapProvenance === undefined);
-  if (providerMap && model.reasoning === true) return true;
+  if (providerMap && model.reasoning === true) return "persisted";
+  // A reviewed capture proves the model reasons, but only the provider can prove this route accepts an
+  // effort parameter, so the wire mapping stays gated on the declared compatibility.
+  if (providerSettings.compat?.supportsReasoningEffort !== true) return "provider-declares-no-effort-support";
   const thinkingLevelMap = providerMap ? model.thinkingLevelMap : deriveReviewedThinkingLevelMap(levels as ReviewedReasoningLevel[]);
-  if (!thinkingLevelMap) return false;
+  if (!thinkingLevelMap) return "rejected";
   const providers = state.providers.map((provider, index) => index !== providerIndex ? provider : {
+    // A reviewed thinking set evidences reasoning only; it must never be recorded as modality evidence.
     ...provider, models: provider.models.map((entry, modelAt) => modelAt === modelIndex ? { ...entry, reasoning: true, thinkingLevelMap, ...(providerMap ? {} : { thinkingLevelMapProvenance: "reviewed" as const }) } : entry),
   });
   await dependencies.saveCatalogState({ ...state, providers });
-  return true;
+  return "persisted";
 }
 
 export async function restoreCatalog(pi: ExtensionAPI, dependencies: Partial<CatalogDependencies> = {}): Promise<CatalogState | null> {

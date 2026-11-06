@@ -31,13 +31,14 @@ const validModel = (value: unknown): value is CatalogModel => {
     && (model.reasoning === undefined || typeof model.reasoning === "boolean")
     && (model.thinkingLevelMap === undefined || validThinkingLevelMap(model.thinkingLevelMap))
     && (model.thinkingLevelMapProvenance === undefined || model.thinkingLevelMapProvenance === "provider" || model.thinkingLevelMapProvenance === "provider-inferred" || model.thinkingLevelMapProvenance === "reviewed")
+    && (model.capabilitiesProvenance === undefined || ["provider-inventory", "aa-review", "authoritative", "last-known-good"].includes(String(model.capabilitiesProvenance)))
     && Array.isArray(model.input) && model.input.length > 0 && model.input.every((x) => x === "text" || x === "image")
     && optionalRate(model.contextWindow) && optionalRate(model.maxTokens)
     && (model.available === undefined || typeof model.available === "boolean")
     && typeof model.active === "boolean"
     && (model.costProvenance === undefined || typeof model.costProvenance === "string")
     && validCost(model.cost)
-    && Object.keys(model).every((key) => ["id", "name", "canonicalId", "reasoning", "thinkingLevelMap", "thinkingLevelMapProvenance", "input", "contextWindow", "maxTokens", "cost", "costProvenance", "available", "active"].includes(key));
+    && Object.keys(model).every((key) => ["id", "name", "canonicalId", "reasoning", "thinkingLevelMap", "thinkingLevelMapProvenance", "capabilitiesProvenance", "input", "contextWindow", "maxTokens", "cost", "costProvenance", "available", "active"].includes(key));
 };
 
 function safeBaseUrl(value: unknown): boolean {

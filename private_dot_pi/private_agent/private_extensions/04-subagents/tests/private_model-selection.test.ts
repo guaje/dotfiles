@@ -7,8 +7,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { normalizeModelMetadata } from "../model-metadata.ts";
-import { BENCHMARK_DIMENSIONS } from "../benchmark-types.ts";
-import { METHODOLOGY, PUBLIC_METHODOLOGY_VERSION } from "../../09-catalog/aa/schema.ts";
+import { DIMENSIONS as AA_DIMENSIONS, METHODOLOGY, PUBLIC_METHODOLOGY_VERSION } from "../../09-catalog/aa/schema.ts";
 import { writePackageStubs } from "./_stubs.ts";
 
 writePackageStubs();
@@ -96,7 +95,9 @@ function buildSandbox(): string {
 		});
 	}
 	mkdirSync(join(extensionsDir, "09-catalog", "aa"), { recursive: true });
+	mkdirSync(join(extensionsDir, "09-catalog", "benchlm"), { recursive: true });
 	cpSync(resolve(HERE, "../../09-catalog/aa/schema.ts"), join(extensionsDir, "09-catalog", "aa", "schema.ts"));
+	cpSync(resolve(HERE, "../../09-catalog/benchlm/schema.ts"), join(extensionsDir, "09-catalog", "benchlm", "schema.ts"));
 	writeSandboxPackages(extensionsDir);
 	// Empty settings: every consumer falls back to its own code-owned policy defaults.
 	writeFileSync(join(root, "settings.config.json"), "{}\n");
@@ -127,7 +128,7 @@ function writeBenchmarkAssets(root: string, generatedAt: number): string {
 			extractorVersion: "aa-current-model-rsc-v1",
 			intelligenceIndexMethodologyVersion: PUBLIC_METHODOLOGY_VERSION,
 		},
-		scores: Object.fromEntries(BENCHMARK_DIMENSIONS.map((dimension) => [dimension, 50])),
+		scores: Object.fromEntries(AA_DIMENSIONS.map((dimension) => [dimension, 50])),
 		toolUse: {
 			components: {
 				tau3Banking: null,
@@ -156,7 +157,7 @@ function writeBenchmarkAssets(root: string, generatedAt: number): string {
 		models: [{ provider: "p", model: "m", thinkingLevel: null, modelId: AA_MODEL_ID, file: "fixture.json", capturedAt: generatedAt, contentDigest: digest(snapshot) }],
 	};
 	manifest.digest = digest(manifest.models);
-	writeFileSync(join(assetRoot, "manifest.json"), JSON.stringify(manifest), { mode: 0o600 });
+	writeFileSync(join(assetRoot, "aa-manifest.json"), JSON.stringify(manifest), { mode: 0o600 });
 	writeFileSync(join(assetRoot, "models", "fixture.json"), JSON.stringify(snapshot), { mode: 0o600 });
 	return assetRoot;
 }
@@ -166,6 +167,35 @@ function writeHealthCache(checkedAt: number, results: unknown[]): void {
 }
 
 /** Fresh assets + fresh healthy cache, which is the only arrangement that can select. */
+function emptyBenchLmRoot(name: string): string {
+	const root = join(sandbox, name);
+	mkdirSync(root, { recursive: true });
+	chmodSync(root, 0o700);
+	return root;
+}
+
+/** A reviewed BenchLM generation for p/m, shaped like the published one. */
+function writeBenchLmAssets(root: string, generatedAt: number): string {
+	const models = join(root, "models");
+	mkdirSync(models, { recursive: true });
+	chmodSync(root, 0o700);
+	const snapshot = {
+		version: 1, runtimeId: "p/m", canonicalId: "test/m", model: "m", creator: "Test Lab", capturedAt: generatedAt,
+		lastUpdated: "2026-10-29", methodologyVersion: "bench-align-v5.8-2026-09-30", sourceSnapshotId: "fixture-snapshot",
+		attribution: "Data from BenchLM.ai", license: "CC BY-NC 4.0",
+		categoryScores: { coding: 70, agentic: 60, knowledge: 55, reasoning: 80 },
+		categoryProvenance: { coding: "leaderboard", agentic: "leaderboard", knowledge: "leaderboard", reasoning: "leaderboard" },
+		categoryEvidence: { coding: { rows: 3, independentlyVerified: 1 } },
+		categories: [{ key: "coding", score: 70, rank: 1, total: 10 }],
+		details: [{ category: "coding", key: "fixture", name: "Fixture Bench", value: 70, formatted: "70%", verificationStatus: "benchmark_exact", verificationLabel: "Independently run", source: { label: "BenchLM run" } }],
+	};
+	const file = "p_m.json";
+	writeFileSync(join(models, file), JSON.stringify(snapshot), { mode: 0o600 });
+	const entries = [{ runtimeId: "p/m", canonicalId: "test/m", file, contentDigest: digest(snapshot) }];
+	writeFileSync(join(root, "benchlm-manifest.json"), JSON.stringify({ version: 1, generatedAt, methodologyVersion: "bench-align-v5.8-2026-09-30", sourceSnapshotId: "fixture-snapshot", digest: digest(entries), models: entries }), { mode: 0o600 });
+	return root;
+}
+
 function readyFixture(): { snapshotRoot: string; models: unknown[] } {
 	const snapshotRoot = writeBenchmarkAssets(sandbox, Date.now());
 	writeHealthCache(Date.now(), [HEALTHY]);
@@ -183,18 +213,19 @@ after(() => {
 	delete (globalThis as any).__modelSelectionCompletionCalls;
 });
 
-test("a healthy scoped model with current benchmarks selects its benchmark route", async () => {
+test("a healthy scoped model falls back to interim AA routing when BenchLM is unavailable", async () => {
 	const { snapshotRoot, models } = readyFixture();
 	try {
 		const result = await selectionModule.selectModelForSubagent({
 			task: "recon the repo",
 			models,
 			snapshotRoot,
+			benchLmRoot: emptyBenchLmRoot("benchlm-unavailable"),
 			snapshotMaxAgeMs: FIXTURE_MAX_AGE_MS,
 		});
 		assert.deepEqual(
 			{ modelId: result.modelId, thinkingLevel: result.thinkingLevel, selector: result.selector },
-			{ modelId: "p/m", thinkingLevel: "medium", selector: "benchmark" },
+			{ modelId: "p/m", thinkingLevel: "medium", selector: "interim" },
 		);
 		assert.equal(result.benchmarkRoute?.routingProfile, "balanced");
 		assert.equal(result.benchmarkRoute?.candidateCount, 1);
@@ -203,17 +234,32 @@ test("a healthy scoped model with current benchmarks selects its benchmark route
 	}
 });
 
-test("model selection stays empty when the benchmark asset root is absent", async () => {
+test("model selection stays empty when neither reviewed generation is available", async () => {
 	writeHealthCache(Date.now(), [HEALTHY]);
 	const result = await selectionModule.selectModelForSubagent({
 		models: [{ id: "p/m", input: ["text"] }],
 		snapshotRoot: join(sandbox, "missing-aa-root"),
+		benchLmRoot: emptyBenchLmRoot("empty-benchlm-root"),
 		snapshotMaxAgeMs: FIXTURE_MAX_AGE_MS,
 	});
 	assert.deepEqual(result, {});
 });
 
-test("model selection stays empty when the local model-health cache is stale", async () => {
+test("a reviewed BenchLM generation routes with no Artificial Analysis generation at all", async () => {
+	const benchLmRoot = writeBenchLmAssets(emptyBenchLmRoot("benchlm-only"), Date.now());
+	writeHealthCache(Date.now(), [HEALTHY]);
+	const result = await selectionModule.selectModelForSubagent({
+		routingProfile: "coding",
+		models: [{ id: "p/m", input: ["text"], reasoning: true, supportsTools: true, contextWindow: 262144, maxTokens: 32768 }],
+		snapshotRoot: join(sandbox, "missing-aa-root"),
+		benchLmRoot,
+		snapshotMaxAgeMs: FIXTURE_MAX_AGE_MS,
+	});
+	assert.equal(result.modelId, "p/m", "BenchLM alone is enough evidence to delegate");
+	assert.equal(result.selector, "benchmark");
+});
+
+test("stale health is diagnosed when no injected probe is available", async () => {
 	const snapshotRoot = writeBenchmarkAssets(sandbox, Date.now());
 	writeHealthCache(1, [HEALTHY]);
 	try {
@@ -222,10 +268,37 @@ test("model selection stays empty when the local model-health cache is stale", a
 			snapshotRoot,
 			snapshotMaxAgeMs: FIXTURE_MAX_AGE_MS,
 		});
-		assert.deepEqual(result, {});
+		assert.equal(result.modelId, undefined);
+		assert.equal(result.benchmarkRoute?.candidates[0]?.rejectionReasons[0], "staleCache");
 	} finally {
 		rmSync(snapshotRoot, { recursive: true, force: true });
 	}
+});
+
+test("stale health is refreshed through the injected probe and written back", async () => {
+	const snapshotRoot = writeBenchmarkAssets(sandbox, Date.now());
+	writeHealthCache(1, []);
+	const probed: string[] = [], merged: string[] = [];
+	try {
+		const result = await selectionModule.selectModelForSubagent({
+			models: [{ id: "p/m", input: ["text"] }], snapshotRoot, snapshotMaxAgeMs: FIXTURE_MAX_AGE_MS,
+			dependencies: { probe: async (id: string) => { probed.push(id); return { ...HEALTHY, checkedAt: Date.now() }; }, merge: async (entry: any) => { merged.push(entry.id); } },
+		});
+		assert.equal(result.modelId, "p/m");
+		assert.deepEqual(probed, ["p/m"]);
+		assert.deepEqual(merged, ["p/m"]);
+	} finally { rmSync(snapshotRoot, { recursive: true, force: true }); }
+});
+
+test("health refresh budget excludes candidates the probe never reached", async () => {
+	const snapshotRoot = writeBenchmarkAssets(sandbox, Date.now()); writeHealthCache(1, []);
+	try {
+		let calls = 0;
+		const exhausted = await selectionModule.selectModelForSubagent({ models: [{ id: "p/m", input: ["text"] }], snapshotRoot, snapshotMaxAgeMs: FIXTURE_MAX_AGE_MS, dependencies: { now: (() => { let n = 0; return () => n++ ? 20_000 : 0; })(), probe: async () => { calls++; return HEALTHY; }, merge: async () => {} } });
+		assert.equal(calls, 0); assert.equal(exhausted.benchmarkRoute?.candidates[0]?.rejectionReasons[0], "unprobedBudget");
+		const routed = await selectionModule.selectModelForSubagent({ models: [{ id: "p/m", input: ["text"] }], snapshotRoot, snapshotMaxAgeMs: FIXTURE_MAX_AGE_MS, dependencies: { now: () => 0, probe: async () => ({ ...HEALTHY, checkedAt: Date.now() }), merge: async () => {} } });
+		assert.equal(routed.modelId, "p/m");
+	} finally { rmSync(snapshotRoot, { recursive: true, force: true }); }
 });
 
 test("model selection stays empty when no models are available", async () => {

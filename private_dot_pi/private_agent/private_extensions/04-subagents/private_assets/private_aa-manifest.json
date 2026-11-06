@@ -1,0 +1,416 @@
+{
+  "digest": "cd938f8870dc5a770c704b7af03c732c51ea82050c66457874df1b44e6c9f7d7",
+  "generatedAt": 1793820828821,
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "5"
+  },
+  "models": [
+    {
+      "capturedAt": 1793820802808,
+      "contentDigest": "d75acf6c34cd9132dcd2e2ea50019884c9a238427588b96db6ea5ead1e4fc882",
+      "file": "kimi-k2.6.json",
+      "model": "Kimi-K2.6",
+      "modelId": "0de67206-4d36-4d10-b8f6-cf37fa747a03",
+      "provider": "kelley",
+      "thinkingLevel": null
+    },
+    {
+      "capturedAt": 1793820803132,
+      "contentDigest": "b37187f00b5c2855b4b85657b196cfdfb9fe2e1ea47eb3c6afea0ba6fbc4897c",
+      "file": "mistral-large-4.json",
+      "model": "mistral-large-4",
+      "modelId": "ea5019ae-b0b7-49a5-80b3-0e584807af0f",
+      "provider": "model-testing",
+      "thinkingLevel": "high"
+    },
+    {
+      "capturedAt": 1793820803611,
+      "contentDigest": "4e1a3e701de6ab67518830c1ee2d51833f2bb953582151bd84668cfbdb3669e8",
+      "file": "mistral-large-4.json",
+      "model": "mistral-large-4",
+      "modelId": "27b24366-fd1a-44b7-8011-e24d7501318d",
+      "provider": "model-testing",
+      "thinkingLevel": "medium"
+    },
+    {
+      "capturedAt": 1793820803995,
+      "contentDigest": "0e12275521a4f3152bd62f63daf63967baf4ac9fb95b789cc66fd6dbace5373e",
+      "file": "muse-glimmer.json",
+      "model": "muse-glimmer",
+      "modelId": "583f98fb-c4b8-4df3-8d40-60ac0ed69882",
+      "provider": "model-testing",
+      "thinkingLevel": "high"
+    },
+    {
+      "capturedAt": 1793820804585,
+      "contentDigest": "5f41f9e758a1b0c1b5935bc30631ae30457a4242a5e51544abf9117e377b8515",
+      "file": "qwen3.8-flash-next.json",
+      "model": "qwen3.8-flash-next",
+      "modelId": "9ac3908c-9eb2-44db-8c01-3ec7da6fc2ae",
+      "provider": "model-testing",
+      "thinkingLevel": "xhigh"
+    },
+    {
+      "capturedAt": 1793820805349,
+      "contentDigest": "f4a2601b69438218d1c461aadb4bd40e0b2a598eb0c250409131c572a10b1f36",
+      "file": "gpt-5.6-sol.json",
+      "model": "gpt-5.6-sol",
+      "modelId": "8afc250d-b538-45a2-812a-4605f4ffd87e",
+      "provider": "openai-codex",
+      "thinkingLevel": "high"
+    },
+    {
+      "capturedAt": 1793820805902,
+      "contentDigest": "7e48731b13b2118a67b10b3b3f2338c4e8298b4f9229817b79dca5e0cf3e7b34",
+      "file": "gpt-5.6-sol.json",
+      "model": "gpt-5.6-sol",
+      "modelId": "0904b596-8932-43bd-9b21-324f128e1723",
+      "provider": "openai-codex",
+      "thinkingLevel": "low"
+    },
+    {
+      "capturedAt": 1793820806280,
+      "contentDigest": "8bde1f01440c2c9206ebf89c133088847d9f13e4cdc259406d10b74f80559a7c",
+      "file": "gpt-5.6-sol.json",
+      "model": "gpt-5.6-sol",
+      "modelId": "d93edfe8-bf35-49ad-b56e-b18116142a1c",
+      "provider": "openai-codex",
+      "thinkingLevel": "max"
+    },
+    {
+      "capturedAt": 1793820807741,
+      "contentDigest": "7850a13a379d77531b41ab1834eed249669ae966746201b271ac5f87ebddec36",
+      "file": "gpt-5.6-sol.json",
+      "model": "gpt-5.6-sol",
+      "modelId": "6f174934-5b7d-4333-86cb-f5ebf4a862e3",
+      "provider": "openai-codex",
+      "thinkingLevel": "medium"
+    },
+    {
+      "capturedAt": 1793820809242,
+      "contentDigest": "70bf331c1e31329127eee0db6ee46abb0cf02734c6b5bdb1408bd2770cef2f0e",
+      "file": "gpt-5.6-sol.json",
+      "model": "gpt-5.6-sol",
+      "modelId": "7c4d1e30-6ecb-46cf-880c-41446d7b51f1",
+      "provider": "openai-codex",
+      "thinkingLevel": "off"
+    },
+    {
+      "capturedAt": 1793820809859,
+      "contentDigest": "98bed7a8da81400a0ede88afe385e3f3b1cfbac6a55a7c3aac73ddf06ece4dfe",
+      "file": "gpt-5.6-sol.json",
+      "model": "gpt-5.6-sol",
+      "modelId": "d998db47-9b67-4727-a2bb-2e1261020ac0",
+      "provider": "openai-codex",
+      "thinkingLevel": "xhigh"
+    },
+    {
+      "capturedAt": 1793820811443,
+      "contentDigest": "cbe8d2421d4a6cef58a252e8a212f68201ddf3df2a4213d5ba9a3bd1d34a6039",
+      "file": "gpt-5.6-terra.json",
+      "model": "gpt-5.6-terra",
+      "modelId": "81972fba-1219-477e-bbfb-18c656a63ff7",
+      "provider": "openai-codex",
+      "thinkingLevel": "high"
+    },
+    {
+      "capturedAt": 1793820812954,
+      "contentDigest": "729305ad23580904db3cea754e0777d4f603ea2538fae9374d11aabd4c460b92",
+      "file": "gpt-5.6-terra.json",
+      "model": "gpt-5.6-terra",
+      "modelId": "cc4a20cd-09fe-4962-a430-119c815e85fa",
+      "provider": "openai-codex",
+      "thinkingLevel": "low"
+    },
+    {
+      "capturedAt": 1793820813378,
+      "contentDigest": "f2b231a98cc276e051da067dc4893ed815239d34420995afb848a5c35b29b627",
+      "file": "gpt-5.6-terra.json",
+      "model": "gpt-5.6-terra",
+      "modelId": "bcf8db0a-3bb6-4d82-9516-0f57370c85a6",
+      "provider": "openai-codex",
+      "thinkingLevel": "max"
+    },
+    {
+      "capturedAt": 1793820813927,
+      "contentDigest": "0960575a6719ba9ce2cb8ecfdb58d04c7ebd12150d6ea7032c29adaf24cb6b52",
+      "file": "gpt-5.6-terra.json",
+      "model": "gpt-5.6-terra",
+      "modelId": "26e0f83a-ca98-4f34-94ac-7c5e251ee410",
+      "provider": "openai-codex",
+      "thinkingLevel": "medium"
+    },
+    {
+      "capturedAt": 1793820814468,
+      "contentDigest": "c1bb187db8c74276338e304b7e4c1a9d245c53da4fe127535bc87f3f211f294b",
+      "file": "gpt-5.6-terra.json",
+      "model": "gpt-5.6-terra",
+      "modelId": "9b97a35e-6ac7-44d9-91c6-422fa678963e",
+      "provider": "openai-codex",
+      "thinkingLevel": "off"
+    },
+    {
+      "capturedAt": 1793820815046,
+      "contentDigest": "c068168c6f33add016040fec3edbeef198907f0c267a71220d37220787136581",
+      "file": "gpt-5.6-terra.json",
+      "model": "gpt-5.6-terra",
+      "modelId": "9e30696f-16fa-4b4f-ba53-161895a85fed",
+      "provider": "openai-codex",
+      "thinkingLevel": "xhigh"
+    },
+    {
+      "capturedAt": 1793820815596,
+      "contentDigest": "3c5c5f5d7db4a4e0e02adcafff58b84e6e84008c43d0a033a725c850f9483e63",
+      "file": "gpt-6-astra.json",
+      "model": "gpt-6-astra",
+      "modelId": "e05a4828-0536-4876-870d-a235023f992b",
+      "provider": "openai-codex",
+      "thinkingLevel": "high"
+    },
+    {
+      "capturedAt": 1793820816052,
+      "contentDigest": "3ca725a9fc9cde6331ca57c73f17c4d90f38fd02c69e9fc87ab9183985d9eb75",
+      "file": "gpt-6-astra.json",
+      "model": "gpt-6-astra",
+      "modelId": "a3f8100d-e38f-408b-b0fa-0085dae18dc1",
+      "provider": "openai-codex",
+      "thinkingLevel": "low"
+    },
+    {
+      "capturedAt": 1793820816385,
+      "contentDigest": "dd40bf2cc8ebcc66eab432bc3399e007eebed4540d1596cdfa5dc86228e20822",
+      "file": "gpt-6-astra.json",
+      "model": "gpt-6-astra",
+      "modelId": "2f339a97-9a0d-499a-9cb5-e0db665bfa25",
+      "provider": "openai-codex",
+      "thinkingLevel": "max"
+    },
+    {
+      "capturedAt": 1793820816852,
+      "contentDigest": "aee7ffd1ac6ca8a58749f92f33f09482fb20b9a997dd338a6718fc8da1dfa95d",
+      "file": "gpt-6-astra.json",
+      "model": "gpt-6-astra",
+      "modelId": "e97a4ef5-e817-480e-9595-12f81dc4974f",
+      "provider": "openai-codex",
+      "thinkingLevel": "medium"
+    },
+    {
+      "capturedAt": 1793820817366,
+      "contentDigest": "0751161a29fdebafe2e2e9ee9685efd964742ca584cba51fce3dbf822139af0c",
+      "file": "gpt-6-astra.json",
+      "model": "gpt-6-astra",
+      "modelId": "1f541ef3-913f-4eb2-9d07-0e93c7a9a5e3",
+      "provider": "openai-codex",
+      "thinkingLevel": "xhigh"
+    },
+    {
+      "capturedAt": 1793820818016,
+      "contentDigest": "516e4456a6c048dbeb98e21048ffe42e19bf85f539c39cf1a71e2e5d0cbadf52",
+      "file": "gpt-6-luna.json",
+      "model": "gpt-6-luna",
+      "modelId": "7d1229bc-deea-4717-ba5b-f59a35d991e3",
+      "provider": "openai-codex",
+      "thinkingLevel": "high"
+    },
+    {
+      "capturedAt": 1793820818339,
+      "contentDigest": "c32a1a46a053a39303d78feae292cf2305f786c5a9a90abef61f1bd15c875b1c",
+      "file": "gpt-6-luna.json",
+      "model": "gpt-6-luna",
+      "modelId": "bf9708d8-933d-44f6-affa-b696a7a650c9",
+      "provider": "openai-codex",
+      "thinkingLevel": "low"
+    },
+    {
+      "capturedAt": 1793820818677,
+      "contentDigest": "90f00e8253a12535c255f58e5c20e09d1dcbfbf0e1b3050945ad54baa3424d90",
+      "file": "gpt-6-luna.json",
+      "model": "gpt-6-luna",
+      "modelId": "6fb13851-40ce-4bda-ad3f-6b38e0c5daa7",
+      "provider": "openai-codex",
+      "thinkingLevel": "max"
+    },
+    {
+      "capturedAt": 1793820819231,
+      "contentDigest": "073a1101e8f14fc415f3f8b49710c7bf6a49534d7c71287b4393e2f0f792d31e",
+      "file": "gpt-6-luna.json",
+      "model": "gpt-6-luna",
+      "modelId": "36667da0-9222-4967-adbb-f7efa15ad213",
+      "provider": "openai-codex",
+      "thinkingLevel": "medium"
+    },
+    {
+      "capturedAt": 1793820819654,
+      "contentDigest": "96eb0cae9db28dc37dbfb72244f5dc3f6fcc7fffa935c0d4919f359df20cc860",
+      "file": "gpt-6-luna.json",
+      "model": "gpt-6-luna",
+      "modelId": "63cb48ea-0b0c-4e07-8ded-6d28dec4fa28",
+      "provider": "openai-codex",
+      "thinkingLevel": "off"
+    },
+    {
+      "capturedAt": 1793820820215,
+      "contentDigest": "b3f8a2d590fcafb58c7ac908db5fec8454938d5e1140352d21e9859a09d5a93b",
+      "file": "gpt-6-luna.json",
+      "model": "gpt-6-luna",
+      "modelId": "19813eb2-460a-475c-af65-810bb8660fec",
+      "provider": "openai-codex",
+      "thinkingLevel": "xhigh"
+    },
+    {
+      "capturedAt": 1793820820742,
+      "contentDigest": "f0963f73f96d271fcb2ebb85c8c700b189a932250861b4674a05641218ba001e",
+      "file": "gpt-6.1-sol.json",
+      "model": "gpt-6.1-sol",
+      "modelId": "3b84fee3-b70a-41bc-819e-5fbdef9a0042",
+      "provider": "openai-codex",
+      "thinkingLevel": "high"
+    },
+    {
+      "capturedAt": 1793820821249,
+      "contentDigest": "de6cbe078a8dea28d178c72227da287b9bf362d20a0be482ecdb16ea7e1b6b4d",
+      "file": "gpt-6.1-sol.json",
+      "model": "gpt-6.1-sol",
+      "modelId": "e76e0fe5-93ca-4272-9359-2eb1740467d1",
+      "provider": "openai-codex",
+      "thinkingLevel": "low"
+    },
+    {
+      "capturedAt": 1793820821745,
+      "contentDigest": "4d755d35dc07b03428431e776e8ec512de78e89b4fe37a36106bb8cf73b99635",
+      "file": "gpt-6.1-sol.json",
+      "model": "gpt-6.1-sol",
+      "modelId": "b25ac058-1e33-4c31-bbc9-a20c3ad0717a",
+      "provider": "openai-codex",
+      "thinkingLevel": "max"
+    },
+    {
+      "capturedAt": 1793820822372,
+      "contentDigest": "a8717be6bc33cc211ea6beb80081fbd4a0fa5bbe50c166d6c0b9820fb1a59224",
+      "file": "gpt-6.1-sol.json",
+      "model": "gpt-6.1-sol",
+      "modelId": "a2e51d62-ea4e-4f15-8be0-be9dc1fb489d",
+      "provider": "openai-codex",
+      "thinkingLevel": "medium"
+    },
+    {
+      "capturedAt": 1793820822843,
+      "contentDigest": "5a1827b5a581582687e9240a9cabb0071a47bd6fb2dd921fd95c2527bc1fd120",
+      "file": "gpt-6.1-sol.json",
+      "model": "gpt-6.1-sol",
+      "modelId": "092a3b0e-c5c8-45dc-bf1b-53673c8ff352",
+      "provider": "openai-codex",
+      "thinkingLevel": "xhigh"
+    },
+    {
+      "capturedAt": 1793820823354,
+      "contentDigest": "41b1097ddfe084d21b80ff7a71f4bb1916b03c853d4d1e203b9bfb0d78bf67d8",
+      "file": "gpt-6.1-terra.json",
+      "model": "gpt-6.1-terra",
+      "modelId": "ea3e1f50-f62d-41d2-849a-9af0413e4d37",
+      "provider": "openai-codex",
+      "thinkingLevel": "high"
+    },
+    {
+      "capturedAt": 1793820823862,
+      "contentDigest": "3d86148970612eea8fc0f262e195d1031ba6120102c835df7cbc346d04286618",
+      "file": "gpt-6.1-terra.json",
+      "model": "gpt-6.1-terra",
+      "modelId": "c955b262-a17f-4f1a-b097-6860b866295b",
+      "provider": "openai-codex",
+      "thinkingLevel": "low"
+    },
+    {
+      "capturedAt": 1793820824186,
+      "contentDigest": "2e83dff35eaef3a3f6bb62693c02a201462dba6209895f3f43779f9b7548e5b3",
+      "file": "gpt-6.1-terra.json",
+      "model": "gpt-6.1-terra",
+      "modelId": "b0c462cf-f2d0-4126-9434-28db9502219f",
+      "provider": "openai-codex",
+      "thinkingLevel": "max"
+    },
+    {
+      "capturedAt": 1793820824656,
+      "contentDigest": "5960f93d3ddd22c926cdb9cf5f8ba2593b63a8c85ea8bd78a2cfba84135e34bd",
+      "file": "gpt-6.1-terra.json",
+      "model": "gpt-6.1-terra",
+      "modelId": "c441e158-a87d-4116-911b-93325e4b4f1c",
+      "provider": "openai-codex",
+      "thinkingLevel": "medium"
+    },
+    {
+      "capturedAt": 1793820825158,
+      "contentDigest": "8bdb3196b8a8e141d93011749ee5a64ac5a02e87f1bef431ba4a38eb8c7f868a",
+      "file": "gpt-6.1-terra.json",
+      "model": "gpt-6.1-terra",
+      "modelId": "0d3c777f-6817-42d7-9bb9-223314bc5a57",
+      "provider": "openai-codex",
+      "thinkingLevel": "off"
+    },
+    {
+      "capturedAt": 1793820825762,
+      "contentDigest": "b4c804aeb79dc9409c2aa1f04eb8241c6621f5e60ebc86c817ddfa112c205417",
+      "file": "gpt-6.1-terra.json",
+      "model": "gpt-6.1-terra",
+      "modelId": "e8d443ba-8aca-4830-a186-ae869bb9c6fe",
+      "provider": "openai-codex",
+      "thinkingLevel": "xhigh"
+    },
+    {
+      "capturedAt": 1793820826584,
+      "contentDigest": "133abb5da06873b4dc179f41aaf378ec8ea5a25cf6d12eb1c7bdc32b9df44b58",
+      "file": "qwen3.8-27b.json",
+      "model": "qwen3.8-27b",
+      "modelId": "7e30585f-fad7-40df-a8cb-03c1d96df38a",
+      "provider": "qwen",
+      "thinkingLevel": "low"
+    },
+    {
+      "capturedAt": 1793820827056,
+      "contentDigest": "3c071b923c601dc1f854c1e4e25ff13a78720f8565b7c0a1db08fcd404b3a1df",
+      "file": "qwen3.8-27b.json",
+      "model": "qwen3.8-27b",
+      "modelId": "6657d7de-a2a9-40bc-a32f-86e80ad63698",
+      "provider": "qwen",
+      "thinkingLevel": "medium"
+    },
+    {
+      "capturedAt": 1793820827562,
+      "contentDigest": "e697b22024641fa441f29e750f62d077503bc7df77ebebe1c1a51868c75b46eb",
+      "file": "qwen3.8-27b.json",
+      "model": "qwen3.8-27b",
+      "modelId": "353c92f3-2148-4c2d-9231-aa7e1322a1fd",
+      "provider": "qwen",
+      "thinkingLevel": "off"
+    },
+    {
+      "capturedAt": 1793820827919,
+      "contentDigest": "f1951b3966c1e26102cd5737fba3bb53e648f366577bd3743a8b1c57ec6407e1",
+      "file": "qwen3.8-27b.json",
+      "model": "qwen3.8-27b",
+      "modelId": "b01dee41-c62b-48ed-8d16-984adc405e5c",
+      "provider": "qwen",
+      "thinkingLevel": "xhigh"
+    },
+    {
+      "capturedAt": 1793820828329,
+      "contentDigest": "91508e69dfdab20ea91670294e9510a63ed8bf7fcff8263197408ce20f4d83a9",
+      "file": "mimo-v2.6-pro.json",
+      "model": "mimo-v2.6-pro",
+      "modelId": "24d8fdfe-6241-424e-b7b7-1b6efb06e4fb",
+      "provider": "xiaomi",
+      "thinkingLevel": "off"
+    },
+    {
+      "capturedAt": 1793820828821,
+      "contentDigest": "2aab7715b9233beb5ffcbd524cdb55814a724823e1c0a55385e643ae8a08cc3a",
+      "file": "glm-5.3-flash.json",
+      "model": "glm-5.3-flash",
+      "modelId": "19496b81-9f41-4214-a77a-1df803b3c5ae",
+      "provider": "z-ai",
+      "thinkingLevel": null
+    }
+  ],
+  "version": 4
+}

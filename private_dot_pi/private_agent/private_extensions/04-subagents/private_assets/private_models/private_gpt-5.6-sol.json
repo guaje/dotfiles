@@ -1,0 +1,1564 @@
+{
+  "version": 2,
+  "model": "gpt-5.6-sol",
+  "aa": {
+    "variants": [
+      {
+        "version": 4,
+        "provider": "openai-codex",
+        "model": "gpt-5.6-sol",
+        "thinkingLevel": "high",
+        "modelId": "8afc250d-b538-45a2-812a-4605f4ffd87e",
+        "capturedAt": 1793820805349,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793723418641,
+          "thinkingLevel": "high"
+        },
+        "source": {
+          "name": "GPT-5.6 Sol (High)",
+          "slug": "gpt-5-6-sol-high",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/gpt-5-6-sol-high",
+          "retrievedAt": 1793820805094,
+          "contentSha256": "7bb327d96b2f2dc69c46dd3ad1933f2a9f183f9cf8fb3fe13f8b463647dc1676",
+          "recordSha256": "04675d9574364ba2bce2b15721b1d5ff40fd5342a42730dfcf4c7ffffe40d6c9",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": null,
+          "coding": null,
+          "agentic": null,
+          "toolUse": 60.017182130584146,
+          "scientificReasoning": 54.852465695839165,
+          "longContext": 81.6666666666667,
+          "instructionFollowing": 69.1836734693878,
+          "knowledge": null,
+          "faithfulness": null
+        },
+        "subBenchmarks": {
+          "ifbench": 69.1836734693878,
+          "hle": 46.014828544949,
+          "gpqa": 92.82828282828281,
+          "critpt": 25.7142857142857
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": {
+              "normalizedScore": 36.701030927835,
+              "sourceKind": "public-page",
+              "fieldPath": "tauBanking",
+              "benchmark": {
+                "id": "tau3-banking",
+                "version": "AA Intelligence Index v5.0.1",
+                "status": "current"
+              },
+              "retrievedAt": 1793820805094,
+              "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol-high",
+              "sourceRecordDigest": "04675d9574364ba2bce2b15721b1d5ff40fd5342a42730dfcf4c7ffffe40d6c9"
+            },
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": {
+              "normalizedScore": 83.3333333333333,
+              "sourceKind": "public-page",
+              "fieldPath": "tau2",
+              "benchmark": {
+                "id": "tau2-telecom",
+                "version": "AA Intelligence Index v5.0.1",
+                "status": "current"
+              },
+              "retrievedAt": 1793820805094,
+              "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol-high",
+              "sourceRecordDigest": "04675d9574364ba2bce2b15721b1d5ff40fd5342a42730dfcf4c7ffffe40d6c9"
+            }
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "tau3-banking+tau2-telecom",
+            "score": 60.017182130584146
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.4444444444444444,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      },
+      {
+        "version": 4,
+        "provider": "openai-codex",
+        "model": "gpt-5.6-sol",
+        "thinkingLevel": "low",
+        "modelId": "0904b596-8932-43bd-9b21-324f128e1723",
+        "capturedAt": 1793820805902,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793723419982,
+          "thinkingLevel": "low"
+        },
+        "source": {
+          "name": "GPT-5.6 Sol (Low)",
+          "slug": "gpt-5-6-sol-low",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/gpt-5-6-sol-low",
+          "retrievedAt": 1793820805649,
+          "contentSha256": "9dbfae6e6186bdc5a36586aab33587f784b92de56d309264a3d38522b8ea33f9",
+          "recordSha256": "38e433272b7b3f01ea98d9a5847ad64aa390568c5c2ae48e8a81bac0d20a224a",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": null,
+          "coding": null,
+          "agentic": null,
+          "toolUse": 52.54777838065955,
+          "scientificReasoning": 48.01448172532509,
+          "longContext": 78,
+          "instructionFollowing": 66.53061224489801,
+          "knowledge": null,
+          "faithfulness": null
+        },
+        "subBenchmarks": {
+          "ifbench": 66.53061224489801,
+          "hle": 39.3883225208526,
+          "gpqa": 89.79797979797979,
+          "critpt": 14.857142857142899
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": {
+              "normalizedScore": 29.0721649484536,
+              "sourceKind": "public-page",
+              "fieldPath": "tauBanking",
+              "benchmark": {
+                "id": "tau3-banking",
+                "version": "AA Intelligence Index v5.0.1",
+                "status": "current"
+              },
+              "retrievedAt": 1793820805649,
+              "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol-low",
+              "sourceRecordDigest": "38e433272b7b3f01ea98d9a5847ad64aa390568c5c2ae48e8a81bac0d20a224a"
+            },
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": {
+              "normalizedScore": 76.0233918128655,
+              "sourceKind": "public-page",
+              "fieldPath": "tau2",
+              "benchmark": {
+                "id": "tau2-telecom",
+                "version": "AA Intelligence Index v5.0.1",
+                "status": "current"
+              },
+              "retrievedAt": 1793820805649,
+              "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol-low",
+              "sourceRecordDigest": "38e433272b7b3f01ea98d9a5847ad64aa390568c5c2ae48e8a81bac0d20a224a"
+            }
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "tau3-banking+tau2-telecom",
+            "score": 52.54777838065955
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.4444444444444444,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      },
+      {
+        "version": 4,
+        "provider": "openai-codex",
+        "model": "gpt-5.6-sol",
+        "thinkingLevel": "max",
+        "modelId": "d93edfe8-bf35-49ad-b56e-b18116142a1c",
+        "capturedAt": 1793820806280,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793723421407,
+          "thinkingLevel": "max"
+        },
+        "source": {
+          "name": "GPT-5.6 Sol (Max)",
+          "slug": "gpt-5-6-sol",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/gpt-5-6-sol",
+          "retrievedAt": 1793820806024,
+          "contentSha256": "bf46a31bad33dd8142188554b36bc1b84791b5d1c0ebb14b075af92dab5dfa41",
+          "recordSha256": "927f53ab93d353f5f62c7d9f23e639265452073130b0e3f2f178356c50c91c3a",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": null,
+          "coding": null,
+          "agentic": null,
+          "toolUse": 64.70880810273106,
+          "scientificReasoning": 58.639132398168535,
+          "longContext": 84,
+          "instructionFollowing": 72.6530612244898,
+          "knowledge": null,
+          "faithfulness": null
+        },
+        "subBenchmarks": {
+          "ifbench": 72.6530612244898,
+          "hle": 49.4902687673772,
+          "gpqa": 94.1414141414141,
+          "critpt": 32.2857142857143
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": {
+              "normalizedScore": 44.3298969072165,
+              "sourceKind": "public-page",
+              "fieldPath": "tauBanking",
+              "benchmark": {
+                "id": "tau3-banking",
+                "version": "AA Intelligence Index v5.0.1",
+                "status": "current"
+              },
+              "retrievedAt": 1793820806024,
+              "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol",
+              "sourceRecordDigest": "927f53ab93d353f5f62c7d9f23e639265452073130b0e3f2f178356c50c91c3a"
+            },
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": {
+              "normalizedScore": 85.0877192982456,
+              "sourceKind": "public-page",
+              "fieldPath": "tau2",
+              "benchmark": {
+                "id": "tau2-telecom",
+                "version": "AA Intelligence Index v5.0.1",
+                "status": "current"
+              },
+              "retrievedAt": 1793820806024,
+              "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol",
+              "sourceRecordDigest": "927f53ab93d353f5f62c7d9f23e639265452073130b0e3f2f178356c50c91c3a"
+            }
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "tau3-banking+tau2-telecom",
+            "score": 64.70880810273106
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.4444444444444444,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      },
+      {
+        "version": 4,
+        "provider": "openai-codex",
+        "model": "gpt-5.6-sol",
+        "thinkingLevel": "medium",
+        "modelId": "6f174934-5b7d-4333-86cb-f5ebf4a862e3",
+        "capturedAt": 1793820807741,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793723422767,
+          "thinkingLevel": "medium"
+        },
+        "source": {
+          "name": "GPT-5.6 Sol (Medium)",
+          "slug": "gpt-5-6-sol-medium",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/gpt-5-6-sol-medium",
+          "retrievedAt": 1793820807488,
+          "contentSha256": "34f30f06fdef56e4bff7d83a1f340e63649678e80281fd6e070c133e6c6cc2a0",
+          "recordSha256": "93197703c4cd7cbafdf49e4deee68c4b10b78fdda0d10d6e87ba53cd2568add2",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": null,
+          "coding": null,
+          "agentic": null,
+          "toolUse": 58.74449870380415,
+          "scientificReasoning": 52.56613979505547,
+          "longContext": 80.3333333333333,
+          "instructionFollowing": 69.5918367346939,
+          "knowledge": null,
+          "faithfulness": null
+        },
+        "subBenchmarks": {
+          "ifbench": 69.5918367346939,
+          "hle": 42.2150139017609,
+          "gpqa": 92.6262626262626,
+          "critpt": 22.8571428571429
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": {
+              "normalizedScore": 36.4948453608247,
+              "sourceKind": "public-page",
+              "fieldPath": "tauBanking",
+              "benchmark": {
+                "id": "tau3-banking",
+                "version": "AA Intelligence Index v5.0.1",
+                "status": "current"
+              },
+              "retrievedAt": 1793820807488,
+              "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol-medium",
+              "sourceRecordDigest": "93197703c4cd7cbafdf49e4deee68c4b10b78fdda0d10d6e87ba53cd2568add2"
+            },
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": {
+              "normalizedScore": 80.9941520467836,
+              "sourceKind": "public-page",
+              "fieldPath": "tau2",
+              "benchmark": {
+                "id": "tau2-telecom",
+                "version": "AA Intelligence Index v5.0.1",
+                "status": "current"
+              },
+              "retrievedAt": 1793820807488,
+              "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol-medium",
+              "sourceRecordDigest": "93197703c4cd7cbafdf49e4deee68c4b10b78fdda0d10d6e87ba53cd2568add2"
+            }
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "tau3-banking+tau2-telecom",
+            "score": 58.74449870380415
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.4444444444444444,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      },
+      {
+        "version": 4,
+        "provider": "openai-codex",
+        "model": "gpt-5.6-sol",
+        "thinkingLevel": "off",
+        "modelId": "7c4d1e30-6ecb-46cf-880c-41446d7b51f1",
+        "capturedAt": 1793820809242,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793723424071,
+          "thinkingLevel": "off"
+        },
+        "source": {
+          "name": "GPT-5.6 Sol (Non-reasoning)",
+          "slug": "gpt-5-6-sol-non-reasoning",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/gpt-5-6-sol-non-reasoning",
+          "retrievedAt": 1793820808988,
+          "contentSha256": "6a302755ae253835172f1da43313563744c806ed07cee9856db15726fb0218df",
+          "recordSha256": "df82fd1bb3c3fcbb0bf7081b7b4cbb5b32f9f6bddd7181ddb74bc2f51758b404",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": null,
+          "coding": null,
+          "agentic": null,
+          "toolUse": 19.5876288659794,
+          "scientificReasoning": 33.60495640013711,
+          "longContext": 62.33333333333329,
+          "instructionFollowing": null,
+          "knowledge": null,
+          "faithfulness": null
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 16.682113067655198,
+          "gpqa": 78.989898989899,
+          "critpt": 5.14285714285714
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": {
+              "normalizedScore": 19.5876288659794,
+              "sourceKind": "public-page",
+              "fieldPath": "tauBanking",
+              "benchmark": {
+                "id": "tau3-banking",
+                "version": "AA Intelligence Index v5.0.1",
+                "status": "current"
+              },
+              "retrievedAt": 1793820808988,
+              "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol-non-reasoning",
+              "sourceRecordDigest": "df82fd1bb3c3fcbb0bf7081b7b4cbb5b32f9f6bddd7181ddb74bc2f51758b404"
+            },
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "tau3-banking-single",
+            "score": 19.5876288659794
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.3333333333333333,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": false
+        }
+      },
+      {
+        "version": 4,
+        "provider": "openai-codex",
+        "model": "gpt-5.6-sol",
+        "thinkingLevel": "xhigh",
+        "modelId": "d998db47-9b67-4727-a2bb-2e1261020ac0",
+        "capturedAt": 1793820809859,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793723426913,
+          "thinkingLevel": "xhigh"
+        },
+        "source": {
+          "name": "GPT-5.6 Sol (Xhigh)",
+          "slug": "gpt-5-6-sol-xhigh",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/gpt-5-6-sol-xhigh",
+          "retrievedAt": 1793820809607,
+          "contentSha256": "61eea648d96a503e50f514edd4d8552529c10e8234d0104dd4d004ccb5fed2e1",
+          "recordSha256": "a3ee56f7d11eb4c253343d4d41d9f2fa535ad460e75441824c87dd8a74530316",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": null,
+          "coding": null,
+          "agentic": null,
+          "toolUse": 61.469825767167045,
+          "scientificReasoning": 56.3383559769102,
+          "longContext": 82.3333333333333,
+          "instructionFollowing": 71.0204081632653,
+          "knowledge": null,
+          "faithfulness": null
+        },
+        "subBenchmarks": {
+          "ifbench": 71.0204081632653,
+          "hle": 47.3123262279889,
+          "gpqa": 93.13131313131309,
+          "critpt": 28.571428571428598
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": {
+              "normalizedScore": 38.144329896907195,
+              "sourceKind": "public-page",
+              "fieldPath": "tauBanking",
+              "benchmark": {
+                "id": "tau3-banking",
+                "version": "AA Intelligence Index v5.0.1",
+                "status": "current"
+              },
+              "retrievedAt": 1793820809607,
+              "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol-xhigh",
+              "sourceRecordDigest": "a3ee56f7d11eb4c253343d4d41d9f2fa535ad460e75441824c87dd8a74530316"
+            },
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": {
+              "normalizedScore": 84.7953216374269,
+              "sourceKind": "public-page",
+              "fieldPath": "tau2",
+              "benchmark": {
+                "id": "tau2-telecom",
+                "version": "AA Intelligence Index v5.0.1",
+                "status": "current"
+              },
+              "retrievedAt": 1793820809607,
+              "sourceUrl": "https://artificialanalysis.ai/models/gpt-5-6-sol-xhigh",
+              "sourceRecordDigest": "a3ee56f7d11eb4c253343d4d41d9f2fa535ad460e75441824c87dd8a74530316"
+            }
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "tau3-banking+tau2-telecom",
+            "score": 61.469825767167045
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.4444444444444444,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      }
+    ]
+  },
+  "benchlm": {
+    "version": 1,
+    "runtimeId": "openai-codex/gpt-5.6-sol",
+    "canonicalId": "openai/gpt-5.6-sol",
+    "model": "GPT-5.6 Sol",
+    "creator": "OpenAI",
+    "capturedAt": 1793907107528,
+    "lastUpdated": "2026-11-05",
+    "methodologyVersion": "bench-align-v5.8-2026-09-30",
+    "sourceSnapshotId": "2026-11-05-3904bad35f77cff7",
+    "attribution": "Data from BenchLM.ai",
+    "license": "CC BY-NC 4.0",
+    "categoryScores": {
+      "coding": 66.98,
+      "agentic": 68.22,
+      "instructionFollowing": 89.1,
+      "knowledge": 76.24,
+      "reasoning": 76.4,
+      "math": 95.8,
+      "multimodalGrounded": 89.9
+    },
+    "categoryProvenance": {
+      "coding": "leaderboard",
+      "agentic": "leaderboard",
+      "instructionFollowing": "leaderboard",
+      "knowledge": "leaderboard",
+      "reasoning": "leaderboard",
+      "math": "leaderboard",
+      "multimodalGrounded": "leaderboard"
+    },
+    "categoryEvidence": {
+      "coding": {
+        "rows": 14,
+        "independentlyVerified": 10
+      },
+      "agentic": {
+        "rows": 11,
+        "independentlyVerified": 4
+      },
+      "instructionFollowing": {
+        "rows": 1,
+        "independentlyVerified": 0
+      },
+      "knowledge": {
+        "rows": 8,
+        "independentlyVerified": 2
+      },
+      "reasoning": {
+        "rows": 4,
+        "independentlyVerified": 3
+      },
+      "math": {
+        "rows": 3,
+        "independentlyVerified": 0
+      },
+      "multimodalGrounded": {
+        "rows": 4,
+        "independentlyVerified": 2
+      }
+    },
+    "categories": [
+      {
+        "key": "agentic",
+        "label": "Agentic",
+        "score": 68.2,
+        "rank": 13,
+        "total": 135
+      },
+      {
+        "key": "coding",
+        "label": "Coding",
+        "score": 67,
+        "rank": 11,
+        "total": 156
+      },
+      {
+        "key": "reasoning",
+        "label": "Reasoning",
+        "score": 76.4,
+        "rank": 11,
+        "total": 26
+      },
+      {
+        "key": "multimodalGrounded",
+        "label": "Multimodal",
+        "score": 89.9,
+        "rank": 7,
+        "total": 58
+      },
+      {
+        "key": "knowledge",
+        "label": "Knowledge",
+        "score": 76.2,
+        "rank": 11,
+        "total": 177
+      },
+      {
+        "key": "multilingual",
+        "label": "Multilingual",
+        "score": null,
+        "rank": null,
+        "total": 17
+      },
+      {
+        "key": "instructionFollowing",
+        "label": "Instruction following",
+        "score": 89.1,
+        "rank": 34,
+        "total": 157
+      },
+      {
+        "key": "math",
+        "label": "Math",
+        "score": null,
+        "rank": null,
+        "total": 12
+      }
+    ],
+    "details": [
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "lifeVal",
+        "name": "LifeVal",
+        "value": 80,
+        "formatted": "80.0%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: LifeVal",
+          "url": "https://openai.com/index/lifeval/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "frontierBench",
+        "name": "Terminal-Bench 3.0",
+        "value": 34.59,
+        "formatted": "34.6%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Terminal-Bench 3.0 leaderboard",
+          "url": "https://www.frontierbench.ai/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "terminalBench21",
+        "name": "Terminal-Bench 2.1",
+        "value": 91.9,
+        "formatted": "91.9%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-5.6",
+          "url": "https://openai.com/index/gpt-5-6/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "browseComp",
+        "name": "BrowseComp",
+        "value": 92.2,
+        "formatted": "92.2%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-5.6",
+          "url": "https://openai.com/index/gpt-5-6/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "osWorld2",
+        "name": "OSWorld 2.0",
+        "value": 62.6,
+        "formatted": "62.6%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-5.6",
+          "url": "https://openai.com/index/gpt-5-6/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "cyberGym",
+        "name": "CyberGym",
+        "value": 84.5,
+        "formatted": "84.5%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-5.6",
+          "url": "https://openai.com/index/gpt-5-6/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "exploitGym",
+        "name": "ExploitGym",
+        "value": 33.7,
+        "formatted": "33.7%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-5.6",
+          "url": "https://openai.com/index/gpt-5-6/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "toolathlon",
+        "name": "Toolathlon",
+        "value": 58,
+        "formatted": "58%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-5.6",
+          "url": "https://openai.com/index/gpt-5-6/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "valsTerminalBench21",
+        "name": "Terminal-Bench 2.1 (Vals)",
+        "value": 85.8,
+        "formatted": "85.8%",
+        "verificationStatus": "aggregator_verified",
+        "verificationLabel": "Verified",
+        "source": {
+          "label": "Vals AI: Terminal-Bench 2.1 leaderboard",
+          "url": "https://www.vals.ai/models/openai_gpt-5.6-sol",
+          "retrievedAt": null,
+          "publisher": "Vals AI",
+          "publisherUrl": "https://www.vals.ai/",
+          "sourceLabel": "Vals AI",
+          "sourceRole": "published-evaluation-results",
+          "scope": "Published leaderboard aggregates and evaluation settings only. Dataset contents are not included.",
+          "datasetContentsIncluded": false,
+          "licenseGrantIncluded": false,
+          "benchmarkUrl": "https://www.vals.ai/benchmarks/terminal-bench-2-1"
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "apprenticeBench",
+        "name": "ApprenticeBench",
+        "value": 26,
+        "formatted": "26%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "NeoCognition: ApprenticeBench GUI results",
+          "url": "https://neocognition.io/blog/apprentice-bench/#are-frontier-agents-ready-for-the-job",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "mazeBench",
+        "name": "MazeBench",
+        "value": 13,
+        "formatted": "13%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "MazeBench AI leaderboard (ASCII mode)",
+          "url": "https://mazebench.com/leaderboard/ai?mode=ascii&tools=1&metric=gems&run=2026-07-22T03-09-29-940-eea927",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "bug-hunt-bench",
+        "name": "Bug Hunt Bench",
+        "value": 42,
+        "formatted": "42.0 fixes",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Bug Hunt Bench public data",
+          "url": "https://bughunt.productcompass.pm/data/benchmark.json",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "swePro",
+        "name": "SWE-bench Pro",
+        "value": 64.6,
+        "formatted": "64.6%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-5.6",
+          "url": "https://openai.com/index/gpt-5-6/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "terminalBench21",
+        "name": "Terminal-Bench 2.1",
+        "value": 91.9,
+        "formatted": "91.9%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-5.6",
+          "url": "https://openai.com/index/gpt-5-6/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "deepSwe",
+        "name": "DeepSWE",
+        "value": 72.7,
+        "formatted": "72.7%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-5.6",
+          "url": "https://openai.com/index/gpt-5-6/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "frontierCode11Extended",
+        "name": "FrontierCode 1.1 Extended",
+        "value": 60.6,
+        "formatted": "60.6%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Cognition: GPT-5.6 models in Devin",
+          "url": "https://devin.ai/blog/gpt-5-6",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "frontierSweV2",
+        "name": "FrontierSWE v2",
+        "value": 32.2,
+        "formatted": "32.2%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Proximal: FrontierSWE v2 leaderboard",
+          "url": "https://www.frontierswe.com/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "cursorBench32",
+        "name": "CursorBench 3.2",
+        "value": 67.2,
+        "formatted": "67.2%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Cursor evals: CursorBench 3.2",
+          "url": "https://cursor.com/cursorbench",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "vulcanBench",
+        "name": "VulcanBench v3",
+        "value": 87,
+        "formatted": "87.0%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "VulcanBench v3 Technical Report No. 4",
+          "url": "https://github.com/morganlinton/VulcanBench/blob/main/docs/results/v3-3way-2026-07/model-card.md",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "vulcanCiiV1",
+        "name": "VulcanBench CII v1",
+        "value": 86.5,
+        "formatted": "86.5%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "VulcanBench CII v1 frontier results",
+          "url": "https://github.com/morganlinton/VulcanBench/blob/main/docs/results/cii-v1-2026-08/README.md",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "valsLiveCodeBench",
+        "name": "LiveCodeBench (Vals)",
+        "value": 82.6,
+        "formatted": "82.6%",
+        "verificationStatus": "aggregator_verified",
+        "verificationLabel": "Verified",
+        "source": {
+          "label": "Vals AI: LiveCodeBench leaderboard",
+          "url": "https://www.vals.ai/models/openai_gpt-5.6-sol",
+          "retrievedAt": null,
+          "publisher": "Vals AI",
+          "publisherUrl": "https://www.vals.ai/",
+          "sourceLabel": "Vals AI",
+          "sourceRole": "published-evaluation-results",
+          "scope": "Published leaderboard aggregates and evaluation settings only. Dataset contents are not included.",
+          "datasetContentsIncluded": false,
+          "licenseGrantIncluded": false,
+          "benchmarkUrl": "https://www.vals.ai/benchmarks/lcb"
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "valsSweBench",
+        "name": "SWE-bench (Vals)",
+        "value": 96.2,
+        "formatted": "96.2%",
+        "verificationStatus": "aggregator_verified",
+        "verificationLabel": "Verified",
+        "source": {
+          "label": "Vals AI: SWE-bench leaderboard",
+          "url": "https://www.vals.ai/models/openai_gpt-5.6-sol",
+          "retrievedAt": null,
+          "publisher": "Vals AI",
+          "publisherUrl": "https://www.vals.ai/",
+          "sourceLabel": "Vals AI",
+          "sourceRole": "published-evaluation-results",
+          "scope": "Published leaderboard aggregates and evaluation settings only. Dataset contents are not included.",
+          "datasetContentsIncluded": false,
+          "licenseGrantIncluded": false,
+          "benchmarkUrl": "https://www.vals.ai/benchmarks/swebench"
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "cursorBench40",
+        "name": "CursorBench 4.0",
+        "value": 41.7,
+        "formatted": "41.7%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Cursor evals: CursorBench 4.0",
+          "url": "https://cursor.com/cursorbench",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "postTrainBench11",
+        "name": "PostTrainBench v1.1",
+        "value": 36.23,
+        "formatted": "36.2%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "PostTrainBench v1.1 public leaderboard",
+          "url": "https://posttrainbench.com/?version=v1.1",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "frontierCode2",
+        "name": "FrontierCode 2.0",
+        "value": 27.6,
+        "formatted": "27.6%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Cognition: FrontierCode 2.0",
+          "url": "https://cognition.com/blog/frontier-code-2.0",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "reasoning",
+        "categoryLabel": "Reasoning",
+        "key": "arcAgi2",
+        "name": "ARC-AGI-2",
+        "value": 92.5,
+        "formatted": "92.5%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ARC Prize: published Semi-Private results",
+          "url": "https://arcprize.org/results/openai-gpt-5-6-sol",
+          "retrievedAt": "2026-11-05T15:24:10.860Z"
+        }
+      },
+      {
+        "category": "reasoning",
+        "categoryLabel": "Reasoning",
+        "key": "arcAgi3",
+        "name": "ARC-AGI-3",
+        "value": 7.78,
+        "formatted": "7.8%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ARC Prize: published Semi-Private results",
+          "url": "https://arcprize.org/results/openai-gpt-5-6-sol",
+          "retrievedAt": "2026-11-05T15:24:10.860Z"
+        }
+      },
+      {
+        "category": "reasoning",
+        "categoryLabel": "Reasoning",
+        "key": "geneBenchPro",
+        "name": "GeneBench-Pro",
+        "value": 28.7,
+        "formatted": "28.7%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GeneBench-Pro technical report",
+          "url": "https://cdn.openai.com/pdf/21938268-21af-442f-af93-3b2249afb241/genebench-pro.pdf",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "reasoning",
+        "categoryLabel": "Reasoning",
+        "key": "arcAgi1",
+        "name": "ARC-AGI-1",
+        "value": 96.5,
+        "formatted": "96.50%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ARC Prize: published Semi-Private results",
+          "url": "https://arcprize.org/results/openai-gpt-5-6-sol",
+          "retrievedAt": "2026-11-05T15:24:10.860Z"
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "extractBenchLlamaIndex",
+        "name": "ExtractBench (LlamaIndex)",
+        "value": 93.77,
+        "formatted": "93.77%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ExtractBench leaderboard, November 5, 2026 snapshot (LlamaIndex)",
+          "url": "https://www.extractbench.ai/#leaderboard",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "parseBenchLlamaIndex",
+        "name": "ParseBench",
+        "value": 74.4,
+        "formatted": "74.40%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ParseBench leaderboard, November 5, 2026 snapshot (LlamaIndex)",
+          "url": "https://www.parsebench.ai/#leaderboard",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "mmmuPro",
+        "name": "MMMU-Pro",
+        "value": 83,
+        "formatted": "83%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-5.6",
+          "url": "https://openai.com/index/gpt-5-6/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "mmmuProPython",
+        "name": "MMMU-Pro w/ Python",
+        "value": 84.6,
+        "formatted": "84.6%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-5.6",
+          "url": "https://openai.com/index/gpt-5-6/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "gpqa",
+        "name": "GPQA",
+        "value": 94.6,
+        "formatted": "94.6%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-5.6",
+          "url": "https://openai.com/index/gpt-5-6/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "gpqaDiamond",
+        "name": "GPQA-D",
+        "value": 94.6,
+        "formatted": "94.6%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-5.6",
+          "url": "https://openai.com/index/gpt-5-6/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "hleVerified",
+        "name": "HLE-Verified",
+        "value": 54.5,
+        "formatted": "54.5%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Google DeepMind: Gemini 3.8 Flash model card",
+          "url": "https://deepmind.google/models/model-cards/gemini-3-8-flash/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "labBench2",
+        "name": "LABBench2",
+        "value": 82.1,
+        "formatted": "82.1%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Google DeepMind: Gemini 3.8 Flash model card",
+          "url": "https://deepmind.google/models/model-cards/gemini-3-8-flash/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "healthBenchProfessional",
+        "name": "HealthBench Professional",
+        "value": 60.5,
+        "formatted": "60.5%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-5.6",
+          "url": "https://openai.com/index/gpt-5-6/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "healthBenchHard",
+        "name": "HealthBench Hard",
+        "value": 33.1,
+        "formatted": "33.1%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-5.6 system card",
+          "url": "https://deploymentsafety.openai.com/gpt-5-6/gpt-5-6.pdf",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "valsGpqaDiamond",
+        "name": "GPQA Diamond (Vals)",
+        "value": 95.2,
+        "formatted": "95.2%",
+        "verificationStatus": "aggregator_verified",
+        "verificationLabel": "Verified",
+        "source": {
+          "label": "Vals AI: GPQA Diamond leaderboard",
+          "url": "https://www.vals.ai/models/openai_gpt-5.6-sol",
+          "retrievedAt": null,
+          "publisher": "Vals AI",
+          "publisherUrl": "https://www.vals.ai/",
+          "sourceLabel": "Vals AI",
+          "sourceRole": "published-evaluation-results",
+          "scope": "Published leaderboard aggregates and evaluation settings only. Dataset contents are not included.",
+          "datasetContentsIncluded": false,
+          "licenseGrantIncluded": false,
+          "benchmarkUrl": "https://www.vals.ai/benchmarks/gpqa"
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "valsMmluPro",
+        "name": "MMLU-Pro (Vals)",
+        "value": 89.1,
+        "formatted": "89.1%",
+        "verificationStatus": "aggregator_verified",
+        "verificationLabel": "Verified",
+        "source": {
+          "label": "Vals AI: MMLU Pro leaderboard",
+          "url": "https://www.vals.ai/models/openai_gpt-5.6-sol",
+          "retrievedAt": null,
+          "publisher": "Vals AI",
+          "publisherUrl": "https://www.vals.ai/",
+          "sourceLabel": "Vals AI",
+          "sourceRole": "published-evaluation-results",
+          "scope": "Published leaderboard aggregates and evaluation settings only. Dataset contents are not included.",
+          "datasetContentsIncluded": false,
+          "licenseGrantIncluded": false,
+          "benchmarkUrl": "https://www.vals.ai/benchmarks/mmlu_pro"
+        }
+      },
+      {
+        "category": "instructionFollowing",
+        "categoryLabel": "Instruction following",
+        "key": "graySwanIpi15",
+        "name": "Gray Swan IPI (15 attempts)",
+        "value": 27,
+        "formatted": "27.0%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Google: Gemini 4 Argon launch chart",
+          "url": "https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-4-argon/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "math",
+        "categoryLabel": "Math",
+        "key": "frontierMath",
+        "name": "FrontierMath (legacy)",
+        "value": 89,
+        "formatted": "89%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-5.6",
+          "url": "https://openai.com/index/gpt-5-6/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "math",
+        "categoryLabel": "Math",
+        "key": "frontierMathV2Tiers13",
+        "name": "FrontierMath v2 (Tiers 1-3)",
+        "value": 89,
+        "formatted": "89.000%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-5.6",
+          "url": "https://openai.com/index/gpt-5-6/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "math",
+        "categoryLabel": "Math",
+        "key": "frontierMathV2Tier4",
+        "name": "FrontierMath v2 (Tier 4)",
+        "value": 83,
+        "formatted": "83.000%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-5.6",
+          "url": "https://openai.com/index/gpt-5-6/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "exploitBench",
+        "name": "ExploitBench",
+        "value": 73.5,
+        "formatted": "74%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-5.6",
+          "url": "https://openai.com/index/gpt-5-6/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "secBenchPro",
+        "name": "SEC-Bench Pro",
+        "value": 71.2,
+        "formatted": "71.2%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-5.6",
+          "url": "https://openai.com/index/gpt-5-6/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "lastOnesCyberRangeCompletion",
+        "name": "The Last Ones completion",
+        "value": 70,
+        "formatted": "70%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI Daybreak",
+          "url": "https://openai.com/daybreak/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "advancedCyberCompletionRateStandard",
+        "name": "ACCR standard",
+        "value": 1.5,
+        "formatted": "1.5%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: Expanding Daybreak",
+          "url": "https://openai.com/index/expanding-daybreak-as-the-cyber-defense-window-narrows/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "advancedCyberCompletionRateBlue",
+        "name": "ACCR Daybreak Blue",
+        "value": 2,
+        "formatted": "2.0%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: Expanding Daybreak",
+          "url": "https://openai.com/index/expanding-daybreak-as-the-cyber-defense-window-narrows/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "frontierCyber",
+        "name": "FrontierCyber",
+        "value": 9.6,
+        "formatted": "9.6%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Irregular: Assessing GPT-5.6 Sol",
+          "url": "https://www.irregular.com/research/assessing-gpt-5.6-sol",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "cyScenarioBenchAverageSuccess",
+        "name": "CyScenarioBench success",
+        "value": 28,
+        "formatted": "28%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Irregular: Assessing GPT-5.6 Sol",
+          "url": "https://www.irregular.com/research/assessing-gpt-5.6-sol",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "cyScenarioBenchScenariosSolved",
+        "name": "CyScenarioBench solved",
+        "value": 7,
+        "formatted": "7%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Irregular: Assessing GPT-5.6 Sol",
+          "url": "https://www.irregular.com/research/assessing-gpt-5.6-sol",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "atomicNetworkAttackSimulation",
+        "name": "Atomic network attacks",
+        "value": 98,
+        "formatted": "98%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Irregular: Assessing GPT-5.6 Sol",
+          "url": "https://www.irregular.com/research/assessing-gpt-5.6-sol",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "atomicVulnerabilityResearch",
+        "name": "Atomic vulnerability research",
+        "value": 91,
+        "formatted": "91%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Irregular: Assessing GPT-5.6 Sol",
+          "url": "https://www.irregular.com/research/assessing-gpt-5.6-sol",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "atomicEvasion",
+        "name": "Atomic evasion",
+        "value": 56,
+        "formatted": "56%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Irregular: Assessing GPT-5.6 Sol",
+          "url": "https://www.irregular.com/research/assessing-gpt-5.6-sol",
+          "retrievedAt": null
+        }
+      }
+    ],
+    "modelAliases": [
+      "openai-codex/gpt-5.6-sol"
+    ]
+  }
+}

@@ -4,13 +4,12 @@ import { chmodSync, mkdtempSync, mkdirSync, readFileSync, renameSync, rmSync, wr
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { loadBenchmarkAssets, loadBenchmarkHealth, ROUTING_POLICY, validateRoutingPolicy } from "../benchmark-assets.ts";
-import { BENCHMARK_DIMENSIONS } from "../benchmark-types.ts";
-import { benchmarkHealthDigest, METHODOLOGY, PUBLIC_METHODOLOGY_VERSION } from "../../09-catalog/aa/schema.ts";
+import { describePolicyGenerationMismatch, loadBenchmarkAssets, loadBenchmarkHealth, ROUTING_POLICY, ROUTING_POLICY_VERSION, validateRoutingPolicy } from "../benchmark-assets.ts";
+import { benchmarkHealthDigest, BENCHMARK_HEALTH_FIELDS, DIMENSIONS as AA_DIMENSIONS, METHODOLOGY, PUBLIC_METHODOLOGY_VERSION } from "../../09-catalog/aa/schema.ts";
 
 const methodology = { id: METHODOLOGY.id, version: METHODOLOGY.version };
 const AA_MODEL_ID = "11111111-1111-4111-8111-111111111111";
-const scores = Object.fromEntries(BENCHMARK_DIMENSIONS.map((dimension) => [dimension, 50]));
+const scores = Object.fromEntries(AA_DIMENSIONS.map((dimension) => [dimension, 50]));
 const canonical = (value: any): any => Array.isArray(value)
 	? value.map(canonical)
 	: value && typeof value === "object"
@@ -50,19 +49,19 @@ function fixture(mutator?: (manifest: any, snapshot: any) => void) {
 	const contentDigest = digest(snapshot);
 	for (const entry of manifest.models) entry.contentDigest ||= contentDigest;
 	manifest.digest = digest([...manifest.models].sort((a, b) => `${a.provider}/${a.model}/${a.thinkingLevel ?? ""}`.localeCompare(`${b.provider}/${b.model}/${b.thinkingLevel ?? ""}`)));
-	writeFileSync(join(root, "manifest.json"), JSON.stringify(manifest), { mode: 0o600 });
+	writeFileSync(join(root, "aa-manifest.json"), JSON.stringify(manifest), { mode: 0o600 });
 	writeFileSync(join(root, "models", "a9_z.json"), JSON.stringify(snapshot), { mode: 0o600 });
 	return { root, dispose: () => rmSync(root, { recursive: true, force: true }) };
 }
 
 test("routing policy validation fails closed for contract drift", () => {
 	assert.equal(validateRoutingPolicy(ROUTING_POLICY), true);
-	const drift = structuredClone(ROUTING_POLICY) as any; drift.profiles.review.minimumCoverage = 0.84;
+	const drift = structuredClone(ROUTING_POLICY) as any; drift.profiles.review.weights.coding = 0.1;
 	assert.equal(validateRoutingPolicy(drift), false);
 	const wrongVersion = structuredClone(ROUTING_POLICY) as any; wrongVersion.version = "3";
 	assert.equal(validateRoutingPolicy(wrongVersion), false);
-	const duplicateFaith = structuredClone(ROUTING_POLICY) as any; duplicateFaith.profiles.research.mandatoryFloors.faithfulness = 7.5;
-	assert.equal(validateRoutingPolicy(duplicateFaith), false);
+	const extraGate = structuredClone(ROUTING_POLICY) as any; extraGate.profiles.research.minimumCoverage = 0.7;
+	assert.equal(validateRoutingPolicy(extraGate), false);
 });
 
 test("loads opaque exact snapshots in stable order", async () => {
@@ -79,7 +78,7 @@ test("loads opaque exact snapshots in stable order", async () => {
 test("retries a missing snapshot only after an atomic manifest switch", async () => {
 	const f = fixture();
 	try {
-		const manifestPath = join(f.root, "manifest.json");
+		const manifestPath = join(f.root, "aa-manifest.json");
 		const oldManifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 		const oldFile = oldManifest.models[0].file;
 		const nextFile = "next.json";
@@ -134,7 +133,7 @@ test("fails closed for stale manifests, duplicate identities/files, and methodol
 test("the same AA model may map to distinct Pi providers", async () => {
 	const f = fixture();
 	try {
-		const manifestPath = join(f.root, "manifest.json");
+		const manifestPath = join(f.root, "aa-manifest.json");
 		const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 		const other = { ...JSON.parse(readFileSync(join(f.root, "models", "a9_z.json"), "utf8")), provider: "other" };
 		manifest.models.push({ provider: "other", model: "m", thinkingLevel: null, modelId: AA_MODEL_ID, file: "other.json", capturedAt: 1000, contentDigest: digest(other) });
@@ -193,7 +192,7 @@ test("content, manifest, and public provenance tampering fails closed", async ()
 test("null benchmark values remain unavailable without fuzzy identity", async () => {
 	const f = fixture((_: any, snapshot: any) => {
 		snapshot.scores.coding = null;
-		snapshot.coverage = (BENCHMARK_DIMENSIONS.length - 1) / BENCHMARK_DIMENSIONS.length;
+		snapshot.coverage = (AA_DIMENSIONS.length - 1) / AA_DIMENSIONS.length;
 	});
 	try {
 		assert.equal((await loadBenchmarkAssets(f.root, 2000, 2000))?.snapshots[0]?.scores.coding, null);
@@ -243,7 +242,7 @@ test("benchmark health artifacts load only when valid, fresh, digest-intact, and
 	const root = mkdtempSync(join(tmpdir(), "pi-benchmark-health-"));
 	try {
 		const entry = (field: string) => ({ checked: 15, scored: field === "ifbench" ? 0 : 12, status: field === "ifbench" ? "retired" : "lagging", newestScoredRelease: field === "ifbench" ? "2026-07-09" : "2026-08-20" });
-		const base = { version: 1 as const, methodology: { id: METHODOLOGY.id, version: METHODOLOGY.version }, fields: Object.fromEntries(BENCHMARK_DIMENSIONS.length ? ["agenticIndex", "critpt", "gdpvalNormalized", "gpqa", "hle", "ifbench", "lcr", "omniscienceAccuracy", "omniscienceHallucinationRate", "tau2", "tau3Banking"].map((field) => [field, entry(field)]) : []) };
+		const base = { version: 1 as const, methodology: { id: METHODOLOGY.id, version: METHODOLOGY.version }, fields: Object.fromEntries(BENCHMARK_HEALTH_FIELDS.map((field) => [field, entry(field)])) };
 		const artifact = { ...base, generatedAt: 1_500, digest: benchmarkHealthDigest(base) };
 		const file = join(root, "benchmark-health.json");
 		const publish = (value: unknown, mode = 0o600) => { writeFileSync(file, JSON.stringify(value)); chmodSync(file, mode); };
@@ -257,6 +256,12 @@ test("benchmark health artifacts load only when valid, fresh, digest-intact, and
 		assert.equal(await loadBenchmarkHealth(root, 1_000, 2_000), null);
 		publish({ ...artifact, fields: { ...artifact.fields, extra: entry("extra") } });
 		assert.equal(await loadBenchmarkHealth(root, 1_000, 2_000), null);
+		// A dropped watched field is rejected even with a matching digest, so every reviewed metric is assessed.
+		const reducedFields = Object.fromEntries(Object.entries(base.fields).filter(([field]) => field !== "tau3Banking"));
+		const reduced = { ...base, fields: reducedFields };
+		publish({ ...reduced, generatedAt: 1_500, digest: benchmarkHealthDigest(reduced) });
+		assert.equal(await loadBenchmarkHealth(root, 1_000, 2_000), null);
+		publish(artifact);
 		publish(artifact, 0o640);
 		assert.equal(await loadBenchmarkHealth(root, 1_000, 2_000), null);
 		publish(artifact);
@@ -266,20 +271,40 @@ test("benchmark health artifacts load only when valid, fresh, digest-intact, and
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("routing policy v5 fallback sources validate structurally", () => {
-	assert.equal(ROUTING_POLICY.version, "5");
-	assert.deepEqual(ROUTING_POLICY.profiles.planning.fallbackSources?.instructionFollowing, [{ fields: ["critpt"], floor: 10, healthField: "ifbench" }]);
-	assert.equal(ROUTING_POLICY.profiles.coding.fallbackSources, undefined);
-	const drift = structuredClone(ROUTING_POLICY) as any;
-	drift.profiles.review.fallbackSources.instructionFollowing[0].fields = ["faithfulness"];
-	assert.equal(validateRoutingPolicy(drift), false);
-	const foreign = structuredClone(ROUTING_POLICY) as any;
-	foreign.profiles.balanced.fallbackSources = { knowledge: [{ fields: ["critpt"], floor: 10, healthField: "ifbench" }] };
-	assert.equal(validateRoutingPolicy(foreign), false);
-	const floorless = structuredClone(ROUTING_POLICY) as any;
-	floorless.profiles.planning.fallbackSources.scientificReasoning[0].floor = -1;
-	assert.equal(validateRoutingPolicy(floorless), false);
-	const unretirable = structuredClone(ROUTING_POLICY) as any;
-	unretirable.profiles.review.fallbackSources.instructionFollowing[0].healthField = "critpt2";
-	assert.equal(validateRoutingPolicy(unretirable), false);
+test("routing policy v8 contains only percentile rubrics", () => {
+	assert.equal(ROUTING_POLICY.version, ROUTING_POLICY_VERSION);
+	assert.equal(ROUTING_POLICY.profiles.planning.weights.math, 0.15);
+	assert.equal(ROUTING_POLICY.profiles.research.weights.knowledge, 0.30);
+	assert.equal(ROUTING_POLICY.profiles["long-context"].constraints.minimumContextWindow, 131072);
+	for (const removed of ["mandatoryFloors", "requiredDimensions", "minimumCoverage", "faithfulnessPolicy", "intelligence"]) assert.equal(JSON.stringify(ROUTING_POLICY).includes(removed), false);
+});
+
+// Routing degrades to interim ranking only when the operational bound has expired but the reviewed generation is
+// still usable for comparison, so the two bounds must actually differ.
+test("the reviewed interim age bound accepts a generation the operational bound rejects", async () => {
+	const f = fixture();
+	try {
+		assert.equal(await loadBenchmarkAssets(f.root, 100, 2000), null, "the operational bound has expired");
+		const frozen = await loadBenchmarkAssets(f.root, ROUTING_POLICY.interim.maxAssetAgeMs, 2000);
+		assert.equal(frozen?.snapshots.length, 1, "the same generation still ranks");
+	} finally {
+		f.dispose();
+	}
+});
+
+test("a routing policy file from another generation is named instead of failing routing silently", async () => {
+	const root = mkdtempSync(join(tmpdir(), "pi-policy-"));
+	const policyPath = join(root, "routing-policy.json");
+	try {
+		writeFileSync(policyPath, JSON.stringify({ ...ROUTING_POLICY, version: "6" }));
+		const notice = await describePolicyGenerationMismatch(policyPath);
+		assert.match(notice ?? "", /generation 6/);
+		assert.match(notice ?? "", new RegExp(`accepts ${ROUTING_POLICY_VERSION}`));
+
+		writeFileSync(policyPath, JSON.stringify({ ...ROUTING_POLICY, version: ROUTING_POLICY_VERSION }));
+		assert.equal(await describePolicyGenerationMismatch(policyPath), null);
+		assert.equal(await describePolicyGenerationMismatch(join(root, "absent.json")), null, "a missing file is not a generation mismatch");
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
 });

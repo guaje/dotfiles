@@ -21,6 +21,10 @@ import type { AgentConfig } from "./agents.ts";
 import { selectModelForSubagent, type ModelMetadata, type ThinkingLevel } from "./model-selection.ts";
 import { getFinalOutput } from "./result.ts";
 import { emptyUsage, type OnUpdateCallback, type SingleResult, type SubagentDetails } from "./types.ts";
+import { recordSubagentOutcome } from "./outcomes.ts";
+import { parseRoutingProfile } from "./task-profile.ts";
+import { ROUTING_POLICY } from "./benchmark-assets.ts";
+import { getSubagentExecutionSettings } from "./settings.ts";
 
 async function writePromptToTempFile(agentName: string, prompt: string): Promise<{ dir: string; filePath: string }> {
 	const tmpDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "pi-subagent-"));
@@ -60,7 +64,11 @@ export async function runSingleAgent(
 	onUpdate: OnUpdateCallback | undefined,
 	makeDetails: (results: SingleResult[]) => SubagentDetails,
 	models: readonly ModelMetadata[] = [],
+	sessionModelId?: string,
+	probeContext?: unknown,
 ): Promise<SingleResult> {
+	const startedAt = Date.now();
+	let ttftMs = 0;
 	const agent = agents.find((a) => a.name === agentName);
 
 	if (!agent) {
@@ -85,12 +93,18 @@ export async function runSingleAgent(
 	let benchmarkRoute: SingleResult["benchmarkRoute"];
 
 	if (!selectedModel) {
-		const decision = await selectModelForSubagent({ task, routingProfile: agent.routingProfile, thinking: agent.thinking, models: [...models] });
+		const decision = await selectModelForSubagent({ task, routingProfile: agent.routingProfile, thinking: agent.thinking, models: [...models], probeContext });
 		benchmarkRoute = decision.benchmarkRoute;
 		if (decision.modelId) {
 			selectedModel = decision.modelId;
 			modelSelector = decision.selector;
 			thinkingLevel = decision.thinkingLevel;
+		} else if (sessionModelId) {
+			// Benchmark routing could not resolve a model. Delegate to the model the human is
+			// actively using in this session rather than the configured default, which may be
+			// offline, unhealthy, or outside the reviewed scope.
+			selectedModel = sessionModelId;
+			modelSelector = "session";
 		} else {
 			modelSelector = "default";
 		}
@@ -126,6 +140,7 @@ export async function runSingleAgent(
 		thinkingLevel,
 		benchmarkRoute,
 		step,
+		startedAt,
 	};
 
 	const emitUpdate = () => {
@@ -167,11 +182,14 @@ export async function runSingleAgent(
 					return;
 				}
 
+				if ((event.type === "message_start" || event.type === "message_update") && event.message?.role === "assistant" && !ttftMs) ttftMs = Math.max(1, Date.now() - startedAt);
+
 				if (event.type === "message_end" && event.message) {
 					const msg = event.message as Message;
 					currentResult.messages.push(msg);
 
 					if (msg.role === "assistant") {
+						if (!ttftMs) ttftMs = Math.max(1, Date.now() - startedAt);
 						currentResult.usage.turns++;
 						const usage = msg.usage;
 						if (usage) {
@@ -229,7 +247,21 @@ export async function runSingleAgent(
 		});
 
 		currentResult.exitCode = exitCode;
+		currentResult.durationMs = Math.max(1, Date.now() - startedAt);
+		currentResult.ttftMs = Math.max(1, ttftMs || currentResult.durationMs);
 		if (wasAborted) throw new Error("Subagent was aborted");
+		try {
+			const profile = parseRoutingProfile(agent.routingProfile);
+			const settings = await getSubagentExecutionSettings();
+			await recordSubagentOutcome(currentResult, {
+				startedAt,
+				ttftMs: currentResult.ttftMs,
+				session: (probeContext as { sessionManager?: { getSessionId?: () => string | undefined } } | undefined)?.sessionManager?.getSessionId?.() ?? process.env.PI_SESSION_ID ?? process.env.PI_SESSION ?? "unknown",
+				profile,
+				expectedOutputTokens: ROUTING_POLICY.profiles[profile].expectedOutputTokens * Math.max(0.5, Math.min(3, task.length / 2000)),
+				outcomeWindow: settings.outcomeWindow,
+			});
+		} catch { /* Outcome logging never breaks delegation. */ }
 		return currentResult;
 	} finally {
 		if (tmpPromptPath)

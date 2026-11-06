@@ -1,0 +1,399 @@
+{
+  "version": 2,
+  "model": "mistral-large-4",
+  "aa": {
+    "variants": [
+      {
+        "version": 4,
+        "provider": "model-testing",
+        "model": "mistral-large-4",
+        "thinkingLevel": "high",
+        "modelId": "ea5019ae-b0b7-49a5-80b3-0e584807af0f",
+        "capturedAt": 1793820803132,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793820803132,
+          "thinkingLevel": "high"
+        },
+        "source": {
+          "name": "Mistral Large 4 (High)",
+          "slug": "mistral-large-4",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/mistral-large-4",
+          "retrievedAt": 1793820802880,
+          "contentSha256": "d0495cf7a0f82ee2056c6eeae46ad8a2cfa4be44c0c95e402d9f49aa9db5839b",
+          "recordSha256": "5714422e6ebcf9290d4285198783e5b991d9e744c8835a6f767cbda7b74bed65",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 26.1,
+          "coding": null,
+          "agentic": null,
+          "toolUse": null,
+          "scientificReasoning": null,
+          "longContext": null,
+          "instructionFollowing": null,
+          "knowledge": 26,
+          "faithfulness": 71.8018018018018
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": null,
+          "gpqa": null,
+          "critpt": 10
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": null,
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "unavailable",
+            "score": null
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.3333333333333333,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      },
+      {
+        "version": 4,
+        "provider": "model-testing",
+        "model": "mistral-large-4",
+        "thinkingLevel": "medium",
+        "modelId": "27b24366-fd1a-44b7-8011-e24d7501318d",
+        "capturedAt": 1793820803611,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793820803611,
+          "thinkingLevel": "medium"
+        },
+        "source": {
+          "name": "Mistral Large 4 (Medium)",
+          "slug": "mistral-large-4-medium",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/mistral-large-4-medium",
+          "retrievedAt": 1793820803359,
+          "contentSha256": "e295cf9c9819b46ad75aa7d1a9b1b187189e114a03fc00baf4c3ec2409d4b163",
+          "recordSha256": "bfb2788f488cbca5c1db645aea17a9e23fe37c67f08e7e1b9e16f90d3a5d3c4f",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 23.1,
+          "coding": null,
+          "agentic": null,
+          "toolUse": null,
+          "scientificReasoning": null,
+          "longContext": null,
+          "instructionFollowing": null,
+          "knowledge": 22.5,
+          "faithfulness": 75.18279569892474
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": null,
+          "gpqa": null,
+          "critpt": 11.1428571428571
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": null,
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "unavailable",
+            "score": null
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.3333333333333333,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      }
+    ]
+  },
+  "benchlm": {
+    "version": 1,
+    "runtimeId": "model-testing/mistral-large-4",
+    "canonicalId": "mistralai/mistral-large-4",
+    "model": "Mistral Large 4",
+    "creator": "Mistral",
+    "capturedAt": 1793907107528,
+    "lastUpdated": "2026-11-05",
+    "methodologyVersion": "bench-align-v5.8-2026-09-30",
+    "sourceSnapshotId": "2026-11-05-3904bad35f77cff7",
+    "attribution": "Data from BenchLM.ai",
+    "license": "CC BY-NC 4.0",
+    "categoryScores": {
+      "coding": 43.58,
+      "agentic": 44.71,
+      "reasoning": 64.3
+    },
+    "categoryProvenance": {
+      "coding": "leaderboard",
+      "agentic": "leaderboard",
+      "reasoning": "leaderboard"
+    },
+    "categoryEvidence": {
+      "coding": {
+        "rows": 2,
+        "independentlyVerified": 2
+      },
+      "agentic": {
+        "rows": 6,
+        "independentlyVerified": 1
+      },
+      "reasoning": {
+        "rows": 1,
+        "independentlyVerified": 1
+      }
+    },
+    "categories": [
+      {
+        "key": "agentic",
+        "label": "Agentic",
+        "score": 44.7,
+        "rank": 67,
+        "total": 135
+      },
+      {
+        "key": "coding",
+        "label": "Coding",
+        "score": 43.6,
+        "rank": 61,
+        "total": 156
+      },
+      {
+        "key": "reasoning",
+        "label": "Reasoning",
+        "score": 64.3,
+        "rank": 18,
+        "total": 26
+      },
+      {
+        "key": "multimodalGrounded",
+        "label": "Multimodal",
+        "score": null,
+        "rank": null,
+        "total": 58
+      },
+      {
+        "key": "knowledge",
+        "label": "Knowledge",
+        "score": null,
+        "rank": null,
+        "total": 177
+      },
+      {
+        "key": "multilingual",
+        "label": "Multilingual",
+        "score": null,
+        "rank": null,
+        "total": 17
+      },
+      {
+        "key": "instructionFollowing",
+        "label": "Instruction following",
+        "score": null,
+        "rank": null,
+        "total": 157
+      },
+      {
+        "key": "math",
+        "label": "Math",
+        "score": null,
+        "rank": null,
+        "total": 12
+      }
+    ],
+    "details": [
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "finch",
+        "name": "Finch",
+        "value": 73.3,
+        "formatted": "73.3%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Mistral AI: Mistral Large 4 is now open weight",
+          "url": "https://mistral.ai/news/mistral-large-4-oss/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "b3AgentSecurity",
+        "name": "b3 Agent Security",
+        "value": 97.1,
+        "formatted": "97.1%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Mistral AI: Mistral Large 4 is now open weight",
+          "url": "https://mistral.ai/news/mistral-large-4-oss/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "cyberHarmfulRefusal",
+        "name": "Cyber Misuse Refusal",
+        "value": 96.6,
+        "formatted": "96.6%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Mistral AI: Mistral Large 4 is now open weight",
+          "url": "https://mistral.ai/news/mistral-large-4-oss/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "cybench",
+        "name": "Cybench",
+        "value": 93,
+        "formatted": "93.0%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Mistral AI: Introducing Mistral Large 4",
+          "url": "https://mistral.ai/news/mistral-large-4/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "browseComp",
+        "name": "BrowseComp",
+        "value": 84.5,
+        "formatted": "84.5%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Mistral AI: Mistral Large 4 is now open weight",
+          "url": "https://mistral.ai/news/mistral-large-4-oss/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "financeAgentV2",
+        "name": "Finance Agent v2",
+        "value": 54.678,
+        "formatted": "54.7%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Vals AI: Finance Agent v2",
+          "url": "https://www.vals.ai/benchmarks/fabv2",
+          "retrievedAt": null,
+          "publisher": "Vals AI",
+          "publisherUrl": "https://www.vals.ai/",
+          "sourceLabel": "Vals AI",
+          "sourceRole": "published-evaluation-results",
+          "scope": "Published leaderboard aggregates and evaluation settings only. Dataset contents are not included.",
+          "datasetContentsIncluded": false,
+          "licenseGrantIncluded": false,
+          "benchmarkUrl": "https://www.vals.ai/benchmarks/fabv2"
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "vibeCodeBench",
+        "name": "Vibe Code Bench",
+        "value": 78.403,
+        "formatted": "78.40%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Vals AI: Vibe Code Bench v1.1",
+          "url": "https://www.vals.ai/benchmarks/vibe-code",
+          "retrievedAt": null,
+          "publisher": "Vals AI",
+          "publisherUrl": "https://www.vals.ai/",
+          "sourceLabel": "Vals AI",
+          "sourceRole": "published-evaluation-results",
+          "scope": "Published leaderboard aggregates and evaluation settings only. Dataset contents are not included.",
+          "datasetContentsIncluded": false,
+          "licenseGrantIncluded": false,
+          "benchmarkUrl": "https://www.vals.ai/benchmarks/vibe-code"
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "frontierCode2",
+        "name": "FrontierCode 2.0",
+        "value": 19.7,
+        "formatted": "19.7%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Cognition: FrontierCode 2.0",
+          "url": "https://cognition.com/blog/frontier-code-2.0",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "reasoning",
+        "categoryLabel": "Reasoning",
+        "key": "stemBench120",
+        "name": "STEMBench",
+        "value": 2.501,
+        "formatted": "2.50",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "STEMBench120 October 28, 2026 snapshot audit (Ulam)",
+          "url": "https://www.ulam.ai/stembench#full-run-results",
+          "retrievedAt": null
+        }
+      }
+    ],
+    "modelAliases": [
+      "model-testing/mistral-large-4"
+    ]
+  }
+}

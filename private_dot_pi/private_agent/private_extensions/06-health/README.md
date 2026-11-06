@@ -16,7 +16,7 @@ Health settings can be configured in `settings.config.json` under the `health` n
 ```
 
 - `health.cacheTtlMs` (number): How long cached health results remain valid, in milliseconds. Default: `900000` (15 minutes). Valid range: 1000–86400000.
-- `health.probeConcurrency` (number): Maximum number of concurrent model probes during health checks. Default: `3`. Valid range: 1–8.
+- `health.probeConcurrency` (number): Maximum number of concurrent model probes during health checks. Default: `3`. Valid range: 1–16.
 
 Legacy flat keys (deprecated but still supported as fallback):
 - `modelHealthCacheTtlMs` is used when `health.cacheTtlMs` is absent or invalid.

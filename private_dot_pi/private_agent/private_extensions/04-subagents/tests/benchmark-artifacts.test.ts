@@ -1,73 +1,64 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DEFAULT_SNAPSHOT_ROOT, loadBenchmarkAssets } from "../benchmark-assets.ts";
+import { DEFAULT_SNAPSHOT_ROOT, loadBenchmarkAssets, loadBenchmarkHealth } from "../benchmark-assets.ts";
 import { routeBenchmarkModel } from "../benchmark-routing.ts";
+import { qualifyBenchmarkProfiles, ROUTING_PROFILES } from "../benchmark-qualification.ts";
+import type { BenchmarkSnapshot } from "../benchmark-types.ts";
 
-const health = (id: string) => [{ id, status: "ok", service: "chat", latencyMs: 1, tokensPerSecond: 1_000 }];
-const candidate = (id: string) => [{ id, reasoning: true, thinkingLevelMap: { xhigh: "xhigh", max: "max" }, input: ["text"], contextWindow: 262_144, maxTokens: 262_144 }];
+const health = (id: string) => [{ id, status: "ok" as const, service: "chat", latencyMs: 1, tokensPerSecond: 1_000 }];
+/** Capability-neutral candidate: only benchmark evidence can gate these profiles. */
+const candidate = (id: string) => ({ id, reasoning: true, thinkingLevelMap: { xhigh: "xhigh", max: "max" }, input: ["text", "image"], contextWindow: 1_000_000, maxTokens: 1_000_000 });
 
-async function realSnapshots() {
+async function published() {
 	const assets = await loadBenchmarkAssets(DEFAULT_SNAPSHOT_ROOT, 31_536_000_000);
-	assert.ok(assets, "the checked-in v4 benchmark artifact must load");
-	return assets;
+	assert.ok(assets, "the published v4 benchmark artifact must load");
+	const benchmarkHealth = await loadBenchmarkHealth(DEFAULT_SNAPSHOT_ROOT, 31_536_000_000);
+	return { assets, benchmarkHealth: benchmarkHealth?.fields };
 }
 
-for (const model of ["gpt-5.6-sol", "gpt-5.6-terra"]) {
-	for (const thinking of ["low", "medium", "high", "xhigh", "max"] as const) {
-		test(`${model} ${thinking} is eligible for research and review`, async () => {
-			const assets = await realSnapshots();
-			const id = `openai-codex/${model}`;
-			const snapshot = assets.snapshots.find((entry) => entry.provider === "openai-codex" && entry.model === model && entry.thinkingLevel === thinking);
-			assert.ok(snapshot, `${id}/${thinking} artifact is required`);
-			for (const profile of ["research", "review"] as const) {
-				const route = routeBenchmarkModel(profile, candidate(id), [snapshot], health(id), assets.manifest.digest, thinking);
-				assert.equal(route.modelId, id, `${profile} should route ${id}/${thinking}`);
+const snapshotId = (snapshot: BenchmarkSnapshot) => `${snapshot.provider}/${snapshot.model}/${snapshot.thinkingLevel ?? "generic"}`;
+
+// The published generation is user data that changes with every reviewed sync, so these tests assert the
+// contract between catalog qualification and runtime routing over whatever set is published, never a
+// hardcoded model list or score literal.
+test("every published snapshot routes for exactly the profiles it qualifies for", async () => {
+	const { assets, benchmarkHealth } = await published();
+	let qualifiedPairs = 0;
+	for (const snapshot of assets.snapshots) {
+		const id = `${snapshot.provider}/${snapshot.model}`;
+		const profiles = ROUTING_PROFILES.filter((profile) => qualifyBenchmarkProfiles(candidate(id), snapshot, benchmarkHealth).some((entry) => entry.profile === profile && entry.qualified));
+		for (const profile of ROUTING_PROFILES) {
+			const route = routeBenchmarkModel(profile, [candidate(id)], [snapshot], health(id), assets.manifest.digest, snapshot.thinkingLevel ?? undefined, benchmarkHealth);
+			if (profiles.includes(profile)) {
+				qualifiedPairs++;
+				assert.equal(route.modelId, id, `${profile} should route ${snapshotId(snapshot)}`);
+			} else {
+				assert.equal(route.modelId, undefined, `${profile} must not route ${snapshotId(snapshot)}`);
 			}
-		});
+		}
 	}
-}
-
-test("Kimi-K2.6 is benchmark-selectable for its eligible profiles", async () => {
-	const assets = await realSnapshots();
-	const id = "kelley/Kimi-K2.6";
-	const snapshot = assets.snapshots.find((entry) => entry.provider === "kelley" && entry.model === "Kimi-K2.6" && entry.thinkingLevel === null);
-	assert.ok(snapshot, `${id} artifact is required`);
-	assert.equal(snapshot.scores.coding, 61.8);
-	const kimi = [{ id, reasoning: true, input: ["text", "image"], contextWindow: 131_072, maxTokens: 163_840, supportsReasoningEffort: false }];
-	for (const profile of ["balanced", "coding", "research", "planning", "review", "long-context"] as const) {
-		const route = routeBenchmarkModel(profile, kimi, [snapshot], health(id), assets.manifest.digest);
-		assert.equal(route.modelId, id, `${profile} should route ${id}`);
-	}
-	const agentic = routeBenchmarkModel("agentic", kimi, [snapshot], health(id), assets.manifest.digest);
-	assert.equal(agentic.modelId, undefined);
-	assert.deepEqual(agentic.diagnostics.candidates[0]?.rejectionReasons, ["mandatoryFloor"]);
+	assert.ok(qualifiedPairs > 0, "a published generation must route at least one profile");
 });
 
-test("reviewed canonical AA UUID routing is independent of the snapshot's legacy provider alias", async () => {
-	const assets = await realSnapshots();
-	const id = "kelley/Kimi-K2.6";
-	const snapshot = assets.snapshots.find((entry) => entry.provider === "kelley" && entry.model === "Kimi-K2.6" && entry.thinkingLevel === null);
-	assert.ok(snapshot);
+test("a published snapshot with too little counted evidence is rejected rather than guessed", async () => {
+	const { assets, benchmarkHealth } = await published();
+	const original = assets.snapshots[0]!;
+	const id = `${original.provider}/${original.model}`;
+	const sparse = { ...original, evidenceDensity: 2 };
+	const qualification = qualifyBenchmarkProfiles(candidate(id), sparse, benchmarkHealth).find((entry) => entry.profile === "coding")!;
+	assert.equal(qualification.reason, "insufficientEvidence");
+	const route = routeBenchmarkModel("coding", [candidate(id)], [sparse], health(id), assets.manifest.digest, sparse.thinkingLevel ?? undefined, benchmarkHealth);
+	assert.equal(route.modelId, undefined);
+	assert.deepEqual(route.diagnostics.candidates[0]?.rejectionReasons, ["insufficientEvidence"]);
+});
+
+test("reviewed AA UUID routing is independent of the snapshot's legacy provider alias", async () => {
+	const { assets, benchmarkHealth } = await published();
+	const snapshot = assets.snapshots.find((entry) => qualifyBenchmarkProfiles(candidate(`${entry.provider}/${entry.model}`), entry, benchmarkHealth).some((profile) => profile.qualified));
+	assert.ok(snapshot, "a published generation must contain at least one routable snapshot");
+	const id = `${snapshot.provider}/${snapshot.model}`;
 	const detached = { ...snapshot, provider: "legacy-provider", model: "legacy-alias" };
-	const route = routeBenchmarkModel("coding", candidate(id), [detached], health(id), assets.manifest.digest);
+	const qualified = ROUTING_PROFILES.find((profile) => qualifyBenchmarkProfiles(candidate(id), snapshot, benchmarkHealth).some((entry) => entry.profile === profile && entry.qualified))!;
+	const route = routeBenchmarkModel(qualified, [candidate(id)], [detached], health(id), assets.manifest.digest, snapshot.thinkingLevel ?? undefined, benchmarkHealth);
 	assert.equal(route.modelId, id);
 });
-
-for (const [id, thinking] of [["openai-codex/gpt-5.6-luna", "high"]] as const) {
-	test(`${id} remains research-eligible but review rejects missing instruction following`, async () => {
-		const assets = await realSnapshots();
-		const [provider, model] = id.split("/");
-		const snapshot = assets.snapshots.find((entry) => entry.provider === provider && entry.model === model && entry.thinkingLevel === (thinking ?? null));
-		assert.ok(snapshot, `${id} artifact is required`);
-		assert.equal(snapshot.scores.instructionFollowing, null);
-		for (const profile of ["balanced", "coding", "agentic", "research", "long-context"] as const) {
-			const route = routeBenchmarkModel(profile, candidate(id), [snapshot], health(id), assets.manifest.digest, thinking);
-			assert.equal(route.modelId, id, `${profile} should route ${id}`);
-		}
-		for (const profile of ["planning", "review"] as const) {
-			const route = routeBenchmarkModel(profile, candidate(id), [snapshot], health(id), assets.manifest.digest, thinking);
-			assert.equal(route.modelId, undefined);
-			assert.deepEqual(route.diagnostics.candidates[0]?.rejectionReasons, ["missingRequiredDimension"]);
-		}
-	});
-}

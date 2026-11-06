@@ -21,7 +21,7 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import { type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { type AgentConfig, type AgentScope, discoverAgents } from "./agents.ts";
-import { DEFAULT_SNAPSHOT_ROOT, loadBenchmarkAssets } from "./benchmark-assets.ts";
+import { DEFAULT_SNAPSHOT_ROOT, ROUTING_POLICY, describePolicyGenerationMismatch, loadBenchmarkAssets, validateRoutingPolicy } from "./benchmark-assets.ts";
 import {
 	DELEGATE_GUIDELINES,
 	buildRosterInjection,
@@ -102,16 +102,23 @@ export default function (pi: ExtensionAPI) {
 		if (!ctx.hasUI) return;
 		if (!benchmarkSnapshotWarningShown) {
 			const executionSettings = await getSubagentExecutionSettings();
-			const benchmarkAssets = await loadBenchmarkAssets(
-				process.env.PI_AA_SNAPSHOT_ROOT || DEFAULT_SNAPSHOT_ROOT,
-				executionSettings.benchmarkSnapshotMaxAgeMs,
-			);
-			if (!benchmarkAssets) {
+			const root = process.env.PI_AA_SNAPSHOT_ROOT || DEFAULT_SNAPSHOT_ROOT;
+			const policyNotice = await describePolicyGenerationMismatch();
+			if (policyNotice) {
 				benchmarkSnapshotWarningShown = true;
-				ctx.ui.notify?.(
-					"Artificial Analysis snapshots are absent, invalid, or stale; automatic subagents will use Pi's default model. Review with /catalog sync or inspect with: node agent/extensions/09-catalog/aa/cli.ts --missing.",
-					"warning",
-				);
+				ctx.ui.notify?.(`Automatic subagent routing is off: ${policyNotice}. Delegations fall back to the model serving this conversation.`, "warning");
+			} else {
+				const benchmarkAssets = await loadBenchmarkAssets(root, executionSettings.benchmarkSnapshotMaxAgeMs);
+				if (!benchmarkAssets) {
+					benchmarkSnapshotWarningShown = true;
+					const frozen = validateRoutingPolicy(ROUTING_POLICY)
+						? await loadBenchmarkAssets(root, ROUTING_POLICY.interim.maxAssetAgeMs)
+						: null;
+					ctx.ui.notify?.(frozen
+						? "Artificial Analysis snapshots are older than the operational limit; subagents rank on the frozen reviewed generation and are marked [temp] until /catalog sync republishes. Inspect with: node agent/extensions/09-catalog/aa/cli.ts --methodology."
+						: "Artificial Analysis snapshots are absent, invalid, or too old to rank; automatic subagents use the model serving this conversation. Review with /catalog sync or inspect with: node agent/extensions/09-catalog/aa/cli.ts --missing.",
+						"warning");
+				}
 			}
 		}
 		ctx.ui.setWidget(
@@ -165,6 +172,11 @@ export default function (pi: ExtensionAPI) {
 				scopedModels?: readonly { model: Record<string, unknown> }[];
 				modelRegistry?: { getAvailable?: () => Record<string, unknown>[] };
 			};
+			// The model the human is actively using in this session. It is known-good for
+			// this run, unlike the configured default model, which may be offline.
+			const sessionModel = ctx.model && typeof ctx.model.provider === "string" && typeof ctx.model.id === "string"
+				? `${ctx.model.provider}/${ctx.model.id}`
+				: undefined;
 			const candidates = getEnabledModelsMetadata(
 				runtime.scopedModels ?? [],
 				runtime.modelRegistry?.getAvailable?.() ?? [],
@@ -269,6 +281,8 @@ export default function (pi: ExtensionAPI) {
 						chainUpdate,
 						makeDetails("chain"),
 						candidates,
+						sessionModel,
+						ctx,
 					);
 					results.push(result);
 
@@ -347,6 +361,8 @@ export default function (pi: ExtensionAPI) {
 						},
 						makeDetails("parallel"),
 						candidates,
+						sessionModel,
+						ctx,
 					);
 					allResults[index] = result;
 					emitParallelUpdate();
@@ -384,6 +400,8 @@ export default function (pi: ExtensionAPI) {
 					widgetOnUpdate,
 					makeDetails("single"),
 					candidates,
+					sessionModel,
+					ctx,
 				);
 				const isError = isFailedResult(result);
 				if (isError) {

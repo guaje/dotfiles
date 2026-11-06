@@ -7,6 +7,8 @@ export interface CostRates {
 
 export type ThinkingLevelMap = Partial<Record<"off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max", string | null>>;
 export type ThinkingLevelMapProvenance = "provider" | "provider-inferred" | "reviewed";
+/** Which evidence set declared this model's input modalities; reasoning support is declared independently. */
+export type CapabilitiesProvenance = "provider-inventory" | "aa-review" | "authoritative" | "last-known-good";
 
 export interface CatalogModel {
   id: string;
@@ -19,6 +21,8 @@ export interface CatalogModel {
   /** Explicit provider metadata wins; incomplete per-effort flags are lower-priority inference. */
   thinkingLevelMapProvenance?: ThinkingLevelMapProvenance;
   input: ("text" | "image")[];
+  /** Absent when no source declared modalities or reasoning support; input is then the text-chat default. */
+  capabilitiesProvenance?: CapabilitiesProvenance;
   contextWindow?: number;
   maxTokens?: number;
   cost?: CostRates;

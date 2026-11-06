@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "methodologyVersion": "bench-align-v5.8-2026-09-30",
+  "mappings": [
+    {
+      "runtimeId": "kelley/Kimi-K2.6",
+      "canonicalId": "moonshotai/kimi-k2.6",
+      "model": "Kimi K2.6",
+      "creator": "Moonshot AI",
+      "slug": "kimi-2-6"
+    },
+    {
+      "runtimeId": "model-testing/mimo-v2.6-pro",
+      "canonicalId": "xiaomi/mimo-v2.6-pro",
+      "model": "MiMo-V2.6-Pro",
+      "creator": "Xiaomi",
+      "slug": "mimo-v2-6-pro"
+    },
+    {
+      "runtimeId": "model-testing/mistral-large-4",
+      "canonicalId": "mistralai/mistral-large-4",
+      "model": "Mistral Large 4",
+      "creator": "Mistral",
+      "slug": "mistral-large-4"
+    },
+    {
+      "runtimeId": "model-testing/muse-glimmer",
+      "canonicalId": "muse/muse-glimmer",
+      "model": "Muse Glimmer 30B",
+      "creator": "Meta",
+      "slug": "muse-glimmer-30b"
+    },
+    {
+      "runtimeId": "model-testing/qwen3.8-27b",
+      "canonicalId": "qwen/qwen3.8-27b",
+      "model": "Qwen3.8-27B",
+      "creator": "Alibaba",
+      "slug": "qwen3-8-27b"
+    },
+    {
+      "runtimeId": "model-testing/qwen3.8-flash-next",
+      "canonicalId": "qwen/qwen3.8-flash-next",
+      "model": "Qwen3.8-Flash-Next",
+      "creator": "Alibaba",
+      "slug": "qwen3-8-flash-next"
+    },
+    {
+      "runtimeId": "openai-codex/gpt-5.6-sol",
+      "canonicalId": "openai/gpt-5.6-sol",
+      "model": "GPT-5.6 Sol",
+      "creator": "OpenAI",
+      "slug": "gpt-5-6-sol"
+    },
+    {
+      "runtimeId": "openai-codex/gpt-5.6-terra",
+      "canonicalId": "openai/gpt-5.6-terra",
+      "model": "GPT-5.6 Terra",
+      "creator": "OpenAI",
+      "slug": "gpt-5-6-terra"
+    },
+    {
+      "runtimeId": "openai-codex/gpt-6-astra",
+      "canonicalId": "openai/gpt-6-astra",
+      "model": "GPT-6 Astra",
+      "creator": "OpenAI",
+      "slug": "gpt-6-astra"
+    },
+    {
+      "runtimeId": "openai-codex/gpt-6-luna",
+      "canonicalId": "openai/gpt-6-luna",
+      "model": "GPT-6 Luna",
+      "creator": "OpenAI",
+      "slug": "gpt-6-luna"
+    },
+    {
+      "runtimeId": "openai-codex/gpt-6.1-sol",
+      "canonicalId": "openai/gpt-6.1-sol",
+      "model": "GPT-6.1 Sol",
+      "creator": "OpenAI",
+      "slug": "gpt-6-1-sol"
+    },
+    {
+      "runtimeId": "openai-codex/gpt-6.1-terra",
+      "canonicalId": "openai/gpt-6.1-terra",
+      "model": "GPT-6.1 Terra",
+      "creator": "OpenAI",
+      "slug": "gpt-6-1-terra"
+    },
+    {
+      "runtimeId": "reallms-dev/glm-5.3-flash",
+      "canonicalId": "z-ai/glm-5.3-flash",
+      "model": "GLM-5.3-Flash",
+      "creator": "Z.AI",
+      "slug": "glm-5-3-flash"
+    },
+    {
+      "runtimeId": "reallms/qwen3.8-27b",
+      "canonicalId": "qwen/qwen3.8-27b",
+      "model": "Qwen3.8-27B",
+      "creator": "Alibaba",
+      "slug": "qwen3-8-27b"
+    }
+  ]
+}

@@ -1,0 +1,95 @@
+{
+  "digest": "3d703ee015d8a6e82431b012539b926e8c5da4b1bfc857d22ab1634efaca080c",
+  "fields": {
+    "agenticIndex": {
+      "checked": 15,
+      "newestScoredRelease": null,
+      "scored": 0,
+      "status": "lagging"
+    },
+    "automationBench": {
+      "checked": 15,
+      "newestScoredRelease": "2026-10-29",
+      "scored": 13,
+      "status": "active"
+    },
+    "critpt": {
+      "checked": 15,
+      "newestScoredRelease": "2026-10-29",
+      "scored": 12,
+      "status": "active"
+    },
+    "gdpvalNormalized": {
+      "checked": 15,
+      "newestScoredRelease": null,
+      "scored": 0,
+      "status": "retired"
+    },
+    "gpqa": {
+      "checked": 15,
+      "newestScoredRelease": "2026-08-30",
+      "scored": 5,
+      "status": "lagging"
+    },
+    "hle": {
+      "checked": 15,
+      "newestScoredRelease": "2026-10-26",
+      "scored": 11,
+      "status": "active"
+    },
+    "ifbench": {
+      "checked": 15,
+      "newestScoredRelease": "2026-10-23",
+      "scored": 1,
+      "status": "active"
+    },
+    "lcr": {
+      "checked": 15,
+      "newestScoredRelease": "2026-10-28",
+      "scored": 12,
+      "status": "active"
+    },
+    "omniscienceAccuracy": {
+      "checked": 15,
+      "newestScoredRelease": "2026-10-29",
+      "scored": 12,
+      "status": "active"
+    },
+    "omniscienceHallucinationRate": {
+      "checked": 15,
+      "newestScoredRelease": "2026-10-29",
+      "scored": 12,
+      "status": "active"
+    },
+    "tau2": {
+      "checked": 15,
+      "newestScoredRelease": null,
+      "scored": 0,
+      "status": "lagging"
+    },
+    "tau3Banking": {
+      "checked": 15,
+      "newestScoredRelease": "2026-08-30",
+      "scored": 5,
+      "status": "lagging"
+    },
+    "terminalBench21": {
+      "checked": 15,
+      "newestScoredRelease": "2026-08-30",
+      "scored": 5,
+      "status": "lagging"
+    },
+    "terminalBench40": {
+      "checked": 15,
+      "newestScoredRelease": "2026-10-29",
+      "scored": 13,
+      "status": "active"
+    }
+  },
+  "generatedAt": 1793723694160,
+  "methodology": {
+    "id": "artificial-analysis-intelligence-index",
+    "version": "5"
+  },
+  "version": 1
+}

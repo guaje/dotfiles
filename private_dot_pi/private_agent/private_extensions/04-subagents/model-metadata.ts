@@ -6,6 +6,7 @@ export interface ModelMetadata {
 	canonicalId?: string;
 	reasoning?: boolean;
 	supportsReasoningEffort?: boolean;
+	supportsTools?: boolean;
 	input?: string[];
 	contextWindow?: number;
 	maxTokens?: number;
@@ -20,6 +21,7 @@ export function normalizeModelMetadata(provider: string, model: Record<string, u
 		...(canonicalId ? { canonicalId } : {}),
 		...(typeof model.reasoning === "boolean" ? { reasoning: model.reasoning } : {}),
 		...(typeof supportsReasoningEffort === "boolean" ? { supportsReasoningEffort } : (model.thinkingLevelMap && typeof model.thinkingLevelMap === "object" ? { supportsReasoningEffort: true } : {})),
+		...(typeof model.supportsTools === "boolean" ? { supportsTools: model.supportsTools } : {}),
 		...(Array.isArray(model.input) && model.input.every((item) => typeof item === "string")
 			? { input: model.input as string[] }
 			: model.input === undefined ? { input: ["text"] } : {}),

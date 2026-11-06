@@ -30,9 +30,17 @@ export interface SafeRuntimeModel {
 export interface AaVariantReport {
   thinkingLevel: BenchmarkThinkingLevel;
   aaModelId: string;
+  sourceUrl?: string;
   qualifiedProfiles: string[];
   /** Qualified profiles whose gate relied on a retired-benchmark fallback substitution. */
   substitutedProfiles?: string[];
+}
+
+export interface SyncedModelCapabilities {
+  input: ("text" | "image")[];
+  reasoning?: boolean;
+  /** Which evidence set declared the modalities; absent means Pi's text-chat default with no claim. */
+  provenance?: string;
 }
 
 export interface SyncedModelReport {
@@ -45,6 +53,7 @@ export interface SyncedModelReport {
   aaVariants: AaVariantReport[];
   aaMissing: boolean;
   available: boolean;
+  capabilities: SyncedModelCapabilities;
 }
 
 export interface CatalogSyncReport {
@@ -262,20 +271,30 @@ export async function syncEnabledModels(pi: any, ctx: SyncContext, dependencies:
       const qualifications = qualifyBenchmarkProfiles({ input: Array.isArray(model.input) ? model.input as string[] : ["text"], contextWindow: model.contextWindow, maxTokens: model.maxTokens }, snapshot, benchmarkHealthState?.fields);
       const qualifiedProfiles = qualifications.filter((qualification) => qualification.qualified).map((qualification) => qualification.profile);
       const substitutedProfiles = qualifications.filter((qualification) => qualification.qualified && qualification.substitutions?.length).map((qualification) => qualification.profile);
-      variants.push({ thinkingLevel: entry.thinkingLevel, aaModelId: entry.aaModelId, qualifiedProfiles, ...(substitutedProfiles.length ? { substitutedProfiles } : {}) });
+      variants.push({ thinkingLevel: entry.thinkingLevel, aaModelId: entry.aaModelId, sourceUrl: snapshot.publicPage?.url ?? `https://artificialanalysis.ai/models/${snapshot.source.slug}`, qualifiedProfiles, ...(substitutedProfiles.length ? { substitutedProfiles } : {}) });
     }
     for (const snapshot of directSnapshots) {
       if (variants.some((variant) => variant.aaModelId === snapshot.modelId)) continue;
       const qualifications = qualifyBenchmarkProfiles({ input: Array.isArray(model.input) ? model.input as string[] : ["text"], contextWindow: model.contextWindow, maxTokens: model.maxTokens }, snapshot, benchmarkHealthState?.fields);
       const qualifiedProfiles = qualifications.filter((qualification) => qualification.qualified).map((qualification) => qualification.profile);
       const substitutedProfiles = qualifications.filter((qualification) => qualification.qualified && qualification.substitutions?.length).map((qualification) => qualification.profile);
-      variants.push({ thinkingLevel: snapshot.thinkingLevel, aaModelId: snapshot.modelId, qualifiedProfiles, ...(substitutedProfiles.length ? { substitutedProfiles } : {}) });
+      variants.push({ thinkingLevel: snapshot.thinkingLevel, aaModelId: snapshot.modelId, sourceUrl: snapshot.publicPage?.url ?? `https://artificialanalysis.ai/models/${snapshot.source.slug}`, qualifiedProfiles, ...(substitutedProfiles.length ? { substitutedProfiles } : {}) });
     }
     variants.sort((a, b) => codePointCompare(`${a.thinkingLevel ?? ""}/${a.aaModelId}`, `${b.thinkingLevel ?? ""}/${b.aaModelId}`));
     const providerSettings = settings.find((provider) => provider.id === model.provider);
     const supportsReasoningEffort = source === "custom" ? providerSettings?.compat?.supportsReasoningEffort === true : model.supportsReasoningEffort;
     const variantCapable = supportsReasoningEffort === true && (model.reasoning === true || source === "custom");
-    reports.push({ id, source, canonicalId, ...(cost ? { cost } : {}), costProvenance, variantCapable, aaVariants: variants, aaMissing: variants.length === 0, available: ollamaCloud && ollama ? !!ollamaModel : catalogModel?.available ?? true });
+    // Capabilities decide Pi's image affordance and thinking selector, so the sync report states the
+    // modalities, the reasoning declaration, and which evidence set declared the modalities (if any).
+    const capabilitySource: SyncedModelCapabilities = source === "custom"
+      ? { input: catalogModel?.input ?? ["text"], ...(catalogModel?.capabilitiesProvenance ? { provenance: catalogModel.capabilitiesProvenance } : {}), ...(catalogModel?.reasoning === undefined ? {} : { reasoning: catalogModel.reasoning }) }
+      : (() => {
+        const observed = previousNative.get(id);
+        return observed
+          ? { input: observed.input, provenance: "runtime-registry", ...(observed.reasoning === undefined ? {} : { reasoning: observed.reasoning }) }
+          : { input: Array.isArray(model.input) ? model.input.filter((entry): entry is "text" | "image" => entry === "text" || entry === "image") : ["text"] };
+      })();
+    reports.push({ id, source, canonicalId, ...(cost ? { cost } : {}), costProvenance, variantCapable, aaVariants: variants, aaMissing: variants.length === 0, available: ollamaCloud && ollama ? !!ollamaModel : catalogModel?.available ?? true, capabilities: capabilitySource });
   }
 
   // Persist every price this sync resolved for scoped custom models so /catalog, /catalog refresh, and

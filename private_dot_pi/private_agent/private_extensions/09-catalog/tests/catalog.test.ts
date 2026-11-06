@@ -4,7 +4,7 @@ import test from "node:test";
 import { loadOllamaCloudCatalog, parseAuthoritativeCatalog } from "../cost-sources.ts";
 import { deriveReviewedThinkingLevelMap, discoverProvider, persistReviewedReasoning, providerModels, publishCatalog, refreshCatalog, restoreCatalog } from "../catalog.ts";
 import { loadCatalogSettings, loadProviderSettings } from "../provider-settings.ts";
-import { renderCatalogOverview, renderCatalogSync } from "../render.ts";
+import { renderCatalogRefresh, renderCatalogOverview, renderCatalogSync } from "../render.ts";
 import { loadCatalogState, validateCatalogState } from "../state.ts";
 import type { CatalogModel, CatalogState, NativeModelObservation } from "../types.ts";
 
@@ -84,13 +84,15 @@ test("catalog overview warns when no validated state is available", () => {
 
 const emptySyncReport: any = { models: [], unresolvedCosts: [], missingAa: [] };
 
-test("catalog sync renders exact grouped AA commands with POSIX quoting and deterministic order", () => {
+test("catalog sync renders exact grouped AA additions and reports automatic shared-asset deletions", () => {
   const rendered = renderCatalogSync(emptySyncReport, { changes: [
     { kind: "M", path: "manifest.json", targetPath: "/synthetic root/manifest.json" },
     { kind: "M", path: "/reviewed config/canonical-mappings.json", targetPath: "/reviewed config/canonical-mappings.json" },
     { kind: "A", path: "models/new'copy.json", targetPath: "/synthetic root/models/new'copy.json" },
     { kind: "D", path: "models/old snapshot.json", targetPath: "/synthetic root/models/old snapshot.json" },
-  ], warnings: ["snapshot cleanup was incomplete after successful publication"] });
+  ], warnings: ["snapshot cleanup was incomplete after successful publication"] }, undefined, undefined, undefined, {
+    forgotten: ["/synthetic root/models/old snapshot.json"], removed: ["/synthetic root/models/old snapshot.json"], skipped: [], warnings: [],
+  });
   assert.match(rendered, /AA artifact changes to track:\n  M manifest\.json\n  M \/reviewed config\/canonical-mappings\.json\n  A models\/new'copy\.json\n  D models\/old snapshot\.json\n  ! snapshot cleanup was incomplete after successful publication/);
   const commandBlock = [
     "chezmoi add -- \\",
@@ -98,25 +100,21 @@ test("catalog sync renders exact grouped AA commands with POSIX quoting and dete
     "  '/reviewed config/canonical-mappings.json' \\",
     "  '/synthetic root/models/new'\"'\"'copy.json'",
     "",
-    "chezmoi forget -- \\",
-    "  '/synthetic root/models/old snapshot.json'",
-    "",
-    "rm -f -- \\",
-    "  '/synthetic root/models/old snapshot.json'",
+    "  Removed 1 deleted shared-asset path(s) automatically (chezmoi forget and rm -f under 04-subagents/assets).",
     "",
     "Review with: chezmoi status",
   ].join("\n");
   assert.equal(rendered.includes(commandBlock), true);
+  assert.doesNotMatch(rendered, /chezmoi forget --|rm -f --/);
 });
 
-test("catalog sync hard-wraps long POSIX arguments without changing their shell value", () => {
+test("catalog sync hard-wraps long POSIX additions without changing their shell value", () => {
   const targetPath = `/synthetic/${"segment-".repeat(14)}quoted'file.json`;
-  const rendered = renderCatalogSync(emptySyncReport, { changes: [{ kind: "D", path: "models/long.json", targetPath }], warnings: [] });
+  const rendered = renderCatalogSync(emptySyncReport, { changes: [{ kind: "A", path: "models/long.json", targetPath }], warnings: [] });
   assert.match(rendered, /Long artifact paths use shell-safe continuation fragments; copy the full command group unchanged\./);
-  assert.match(rendered, /`chezmoi forget` applies only to tracked deletions; use `chezmoi status` to filter it\./);
-  const start = rendered.indexOf("chezmoi forget --"), end = rendered.indexOf("\n\nrm -f --", start);
+  const start = rendered.indexOf("chezmoi add --"), end = rendered.indexOf("Review with: chezmoi status", start);
   assert.ok(start >= 0 && end > start);
-  const command = rendered.slice(start, end).replace("chezmoi forget --", "set --");
+  const command = rendered.slice(start, end).trimEnd().replace("chezmoi add --", "set --");
   const fragmentLines = command.split("\n").filter((line) => line.startsWith("  '") || line.startsWith("'"));
   assert.ok(fragmentLines.length > 1); assert.ok(fragmentLines.every((line) => line.length <= 51));
   const parsed = spawnSync("sh", ["-c", `${command}\nprintf '<%s>' "$1"`], { encoding: "utf8" });
@@ -127,9 +125,11 @@ test("catalog sync hard-wraps long POSIX arguments without changing their shell 
 test("catalog sync omits grouped commands whose artifact category is empty", () => {
   const additionsOnly = renderCatalogSync(emptySyncReport, { changes: [{ kind: "A", path: "models/new.json", targetPath: "/synthetic/models/new.json" }], warnings: [] });
   assert.match(additionsOnly, /chezmoi add --/); assert.doesNotMatch(additionsOnly, /chezmoi forget --|rm -f --/);
-  const deletionsOnly = renderCatalogSync(emptySyncReport, { changes: [{ kind: "D", path: "models/old.json", targetPath: "/synthetic/models/old.json" }], warnings: [] });
-  assert.doesNotMatch(deletionsOnly, /chezmoi add --/); assert.match(deletionsOnly, /chezmoi forget --[\s\S]*rm -f --/);
-  assert.match(deletionsOnly, /rm -f -- \\\n  '\/synthetic\/models\/old\.json'\n\nReview with: chezmoi status/);
+  const deletionsOnly = renderCatalogSync(emptySyncReport, { changes: [{ kind: "D", path: "models/old.json", targetPath: "/synthetic/models/old.json" }], warnings: [] }, undefined, undefined, undefined, {
+    forgotten: ["/synthetic/models/old.json"], removed: ["/synthetic/models/old.json"], skipped: [], warnings: [],
+  });
+  assert.doesNotMatch(deletionsOnly, /chezmoi add --|chezmoi forget --|rm -f --/);
+  assert.match(deletionsOnly, /Removed 1 deleted shared-asset path\(s\) automatically/);
 });
 
 test("catalog sync lists outstanding AA mappings with review guidance", () => {
@@ -191,7 +191,7 @@ test("enabled models omitted from /models are recovered without per-model config
     assert.deepEqual(providerModels(discovered).map((model) => model.id), ["configured", "other"]);
     assert.deepEqual(discovered.models.find((model) => model.id === "configured"), {
       id: "configured", name: "Configured", canonicalId: "test-provider/configured", reasoning: true,
-      input: ["text", "image"], contextWindow: 42, maxTokens: 7,
+      input: ["text", "image"], capabilitiesProvenance: "provider-inventory", contextWindow: 42, maxTokens: 7,
       costProvenance: "unknown", available: true, active: true,
     });
   } finally { globalThis.fetch = previous; }
@@ -209,7 +209,7 @@ test("catalog enriches missing pricing and limits from the authoritative exact-I
     const discovered = await discoverProvider(provider, new Set(["test-provider/private-name"]), undefined, source);
     assert.deepEqual(discovered.models[0], {
       id: "private-name", name: "Reviewed model", canonicalId: "vendor/known-model",
-      input: ["text"], contextWindow: 321, maxTokens: 45,
+      input: ["text"], capabilitiesProvenance: "provider-inventory", contextWindow: 321, maxTokens: 45,
       cost: { input: 2, output: 6, cacheRead: 0.2, cacheWrite: 0 },
       costProvenance: "authoritative:openrouter:/api/v1/models", available: true, active: true,
     });
@@ -299,7 +299,7 @@ test("catalog enriches selected models from provider /model/info", async () => {
     assert.equal(seen.filter((url) => url.includes("/model/info?")).length, 1, "only selected models need detailed metadata");
     assert.deepEqual(discovered.models.find((model) => model.id === "enabled"), {
       id: "enabled", name: "Provider Detail", canonicalId: "test-provider/enabled", reasoning: true,
-      input: ["text", "image"], contextWindow: 262144, maxTokens: 32768,
+      input: ["text", "image"], capabilitiesProvenance: "provider-inventory", contextWindow: 262144, maxTokens: 32768,
       cost: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 },
       costProvenance: "provider:/model/info", available: true, active: true,
     });
@@ -383,6 +383,7 @@ test("refresh publishes and saves only a complete successful catalog; restore re
     loadProviderSettings: async () => [provider],
     loadEnabledModels: async () => new Set(["test-provider/enabled"]),
     loadAuthoritativeCatalog: async () => parseAuthoritativeCatalog({ data: [] }),
+    loadReviewedCapabilities: async () => new Map(),
     loadCatalogState: async () => null,
     saveCatalogState: async (state: unknown) => { saved.push(state); },
   };
@@ -424,6 +425,7 @@ test("refresh retains reviewed maps over inferred flags but accepts explicit map
       loadProviderSettings: async () => [provider], loadEnabledModels: async () => new Set(),
       loadCatalogSettings: async () => ({ refreshTtlMs: 1, requestTimeoutMs: 1 }),
       loadAuthoritativeCatalog: async () => parseAuthoritativeCatalog({ data: [] }),
+      loadReviewedCapabilities: async () => new Map(),
       loadCatalogState: async () => previousState, loadReviewedCosts: async () => new Map(),
       saveCatalogState: async (state: any) => { saved = state; },
     });
@@ -483,14 +485,15 @@ test("complete reviewed variants replace incomplete inferred reasoning maps", as
   }] }], nativeModels: [] };
   assert.equal(await persistReviewedReasoning("test-provider/enabled", ["off", "low", "medium", "xhigh"], {
     loadProviderSettings: async () => [{ ...provider, compat: { supportsReasoningEffort: true } }], loadCatalogState: async () => current, saveCatalogState: async (state: any) => { saved = state; },
-  }), true);
+  }), "persisted");
+  assert.equal("capabilitiesProvenance" in saved.providers[0].models[0], false, "reviewed levels evidence reasoning, not modalities");
   assert.deepEqual(saved.providers[0].models[0].thinkingLevelMap, { off: null, minimal: "low", low: "low", medium: "medium", high: "xhigh", xhigh: "xhigh", max: "xhigh" });
   assert.equal(saved.providers[0].models[0].thinkingLevelMapProvenance, "reviewed");
   assert.deepEqual(deriveReviewedThinkingLevelMap(["off", "low", "medium", "xhigh"]), { off: null, minimal: "low", low: "low", medium: "medium", high: "xhigh", xhigh: "xhigh", max: "xhigh" });
   assert.equal(deriveReviewedThinkingLevelMap(["off"]), undefined);
   assert.equal(await persistReviewedReasoning("test-provider/enabled", ["high", null], {
     loadProviderSettings: async () => [{ ...provider, compat: { supportsReasoningEffort: true } }], loadCatalogState: async () => current, saveCatalogState: async () => { throw new Error("must not save"); },
-  }), false);
+  }), "rejected");
 });
 
 test("provider thinking maps win over reviewed derivation", async () => {
@@ -498,7 +501,7 @@ test("provider thinking maps win over reviewed derivation", async () => {
   const current: any = { version: 2, updatedAt: 1, providers: [{ ...provider, compat: { supportsReasoningEffort: true }, models: [{ ...catalogState().providers[0].models[0], thinkingLevelMap: { high: "provider-high" }, thinkingLevelMapProvenance: "provider" }] }], nativeModels: [] };
   assert.equal(await persistReviewedReasoning("test-provider/enabled", ["low", "medium", "xhigh"], {
     loadProviderSettings: async () => [{ ...provider, compat: { supportsReasoningEffort: true } }], loadCatalogState: async () => current, saveCatalogState: async (state: any) => { saved = state; },
-  }), true);
+  }), "persisted");
   assert.equal(saved.providers[0].models[0].reasoning, true);
   assert.deepEqual(saved.providers[0].models[0].thinkingLevelMap, { high: "provider-high" });
   assert.equal(saved.providers[0].models[0].thinkingLevelMapProvenance, "provider");
@@ -509,7 +512,7 @@ test("legacy provider thinking maps still win over reviewed derivation", async (
   const current: any = { version: 2, updatedAt: 1, providers: [{ ...provider, compat: { supportsReasoningEffort: true }, models: [{ ...catalogState().providers[0].models[0], reasoning: true, thinkingLevelMap: { high: "legacy-high" } }] }], nativeModels: [] };
   assert.equal(await persistReviewedReasoning("test-provider/enabled", ["low", "medium", "xhigh"], {
     loadProviderSettings: async () => [{ ...provider, compat: { supportsReasoningEffort: true } }], loadCatalogState: async () => current, saveCatalogState: async () => { saves++; },
-  }), true);
+  }), "persisted");
   assert.equal(saves, 0);
   assert.deepEqual(current.providers[0].models[0].thinkingLevelMap, { high: "legacy-high" });
   assert.equal(current.providers[0].models[0].thinkingLevelMapProvenance, undefined);
@@ -565,4 +568,208 @@ test("sync output discloses retired-benchmark coverage and fallback substitution
   assert.doesNotMatch(rendered, /! hle:/);
   const additions = rendered.split("chezmoi add")[1] ?? "";
   assert.match(additions, /benchmark-health/);
+});
+
+test("a reviewed thinking set is not turned into an effort selector when the provider declares no effort support", async () => {
+  let saves = 0;
+  const current: any = { version: 2, updatedAt: 1, providers: [{ ...provider, models: [{ ...catalogState().providers[0].models[0] }] }], nativeModels: [] };
+  assert.equal(await persistReviewedReasoning("test-provider/enabled", ["low", "medium", "xhigh"], {
+    loadProviderSettings: async () => [{ ...provider, compat: { supportsReasoningEffort: false } }], loadCatalogState: async () => current, saveCatalogState: async () => { saves++; },
+  }), "provider-declares-no-effort-support");
+  assert.equal(saves, 0);
+  assert.equal(current.providers[0].models[0].thinkingLevelMap, undefined);
+});
+
+// Capability evidence: pi renders an image affordance and a thinking selector from exactly these fields,
+// so an unannotated route must never be reported as text-only when other reviewed evidence disagrees.
+function inventory(body: unknown) {
+  const previous = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify(body));
+  return () => { globalThis.fetch = previous; };
+}
+
+test("sync output names the evidence behind each model's capabilities", () => {
+  const report = { ...emptySyncReport, models: [
+    { id: "test-provider/reviewed", source: "custom", canonicalId: "vendor/reviewed", cost: knownCost, costProvenance: "aa-catalog:reference-price:reviewed-model", variantCapable: true, aaVariants: [], aaMissing: true, available: true, capabilities: { input: ["text", "image"], reasoning: true, provenance: "aa-review" } },
+    { id: "test-provider/unannotated", source: "custom", canonicalId: "test-provider/unannotated", costProvenance: "unknown", variantCapable: false, aaVariants: [], aaMissing: true, available: true, capabilities: { input: ["text"] } },
+  ] } as any;
+  const rendered = renderCatalogSync(report);
+  assert.match(rendered, /capabilities: text, image \(input declared by aa-review\), reasoning/);
+  assert.match(rendered, /capabilities: text \(no source declared input modalities\), reasoning undeclared/);
+});
+
+test("an inventory that declares no modalities takes the reviewed AA capture instead of claiming text-only", async () => {
+  const restore = inventory({ data: [{ id: "silent" }] });
+  try {
+    const discovered = await discoverProvider(provider, new Set(), undefined, emptySource, 5_000, new Map([["test-provider/silent", { input: ["text", "image"], reasoning: true }]]));
+    const model = discovered.models.find((entry) => entry.id === "silent")!;
+    assert.deepEqual(model.input, ["text", "image"]);
+    assert.equal(model.reasoning, true);
+    assert.equal(model.capabilitiesProvenance, "aa-review");
+  } finally { restore(); }
+});
+
+test("a provider that declares only reasoning leaves the modality provenance with the modality source", async () => {
+  const restore = inventory({ data: [{ id: "reasoning-only", supports_reasoning: true }] });
+  try {
+    const discovered = await discoverProvider(provider, new Set(), undefined, emptySource, 5_000, new Map([["test-provider/reasoning-only", { input: ["text", "image"] }]]));
+    const model = discovered.models.find((entry) => entry.id === "reasoning-only")!;
+    assert.equal(model.reasoning, true);
+    assert.deepEqual(model.input, ["text", "image"]);
+    assert.equal(model.capabilitiesProvenance, "aa-review", "reasoning evidence must not relabel a defaulted modality set");
+  } finally { restore(); }
+});
+
+test("litellm reasoning_effort_levels becomes provider-provenance effort support", async () => {
+  const restore = inventory({ data: [{ id: "leveled", supports_reasoning: true, reasoning_effort_levels: ["none", "low", "medium", "high", "xhigh", "max"] }] });
+  try {
+    const discovered = await discoverProvider(provider, new Set(), undefined, emptySource, 5_000, new Map());
+    const model = discovered.models.find((entry) => entry.id === "leveled")!;
+    assert.equal(model.reasoning, true);
+    assert.equal(model.thinkingLevelMapProvenance, "provider");
+    // A declared `none` supplies the exact off wire value rather than suppressing the parameter.
+    assert.deepEqual(model.thinkingLevelMap, { off: "none", minimal: "low", low: "low", medium: "medium", high: "high", xhigh: "xhigh", max: "max" });
+  } finally { restore(); }
+});
+
+test("litellm null capability placeholders stay unknown instead of denying a capability", async () => {
+  const restore = inventory({ data: [{ id: "nulls", supports_reasoning: true, supports_vision: null, reasoning_effort_levels: null, supports_xhigh_reasoning_effort: null }] });
+  try {
+    const discovered = await discoverProvider(provider, new Set(), undefined, emptySource, 5_000, new Map([["test-provider/nulls", { input: ["text", "image"] }]]));
+    const model = discovered.models.find((entry) => entry.id === "nulls")!;
+    assert.deepEqual(model.input, ["text", "image"], "null is not a denial, so reviewed evidence still applies");
+    assert.equal(model.capabilitiesProvenance, "aa-review");
+    assert.equal("thinkingLevelMap" in model, false);
+  } finally { restore(); }
+});
+
+test("a route that declares supports_vision false declares text-only input", async () => {
+  const restore = inventory({ data: [{ id: "no-images", supports_vision: false }] });
+  try {
+    const discovered = await discoverProvider(provider, new Set(), undefined, emptySource, 5_000, new Map([["test-provider/no-images", { input: ["text", "image"], reasoning: true }]]));
+    const model = discovered.models.find((entry) => entry.id === "no-images")!;
+    assert.deepEqual(model.input, ["text"]);
+    assert.equal(model.capabilitiesProvenance, "provider-inventory");
+  } finally { restore(); }
+});
+
+test("the authoritative catalog covers a model no reviewed capture describes", async () => {
+  const restore = inventory({ data: [{ id: "silent" }] });
+  const source = Promise.resolve(parseAuthoritativeCatalog({ data: [{ id: "silent", input: ["text", "image"], supported_parameters: ["reasoning"] }] }));
+  try {
+    const discovered = await discoverProvider(provider, new Set(), undefined, source, 5_000, new Map());
+    const model = discovered.models.find((entry) => entry.id === "silent")!;
+    assert.deepEqual(model.input, ["text", "image"]);
+    assert.equal(model.reasoning, true);
+    assert.equal(model.capabilitiesProvenance, "authoritative");
+  } finally { restore(); }
+});
+
+test("the route's own modality declaration outranks reviewed AA capability evidence", async () => {
+  const restore = inventory({ data: [{ id: "text-only-route", input: ["text"] }] });
+  try {
+    const discovered = await discoverProvider(provider, new Set(), undefined, emptySource, 5_000, new Map([["test-provider/text-only-route", { input: ["text", "image"], reasoning: true }]]));
+    const model = discovered.models.find((entry) => entry.id === "text-only-route")!;
+    assert.deepEqual(model.input, ["text"], "a route that accepts only text must not advertise image input");
+    assert.equal(model.reasoning, true, "reasoning is the only capability the reviewed capture may supply here");
+    assert.equal(model.capabilitiesProvenance, "provider-inventory");
+  } finally { restore(); }
+});
+
+test("a model no source describes stays at the text-chat default with no capability claim", async () => {
+  const restore = inventory({ data: [{ id: "unknown-capabilities" }] });
+  try {
+    const discovered = await discoverProvider(provider, new Set(), undefined, emptySource, 5_000, new Map());
+    const model = discovered.models.find((entry) => entry.id === "unknown-capabilities")!;
+    assert.deepEqual(model.input, ["text"]);
+    assert.equal("capabilitiesProvenance" in model, false);
+    assert.equal("reasoning" in model, false);
+  } finally { restore(); }
+});
+
+test("a refresh that loses capability evidence keeps the previously evidenced modalities", async () => {
+  const previousFetch = globalThis.fetch;
+  const prior: any = {
+    version: 2, updatedAt: 1, nativeModels: [],
+    providers: [{ ...provider, models: [{ ...catalogState().providers[0].models[0], id: "carried", canonicalId: "test-provider/carried", reasoning: undefined, input: ["text", "image"], capabilitiesProvenance: "aa-review" }] }],
+  };
+  globalThis.fetch = async () => new Response(JSON.stringify({ data: [{ id: "carried" }] }));
+  let saved: any;
+  try {
+    const refreshed = await refreshCatalog({ registerProvider: () => {} } as any, undefined, {
+      loadProviderSettings: async () => [provider], loadEnabledModels: async () => new Set(),
+      loadCatalogSettings: async () => ({ refreshTtlMs: 1, requestTimeoutMs: 1 }),
+      loadAuthoritativeCatalog: async () => parseAuthoritativeCatalog({ data: [] }),
+      loadReviewedCapabilities: async () => new Map(), loadReviewedCosts: async () => new Map(),
+      loadCatalogState: async () => prior, saveCatalogState: async (state: any) => { saved = state; },
+    });
+    const model = refreshed.providers[0]!.models.find((entry) => entry.id === "carried")!;
+    assert.deepEqual(model.input, ["text", "image"]);
+    assert.equal(model.capabilitiesProvenance, "last-known-good");
+    assert.deepEqual(providerModels(saved.providers[0]!).find((entry) => entry.id === "carried")!.input, ["text", "image"]);
+  } finally { globalThis.fetch = previousFetch; }
+});
+
+test("catalog refresh keeps the cost overview and methodology audit in one replaceable notice", () => {
+  const refresh = renderCatalogRefresh(
+    { text: "cost overview: 2 active models, no unknown costs", level: "info" },
+    { text: "methodology audit: unchanged this run", level: "warning" },
+  );
+  assert.match(refresh.text, /cost overview: 2 active models/);
+  assert.match(refresh.text, /methodology audit: unchanged this run/);
+  assert.equal(refresh.level, "warning");
+});
+
+test("catalog sync includes elapsed time in its retained report", () => {
+  const rendered = renderCatalogSync(emptySyncReport, undefined, undefined, undefined, undefined, undefined, 2.5);
+  assert.match(rendered, /^Catalog sync completed in 2\.5s/);
+});
+
+test("catalog sync shows reviewed source URLs beside AA variants and BenchLM evidence", () => {
+  const report: any = {
+    ...emptySyncReport,
+    models: [{
+      id: "test-provider/model-alpha",
+      source: "custom",
+      canonicalId: "test-provider/model-alpha",
+      costProvenance: "runtime-registry",
+      variantCapable: true,
+      aaMissing: false,
+      available: true,
+      capabilities: { input: ["text", "image"], reasoning: true, provenance: "provider-inventory" },
+      aaVariants: [
+        { thinkingLevel: "high", aaModelId: "aa-1", sourceUrl: "https://artificialanalysis.ai/models/model-alpha", qualifiedProfiles: [] },
+        { thinkingLevel: "medium", aaModelId: "aa-2", sourceUrl: "https://artificialanalysis.ai/models/model-alpha", qualifiedProfiles: [] },
+      ],
+    }],
+    unresolvedCosts: [],
+    missingAa: [],
+  };
+  const benchLm: any = {
+    methodologyVersion: "bench-1",
+    sourceSnapshotId: "snap",
+    lastUpdated: "2026-11-05",
+    license: "CC BY-NC 4.0",
+    generatedAt: 1,
+    models: [{
+      runtimeId: "test-provider/model-alpha",
+      model: "Model Alpha",
+      creator: "Test Provider",
+      sourceUrl: "https://benchlm.ai/models/model-alpha",
+      detailRows: 9,
+      unusedCategories: 0,
+      profiles: ["balanced", "coding", "agentic"],
+      categories: [
+        { key: "coding", score: 43.6, provenance: "published-category", rows: 2, independentlyVerified: 2 },
+        { key: "agentic", score: 44.7, provenance: "published-category", rows: 6, independentlyVerified: 2 },
+        { key: "reasoning", score: 64.3, provenance: "published-category", rows: 1, independentlyVerified: 1 },
+      ],
+    }],
+  };
+  const rendered = renderCatalogSync(report, undefined, undefined, benchLm);
+  assert.match(rendered, /AA variants \(https:\/\/artificialanalysis\.ai\/models\/model-alpha\):/);
+  assert.match(rendered, /    high: no benchmark-qualified profiles/);
+  assert.match(rendered, /BenchLM \(https:\/\/benchlm\.ai\/models\/model-alpha\):/);
+  assert.match(rendered, /    coding 43\.6 · agentic 44\.7 · reasoning 64\.3/);
+  assert.match(rendered, /eligible on evidence for: balanced, coding, agentic/);
 });

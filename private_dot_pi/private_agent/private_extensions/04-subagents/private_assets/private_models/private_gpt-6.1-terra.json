@@ -1,0 +1,806 @@
+{
+  "version": 2,
+  "model": "gpt-6.1-terra",
+  "aa": {
+    "variants": [
+      {
+        "version": 4,
+        "provider": "openai-codex",
+        "model": "gpt-6.1-terra",
+        "thinkingLevel": "high",
+        "modelId": "ea3e1f50-f62d-41d2-849a-9af0413e4d37",
+        "capturedAt": 1793820823354,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793729308151,
+          "thinkingLevel": "high"
+        },
+        "source": {
+          "name": "GPT-6.1 Terra (High)",
+          "slug": "gpt-6-1-terra-high",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/gpt-6-1-terra-high",
+          "retrievedAt": 1793820823101,
+          "contentSha256": "18d67ddaa4c413b4406984b09f24b0a7dc34e97be03c6fff149661c56398998f",
+          "recordSha256": "4546c220b72d8db5a6cf24cc35706bb7b757e325257d6810d7521df91bd517d6",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 42.4,
+          "coding": null,
+          "agentic": null,
+          "toolUse": null,
+          "scientificReasoning": null,
+          "longContext": 82.3333333333333,
+          "instructionFollowing": null,
+          "knowledge": 47.266666666666666,
+          "faithfulness": 63.02149178255373
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 43.2808155699722,
+          "gpqa": null,
+          "critpt": 25.7142857142857
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": null,
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "unavailable",
+            "score": null
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.4444444444444444,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      },
+      {
+        "version": 4,
+        "provider": "openai-codex",
+        "model": "gpt-6.1-terra",
+        "thinkingLevel": "low",
+        "modelId": "c955b262-a17f-4f1a-b097-6860b866295b",
+        "capturedAt": 1793820823862,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793729309379,
+          "thinkingLevel": "low"
+        },
+        "source": {
+          "name": "GPT-6.1 Terra (Low)",
+          "slug": "gpt-6-1-terra-low",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/gpt-6-1-terra-low",
+          "retrievedAt": 1793820823611,
+          "contentSha256": "3afa48e75afd1b21c289c3e3547a808a6f045ed63bda68f9c0034f62f6fcfe90",
+          "recordSha256": "8de303cfc51d57e0c12cc63006e16559fb6312231636861fb0b011d4efdb1fe2",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 29.4,
+          "coding": null,
+          "agentic": null,
+          "toolUse": null,
+          "scientificReasoning": null,
+          "longContext": 81,
+          "instructionFollowing": null,
+          "knowledge": 45.56666666666666,
+          "faithfulness": 58.420085731781995
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 35.820203892493005,
+          "gpqa": null,
+          "critpt": 15.1428571428571
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": null,
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "unavailable",
+            "score": null
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.4444444444444444,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      },
+      {
+        "version": 4,
+        "provider": "openai-codex",
+        "model": "gpt-6.1-terra",
+        "thinkingLevel": "max",
+        "modelId": "b0c462cf-f2d0-4126-9434-28db9502219f",
+        "capturedAt": 1793820824186,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793729310575,
+          "thinkingLevel": "max"
+        },
+        "source": {
+          "name": "GPT-6.1 Terra (Max)",
+          "slug": "gpt-6-1-terra",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/gpt-6-1-terra",
+          "retrievedAt": 1793820823932,
+          "contentSha256": "222502af685cabfe379d013b3dc6ec375df3aa43ab2347f21a4aa208b74766f2",
+          "recordSha256": "347a6c4dffe887f0d0d896d12d7283e2cb85155f4d6caa17322fcddaa774074a",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 51.3,
+          "coding": null,
+          "agentic": null,
+          "toolUse": null,
+          "scientificReasoning": null,
+          "longContext": 82.6666666666667,
+          "instructionFollowing": null,
+          "knowledge": 47.63333333333333,
+          "faithfulness": 65.49968173138129
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 46.246524559777605,
+          "gpqa": null,
+          "critpt": 28.000000000000004
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": null,
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "unavailable",
+            "score": null
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.4444444444444444,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      },
+      {
+        "version": 4,
+        "provider": "openai-codex",
+        "model": "gpt-6.1-terra",
+        "thinkingLevel": "medium",
+        "modelId": "c441e158-a87d-4116-911b-93325e4b4f1c",
+        "capturedAt": 1793820824656,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793729311747,
+          "thinkingLevel": "medium"
+        },
+        "source": {
+          "name": "GPT-6.1 Terra (Medium)",
+          "slug": "gpt-6-1-terra-medium",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/gpt-6-1-terra-medium",
+          "retrievedAt": 1793820824402,
+          "contentSha256": "eeed91d04000e094af577b54654e3092b6c7e987386f6c0279c1f9942c1b1940",
+          "recordSha256": "ad40d60af7ed04a6ede45c6e3374500bdca982e8d73c67d9ff960df38f49ae2c",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 38.2,
+          "coding": null,
+          "agentic": null,
+          "toolUse": null,
+          "scientificReasoning": null,
+          "longContext": 80.6666666666667,
+          "instructionFollowing": null,
+          "knowledge": 47.43333333333333,
+          "faithfulness": 60.367786937222576
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 40.2224281742354,
+          "gpqa": null,
+          "critpt": 21.4285714285714
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": null,
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "unavailable",
+            "score": null
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.4444444444444444,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      },
+      {
+        "version": 4,
+        "provider": "openai-codex",
+        "model": "gpt-6.1-terra",
+        "thinkingLevel": "off",
+        "modelId": "0d3c777f-6817-42d7-9bb9-223314bc5a57",
+        "capturedAt": 1793820825158,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793729312925,
+          "thinkingLevel": "off"
+        },
+        "source": {
+          "name": "GPT-6.1 Terra (Non-reasoning)",
+          "slug": "gpt-6-1-terra-non-reasoning",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/gpt-6-1-terra-non-reasoning",
+          "retrievedAt": 1793820824904,
+          "contentSha256": "90cd8549871da9faa7296d0e5065421d50050cfc64e5e1190fab9625a7ca0cf5",
+          "recordSha256": "c7e4e41142c6338d1903f964baa26cfe572521c944ad0acde94a650bb5c37377",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 30.5,
+          "coding": null,
+          "agentic": null,
+          "toolUse": null,
+          "scientificReasoning": null,
+          "longContext": 67.6666666666667,
+          "instructionFollowing": null,
+          "knowledge": 40.733333333333334,
+          "faithfulness": 22.89088863892013
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 21.1306765523633,
+          "gpqa": null,
+          "critpt": 4.857142857142859
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": null,
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "unavailable",
+            "score": null
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.4444444444444444,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": false
+        }
+      },
+      {
+        "version": 4,
+        "provider": "openai-codex",
+        "model": "gpt-6.1-terra",
+        "thinkingLevel": "xhigh",
+        "modelId": "e8d443ba-8aca-4830-a186-ae869bb9c6fe",
+        "capturedAt": 1793820825762,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793729314187,
+          "thinkingLevel": "xhigh"
+        },
+        "source": {
+          "name": "GPT-6.1 Terra (Xhigh)",
+          "slug": "gpt-6-1-terra-xhigh",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/gpt-6-1-terra-xhigh",
+          "retrievedAt": 1793820825511,
+          "contentSha256": "a56caa5ab21cfff5839de4f8e2c62de2f0353780954e30232e74a36c0c3020d9",
+          "recordSha256": "188239d2b95ecc7af0abbf21aad977a5b3e2fe4dbffcf6ec2ca25ea9aec1371d",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 45.3,
+          "coding": null,
+          "agentic": null,
+          "toolUse": null,
+          "scientificReasoning": null,
+          "longContext": 81.6666666666667,
+          "instructionFollowing": null,
+          "knowledge": 48.03333333333333,
+          "faithfulness": 63.24567030147531
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 43.7442075996293,
+          "gpqa": null,
+          "critpt": 26.5714285714286
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": null,
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "unavailable",
+            "score": null
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.4444444444444444,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      }
+    ]
+  },
+  "benchlm": {
+    "version": 1,
+    "runtimeId": "openai-codex/gpt-6.1-terra",
+    "canonicalId": "openai/gpt-6.1-terra",
+    "model": "GPT-6.1 Terra",
+    "creator": "OpenAI",
+    "capturedAt": 1793907107528,
+    "lastUpdated": "2026-11-05",
+    "methodologyVersion": "bench-align-v5.8-2026-09-30",
+    "sourceSnapshotId": "2026-11-05-3904bad35f77cff7",
+    "attribution": "Data from BenchLM.ai",
+    "license": "CC BY-NC 4.0",
+    "categoryScores": {
+      "agentic": 76.68,
+      "knowledge": 77.25,
+      "reasoning": 81.8,
+      "math": 97.3,
+      "multimodalGrounded": 91.6
+    },
+    "categoryProvenance": {
+      "agentic": "leaderboard",
+      "knowledge": "leaderboard",
+      "reasoning": "leaderboard",
+      "math": "leaderboard",
+      "multimodalGrounded": "leaderboard"
+    },
+    "categoryEvidence": {
+      "agentic": {
+        "rows": 5,
+        "independentlyVerified": 1
+      },
+      "knowledge": {
+        "rows": 5,
+        "independentlyVerified": 0
+      },
+      "math": {
+        "rows": 2,
+        "independentlyVerified": 2
+      },
+      "multimodalGrounded": {
+        "rows": 4,
+        "independentlyVerified": 3
+      }
+    },
+    "categories": [
+      {
+        "key": "agentic",
+        "label": "Agentic",
+        "score": 76.7,
+        "rank": 6,
+        "total": 135
+      },
+      {
+        "key": "coding",
+        "label": "Coding",
+        "score": null,
+        "rank": null,
+        "total": 156
+      },
+      {
+        "key": "reasoning",
+        "label": "Reasoning",
+        "score": null,
+        "rank": null,
+        "total": 26
+      },
+      {
+        "key": "multimodalGrounded",
+        "label": "Multimodal",
+        "score": 91.6,
+        "rank": 4,
+        "total": 58
+      },
+      {
+        "key": "knowledge",
+        "label": "Knowledge",
+        "score": 77.2,
+        "rank": 10,
+        "total": 177
+      },
+      {
+        "key": "multilingual",
+        "label": "Multilingual",
+        "score": null,
+        "rank": null,
+        "total": 17
+      },
+      {
+        "key": "instructionFollowing",
+        "label": "Instruction following",
+        "score": null,
+        "rank": null,
+        "total": 157
+      },
+      {
+        "key": "math",
+        "label": "Math",
+        "score": null,
+        "rank": null,
+        "total": 12
+      }
+    ],
+    "details": [
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "terminalBench4",
+        "name": "Terminal-Bench 4.0",
+        "value": 50.3,
+        "formatted": "50.30%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: Introducing GPT-6.1 Terra",
+          "url": "https://openai.com/index/introducing-gpt-6-1-terra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "terminalBenchScience",
+        "name": "Terminal-Bench-Science 0.1",
+        "value": 58.3,
+        "formatted": "58.3%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: Introducing GPT-6.1 Terra",
+          "url": "https://openai.com/index/introducing-gpt-6-1-terra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "agentsLastExam",
+        "name": "Agents' Last Exam",
+        "value": 60,
+        "formatted": "60.0%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: Introducing GPT-6.1 Terra",
+          "url": "https://openai.com/index/introducing-gpt-6-1-terra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "osWorld21Offline",
+        "name": "OSWorld 2.1 Offline",
+        "value": 74.2,
+        "formatted": "74.2%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: Introducing GPT-6.1 Terra",
+          "url": "https://openai.com/index/introducing-gpt-6-1-terra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "mazeBench",
+        "name": "MazeBench",
+        "value": 16,
+        "formatted": "16%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "MazeBench AI leaderboard (ASCII mode)",
+          "url": "https://mazebench.com/leaderboard/ai?mode=ascii&tools=1&metric=gems&run=run-2026-10-26T18-38-53-727Z-4c8cb6",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "parseBenchLlamaIndex",
+        "name": "ParseBench",
+        "value": 73.64,
+        "formatted": "73.64%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ParseBench leaderboard, November 5, 2026 snapshot (LlamaIndex)",
+          "url": "https://www.parsebench.ai/#leaderboard",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "extractBenchPro",
+        "name": "ExtractBench Pro",
+        "value": 27,
+        "formatted": "27%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ExtractBench Pro leaderboard, October 28, 2026 snapshot (LlamaIndex)",
+          "url": "https://www.extractbench.ai/pro#leaderboard",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "extractBenchLlamaIndex",
+        "name": "ExtractBench (LlamaIndex)",
+        "value": 94.28,
+        "formatted": "94.28%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ExtractBench leaderboard, November 5, 2026 snapshot (LlamaIndex)",
+          "url": "https://www.extractbench.ai/#leaderboard",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "mmmuPro",
+        "name": "MMMU-Pro",
+        "value": 85.5,
+        "formatted": "85.5%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: Introducing GPT-6.1 Terra",
+          "url": "https://openai.com/index/introducing-gpt-6-1-terra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "healthBench",
+        "name": "HealthBench (raw)",
+        "value": 51.1,
+        "formatted": "51.1%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6.1 Terra system card addendum",
+          "url": "https://deploymentsafety.openai.com/gpt-6-1-terra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "healthBenchLengthAdjusted",
+        "name": "HealthBench (length-adjusted)",
+        "value": 55.1,
+        "formatted": "55.1%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6.1 Terra system card addendum",
+          "url": "https://deploymentsafety.openai.com/gpt-6-1-terra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "healthBenchProfessional",
+        "name": "HealthBench Professional",
+        "value": 62.7,
+        "formatted": "62.7%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6.1 Terra system card addendum",
+          "url": "https://deploymentsafety.openai.com/gpt-6-1-terra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "healthBenchProfessionalRaw",
+        "name": "HealthBench Professional (raw)",
+        "value": 64.2,
+        "formatted": "64.2%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6.1 Terra system card addendum",
+          "url": "https://deploymentsafety.openai.com/gpt-6-1-terra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "healthBenchHard",
+        "name": "HealthBench Hard",
+        "value": 31.4,
+        "formatted": "31.4%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6.1 Terra system card addendum",
+          "url": "https://deploymentsafety.openai.com/gpt-6-1-terra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "math",
+        "categoryLabel": "Math",
+        "key": "frontierMathV2Tiers13",
+        "name": "FrontierMath v2 (Tiers 1-3)",
+        "value": 90.877,
+        "formatted": "90.877%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI FrontierMath v2 leaderboard",
+          "url": "https://epoch.ai/benchmarks/frontiermath-tiers-1-3-v2",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "math",
+        "categoryLabel": "Math",
+        "key": "frontierMathV2Tier4",
+        "name": "FrontierMath v2 (Tier 4)",
+        "value": 92.683,
+        "formatted": "92.683%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI FrontierMath v2 leaderboard",
+          "url": "https://epoch.ai/benchmarks/frontiermath-tier-4-v2?view=graph&tab=leaderboard",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "exploitBench",
+        "name": "ExploitBench",
+        "value": 97.1,
+        "formatted": "97%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6.1 Terra system card addendum",
+          "url": "https://deploymentsafety.openai.com/gpt-6-1-terra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "secBenchPro",
+        "name": "SEC-Bench Pro",
+        "value": 83.33,
+        "formatted": "83.3%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6.1 Terra system card addendum",
+          "url": "https://deploymentsafety.openai.com/gpt-6-1-terra",
+          "retrievedAt": null
+        }
+      }
+    ],
+    "modelAliases": [
+      "openai-codex/gpt-6.1-terra"
+    ]
+  }
+}

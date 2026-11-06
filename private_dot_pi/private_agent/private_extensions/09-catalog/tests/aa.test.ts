@@ -18,12 +18,33 @@ const HASH = "a".repeat(64);
 const TEMP_ROOTS = new Set<string>();
 test.afterEach(async () => { for (const directory of TEMP_ROOTS) await rm(directory, { recursive: true, force: true }); TEMP_ROOTS.clear(); });
 async function secureWrite(file: string, value: unknown): Promise<void> { await writeFile(file, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 }); await chmod(file, 0o600); }
+function aaFromArtifacts(parsed: unknown): any {
+  const variants = (parsed as { aa?: { variants?: unknown[] } })?.aa?.variants;
+  return Array.isArray(variants) ? variants[0] : parsed;
+}
 async function fixture(): Promise<{ directory: string; root: string; env: NodeJS.ProcessEnv }> {
   const directory = await mkdtemp(path.join(os.tmpdir(), "pi-aa-test-")); TEMP_ROOTS.add(directory); const root = path.join(directory, "aa"); await mkdir(path.join(root, "models"), { recursive: true, mode: 0o700 }); await chmod(root, 0o700); await chmod(path.join(root, "models"), 0o700);
   const settings = path.join(directory, "settings.json"), models = path.join(directory, "models.json"); await secureWrite(settings, { enabledModels: ["runtime/model"] }); await secureWrite(models, { providers: { runtime: { compat: { supportsReasoningEffort: true } } } });
-  return { directory, root, env: { PI_AA_SETTINGS_CONFIG: settings, PI_AA_MODELS_CONFIG: models, PI_AA_SNAPSHOT_ROOT: root, PI_AA_CANONICAL_MAPPINGS: path.join(root, "canonical-mappings.json"), PI_CATALOG_STATE: path.join(directory, "catalog-state.json"), PI_AA_PUBLIC_PAGE_DELAY: "0", AA_API_KEY: "unit-secret" } };
+  return { directory, root, env: { PI_AA_SETTINGS_CONFIG: settings, PI_AA_MODELS_CONFIG: models, PI_AA_SNAPSHOT_ROOT: root, PI_AA_CANONICAL_MAPPINGS: path.join(root, "aa-canonical-mappings.json"), PI_CATALOG_STATE: path.join(directory, "catalog-state.json"), PI_AA_PUBLIC_PAGE_DELAY: "0", AA_API_KEY: "unit-secret" } };
 }
+async function publishedSnapshot(root: string): Promise<Record<string, any>> {
+  const manifest = JSON.parse(await readFile(path.join(root, "aa-manifest.json"), "utf8"));
+  return aaFromArtifacts(JSON.parse(await readFile(path.join(root, "models", manifest.models[0].file), "utf8")));
+}
+
+let reviewedSnapshotPrototype: Promise<Record<string, any>> | undefined;
+/** A real, digest-valid snapshot produced by the writer, reused as the base for schema mutations. */
+function reviewedSnapshot(): Promise<Record<string, any>> {
+  reviewedSnapshotPrototype ??= (async () => {
+    const item = await fixture();
+    await createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() }).add("runtime/model", ID1, null, undefined, item.env);
+    return publishedSnapshot(item.root);
+  })();
+  return reviewedSnapshotPrototype;
+}
+
 function catalog(id = ID1) { return { records: [{ id, name: "Synthetic Model", slug: "synthetic-model", openrouter_api_id: "model", evaluations: { artificial_analysis_intelligence_index: 72, artificial_analysis_coding_index: 75, artificial_analysis_agentic_index: 70 } }], sourceUrl: "https://artificialanalysis.ai/api/v2/language/models/free" }; }
+function catalogBoth() { const a = catalog(); const b = catalog(ID2); return { records: [...a.records, ...b.records], sourceUrl: a.sourceUrl }; }
 function publicPage(id = ID1) { return { record: { id, name: "Synthetic Model", slug: "synthetic-model", intelligenceIndex: 72, tauBanking: 0.8, gdpvalNormalized: 0.75, tau2: 0.7, hle: 0.6, gpqa: 0.8, critpt: 0.7, lcr: 0.9, ifbench: 0.85, omniscienceAccuracy: 0.65, omniscienceHallucinationRate: 0.2 }, provenance: { url: "https://artificialanalysis.ai/models/synthetic-model", retrievedAt: 1_700_000_000_000, contentSha256: HASH, recordSha256: HASH, extractorVersion: "aa-current-model-rsc-v1" as const, intelligenceIndexMethodologyVersion: PUBLIC_METHODOLOGY_VERSION } }; }
 function legacyManifest(entries: Array<{ provider: string; model: string; thinkingLevel: null; aaModelId: string }>) {
   const models = entries.map((entry) => ({ provider: entry.provider, model: entry.model, thinkingLevel: entry.thinkingLevel, modelId: entry.aaModelId, file: `${entry.provider}-${entry.model}.json`, capturedAt: 1, contentDigest: HASH }));
@@ -170,8 +191,37 @@ test("strict shared mappings, v3 extraction, and producer/consumer validators ha
 
 test("writer builds exact v4 scores, remains a semantic no-op, and uses owner-only files", { concurrency: false }, async () => {
   const item = await fixture(); let now = 1_700_000_001_000; const service = createAaService({ now: () => now, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() });
-  const first = await service.add("runtime/model", ID1, null, undefined, item.env); assert.equal(first.changed, true); const manifestBefore = await readFile(path.join(item.root, "manifest.json"), "utf8"); const manifest = JSON.parse(manifestBefore); assert.equal(validateManifest(manifest), true); const snapshot = JSON.parse(await readFile(path.join(item.root, "models", manifest.models[0].file), "utf8")); assert.equal(validateSnapshot(snapshot), true); assert.equal(snapshot.scores.coding, 75); assert.equal(snapshot.scores.toolUse, 77.5); assert.equal(snapshot.scores.scientificReasoning, 70); assert.deepEqual(snapshot.outputTokens, {}); assert.equal((await lstat(path.join(item.root, "manifest.json"))).mode & 0o777, 0o600);
-  now += 10_000; const second = await service.refresh("runtime/model", undefined, item.env); assert.equal(second.changed, false); assert.equal(await readFile(path.join(item.root, "manifest.json"), "utf8"), manifestBefore);
+  const first = await service.add("runtime/model", ID1, null, undefined, item.env); assert.equal(first.changed, true); const manifestBefore = await readFile(path.join(item.root, "aa-manifest.json"), "utf8"); const manifest = JSON.parse(manifestBefore); assert.equal(validateManifest(manifest), true); const snapshot = aaFromArtifacts(JSON.parse(await readFile(path.join(item.root, "models", manifest.models[0].file), "utf8"))); assert.equal(validateSnapshot(snapshot), true); assert.equal(snapshot.scores.coding, 75); assert.equal(snapshot.scores.toolUse, 77.5); assert.equal(snapshot.scores.scientificReasoning, 70); assert.deepEqual(snapshot.outputTokens, {}); assert.equal((await lstat(path.join(item.root, "aa-manifest.json"))).mode & 0o777, 0o600);
+  now += 10_000; const second = await service.refresh("runtime/model", undefined, item.env); assert.equal(second.changed, false); assert.equal(await readFile(path.join(item.root, "aa-manifest.json"), "utf8"), manifestBefore);
+});
+
+test("tool use averages the reviewed components AA still publishes and records which rule fired", { concurrency: false }, async () => {
+  const cases: Array<{ drop: string[]; expected: [string, string, number | null] }> = [
+    { drop: [], expected: ["v2", "tau3-banking+gdpval-aa", 77.5] },
+    { drop: ["gdpvalNormalized"], expected: ["v2", "tau3-banking+tau2-telecom", 75] },
+    { drop: ["gdpvalNormalized", "tau2"], expected: ["v2", "tau3-banking-single", 80] },
+    { drop: ["gdpvalNormalized", "tauBanking"], expected: ["v2", "tau2-telecom-fallback", 70] },
+    { drop: ["gdpvalNormalized", "tauBanking", "tau2"], expected: ["v2", "unavailable", null] },
+  ];
+  const published: Record<string, any>[] = [];
+  for (const testCase of cases) {
+    const item = await fixture();
+    const service = createAaService({
+      now: () => 1_700_000_001_000,
+      fetchCatalog: async () => catalog(),
+      fetchPublicModel: async () => { const page = publicPage(); for (const field of testCase.drop) delete (page.record as Record<string, unknown>)[field]; return page; },
+    });
+    await service.add("runtime/model", ID1, null, undefined, item.env);
+    published.push(await publishedSnapshot(item.root));
+  }
+  cases.forEach((testCase, index) => {
+    const snapshot = published[index];
+    assert.equal(validateSnapshot(snapshot), true, `components ${testCase.drop.join("+") || "as published"} publish a valid artifact`);
+    assert.deepEqual([snapshot.toolUse.derivation.version, snapshot.toolUse.derivation.rule, snapshot.scores.toolUse], testCase.expected, testCase.drop.join("+") || "all components");
+  });
+  // A v1 artifact may not claim a rule its own ladder never produced.
+  const blend = published[1];
+  assert.equal(validateSnapshot({ ...blend, toolUse: { ...blend.toolUse, derivation: { version: "v1", rule: "tau3-banking+tau2-telecom", score: 75 } } }), false);
 });
 
 test("artifact capture records resolved roots and exact custom metadata targets", { concurrency: false }, async () => {
@@ -184,8 +234,8 @@ test("artifact capture records resolved roots and exact custom metadata targets"
 
   const captured = await service.captureArtifactState(item.env);
   assert.equal(captured.snapshotRoot, path.resolve(item.root));
-  assert.equal(captured.manifest?.path, "manifest.json");
-  assert.equal(captured.manifest?.targetPath, path.join(item.root, "manifest.json"));
+  assert.equal(captured.manifest?.path, "aa-manifest.json");
+  assert.equal(captured.manifest?.targetPath, path.join(item.root, "aa-manifest.json"));
   assert.equal(captured.canonicalMappings?.path, mappingsPath);
   assert.equal(captured.canonicalMappings?.targetPath, mappingsPath);
 });
@@ -214,7 +264,7 @@ test("shared writes preserve an exact pinned disabled baseline but reject disabl
     { provider: "legacy", model: "model", thinkingLevel: null, aaModelId: ID1 },
     { provider: "runtime", model: "model", thinkingLevel: null, aaModelId: ID2 },
   ], undefined, item.env)).changed, true);
-  const manifest = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8"));
+  const manifest = JSON.parse(await readFile(path.join(item.root, "aa-manifest.json"), "utf8"));
   assert.deepEqual(manifest.models.map((entry: any) => [entry.provider, entry.model, entry.thinkingLevel, entry.modelId]), [
     ["legacy", "model", null, ID1], ["runtime", "model", null, ID2],
   ]);
@@ -263,9 +313,9 @@ test("reviewed publications reuse one free catalog and supplement its null metri
     { aaModelId: ID2, slug: second.slug, name: second.name, thinkingLevel: "xhigh" },
   ], undefined, item.env, review.catalog);
   assert.equal(calls, 1);
-  const manifest = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8"));
+  const manifest = JSON.parse(await readFile(path.join(item.root, "aa-manifest.json"), "utf8"));
   for (const entry of manifest.models) {
-    const snapshot = JSON.parse(await readFile(path.join(item.root, "models", entry.file), "utf8"));
+    const snapshot = aaFromArtifacts(JSON.parse(await readFile(path.join(item.root, "models", entry.file), "utf8")));
     assert.equal(snapshot.scores.intelligence, 72);
     assert.equal(snapshot.toolUse.components.tau3Banking.sourceKind, "public-page");
   }
@@ -274,17 +324,17 @@ test("reviewed publications reuse one free catalog and supplement its null metri
 test("public values only supplement API nulls and conflicts abort before publication", { concurrency: false }, async () => {
   const item = await fixture(); const api = structuredClone(catalog()); (api.records[0]!.evaluations as any).artificial_analysis_intelligence_index = null;
   const service = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => api, fetchPublicModel: async () => publicPage() }); await service.add("runtime/model", ID1, null, undefined, item.env);
-  const manifest = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8")); const snapshot = JSON.parse(await readFile(path.join(item.root, "models", manifest.models[0].file), "utf8")); assert.equal(snapshot.scores.intelligence, 72); assert.equal(snapshot.toolUse.components.tau3Banking.sourceKind, "public-page");
-  const conflictItem = await fixture(); const conflictPage = publicPage(); conflictPage.record.intelligenceIndex = 73; const conflicting = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => catalog(), fetchPublicModel: async () => conflictPage }); await assert.rejects(conflicting.add("runtime/model", ID1, null, undefined, conflictItem.env), /API\/public metric conflict: intelligenceIndex/); await assert.rejects(readFile(path.join(conflictItem.root, "manifest.json")), /ENOENT/);
+  const manifest = JSON.parse(await readFile(path.join(item.root, "aa-manifest.json"), "utf8")); const snapshot = aaFromArtifacts(JSON.parse(await readFile(path.join(item.root, "models", manifest.models[0].file), "utf8"))); assert.equal(snapshot.scores.intelligence, 72); assert.equal(snapshot.toolUse.components.tau3Banking.sourceKind, "public-page");
+  const conflictItem = await fixture(); const conflictPage = publicPage(); conflictPage.record.intelligenceIndex = 73; const conflicting = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => catalog(), fetchPublicModel: async () => conflictPage }); await assert.rejects(conflicting.add("runtime/model", ID1, null, undefined, conflictItem.env), /API\/public metric conflict: intelligenceIndex/); await assert.rejects(readFile(path.join(conflictItem.root, "aa-manifest.json")), /ENOENT/);
 });
 
 test("refresh-all performs only a strict mapping-only v3 migration and preserves its disabled baseline", { concurrency: false }, async () => {
   const item = await fixture();
   await secureWrite(item.env.PI_AA_CANONICAL_MAPPINGS!, { version: 1, mappings: [{ provider: "legacy", model: "model", canonicalId: "legacy/model", thinkingLevel: null, aaModelId: ID1 }] });
-  await secureWrite(path.join(item.root, "manifest.json"), { version: 3, models: [{ provider: "legacy", model: "model", thinkingLevel: null, aaModelId: ID1, file: "legacy.json", capturedAt: 1, contentDigest: HASH }] });
+  await secureWrite(path.join(item.root, "aa-manifest.json"), { version: 3, models: [{ provider: "legacy", model: "model", thinkingLevel: null, aaModelId: ID1, file: "legacy.json", capturedAt: 1, contentDigest: HASH }] });
   const service = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() }); const result = await service.refreshAll(undefined, item.env); assert.equal(result.changed, true);
-  const manifest = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8")); assert.equal(manifest.version, 4); assert.equal(manifest.models[0].provider, "legacy"); assert.equal(manifest.models[0].modelId, ID1); await service.check(item.env);
-  await secureWrite(path.join(item.root, "manifest.json"), { version: 3, models: [], extra: true }); await assert.rejects(service.refreshAll(undefined, item.env), /invalid or unsupported manifest/);
+  const manifest = JSON.parse(await readFile(path.join(item.root, "aa-manifest.json"), "utf8")); assert.equal(manifest.version, 4); assert.equal(manifest.models[0].provider, "legacy"); assert.equal(manifest.models[0].modelId, ID1); await service.check(item.env);
+  await secureWrite(path.join(item.root, "aa-manifest.json"), { version: 3, models: [], extra: true }); await assert.rejects(service.refreshAll(undefined, item.env), /invalid or unsupported manifest/);
 });
 
 test("methodology mismatch errors name the local pin and the upstream or artifacts version", { concurrency: false }, async () => {
@@ -292,15 +342,15 @@ test("methodology mismatch errors name the local pin and the upstream or artifac
   try {
     globalThis.fetch = async () => new Response(JSON.stringify({ intelligence_index_version: "9.9", pagination: { has_more: false }, data: [] }));
     const config = { ...baseConfig({}), apiKey: "secret" };
-    await assert.rejects(fetchCatalog(config), /Intelligence Index methodology changed: local pin 4\.3, upstream 9\.9/);
+    await assert.rejects(fetchCatalog(config), new RegExp(`Intelligence Index methodology changed: local pin ${METHODOLOGY.version.replace(".", "\\.")}, upstream 9\\.9`));
     const frame = `<script>self.__next_f.push(${JSON.stringify([1, JSON.stringify({ methodology: "Intelligence Index v9.9.9", currentModel: { id: ID1, slug: "synthetic-model", name: "Synthetic Model" } })])})</script>`;
     globalThis.fetch = async () => new Response(frame);
-    await assert.rejects(fetchPublicModel(baseConfig({ PI_AA_PUBLIC_PAGE_DELAY: "0" }), "synthetic-model"), /public Intelligence Index methodology changed: local pin 4\.3\.2, upstream 9\.9\.9/);
+    await assert.rejects(fetchPublicModel(baseConfig({ PI_AA_PUBLIC_PAGE_DELAY: "0" }), "synthetic-model"), new RegExp(`public Intelligence Index methodology changed: local pin ${PUBLIC_METHODOLOGY_VERSION.replace(".", "\\.")}, upstream 9\\.9\\.9`));
   } finally { globalThis.fetch = original; }
   const item = await fixture();
-  await secureWrite(path.join(item.root, "manifest.json"), legacyManifest([{ provider: "runtime", model: "model", thinkingLevel: null, aaModelId: ID1 }]));
+  await secureWrite(path.join(item.root, "aa-manifest.json"), legacyManifest([{ provider: "runtime", model: "model", thinkingLevel: null, aaModelId: ID1 }]));
   const service = createAaService({ fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() });
-  await assert.rejects(service.check(item.env), /Intelligence Index methodology changed: local pin 4\.3, artifacts pin 4\.1/);
+  await assert.rejects(service.check(item.env), new RegExp(`Intelligence Index methodology changed: local pin ${METHODOLOGY.version.replace(".", "\\.")}, artifacts pin 4\\.1`));
   await assert.rejects(service.check(item.env), /republish with --refresh-all or \/catalog sync/);
 });
 
@@ -311,22 +361,22 @@ test("legacy-methodology manifests republish wholesale and preserve the mapping 
   const service = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => two, fetchPublicModel: async (_config, slug) => {
     const second = slug === secondRecord.slug; const page = publicPage(second ? ID2 : ID1); page.record.slug = slug; page.record.name = second ? secondRecord.name : "Synthetic Model"; page.provenance.url = `https://artificialanalysis.ai/models/${slug}`; return page;
   } });
-  await secureWrite(path.join(item.root, "manifest.json"), legacyManifest([{ provider: "legacy", model: "model", thinkingLevel: null, aaModelId: ID1 }]));
+  await secureWrite(path.join(item.root, "aa-manifest.json"), legacyManifest([{ provider: "legacy", model: "model", thinkingLevel: null, aaModelId: ID1 }]));
   assert.equal((await service.refreshAll(undefined, item.env)).changed, true);
-  let manifest = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8")); assert.equal(manifest.methodology.version, METHODOLOGY.version); assert.deepEqual(manifest.models.map((entry: any) => [entry.provider, entry.model, entry.modelId]), [["legacy", "model", ID1]]); await service.check(item.env);
-  await secureWrite(path.join(item.root, "manifest.json"), legacyManifest([{ provider: "legacy", model: "model", thinkingLevel: null, aaModelId: ID1 }]));
+  let manifest = JSON.parse(await readFile(path.join(item.root, "aa-manifest.json"), "utf8")); assert.equal(manifest.methodology.version, METHODOLOGY.version); assert.deepEqual(manifest.models.map((entry: any) => [entry.provider, entry.model, entry.modelId]), [["legacy", "model", ID1]]); await service.check(item.env);
+  await secureWrite(path.join(item.root, "aa-manifest.json"), legacyManifest([{ provider: "legacy", model: "model", thinkingLevel: null, aaModelId: ID1 }]));
   assert.equal((await service.add("runtime/model", ID2, null, undefined, item.env)).changed, true);
-  manifest = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8")); assert.deepEqual(manifest.models.map((entry: any) => [entry.provider, entry.model, entry.modelId]).sort(), [["legacy", "model", ID1], ["runtime", "model", ID2]].sort()); await service.check(item.env);
-  await secureWrite(path.join(item.root, "manifest.json"), legacyManifest([{ provider: "legacy", model: "model", thinkingLevel: null, aaModelId: ID1 }, { provider: "runtime", model: "model", thinkingLevel: null, aaModelId: ID2 }]));
+  manifest = JSON.parse(await readFile(path.join(item.root, "aa-manifest.json"), "utf8")); assert.deepEqual(manifest.models.map((entry: any) => [entry.provider, entry.model, entry.modelId]).sort(), [["legacy", "model", ID1], ["runtime", "model", ID2]].sort()); await service.check(item.env);
+  await secureWrite(path.join(item.root, "aa-manifest.json"), legacyManifest([{ provider: "legacy", model: "model", thinkingLevel: null, aaModelId: ID1 }, { provider: "runtime", model: "model", thinkingLevel: null, aaModelId: ID2 }]));
   assert.equal((await service.refresh("legacy/model", undefined, item.env)).changed, true);
-  manifest = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8")); assert.deepEqual(manifest.models.map((entry: any) => [entry.provider, entry.model, entry.modelId]).sort(), [["legacy", "model", ID1], ["runtime", "model", ID2]].sort()); await service.check(item.env);
-  const corrupt = legacyManifest([{ provider: "legacy", model: "model", thinkingLevel: null, aaModelId: ID1 }]); corrupt.digest = "b".repeat(64); await secureWrite(path.join(item.root, "manifest.json"), corrupt);
+  manifest = JSON.parse(await readFile(path.join(item.root, "aa-manifest.json"), "utf8")); assert.deepEqual(manifest.models.map((entry: any) => [entry.provider, entry.model, entry.modelId]).sort(), [["legacy", "model", ID1], ["runtime", "model", ID2]].sort()); await service.check(item.env);
+  const corrupt = legacyManifest([{ provider: "legacy", model: "model", thinkingLevel: null, aaModelId: ID1 }]); corrupt.digest = "b".repeat(64); await secureWrite(path.join(item.root, "aa-manifest.json"), corrupt);
   await assert.rejects(service.refreshAll(undefined, item.env), /invalid or unsupported manifest/);
 });
 
 test("missing treats only secure, current, digest-verified complete artifacts as present", { concurrency: false }, async () => {
   const item = await fixture(); const now = 1_700_000_001_000; const service = createAaService({ now: () => now, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() }); await service.add("runtime/model", ID1, null, undefined, item.env); assert.deepEqual(await service.missing(item.env), []);
-  const manifestPath = path.join(item.root, "manifest.json"); const manifest = JSON.parse(await readFile(manifestPath, "utf8")); const snapshotPath = path.join(item.root, "models", manifest.models[0].file); const snapshot = JSON.parse(await readFile(snapshotPath, "utf8"));
+  const manifestPath = path.join(item.root, "aa-manifest.json"); const manifest = JSON.parse(await readFile(manifestPath, "utf8")); const snapshotPath = path.join(item.root, "models", manifest.models[0].file); const snapshot = aaFromArtifacts(JSON.parse(await readFile(snapshotPath, "utf8")));
   await secureWrite(manifestPath, { ...manifest, digest: "b".repeat(64) }); assert.deepEqual(await service.missing(item.env), ["runtime/model"]); await secureWrite(manifestPath, manifest);
   await secureWrite(snapshotPath, { ...snapshot, scores: { ...snapshot.scores, coding: 74 } }); assert.equal(validateSnapshot(JSON.parse(await readFile(snapshotPath, "utf8"))), true); assert.deepEqual(await service.missing(item.env), ["runtime/model"]); await secureWrite(snapshotPath, snapshot);
   await chmod(manifestPath, 0o644); assert.deepEqual(await service.missing(item.env), ["runtime/model"]); await chmod(manifestPath, 0o600);
@@ -340,21 +390,21 @@ test("simultaneous writers serialize at the real lock boundary", { concurrency: 
 });
 
 test("readers keep the prior manifest generation while new immutable snapshots are staged", { concurrency: false }, async () => {
-  const item = await fixture(); let now = 1_700_000_001_000; const initial = createAaService({ now: () => now++, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() }); await initial.add("runtime/model", ID1, null, undefined, item.env); const priorManifest = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8")); const priorSnapshotPath = path.join(item.root, "models", priorManifest.models[0].file);
+  const item = await fixture(); let now = 1_700_000_001_000; const initial = createAaService({ now: () => now++, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() }); await initial.add("runtime/model", ID1, null, undefined, item.env); const priorManifest = JSON.parse(await readFile(path.join(item.root, "aa-manifest.json"), "utf8")); const priorSnapshotPath = path.join(item.root, "models", priorManifest.models[0].file);
   let release!: () => void; let started!: () => void; const entered = new Promise<void>((resolve) => { started = resolve; }); const gate = new Promise<void>((resolve) => { release = resolve; });
-  const update = createAaService({ now: () => now++, fetchCatalog: async () => catalog(ID2), fetchPublicModel: async () => publicPage(ID2), fsHooks: { async beforeManifestRename() { started(); await gate; } } }); const pending = update.add("runtime/model", ID2, null, undefined, item.env); await entered;
+  const update = createAaService({ now: () => now++, fetchCatalog: async () => catalogBoth(), fetchPublicModel: async (...args: any[]) => publicPage((args[3] as any)?.id ?? ID2), fsHooks: { async beforeManifestRename() { started(); await gate; } } }); const pending = update.add("runtime/model", ID2, null, undefined, item.env); await entered;
   try { const active = await loadBenchmarkAssets(item.root, 2_592_000_000, now); assert.equal(active?.snapshots[0]?.modelId, ID1); } finally { release(); }
-  await pending; const current = await loadBenchmarkAssets(item.root, 2_592_000_000, now); assert.equal(current?.snapshots[0]?.modelId, ID2); assert.equal(validateSnapshot(JSON.parse(await readFile(priorSnapshotPath, "utf8"))), true);
+  await pending; const current = await loadBenchmarkAssets(item.root, 2_592_000_000, now); assert.equal(current?.snapshots[0]?.modelId, ID2); assert.equal(validateSnapshot(aaFromArtifacts(JSON.parse(await readFile(priorSnapshotPath, "utf8")))), true);
 });
 
 test("service readers retry only after a missing snapshot and a changed manifest", { concurrency: false }, async () => {
-  const item = await fixture(); let now = 1_700_000_001_000;
+  const item = await fixture(); let now = 1_700_000_001_000; await secureWrite(item.env.PI_AA_SETTINGS_CONFIG!, { enabledModels: ["runtime/model", "companion/companion-model"] }); 
   const initial = createAaService({ now: () => now++, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() });
   await initial.add("runtime/model", ID1, null, undefined, item.env);
-  const manifestPath = path.join(item.root, "manifest.json"); const oldManifest = await readFile(manifestPath, "utf8"); const oldFile = JSON.parse(oldManifest).models[0].file;
-  const updated = createAaService({ now: () => now++, fetchCatalog: async () => catalog(ID2), fetchPublicModel: async () => publicPage(ID2) });
-  await updated.add("runtime/model", ID2, null, undefined, item.env);
-  const nextManifest = await readFile(manifestPath, "utf8");
+  const manifestPath = path.join(item.root, "aa-manifest.json"); const oldManifest = await readFile(manifestPath, "utf8"); const oldFile = JSON.parse(oldManifest).models[0].file;
+  const updated = createAaService({ now: () => now++, fetchCatalog: async () => catalogBoth(), fetchPublicModel: async (...args: any[]) => publicPage((args[3] as any)?.id ?? ID2) });
+  await updated.replaceReviewedVariants("companion/companion-model", "companion/companion-model", [{ aaModelId: ID2, slug: "synthetic-model", name: "Synthetic Model", thinkingLevel: null }], undefined, item.env);
+await secureWrite(item.env.PI_AA_SETTINGS_CONFIG!, { enabledModels: ["companion/companion-model"] }); await updated.enforceScope(undefined, item.env);   const nextManifest = await readFile(manifestPath, "utf8");
   await writeFile(manifestPath, oldManifest, { mode: 0o600 }); await chmod(manifestPath, 0o600);
   let switched = false; let snapshotReads = 0;
   const reader = createAaService({ now: () => now, fsHooks: { async beforeSnapshotRead() {
@@ -369,55 +419,55 @@ test("service readers retry only after a missing snapshot and a changed manifest
 
   const unchanged = await fixture(); const unchangedService = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() });
   await unchangedService.add("runtime/model", ID1, null, undefined, unchanged.env);
-  const unchangedManifest = JSON.parse(await readFile(path.join(unchanged.root, "manifest.json"), "utf8")); await rm(path.join(unchanged.root, "models", unchangedManifest.models[0].file));
+  const unchangedManifest = JSON.parse(await readFile(path.join(unchanged.root, "aa-manifest.json"), "utf8")); await rm(path.join(unchanged.root, "models", unchangedManifest.models[0].file));
   await assert.rejects(unchangedService.check(unchanged.env), /missing required file/);
 });
 
 test("service snapshot-read hooks do not recover malformed or unsafe artifacts", { concurrency: false }, async () => {
   const malformed = await fixture(); const normal = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() });
-  await normal.add("runtime/model", ID1, null, undefined, malformed.env); await writeFile(path.join(malformed.root, "manifest.json"), "{", { mode: 0o600 });
+  await normal.add("runtime/model", ID1, null, undefined, malformed.env); await writeFile(path.join(malformed.root, "aa-manifest.json"), "{", { mode: 0o600 });
   let malformedReads = 0; const malformedReader = createAaService({ now: () => 1_700_000_001_000, fsHooks: { beforeSnapshotRead() { malformedReads++; } } });
   await assert.rejects(malformedReader.check(malformed.env), /invalid JSON/); assert.equal(malformedReads, 0);
 
   const unsafe = await fixture(); await normal.add("runtime/model", ID1, null, undefined, unsafe.env);
-  const unsafeManifest = JSON.parse(await readFile(path.join(unsafe.root, "manifest.json"), "utf8")); await chmod(path.join(unsafe.root, "models", unsafeManifest.models[0].file), 0o644);
+  const unsafeManifest = JSON.parse(await readFile(path.join(unsafe.root, "aa-manifest.json"), "utf8")); await chmod(path.join(unsafe.root, "models", unsafeManifest.models[0].file), 0o644);
   let unsafeReads = 0; const unsafeReader = createAaService({ now: () => 1_700_000_001_000, fsHooks: { beforeSnapshotRead() { unsafeReads++; } } });
   await assert.rejects(unsafeReader.check(unsafe.env), /unsafe permissions/); assert.equal(unsafeReads, 0);
 });
 
 test("writers reject manifest entries that disagree with their referenced snapshots", { concurrency: false }, async () => {
   const item = await fixture(); const service = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() }); await service.add("runtime/model", ID1, null, undefined, item.env);
-  const manifestPath = path.join(item.root, "manifest.json"); const manifest = JSON.parse(await readFile(manifestPath, "utf8")); manifest.models[0].provider = "other"; manifest.digest = canonicalDigest(manifest.models); await secureWrite(manifestPath, manifest);
+  const manifestPath = path.join(item.root, "aa-manifest.json"); const manifest = JSON.parse(await readFile(manifestPath, "utf8")); manifest.models[0].provider = "other"; manifest.digest = canonicalDigest(manifest.models); await secureWrite(manifestPath, manifest);
   await assert.rejects(service.add("runtime/model", ID1, null, undefined, item.env), /invalid snapshot/);
 });
 
 test("canonical mappings must match snapshot identity, UUID, and thinking level", { concurrency: false }, async () => {
   const item = await fixture(); const service = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() }); await service.add("runtime/model", ID1, null, undefined, item.env);
-  const mappingsPath = path.join(item.root, "canonical-mappings.json");
+  const mappingsPath = path.join(item.root, "aa-canonical-mappings.json");
   await secureWrite(mappingsPath, { version: 1, mappings: [{ provider: "alias", model: "model", canonicalId: "canonical/model", thinkingLevel: null, aaModelId: ID1 }] }); await assert.rejects(service.check(item.env), /mismatched AA snapshot/); await assert.rejects(service.add("runtime/model", ID1, null, undefined, item.env), /mismatched AA snapshot/);
   await secureWrite(mappingsPath, { version: 1, mappings: [{ provider: "runtime", model: "model", canonicalId: "runtime/model", thinkingLevel: "high", aaModelId: ID1 }] }); await assert.rejects(service.check(item.env), /mismatched AA snapshot/);
 });
 
 test("alias-aware reviewed publication has one manifest commit point and preserves static mappings", { concurrency: false }, async () => {
   const item = await fixture(); let now = 1_700_000_001_000; const normal = createAaService({ now: () => now++, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() }); await normal.add("runtime/model", ID1, null, undefined, item.env);
-  await secureWrite(path.join(item.root, "canonical-mappings.json"), { version: 1, mappings: [{ provider: "runtime", model: "model", canonicalId: "canonical/model", thinkingLevel: null, aaModelId: ID1 }] }); const before = await readFile(path.join(item.root, "manifest.json"), "utf8"); const mappingsBefore = await readFile(path.join(item.root, "canonical-mappings.json"), "utf8");
-  const failing = createAaService({ now: () => now++, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage(), fsHooks: { beforeManifestRename() { throw new Error("injected manifest failure"); } } }); await assert.rejects(failing.replaceReviewedVariants("runtime/model", "canonical/model", [{ aaModelId: ID1, slug: "synthetic-model", name: "Synthetic Model", thinkingLevel: null }], undefined, item.env), /injected manifest failure/); assert.equal(await readFile(path.join(item.root, "manifest.json"), "utf8"), before); assert.equal(await readFile(path.join(item.root, "canonical-mappings.json"), "utf8"), mappingsBefore); assert.equal((await readdir(path.join(item.root, "models"))).filter((file) => file.endsWith(".json")).length, 1);
-  const replaced = createAaService({ now: () => now++, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() }); await replaced.replaceReviewedVariants("runtime/model", "canonical/model", [{ aaModelId: ID1, slug: "synthetic-model", name: "Synthetic Model", thinkingLevel: null }], undefined, item.env); const manifest = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8")); assert.deepEqual(manifest.models.map((entry: any) => `${entry.provider}/${entry.model}`), ["canonical/model"]); assert.equal(manifest.models[0].modelId, ID1);
-  assert.equal(await readFile(path.join(item.root, "canonical-mappings.json"), "utf8"), mappingsBefore); await replaced.check(item.env); const runtimeConfig = await loadRuntimeConfig(item.env); assert.equal(canonicalIdentity(runtimeConfig, "runtime/model"), "canonical/model");
-  const unsafeReplacement = createAaService({ now: () => now++, fetchCatalog: async () => catalog(ID2), fetchPublicModel: async () => publicPage(ID2) }); await assert.rejects(unsafeReplacement.replaceReviewedVariants("runtime/model", "canonical/model", [{ aaModelId: ID2, slug: "synthetic-model", name: "Synthetic Model", thinkingLevel: null }], undefined, item.env), /canonical mapping references a mismatched AA snapshot/); assert.equal(await readFile(path.join(item.root, "canonical-mappings.json"), "utf8"), mappingsBefore);
+  await secureWrite(path.join(item.root, "aa-canonical-mappings.json"), { version: 1, mappings: [{ provider: "runtime", model: "model", canonicalId: "canonical/model", thinkingLevel: null, aaModelId: ID1 }] }); const before = await readFile(path.join(item.root, "aa-manifest.json"), "utf8"); const mappingsBefore = await readFile(path.join(item.root, "aa-canonical-mappings.json"), "utf8");
+  const failing = createAaService({ now: () => now++, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage(), fsHooks: { beforeManifestRename() { throw new Error("injected manifest failure"); } } }); await assert.rejects(failing.replaceReviewedVariants("runtime/model", "canonical/model", [{ aaModelId: ID1, slug: "synthetic-model", name: "Synthetic Model", thinkingLevel: null }], undefined, item.env), /injected manifest failure/); assert.equal(await readFile(path.join(item.root, "aa-manifest.json"), "utf8"), before); assert.equal(await readFile(path.join(item.root, "aa-canonical-mappings.json"), "utf8"), mappingsBefore); assert.equal((await readdir(path.join(item.root, "models"))).filter((file) => file.endsWith(".json")).length, 1);
+  const replaced = createAaService({ now: () => now++, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() }); await replaced.replaceReviewedVariants("runtime/model", "canonical/model", [{ aaModelId: ID1, slug: "synthetic-model", name: "Synthetic Model", thinkingLevel: null }], undefined, item.env); const manifest = JSON.parse(await readFile(path.join(item.root, "aa-manifest.json"), "utf8")); assert.deepEqual(manifest.models.map((entry: any) => `${entry.provider}/${entry.model}`), ["canonical/model"]); assert.equal(manifest.models[0].modelId, ID1);
+  assert.equal(await readFile(path.join(item.root, "aa-canonical-mappings.json"), "utf8"), mappingsBefore); await replaced.check(item.env); const runtimeConfig = await loadRuntimeConfig(item.env); assert.equal(canonicalIdentity(runtimeConfig, "runtime/model"), "canonical/model");
+  const unsafeReplacement = createAaService({ now: () => now++, fetchCatalog: async () => catalogBoth(), fetchPublicModel: async (...args: any[]) => publicPage((args[3] as any)?.id ?? ID2) }); await assert.rejects(unsafeReplacement.replaceReviewedVariants("runtime/model", "canonical/model", [{ aaModelId: ID2, slug: "synthetic-model", name: "Synthetic Model", thinkingLevel: null }], undefined, item.env), /canonical mapping references a mismatched AA snapshot/); assert.equal(await readFile(path.join(item.root, "aa-canonical-mappings.json"), "utf8"), mappingsBefore);
 });
 
 test("an existing filename collision is never overwritten", { concurrency: false }, async () => {
-  const item = await fixture(); const service = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage(), fsHooks: { async beforeInstall(file) { await secureWrite(path.join(item.root, "models", file), { collision: true }); } } }); await assert.rejects(service.add("runtime/model", ID1, null, undefined, item.env), /snapshot filename collision|invalid JSON/); await assert.rejects(readFile(path.join(item.root, "manifest.json")), /ENOENT/); const files = (await readdir(path.join(item.root, "models"))).filter((file) => file.endsWith(".json")); assert.equal(files.length, 1); assert.deepEqual(JSON.parse(await readFile(path.join(item.root, "models", files[0]!), "utf8")), { collision: true });
+  const item = await fixture(); const service = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage(), fsHooks: { async beforeInstall(file) { await secureWrite(path.join(item.root, "models", file), { collision: true }); } } }); await assert.rejects(service.add("runtime/model", ID1, null, undefined, item.env), /snapshot filename collision|invalid JSON/); await assert.rejects(readFile(path.join(item.root, "aa-manifest.json")), /ENOENT/); const files = (await readdir(path.join(item.root, "models"))).filter((file) => file.endsWith(".json")); assert.equal(files.length, 1); assert.deepEqual(JSON.parse(await readFile(path.join(item.root, "models", files[0]!), "utf8")), { collision: true });
 });
 
 test("snapshot installation injection fails before commit without leaving artifacts", { concurrency: false }, async () => {
-  const item = await fixture(); const service = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage(), fsHooks: { beforeInstall() { throw new Error("injected install failure"); } } }); await assert.rejects(service.add("runtime/model", ID1, null, undefined, item.env), /injected install failure/); assert.deepEqual((await readdir(path.join(item.root, "models"))).filter((file) => file.endsWith(".json")), []); await assert.rejects(readFile(path.join(item.root, "manifest.json")), /ENOENT/);
+  const item = await fixture(); const service = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage(), fsHooks: { beforeInstall() { throw new Error("injected install failure"); } } }); await assert.rejects(service.add("runtime/model", ID1, null, undefined, item.env), /injected install failure/); assert.deepEqual((await readdir(path.join(item.root, "models"))).filter((file) => file.endsWith(".json")), []); await assert.rejects(readFile(path.join(item.root, "aa-manifest.json")), /ENOENT/);
 });
 
 test("post-commit pruning failures are warnings and never undo publication", { concurrency: false }, async () => {
   const item = await fixture(); let now = 1_700_000_001_000; const normal = createAaService({ now: () => now++, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() }); await normal.add("runtime/model", ID1, null, undefined, item.env); await secureWrite(path.join(item.root, "models", "orphan.json"), { orphan: true }); await utimes(path.join(item.root, "models", "orphan.json"), new Date(0), new Date(0));
-  const cleanupFailure = createAaService({ now: () => now++, fetchCatalog: async () => catalog(ID2), fetchPublicModel: async () => publicPage(ID2), fsHooks: { beforePrune() { throw new Error("injected cleanup failure"); } } }); const result = await cleanupFailure.add("runtime/model", ID2, null, undefined, item.env); assert.equal(result.changed, true); assert.deepEqual(result.warnings, ["snapshot cleanup was incomplete after successful publication"]); const manifest = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8")); assert.equal(manifest.models[0].modelId, ID2); assert.equal((await lstat(path.join(item.root, "models", "orphan.json"))).isFile(), true);
+  const cleanupFailure = createAaService({ now: () => now++, fetchCatalog: async () => catalogBoth(), fetchPublicModel: async (...args: any[]) => publicPage((args[3] as any)?.id ?? ID2), fsHooks: { beforePrune() { throw new Error("injected cleanup failure"); } } }); const result = await cleanupFailure.add("runtime/model", ID2, null, undefined, item.env); assert.equal(result.changed, true); assert.deepEqual(result.warnings, ["snapshot cleanup was incomplete after successful publication"]); const manifest = JSON.parse(await readFile(path.join(item.root, "aa-manifest.json"), "utf8")); assert.equal(manifest.models[0].modelId, ID2); assert.equal((await lstat(path.join(item.root, "models", "orphan.json"))).isFile(), true);
 });
 
 test("lock contention and verified native effort capability gate specific variants", { concurrency: false }, async () => {
@@ -428,37 +478,37 @@ test("lock contention and verified native effort capability gate specific varian
 });
 
 test("interactive publications defer pruning and final cleanup reports only secure generated deletions", { concurrency: false }, async () => {
-  const item = await fixture(); let now = 1_700_000_001_000;
+  const item = await fixture(); let now = 1_700_000_001_000; await secureWrite(item.env.PI_AA_SETTINGS_CONFIG!, { enabledModels: ["runtime/model", "companion/companion-model"] }); 
   const initial = createAaService({ now: () => now++, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() });
   await initial.add("runtime/model", ID1, null, undefined, item.env);
   const before = await initial.captureArtifactState(item.env); const old = before.manifestSnapshotFiles[0]!;
   const orphan = "aaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb.json"; await secureWrite(path.join(item.root, "models", orphan), { orphan: true }); await utimes(path.join(item.root, "models", orphan), new Date(0), new Date(0));
-  const updated = createAaService({ now: () => now++, fetchCatalog: async () => catalog(ID2), fetchPublicModel: async () => publicPage(ID2) });
-  const publication = await updated.replaceReviewedVariants("runtime/model", "runtime/model", [{ aaModelId: ID2, slug: "synthetic-model", name: "Synthetic Model", thinkingLevel: null }], undefined, item.env, undefined, { prune: false });
-  assert.equal(publication.changed, true); assert.equal((await readdir(path.join(item.root, "models"))).includes(old), true); assert.equal((await readdir(path.join(item.root, "models"))).includes(orphan), true);
+  const updated = createAaService({ now: () => now++, fetchCatalog: async () => catalogBoth(), fetchPublicModel: async (...args: any[]) => publicPage((args[3] as any)?.id ?? ID2) });
+  const publication = await updated.replaceReviewedVariants("companion/companion-model", "companion/companion-model", [{ aaModelId: ID2, slug: "synthetic-model", name: "Synthetic Model", thinkingLevel: null }], undefined, item.env, undefined, { prune: false });
+await secureWrite(item.env.PI_AA_SETTINGS_CONFIG!, { enabledModels: ["companion/companion-model"] }); await updated.enforceScope(undefined, item.env);   assert.equal(publication.changed, true); assert.equal((await readdir(path.join(item.root, "models"))).includes(old), true); assert.equal((await readdir(path.join(item.root, "models"))).includes(orphan), true);
   await secureWrite(path.join(item.root, "models", "unexpected.json"), { preserved: true });
   const cleanup = await updated.cleanupObsoleteSnapshots(undefined, item.env);
   assert.deepEqual(cleanup.deleted, [`models/${old}`, `models/${orphan}`].sort()); assert.deepEqual(cleanup.warnings, ["snapshot cleanup skipped an unexpected file"]);
   assert.equal((await readdir(path.join(item.root, "models"))).includes(old), false);
   const after = await updated.captureArtifactState(item.env);
   assert.equal(after.snapshotRoot, path.resolve(item.root));
-  assert.equal(after.manifest?.path, "manifest.json");
-  assert.equal(after.manifest?.targetPath, path.join(item.root, "manifest.json"));
+  assert.equal(after.manifest?.path, "aa-manifest.json");
+  assert.equal(after.manifest?.targetPath, path.join(item.root, "aa-manifest.json"));
   assert.equal(after.generatedSnapshotFiles.length, 1);
 });
 
 test("standalone final cleanup warns on deletion failure without changing the current manifest", { concurrency: false }, async () => {
-  const item = await fixture(); let now = 1_700_000_001_000;
+  const item = await fixture(); let now = 1_700_000_001_000; await secureWrite(item.env.PI_AA_SETTINGS_CONFIG!, { enabledModels: ["runtime/model", "companion/companion-model"] }); 
   const initial = createAaService({ now: () => now++, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() });
   await initial.add("runtime/model", ID1, null, undefined, item.env);
-  const old = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8")).models[0].file;
-  const updated = createAaService({ now: () => now++, fetchCatalog: async () => catalog(ID2), fetchPublicModel: async () => publicPage(ID2) });
-  await updated.add("runtime/model", ID2, null, undefined, item.env);
-  const failingCleanup = createAaService({ fsHooks: { beforePrune() { throw new Error("injected cleanup failure"); } } });
+  const old = JSON.parse(await readFile(path.join(item.root, "aa-manifest.json"), "utf8")).models[0].file;
+  const updated = createAaService({ now: () => now++, fetchCatalog: async () => catalogBoth(), fetchPublicModel: async (...args: any[]) => publicPage((args[3] as any)?.id ?? ID2) });
+  await updated.replaceReviewedVariants("companion/companion-model", "companion/companion-model", [{ aaModelId: ID2, slug: "synthetic-model", name: "Synthetic Model", thinkingLevel: null }], undefined, item.env);
+await secureWrite(item.env.PI_AA_SETTINGS_CONFIG!, { enabledModels: ["companion/companion-model"] }); await updated.enforceScope(undefined, item.env);   const failingCleanup = createAaService({ fsHooks: { beforePrune() { throw new Error("injected cleanup failure"); } } });
   const cleanup = await failingCleanup.cleanupObsoleteSnapshots(undefined, item.env);
   assert.deepEqual(cleanup, { deleted: [], warnings: ["snapshot cleanup was incomplete after successful publication"] });
   assert.equal((await lstat(path.join(item.root, "models", old))).isFile(), true);
-  assert.equal(JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8")).models[0].modelId, ID2);
+  assert.equal(JSON.parse(await readFile(path.join(item.root, "aa-manifest.json"), "utf8")).models[0].modelId, ID2);
 });
 
 test("native thinking maps infer effort support only when valid and not explicitly overridden", { concurrency: false }, async () => {
@@ -501,7 +551,7 @@ test("an existing specific native mapping with a provider thinking map does not 
 
 test("enforceScope drops out-of-scope manifest entries and canonical rows without touching retained snapshots", { concurrency: false }, async () => {
   const item = await fixture();
-  await secureWrite(item.env.PI_AA_SETTINGS_CONFIG!, { enabledModels: ["runtime/model", "other/model"] });
+  await secureWrite(item.env.PI_AA_SETTINGS_CONFIG!, { enabledModels: ["runtime/model", "other/scoped-model"] });
   await secureWrite(item.env.PI_AA_MODELS_CONFIG!, { providers: { runtime: { compat: { supportsReasoningEffort: true } }, other: { compat: { supportsReasoningEffort: true } } } });
   const service = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async (config) => ({ records: [
     { id: ID1, name: "Synthetic Model", slug: "synthetic-model", openrouter_api_id: "model" },
@@ -511,16 +561,16 @@ test("enforceScope drops out-of-scope manifest entries and canonical rows withou
   } });
   assert.equal((await service.replaceBatch([
     { provider: "runtime", model: "model", thinkingLevel: null, aaModelId: ID1 },
-    { provider: "other", model: "model", thinkingLevel: "low", aaModelId: ID2 },
+    { provider: "other", model: "scoped-model", thinkingLevel: "low", aaModelId: ID2 },
   ], undefined, item.env)).changed, true);
-  await secureWrite(item.env.PI_AA_CANONICAL_MAPPINGS!, { version: 1, mappings: [{ provider: "other", model: "model", canonicalId: "aa/scoped-model", thinkingLevel: "low", aaModelId: ID2 }] });
-  const before = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8"));
+  await secureWrite(item.env.PI_AA_CANONICAL_MAPPINGS!, { version: 1, mappings: [{ provider: "other", model: "scoped-model", canonicalId: "aa/scoped-model", thinkingLevel: "low", aaModelId: ID2 }] });
+  const before = JSON.parse(await readFile(path.join(item.root, "aa-manifest.json"), "utf8"));
   const retained = before.models.find((entry: any) => entry.provider === "runtime");
 
   await secureWrite(item.env.PI_AA_SETTINGS_CONFIG!, { enabledModels: ["runtime/model"] });
   const enforced = await service.enforceScope(undefined, item.env);
-  assert.deepEqual(enforced.removed, ["other/model (low)"]); assert.equal(enforced.changed, true);
-  const manifest = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8"));
+  assert.deepEqual(enforced.removed, ["other/scoped-model (low)"]); assert.equal(enforced.changed, true);
+  const manifest = JSON.parse(await readFile(path.join(item.root, "aa-manifest.json"), "utf8"));
   assert.deepEqual(manifest.models.map((entry: any) => `${entry.provider}/${entry.model}`), ["runtime/model"]);
   assert.deepEqual(manifest.models[0], retained);
   assert.deepEqual(JSON.parse(await readFile(item.env.PI_AA_CANONICAL_MAPPINGS!, "utf8")).mappings, []);
@@ -539,29 +589,30 @@ test("enforceScope keeps canonical-identity entries while the scoped runtime ena
   const service = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() });
   assert.equal((await service.replaceBatch([{ provider: "canonical", model: "model", thinkingLevel: null, aaModelId: ID1 }], undefined, item.env)).changed, true);
   assert.equal((await service.enforceScope(undefined, item.env)).changed, false);
-  const kept = JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8"));
+  const kept = JSON.parse(await readFile(path.join(item.root, "aa-manifest.json"), "utf8"));
   assert.deepEqual(kept.models.map((entry: any) => `${entry.provider}/${entry.model}`), ["canonical/model"]);
 
   await secureWrite(item.env.PI_AA_SETTINGS_CONFIG!, { enabledModels: [] });
   const enforced = await service.enforceScope(undefined, item.env);
   assert.deepEqual(enforced.removed, ["canonical/model (generic)"]); assert.equal(enforced.changed, true);
-  assert.deepEqual(JSON.parse(await readFile(path.join(item.root, "manifest.json"), "utf8")).models, []);
+  assert.deepEqual(JSON.parse(await readFile(path.join(item.root, "aa-manifest.json"), "utf8")).models, []);
   assert.deepEqual(JSON.parse(await readFile(item.env.PI_AA_CANONICAL_MAPPINGS!, "utf8")).mappings, []);
 });
 
 test("enforceScope fails closed on missing, corrupt, or legacy-pinned manifests and cleans its lock", { concurrency: false }, async () => {
   const item = await fixture(); const service = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() });
-  await assert.rejects(service.enforceScope(undefined, item.env), /missing required file: manifest\.json/);
-  await secureWrite(path.join(item.root, "manifest.json"), legacyManifest([{ provider: "legacy", model: "model", thinkingLevel: null, aaModelId: ID1 }]));
+  await assert.rejects(service.enforceScope(undefined, item.env), /missing required file: .*manifest\.json/);
+  await secureWrite(path.join(item.root, "aa-manifest.json"), legacyManifest([{ provider: "legacy", model: "model", thinkingLevel: null, aaModelId: ID1 }]));
   await assert.rejects(service.enforceScope(undefined, item.env), /methodology changed/);
-  await secureWrite(path.join(item.root, "manifest.json"), { version: 4, generatedAt: 1_700_000_001_000, digest: "0".repeat(64), methodology: { id: METHODOLOGY.id, version: METHODOLOGY.version }, models: [] });
+  await secureWrite(path.join(item.root, "aa-manifest.json"), { version: 4, generatedAt: 1_700_000_001_000, digest: "0".repeat(64), methodology: { id: METHODOLOGY.id, version: METHODOLOGY.version }, models: [] });
   await assert.rejects(service.enforceScope(undefined, item.env), /manifest digest mismatch/);
   assert.deepEqual((await readdir(item.root)).filter((entry) => entry.startsWith(".refresh.lock") || entry.startsWith(".staging-")), []);
 });
 
-function healthPage(id: string, slug: string, scores: Partial<Record<string, number | null>>) {
-  const values: Record<string, number | null> = { agenticIndex: 50, critpt: 40, gdpvalNormalized: 30, gpqa: 60, hle: 55, ifbench: 65, lcr: 50, omniscienceAccuracy: 40, omniscienceHallucinationRate: 20, tau2: 50, tau3Banking: 45, ...scores };
-  const record = { id, slug, name: `Model ${slug}`, methodology: `Intelligence Index v${PUBLIC_METHODOLOGY_VERSION}`, ...values };
+/** Page payloads use the key names the live extractor actually sees; a field omitted here is absent upstream. */
+function healthPage(id: string, slug: string, name: string, scores: Partial<Record<string, number | null>> = {}) {
+  const values: Record<string, number | null> = { critpt: 40, gpqa: 60, hle: 55, ifbench: 65, lcr: 50, omniscienceAccuracy: 40, omniscienceHallucinationRate: 20, tau2: 50, tauBanking: 45, automationBenchPartialScore: 50, terminalBench21: 60, terminalBench40: 30, ...scores };
+  const record = { id, slug, name, methodology: `Intelligence Index v${PUBLIC_METHODOLOGY_VERSION}`, ...values };
   return `<script>self.__next_f.push(${JSON.stringify([1, JSON.stringify({ methodology: `Intelligence Index v${PUBLIC_METHODOLOGY_VERSION}`, currentModel: record })])})</script>`;
 }
 
@@ -570,7 +621,7 @@ test("benchmark health detection samples dated releases, classifies fields, and 
   const service = createAaService();
   const day = 86_400_000; const newest = Date.UTC(2026, 8, 22);
   const iso = (days: number) => new Date(newest - days * day).toISOString().slice(0, 10);
-  const records = Array.from({ length: 20 }, (_, index) => ({ id: `${index.toString(16).padStart(8, "0")}-0000-4000-8000-000000000000`, name: `Model ${index}`, slug: `model-${index}`, release_date: iso(index * 4), evaluations: {} }));
+  const records = Array.from({ length: 20 }, (_, index) => ({ id: `${index.toString(16).padStart(8, "0")}-0000-4000-8000-000000000000`, name: `Model ${index}`, slug: `model-${index}`, release_date: iso(index * 4), evaluations: { artificial_analysis_agentic_index: 40, tau_banking: 45 } }));
   const original = globalThis.fetch;
   try {
     globalThis.fetch = async (input) => {
@@ -579,26 +630,42 @@ test("benchmark health detection samples dated releases, classifies fields, and 
       const slug = url.pathname.split("/").pop()!;
       if (slug === "model-1") return new Response("missing", { status: 404 });
       const index = Number(slug.replace("model-", ""));
-      // ifbench has no scores anywhere in the sample window; gpqa stays live everywhere; hle missing in the newest cohort only.
+      // No page in the window publishes agenticIndex or gdpvalNormalized. The Agentic Index stays live because the
+      // API scores it, gdpval-aa is retired because neither source carries it, IFBench keys are present but null
+      // (a release-scoped gap, not retirement), and hle is missing in the newest cohort only.
       const cohort = index <= 7;
-      return new Response(healthPage(records[index]!.id, slug, { ifbench: null, gpqa: 55, hle: cohort ? null : 50 }));
+      return new Response(healthPage(records[index]!.id, slug, records[index]!.name, { ifbench: null, gpqa: 55, hle: cohort ? null : 50 }));
     };
     const result = await service.detectBenchmarkHealth(undefined, item.env);
     assert.equal(result.changed, true);
     assert.ok(result.warnings.some((entry) => /unavailable model page/.test(entry)));
-    assert.equal(result.fields.ifbench.status, "retired");
-    assert.equal(result.fields.ifbench.scored, 0);
-    assert.equal(result.fields.ifbench.newestScoredRelease, null);
+    assert.equal(result.fields.agenticIndex.status, "active", "a metric the API still scores is not retired by a missing page key");
+    assert.equal(result.fields.agenticIndex.scored, 14);
+    assert.equal(result.fields.gdpvalNormalized.status, "retired");
+    assert.equal(result.fields.gdpvalNormalized.scored, 0);
+    assert.equal(result.fields.gdpvalNormalized.newestScoredRelease, null);
+    assert.equal(result.fields.ifbench.status, "lagging", "a published-but-null value is a gap, not a retirement");
     assert.equal(result.fields.gpqa.status, "active");
     assert.equal(result.fields.hle.status, "lagging");
+    assert.equal(result.fields.tau3Banking.status, "active", "tau-banking is published under a different page key than the watched field name");
+    assert.equal(result.fields.automationBench.status, "active");
     assert.equal(result.fields.tau3Banking.checked, 14);
     const artifact: any = JSON.parse(await readFile(path.join(item.root, "benchmark-health.json"), "utf8"));
     assert.equal(artifact.version, 1);
     assert.match(artifact.digest, /^[0-9a-f]{64}$/);
     assert.equal((await lstat(path.join(item.root, "benchmark-health.json"))).mode & 0o777, 0o600);
+    // A methodology pin move leaves the published artifact describing the previous generation. That must not
+    // make the next regeneration impossible, but a malformed or foreign artifact must stay a hard failure.
+    await secureWrite(path.join(item.root, "benchmark-health.json"), { ...artifact, methodology: { id: METHODOLOGY.id, version: "0.9" } });
+    const superseded = await service.detectBenchmarkHealth(undefined, item.env);
+    assert.equal(superseded.changed, true, "an artifact pinned to an older methodology generation is replaced, not defended");
+    assert.ok(superseded.warnings.some((entry) => /described Artificial Analysis 0\.9/.test(entry)), "the report names the generation it replaced");
+    assert.equal(JSON.parse(await readFile(path.join(item.root, "benchmark-health.json"), "utf8")).methodology.version, METHODOLOGY.version);
     const repeat = await service.detectBenchmarkHealth(undefined, item.env);
     assert.equal(repeat.changed, false);
-    assert.equal(repeat.fields.ifbench.status, "retired");
+    assert.equal(repeat.fields.gdpvalNormalized.status, "retired");
+    await secureWrite(path.join(item.root, "benchmark-health.json"), { version: 1, generatedAt: 1, digest: "not-a-digest", methodology: { id: "someone-else-index", version: METHODOLOGY.version }, fields: {} });
+    await assert.rejects(service.detectBenchmarkHealth(undefined, item.env), /invalid or unsupported benchmark-health\.json/);
   } finally { globalThis.fetch = original; }
 });
 
@@ -612,4 +679,54 @@ test("benchmark health detection fails closed without dated samples or a parseab
     globalThis.fetch = async () => new Response(JSON.stringify({ error: "API key is required" }), { status: 401 });
     await assert.rejects(service.detectBenchmarkHealth(undefined, item.env), /401/);
   } finally { globalThis.fetch = original; }
+});
+
+const identity = { id: ID1, slug: "synthetic-model", name: "Synthetic Model" };
+const scoredRecord = (overrides: Record<string, unknown> = {}) => ({ ...identity, contextWindowTokens: 200_000, inputModalityText: true, inputModalityImage: true, isReasoning: true, intelligenceIndex: 70, critpt: 0.3, ...overrides });
+
+test("identity-bound extraction reads a record the page no longer keys as currentModel", () => {
+  const inner = JSON.stringify({ methodology: `Intelligence Index v${PUBLIC_METHODOLOGY_VERSION}`, releases: [{ models: [scoredRecord()] }] });
+  const html = `<script>self.__next_f.push(${JSON.stringify([1, JSON.stringify(inner).slice(1, -1)])})</script>`;
+  assert.throws(() => extractCurrentModel(html), /exactly one currentModel record/, "an identity-free read must not guess which record is current");
+  assert.equal(extractCurrentModel(html, identity).critpt, 0.3);
+  assert.throws(() => extractCurrentModel(html, { ...identity, name: "Renamed Model" }), /does not contain the analysis record/, "a differing name is not the reviewed record");
+});
+
+test("identity-bound extraction fails closed on ambiguity and on a foreign methodology", { concurrency: false }, async () => {
+  const frame = (body: unknown, version = PUBLIC_METHODOLOGY_VERSION) => `<script>self.__next_f.push(${JSON.stringify([1, JSON.stringify({ methodology: `Intelligence Index v${version}`, models: body })])})</script>`;
+  assert.throws(() => extractCurrentModel(frame([scoredRecord(), scoredRecord({ contextWindowTokens: 400_000 })]), identity), /conflicting analysis records/);
+  const original = globalThis.fetch;
+  try {
+    const config = baseConfig({ PI_AA_PUBLIC_PAGE_DELAY: "0" });
+    globalThis.fetch = async () => new Response(frame([scoredRecord({ methodology: `Intelligence Index v${PUBLIC_METHODOLOGY_VERSION}` })]));
+    const recovered = await fetchPublicModel(config, "synthetic-model", undefined, identity);
+    assert.equal(recovered.record.id, ID1);
+    assert.equal(recovered.provenance.intelligenceIndexMethodologyVersion, PUBLIC_METHODOLOGY_VERSION);
+    globalThis.fetch = async () => new Response(frame([scoredRecord()], "9.9.9"));
+    await assert.rejects(fetchPublicModel(config, "synthetic-model", undefined, identity), /methodology changed/);
+  } finally { globalThis.fetch = original; }
+});
+
+test("publication records the reviewed capability evidence and omits it when unevidenced", { concurrency: false }, async () => {
+  const withCapabilities = () => { const page = publicPage(); return { ...page, record: { ...page.record, inputModalityText: true, inputModalityImage: true, isReasoning: true } }; };
+  const item = await fixture();
+  const service = createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => catalog(), fetchPublicModel: async () => withCapabilities() });
+  await service.add("runtime/model", ID1, null, undefined, item.env);
+  const published = await publishedSnapshot(item.root);
+  assert.equal(validateSnapshot(published), true);
+  assert.deepEqual(published.capabilities, { input: ["text", "image"], reasoning: true });
+
+  const plain = await fixture();
+  await createAaService({ now: () => 1_700_000_001_000, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() }).add("runtime/model", ID1, null, undefined, plain.env);
+  assert.equal("capabilities" in await publishedSnapshot(plain.root), false, "an unannotated page records no capability claim at all");
+});
+
+test("snapshot capability evidence accepts only declared pi modalities and reasoning support", async () => {
+  const base = await reviewedSnapshot();
+  for (const capabilities of [{ input: ["text", "image"], reasoning: true }, { reasoning: false }]) {
+    assert.equal(validateSnapshot({ ...base, capabilities }), true, `accepts ${JSON.stringify(capabilities)}`);
+  }
+  for (const capabilities of [{}, { input: [] }, { input: ["video"] }, { input: ["text", "text"] }, { reasoning: "yes" }, { input: ["text"], effort: "high" }, [], null]) {
+    assert.equal(validateSnapshot({ ...base, capabilities }), false, `rejects ${JSON.stringify(capabilities)}`);
+  }
 });

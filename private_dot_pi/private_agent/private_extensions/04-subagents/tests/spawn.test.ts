@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
 import { writePackageStubs } from "./_stubs.ts";
 
@@ -11,6 +12,8 @@ const MODULE_PATH = resolve(SUBAGENT_DIR, "spawn.ts");
 const TESTABLE_PATH = resolve(SUBAGENT_DIR, ".spawn.testable.ts");
 const CHILD_STUB = resolve(SUBAGENT_DIR, ".spawn-child-stub.ts");
 const MODELSEL_STUB = resolve(SUBAGENT_DIR, ".spawn-modelsel-stub.ts");
+const OUTCOMES_TEST_PATH = resolve(tmpdir(), `pi-spawn-outcomes-${process.pid}.json`);
+process.env.PI_SUBAGENT_OUTCOMES_PATH = OUTCOMES_TEST_PATH;
 
 async function loadModule() {
 	writePackageStubs();
@@ -67,6 +70,7 @@ function cleanup() {
 	rmSync(TESTABLE_PATH, { force: true });
 	rmSync(CHILD_STUB, { force: true });
 	rmSync(MODELSEL_STUB, { force: true });
+	rmSync(OUTCOMES_TEST_PATH, { force: true });
 	delete (globalThis as any).__subagentSpawnCalls;
 	delete (globalThis as any).__subagentSpawnController;
 	delete (globalThis as any).__subagentModelDecision;
@@ -160,8 +164,68 @@ test("runSingleAgent passes selected --model/--thinking to the child and streams
 		assert.equal(result.usage.input, 10);
 		assert.equal(result.usage.cost, 0.002);
 		assert.equal(result.usage.contextTokens, 15);
+		assert.ok(result.durationMs > 0);
+		assert.ok(result.ttftMs > 0);
+		assert.ok(result.startedAt > 0);
 		// final assistant text was captured
 		assert.equal(result.messages.length, 1);
+	} finally {
+		cleanup();
+	}
+});
+
+const assistantLine = (text: string, model: string) => JSON.stringify({
+	type: "message_end",
+	message: { role: "assistant", content: [{ type: "text", text }], model, stopReason: "end", usage: { input: 3, output: 2, cacheRead: 0, cacheWrite: 0, cost: { total: 0 }, totalTokens: 5 } },
+});
+
+test("runSingleAgent delegates to the parent session model when benchmark routing does not resolve", async () => {
+	const mod = await loadModule();
+	// Benchmark routing yields nothing (missing, stale, or unresolved assets).
+	(globalThis as any).__subagentModelDecision = undefined;
+	(globalThis as any).__subagentSpawnController = () => ({ lines: [assistantLine("delegated", "prov/parent-session")], code: 0 });
+	try {
+		const result = await mod.runSingleAgent(
+			"/cwd",
+			[{ name: "scout", description: "d", systemPrompt: "", source: "user", filePath: "/x" }],
+			"scout",
+			"find auth",
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			makeDetails,
+			[],
+			"prov/parent-session",
+		);
+		const args = (globalThis as any).__subagentSpawnCalls[0].args as string[];
+		assert.equal(args[args.indexOf("--model") + 1], "prov/parent-session", "the child must not fall through to the configured default model");
+		assert.equal(result.model, "prov/parent-session");
+		assert.equal(result.modelSelector, "session");
+	} finally {
+		cleanup();
+	}
+});
+
+test("runSingleAgent keeps the child default only when no parent session model is known", async () => {
+	const mod = await loadModule();
+	(globalThis as any).__subagentSpawnController = () => ({ lines: [assistantLine("delegated", "prov/child-default")], code: 0 });
+	try {
+		const result = await mod.runSingleAgent(
+			"/cwd",
+			[{ name: "scout", description: "d", systemPrompt: "", source: "user", filePath: "/x" }],
+			"scout",
+			"find auth",
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			makeDetails,
+			[],
+		);
+		const args = (globalThis as any).__subagentSpawnCalls[0].args as string[];
+		assert.ok(!args.includes("--model"), "an unknown parent model must not invent a --model argument");
+		assert.equal(result.modelSelector, "default");
 	} finally {
 		cleanup();
 	}

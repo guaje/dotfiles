@@ -1,0 +1,416 @@
+{
+  "version": 2,
+  "model": "muse-glimmer",
+  "aa": {
+    "variants": [
+      {
+        "version": 4,
+        "provider": "model-testing",
+        "model": "muse-glimmer",
+        "thinkingLevel": "high",
+        "modelId": "583f98fb-c4b8-4df3-8d40-60ac0ed69882",
+        "capturedAt": 1793820803995,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793723415964,
+          "thinkingLevel": "high"
+        },
+        "source": {
+          "name": "Muse Glimmer (High)",
+          "slug": "muse-glimmer",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/muse-glimmer",
+          "retrievedAt": 1793820803738,
+          "contentSha256": "28d9eedbc947ca8a5690fcbaf7574e85c8b63d55e17efd28218026d3d3cdec6d",
+          "recordSha256": "9923b3a46d2568db5a7aefce3fd814385040e92bd92ee8338e5bf9524f5c1609",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 6.3,
+          "coding": null,
+          "agentic": null,
+          "toolUse": 23.5051546391753,
+          "scientificReasoning": 36.023854770842725,
+          "longContext": 83.3333333333333,
+          "instructionFollowing": null,
+          "knowledge": 27.96666666666667,
+          "faithfulness": 16.427579824155487
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 21.9647822057461,
+          "gpqa": 83.5353535353535,
+          "critpt": 2.57142857142857
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": {
+              "normalizedScore": 23.5051546391753,
+              "sourceKind": "public-page",
+              "fieldPath": "tauBanking",
+              "benchmark": {
+                "id": "tau3-banking",
+                "version": "AA Intelligence Index v5.0.1",
+                "status": "current"
+              },
+              "retrievedAt": 1793820803738,
+              "sourceUrl": "https://artificialanalysis.ai/models/muse-glimmer",
+              "sourceRecordDigest": "9923b3a46d2568db5a7aefce3fd814385040e92bd92ee8338e5bf9524f5c1609"
+            },
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "tau3-banking-single",
+            "score": 23.5051546391753
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.6666666666666666,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      }
+    ]
+  },
+  "benchlm": {
+    "version": 1,
+    "runtimeId": "model-testing/muse-glimmer",
+    "canonicalId": "muse/muse-glimmer",
+    "model": "Muse Glimmer 30B",
+    "creator": "Meta",
+    "capturedAt": 1793907107528,
+    "lastUpdated": "2026-11-05",
+    "methodologyVersion": "bench-align-v5.8-2026-09-30",
+    "sourceSnapshotId": "2026-11-05-3904bad35f77cff7",
+    "attribution": "Data from BenchLM.ai",
+    "license": "CC BY-NC 4.0",
+    "categoryScores": {
+      "coding": 23.87,
+      "agentic": 19.37,
+      "instructionFollowing": 81.1,
+      "knowledge": 38.16,
+      "reasoning": 82.2,
+      "math": 84.6,
+      "multimodalGrounded": 65.1
+    },
+    "categoryProvenance": {
+      "coding": "leaderboard",
+      "agentic": "leaderboard",
+      "instructionFollowing": "leaderboard",
+      "knowledge": "leaderboard",
+      "reasoning": "leaderboard",
+      "math": "leaderboard",
+      "multimodalGrounded": "leaderboard"
+    },
+    "categoryEvidence": {
+      "coding": {
+        "rows": 4,
+        "independentlyVerified": 0
+      },
+      "agentic": {
+        "rows": 4,
+        "independentlyVerified": 0
+      },
+      "instructionFollowing": {
+        "rows": 1,
+        "independentlyVerified": 0
+      },
+      "math": {
+        "rows": 1,
+        "independentlyVerified": 0
+      },
+      "multimodalGrounded": {
+        "rows": 4,
+        "independentlyVerified": 0
+      }
+    },
+    "categories": [
+      {
+        "key": "agentic",
+        "label": "Agentic",
+        "score": 19.4,
+        "rank": 123,
+        "total": 135
+      },
+      {
+        "key": "coding",
+        "label": "Coding",
+        "score": 23.9,
+        "rank": 123,
+        "total": 156
+      },
+      {
+        "key": "reasoning",
+        "label": "Reasoning",
+        "score": null,
+        "rank": null,
+        "total": 26
+      },
+      {
+        "key": "multimodalGrounded",
+        "label": "Multimodal",
+        "score": 65.1,
+        "rank": 45,
+        "total": 58
+      },
+      {
+        "key": "knowledge",
+        "label": "Knowledge",
+        "score": 38.2,
+        "rank": 123,
+        "total": 177
+      },
+      {
+        "key": "multilingual",
+        "label": "Multilingual",
+        "score": null,
+        "rank": null,
+        "total": 17
+      },
+      {
+        "key": "instructionFollowing",
+        "label": "Instruction following",
+        "score": 81.1,
+        "rank": 61,
+        "total": 157
+      },
+      {
+        "key": "math",
+        "label": "Math",
+        "score": null,
+        "rank": null,
+        "total": 12
+      }
+    ],
+    "details": [
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "mcpAtlas",
+        "name": "MCP Atlas",
+        "value": 75.5,
+        "formatted": "75.5%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Meta AI Research: Muse Glimmer launch post",
+          "url": "https://research.meta.ai/blog/introducing-muse-glimmer-open-agentic-model",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "deepSearchQa",
+        "name": "DeepSearchQA",
+        "value": 74.6,
+        "formatted": "74.6%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Meta AI Research: Muse Glimmer launch post",
+          "url": "https://research.meta.ai/blog/introducing-muse-glimmer-open-agentic-model",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "skillsBench",
+        "name": "skillsBench",
+        "value": 44.3,
+        "formatted": "44.3%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Meta AI Research: Muse Glimmer launch post",
+          "url": "https://research.meta.ai/blog/introducing-muse-glimmer-open-agentic-model",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "osWorldVerified",
+        "name": "OSWorld-Verified",
+        "value": 65.9,
+        "formatted": "65.9%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Meta AI Research: Muse Glimmer launch post",
+          "url": "https://research.meta.ai/blog/introducing-muse-glimmer-open-agentic-model",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "swePro",
+        "name": "SWE-bench Pro",
+        "value": 51.2,
+        "formatted": "51.2%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Meta AI Research: Muse Glimmer launch post",
+          "url": "https://research.meta.ai/blog/introducing-muse-glimmer-open-agentic-model",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "sweVerified",
+        "name": "SWE-bench Verified",
+        "value": 76,
+        "formatted": "76%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Meta AI Research: Muse Glimmer launch post",
+          "url": "https://research.meta.ai/blog/introducing-muse-glimmer-open-agentic-model",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "terminalBench21",
+        "name": "Terminal-Bench 2.1",
+        "value": 51.7,
+        "formatted": "51.7%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Meta AI Research: Muse Glimmer launch post",
+          "url": "https://research.meta.ai/blog/introducing-muse-glimmer-open-agentic-model",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "sciCode",
+        "name": "SciCode",
+        "value": 43.6,
+        "formatted": "43.6%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Meta AI Research: Muse Glimmer launch post",
+          "url": "https://research.meta.ai/blog/introducing-muse-glimmer-open-agentic-model",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "charxiv",
+        "name": "CharXiv",
+        "value": 78.8,
+        "formatted": "78.8%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Meta AI Research: Muse Glimmer launch post",
+          "url": "https://research.meta.ai/blog/introducing-muse-glimmer-open-agentic-model",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "screenSpotPro",
+        "name": "ScreenSpot Pro",
+        "value": 75.4,
+        "formatted": "75.4%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Meta AI Research: Muse Glimmer launch post",
+          "url": "https://research.meta.ai/blog/introducing-muse-glimmer-open-agentic-model",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "omniDocBench15",
+        "name": "OmniDocBench 1.5",
+        "value": 75.8,
+        "formatted": "75.8%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Meta AI Research: Muse Glimmer launch post",
+          "url": "https://research.meta.ai/blog/introducing-muse-glimmer-open-agentic-model",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "mmmuPro",
+        "name": "MMMU-Pro",
+        "value": 74,
+        "formatted": "74%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Meta AI Research: Muse Glimmer launch post",
+          "url": "https://research.meta.ai/blog/introducing-muse-glimmer-open-agentic-model",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "instructionFollowing",
+        "categoryLabel": "Instruction following",
+        "key": "ifBench",
+        "name": "IFBench",
+        "value": 77,
+        "formatted": "77%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Meta AI Research: Muse Glimmer launch post",
+          "url": "https://research.meta.ai/blog/introducing-muse-glimmer-open-agentic-model",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "math",
+        "categoryLabel": "Math",
+        "key": "aime2026",
+        "name": "AIME26",
+        "value": 94.7,
+        "formatted": "94.7%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Meta AI Research: Muse Glimmer launch post",
+          "url": "https://research.meta.ai/blog/introducing-muse-glimmer-open-agentic-model",
+          "retrievedAt": null
+        }
+      }
+    ],
+    "modelAliases": [
+      "model-testing/muse-glimmer"
+    ]
+  }
+}

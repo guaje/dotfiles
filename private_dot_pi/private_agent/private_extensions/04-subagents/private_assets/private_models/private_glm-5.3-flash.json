@@ -1,0 +1,663 @@
+{
+  "version": 2,
+  "model": "glm-5.3-flash",
+  "aa": {
+    "variants": [
+      {
+        "version": 4,
+        "provider": "z-ai",
+        "model": "glm-5.3-flash",
+        "thinkingLevel": null,
+        "modelId": "19496b81-9f41-4214-a77a-1df803b3c5ae",
+        "capturedAt": 1793820828821,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793729389730,
+          "thinkingLevel": null
+        },
+        "source": {
+          "name": "GLM-5.3-Flash",
+          "slug": "glm-5-3-flash",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/glm-5-3-flash",
+          "retrievedAt": 1793820828567,
+          "contentSha256": "d0ab0b853bdfc37482135c4f3ad6a169322a4d10afa5d2049de77a660fb1ed39",
+          "recordSha256": "ae83bd7a33b60abc935d3b108f82db311768e3991b3c99a117cf771348437e8d",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 27.8,
+          "coding": null,
+          "agentic": null,
+          "toolUse": 47.2164948453608,
+          "scientificReasoning": 48.83080239706743,
+          "longContext": 80,
+          "instructionFollowing": null,
+          "knowledge": 28.199999999999996,
+          "faithfulness": 61.652739090065
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 39.8517145505097,
+          "gpqa": 91.2121212121212,
+          "critpt": 15.4285714285714
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": {
+              "normalizedScore": 47.2164948453608,
+              "sourceKind": "public-page",
+              "fieldPath": "tauBanking",
+              "benchmark": {
+                "id": "tau3-banking",
+                "version": "AA Intelligence Index v5.0.1",
+                "status": "current"
+              },
+              "retrievedAt": 1793820828567,
+              "sourceUrl": "https://artificialanalysis.ai/models/glm-5-3-flash",
+              "sourceRecordDigest": "ae83bd7a33b60abc935d3b108f82db311768e3991b3c99a117cf771348437e8d"
+            },
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "tau3-banking-single",
+            "score": 47.2164948453608
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.6666666666666666,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      }
+    ]
+  },
+  "benchlm": {
+    "version": 1,
+    "runtimeId": "reallms-dev/glm-5.3-flash",
+    "canonicalId": "z-ai/glm-5.3-flash",
+    "model": "GLM-5.3-Flash",
+    "creator": "Z.AI",
+    "capturedAt": 1793907107528,
+    "lastUpdated": "2026-11-05",
+    "methodologyVersion": "bench-align-v5.8-2026-09-30",
+    "sourceSnapshotId": "2026-11-05-3904bad35f77cff7",
+    "attribution": "Data from BenchLM.ai",
+    "license": "CC BY-NC 4.0",
+    "categoryScores": {
+      "coding": 47.26,
+      "agentic": 58.27,
+      "knowledge": 60.12,
+      "math": 60.4,
+      "multimodalGrounded": 81
+    },
+    "categoryProvenance": {
+      "coding": "leaderboard",
+      "agentic": "leaderboard",
+      "knowledge": "leaderboard",
+      "math": "leaderboard",
+      "multimodalGrounded": "leaderboard"
+    },
+    "categoryEvidence": {
+      "coding": {
+        "rows": 8,
+        "independentlyVerified": 5
+      },
+      "agentic": {
+        "rows": 9,
+        "independentlyVerified": 4
+      },
+      "knowledge": {
+        "rows": 2,
+        "independentlyVerified": 2
+      },
+      "math": {
+        "rows": 2,
+        "independentlyVerified": 2
+      },
+      "multimodalGrounded": {
+        "rows": 7,
+        "independentlyVerified": 2
+      }
+    },
+    "categories": [
+      {
+        "key": "agentic",
+        "label": "Agentic",
+        "score": 58.3,
+        "rank": 35,
+        "total": 135
+      },
+      {
+        "key": "coding",
+        "label": "Coding",
+        "score": 47.3,
+        "rank": 52,
+        "total": 156
+      },
+      {
+        "key": "reasoning",
+        "label": "Reasoning",
+        "score": null,
+        "rank": null,
+        "total": 26
+      },
+      {
+        "key": "multimodalGrounded",
+        "label": "Multimodal",
+        "score": 81,
+        "rank": 19,
+        "total": 58
+      },
+      {
+        "key": "knowledge",
+        "label": "Knowledge",
+        "score": 60.1,
+        "rank": 47,
+        "total": 177
+      },
+      {
+        "key": "multilingual",
+        "label": "Multilingual",
+        "score": null,
+        "rank": null,
+        "total": 17
+      },
+      {
+        "key": "instructionFollowing",
+        "label": "Instruction following",
+        "score": null,
+        "rank": null,
+        "total": 157
+      },
+      {
+        "key": "math",
+        "label": "Math",
+        "score": null,
+        "rank": null,
+        "total": 12
+      }
+    ],
+    "details": [
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "terminalBench21",
+        "name": "Terminal-Bench 2.1",
+        "value": 84.3,
+        "formatted": "84.3%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Z.AI GLM-5.3-Flash launch post",
+          "url": "https://z.ai/blog/glm-5.3-flash",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "toolathlonVerified",
+        "name": "Toolathlon-Verified",
+        "value": 78.4,
+        "formatted": "78.4%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Z.AI GLM-5.3-Flash launch post",
+          "url": "https://z.ai/blog/glm-5.3-flash",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "automationBench",
+        "name": "AutomationBench",
+        "value": 48.8,
+        "formatted": "48.8%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Z.AI GLM-5.3-Flash launch post",
+          "url": "https://z.ai/blog/glm-5.3-flash",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "agentsLastExam",
+        "name": "Agents' Last Exam",
+        "value": 26.3,
+        "formatted": "26.3%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Z.AI GLM-5.3-Flash launch post",
+          "url": "https://z.ai/blog/glm-5.3-flash",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "hleWithTools",
+        "name": "HLE w/ tools",
+        "value": 55.3,
+        "formatted": "55.3%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Z.AI GLM-5.3-Flash launch post",
+          "url": "https://z.ai/blog/glm-5.3-flash",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "valsTerminalBench21",
+        "name": "Terminal-Bench 2.1 (Vals)",
+        "value": 62.9,
+        "formatted": "62.9%",
+        "verificationStatus": "aggregator_verified",
+        "verificationLabel": "Verified",
+        "source": {
+          "label": "Vals AI: Terminal-Bench 2.1 leaderboard",
+          "url": "https://www.vals.ai/models/zai_glm-5.3-flash",
+          "retrievedAt": null,
+          "publisher": "Vals AI",
+          "publisherUrl": "https://www.vals.ai/",
+          "sourceLabel": "Vals AI",
+          "sourceRole": "published-evaluation-results",
+          "scope": "Published leaderboard aggregates and evaluation settings only. Dataset contents are not included.",
+          "datasetContentsIncluded": false,
+          "licenseGrantIncluded": false,
+          "benchmarkUrl": "https://www.vals.ai/benchmarks/terminal-bench-2-1"
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "hermesIndex",
+        "name": "Hermes Index",
+        "value": 34.95,
+        "formatted": "35.0%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Nous Research: Hermes Index leaderboard",
+          "url": "https://portal.nousresearch.com/bench",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "hermesBench",
+        "name": "Hermes Bench",
+        "value": 68.88,
+        "formatted": "68.9%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Nous Research: Hermes Index leaderboard",
+          "url": "https://portal.nousresearch.com/bench",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "mazeBench",
+        "name": "MazeBench",
+        "value": 0,
+        "formatted": "0%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "MazeBench AI leaderboard (ASCII mode)",
+          "url": "https://mazebench.com/leaderboard/ai?mode=ascii&tools=1&metric=gems&run=2026-08-23T15-20-35-692-0f28c7",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "terminalBench21",
+        "name": "Terminal-Bench 2.1",
+        "value": 84.3,
+        "formatted": "84.3%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Z.AI GLM-5.3-Flash launch post",
+          "url": "https://z.ai/blog/glm-5.3-flash",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "deepSwe",
+        "name": "DeepSWE",
+        "value": 63.4,
+        "formatted": "63.4%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Z.AI GLM-5.3-Flash launch post",
+          "url": "https://z.ai/blog/glm-5.3-flash",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "nl2Repo",
+        "name": "NL2Repo",
+        "value": 56.3,
+        "formatted": "56.3%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Z.AI GLM-5.3-Flash launch post",
+          "url": "https://z.ai/blog/glm-5.3-flash",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "valsLiveCodeBench",
+        "name": "LiveCodeBench (Vals)",
+        "value": 80.5,
+        "formatted": "80.5%",
+        "verificationStatus": "aggregator_verified",
+        "verificationLabel": "Verified",
+        "source": {
+          "label": "Vals AI: LiveCodeBench leaderboard",
+          "url": "https://www.vals.ai/models/zai_glm-5.3-flash",
+          "retrievedAt": null,
+          "publisher": "Vals AI",
+          "publisherUrl": "https://www.vals.ai/",
+          "sourceLabel": "Vals AI",
+          "sourceRole": "published-evaluation-results",
+          "scope": "Published leaderboard aggregates and evaluation settings only. Dataset contents are not included.",
+          "datasetContentsIncluded": false,
+          "licenseGrantIncluded": false,
+          "benchmarkUrl": "https://www.vals.ai/benchmarks/lcb"
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "valsSweBench",
+        "name": "SWE-bench (Vals)",
+        "value": 92,
+        "formatted": "92.0%",
+        "verificationStatus": "aggregator_verified",
+        "verificationLabel": "Verified",
+        "source": {
+          "label": "Vals AI: SWE-bench leaderboard",
+          "url": "https://www.vals.ai/models/zai_glm-5.3-flash",
+          "retrievedAt": null,
+          "publisher": "Vals AI",
+          "publisherUrl": "https://www.vals.ai/",
+          "sourceLabel": "Vals AI",
+          "sourceRole": "published-evaluation-results",
+          "scope": "Published leaderboard aggregates and evaluation settings only. Dataset contents are not included.",
+          "datasetContentsIncluded": false,
+          "licenseGrantIncluded": false,
+          "benchmarkUrl": "https://www.vals.ai/benchmarks/swebench"
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "openHarmonyBench",
+        "name": "OpenHarmony Bench",
+        "value": 57.3,
+        "formatted": "57.3%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "OpenHarmony Bench official leaderboard",
+          "url": "https://bench.matrix.openharmony.cn/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "frontierSweV2",
+        "name": "FrontierSWE v2",
+        "value": 18.1,
+        "formatted": "18.1%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Proximal: FrontierSWE v2 leaderboard",
+          "url": "https://www.frontierswe.com/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "bug-hunt-bench",
+        "name": "Bug Hunt Bench",
+        "value": 17.7,
+        "formatted": "17.7 fixes",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Bug Hunt Bench public data",
+          "url": "https://bughunt.productcompass.pm/data/benchmark.json",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "extractBenchLlamaIndex",
+        "name": "ExtractBench (LlamaIndex)",
+        "value": 80.75,
+        "formatted": "80.75%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ExtractBench leaderboard, November 5, 2026 snapshot (LlamaIndex)",
+          "url": "https://www.extractbench.ai/#leaderboard",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "parseBenchLlamaIndex",
+        "name": "ParseBench",
+        "value": 70.55,
+        "formatted": "70.55%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ParseBench leaderboard, November 5, 2026 snapshot (LlamaIndex)",
+          "url": "https://www.parsebench.ai/#leaderboard",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "officeQaPro",
+        "name": "OfficeQA Pro",
+        "value": 62.4,
+        "formatted": "62.4%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Z.AI GLM-5.3-Flash launch post",
+          "url": "https://z.ai/blog/glm-5.3-flash",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "charxiv",
+        "name": "CharXiv",
+        "value": 89.4,
+        "formatted": "89.4%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Z.AI GLM-5.3-Flash launch post",
+          "url": "https://z.ai/blog/glm-5.3-flash",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "chartographyWithTools",
+        "name": "Chartography (tools)",
+        "value": 78,
+        "formatted": "78.0%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Z.AI GLM-5.3-Flash launch post",
+          "url": "https://z.ai/blog/glm-5.3-flash",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "babyVision",
+        "name": "BabyVision",
+        "value": 53.4,
+        "formatted": "53.4%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Z.AI GLM-5.3-Flash launch post",
+          "url": "https://z.ai/blog/glm-5.3-flash",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "mmvu",
+        "name": "MMVU",
+        "value": 80.5,
+        "formatted": "80.5%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Z.AI GLM-5.3-Flash launch post",
+          "url": "https://z.ai/blog/glm-5.3-flash",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "valsGpqaDiamond",
+        "name": "GPQA Diamond (Vals)",
+        "value": 86.4,
+        "formatted": "86.4%",
+        "verificationStatus": "aggregator_verified",
+        "verificationLabel": "Verified",
+        "source": {
+          "label": "Vals AI: GPQA Diamond leaderboard",
+          "url": "https://www.vals.ai/models/zai_glm-5.3-flash",
+          "retrievedAt": null,
+          "publisher": "Vals AI",
+          "publisherUrl": "https://www.vals.ai/",
+          "sourceLabel": "Vals AI",
+          "sourceRole": "published-evaluation-results",
+          "scope": "Published leaderboard aggregates and evaluation settings only. Dataset contents are not included.",
+          "datasetContentsIncluded": false,
+          "licenseGrantIncluded": false,
+          "benchmarkUrl": "https://www.vals.ai/benchmarks/gpqa"
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "valsMmluPro",
+        "name": "MMLU-Pro (Vals)",
+        "value": 86.1,
+        "formatted": "86.1%",
+        "verificationStatus": "aggregator_verified",
+        "verificationLabel": "Verified",
+        "source": {
+          "label": "Vals AI: MMLU Pro leaderboard",
+          "url": "https://www.vals.ai/models/zai_glm-5.3-flash",
+          "retrievedAt": null,
+          "publisher": "Vals AI",
+          "publisherUrl": "https://www.vals.ai/",
+          "sourceLabel": "Vals AI",
+          "sourceRole": "published-evaluation-results",
+          "scope": "Published leaderboard aggregates and evaluation settings only. Dataset contents are not included.",
+          "datasetContentsIncluded": false,
+          "licenseGrantIncluded": false,
+          "benchmarkUrl": "https://www.vals.ai/benchmarks/mmlu_pro"
+        }
+      },
+      {
+        "category": "math",
+        "categoryLabel": "Math",
+        "key": "frontierMathV2Tiers13",
+        "name": "FrontierMath v2 (Tiers 1-3)",
+        "value": 55.789,
+        "formatted": "55.789%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI FrontierMath v2 leaderboard",
+          "url": "https://epoch.ai/benchmarks/frontiermath-tiers-1-3-v2",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "math",
+        "categoryLabel": "Math",
+        "key": "frontierMathV2Tier4",
+        "name": "FrontierMath v2 (Tier 4)",
+        "value": 17.073,
+        "formatted": "17.073%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI FrontierMath v2 leaderboard",
+          "url": "https://epoch.ai/benchmarks/frontiermath-tier-4-v2?view=graph&tab=leaderboard",
+          "retrievedAt": null
+        }
+      }
+    ],
+    "modelAliases": [
+      "reallms-dev/glm-5.3-flash",
+      "z-ai/glm-5.3-flash"
+    ]
+  }
+}

@@ -64,8 +64,12 @@ export function modelDisplayFor(r: SingleResult): string | undefined {
 	return r.thinkingLevel ? `${r.model} • ${r.thinkingLevel}` : r.model;
 }
 
+/** Only a certified benchmark route is highlighted; interim and fallback routes stay visually quiet. */
+function isCertifiedRoute(selector: SingleResult["modelSelector"]): boolean { return selector === "benchmark"; }
 function routeTag(selector: SingleResult["modelSelector"]): string {
 	if (selector === "benchmark") return "[bench]";
+	if (selector === "interim") return "[temp]";
+	if (selector === "session") return "[session]";
 	if (selector === "default") return "[default]";
 	if (selector === "heuristic") return "[auto]";
 	if (selector === "llm") return "[llm-select]";
@@ -230,12 +234,23 @@ export function renderSubagentResult(
 		if (expanded) {
 			const container = new Container();
 			let header = `${icon} ${theme.fg("toolTitle", theme.bold(r.agent))}${theme.fg("muted", ` (${r.agentSource})`)}`;
-			if (routeTag(r.modelSelector)) header += ` ${theme.fg(r.modelSelector === "benchmark" ? "accent" : "dim", routeTag(r.modelSelector))}`;
-			if (r.benchmarkRoute) header += ` ${theme.fg("dim", `${r.benchmarkRoute.routingProfile} q:${r.benchmarkRoute.qualityScore.toFixed(3)} ${Math.round(r.benchmarkRoute.predictedCompletionMs)}ms`)}`;
+			if (routeTag(r.modelSelector)) header += ` ${theme.fg(isCertifiedRoute(r.modelSelector) ? "accent" : "dim", routeTag(r.modelSelector))}`;
+			if (r.benchmarkRoute) {
+				const route = r.benchmarkRoute;
+				const flags = [route.exploration ? "explore" : "", route.speedDisagreement ? "probe says fast, real work says slow" : ""].filter(Boolean).join(",");
+				header += ` ${theme.fg("dim", `${route.routingProfile} q:${route.qualityScore.toFixed(1)} ${Math.round(route.predictedCompletionMs)}ms conf:${Math.round((route.confidence ?? 0) * 100)}%${flags ? ` ${flags}` : ""}`)}`;
+			}
 			if (isError && r.stopReason) header += ` ${theme.fg("error", `[${r.stopReason}]`)}`;
 			container.addChild(new Text(header, 0, 0));
 			if (isError && r.errorMessage)
 				container.addChild(new Text(theme.fg("error", `Error: ${r.errorMessage}`), 0, 0));
+			if (r.benchmarkRoute) {
+				const sources = r.benchmarkRoute.sources?.join(", ") || "none";
+				const unmeasured = r.benchmarkRoute.unmeasured?.join(", ") || "none";
+				container.addChild(new Text(theme.fg("dim", `evidence: ${sources} • unmeasured: ${unmeasured}`), 0, 0));
+				const rejected = r.benchmarkRoute.candidates.filter((candidate) => !candidate.eligible).map((candidate) => `${candidate.modelId}: ${candidate.rejectionReasons.join(", ").replace("unprobedBudget", "unprobed (budget)")}`);
+				if (rejected.length) container.addChild(new Text(theme.fg("warning", `gates: ${rejected.join(" • ")}`), 0, 0));
+			}
 			container.addChild(new Spacer(1));
 			container.addChild(new Text(theme.fg("muted", "─── Task ───"), 0, 0));
 			container.addChild(new Text(theme.fg("dim", r.task), 0, 0));
@@ -268,7 +283,7 @@ export function renderSubagentResult(
 		}
 
 		let text = `${icon} ${theme.fg("toolTitle", theme.bold(r.agent))}${theme.fg("muted", ` (${r.agentSource})`)}`;
-		if (routeTag(r.modelSelector)) text += ` ${theme.fg(r.modelSelector === "benchmark" ? "accent" : "dim", routeTag(r.modelSelector))}`;
+		if (routeTag(r.modelSelector)) text += ` ${theme.fg(isCertifiedRoute(r.modelSelector) ? "accent" : "dim", routeTag(r.modelSelector))}`;
 		if (isError && r.stopReason) text += ` ${theme.fg("error", `[${r.stopReason}]`)}`;
 		if (isError && r.errorMessage) text += `\n${theme.fg("error", `Error: ${r.errorMessage}`)}`;
 		else if (displayItems.length === 0) text += `\n${theme.fg("muted", "(no output)")}`;
@@ -319,7 +334,7 @@ export function renderSubagentResult(
 				container.addChild(new Spacer(1));
 				container.addChild(
 					new Text(
-						`${theme.fg("muted", `─── Step ${r.step}: `) + theme.fg("accent", r.agent)} ${rIcon}${routeTag(r.modelSelector) ? ` ${theme.fg(r.modelSelector === "benchmark" ? "accent" : "dim", routeTag(r.modelSelector))}` : ""}`,
+						`${theme.fg("muted", `─── Step ${r.step}: `) + theme.fg("accent", r.agent)} ${rIcon}${routeTag(r.modelSelector) ? ` ${theme.fg(isCertifiedRoute(r.modelSelector) ? "accent" : "dim", routeTag(r.modelSelector))}` : ""}`,
 						0,
 						0,
 					),
@@ -364,7 +379,7 @@ export function renderSubagentResult(
 		for (const r of details.results) {
 			const rIcon = r.exitCode === 0 ? theme.fg("success", "✓") : theme.fg("error", "✗");
 			const displayItems = getDisplayItems(r.messages);
-			text += `\n\n${theme.fg("muted", `─── Step ${r.step}: `)}${theme.fg("accent", r.agent)} ${rIcon}${routeTag(r.modelSelector) ? ` ${theme.fg(r.modelSelector === "benchmark" ? "accent" : "dim", routeTag(r.modelSelector))}` : ""}`;
+			text += `\n\n${theme.fg("muted", `─── Step ${r.step}: `)}${theme.fg("accent", r.agent)} ${rIcon}${routeTag(r.modelSelector) ? ` ${theme.fg(isCertifiedRoute(r.modelSelector) ? "accent" : "dim", routeTag(r.modelSelector))}` : ""}`;
 			if (displayItems.length === 0) text += `\n${theme.fg("muted", "(no output)")}`;
 			else text += `\n${renderDisplayItems(displayItems, 5)}`;
 		}
@@ -401,7 +416,7 @@ export function renderSubagentResult(
 
 				container.addChild(new Spacer(1));
 				container.addChild(
-					new Text(`${theme.fg("muted", "─── ") + theme.fg("accent", r.agent)} ${rIcon}${routeTag(r.modelSelector) ? ` ${theme.fg(r.modelSelector === "benchmark" ? "accent" : "dim", routeTag(r.modelSelector))}` : ""}`, 0, 0),
+					new Text(`${theme.fg("muted", "─── ") + theme.fg("accent", r.agent)} ${rIcon}${routeTag(r.modelSelector) ? ` ${theme.fg(isCertifiedRoute(r.modelSelector) ? "accent" : "dim", routeTag(r.modelSelector))}` : ""}`, 0, 0),
 				);
 				container.addChild(new Text(theme.fg("muted", "Task: ") + theme.fg("dim", r.task), 0, 0));
 
@@ -444,7 +459,7 @@ export function renderSubagentResult(
 						? theme.fg("error", "✗")
 						: theme.fg("success", "✓");
 			const displayItems = getDisplayItems(r.messages);
-			text += `\n\n${theme.fg("muted", "─── ")}${theme.fg("accent", r.agent)} ${rIcon}${routeTag(r.modelSelector) ? ` ${theme.fg(r.modelSelector === "benchmark" ? "accent" : "dim", routeTag(r.modelSelector))}` : ""}`;
+			text += `\n\n${theme.fg("muted", "─── ")}${theme.fg("accent", r.agent)} ${rIcon}${routeTag(r.modelSelector) ? ` ${theme.fg(isCertifiedRoute(r.modelSelector) ? "accent" : "dim", routeTag(r.modelSelector))}` : ""}`;
 			if (displayItems.length === 0)
 				text += `\n${theme.fg("muted", r.exitCode === -1 ? "(running...)" : "(no output)")}`;
 			else text += `\n${renderDisplayItems(displayItems, 5)}`;

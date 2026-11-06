@@ -1,0 +1,891 @@
+{
+  "version": 2,
+  "model": "gpt-6-luna",
+  "aa": {
+    "variants": [
+      {
+        "version": 4,
+        "provider": "openai-codex",
+        "model": "gpt-6-luna",
+        "thinkingLevel": "high",
+        "modelId": "7d1229bc-deea-4717-ba5b-f59a35d991e3",
+        "capturedAt": 1793820818016,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793723446597,
+          "thinkingLevel": "high"
+        },
+        "source": {
+          "name": "GPT-6 Luna (High)",
+          "slug": "gpt-6-luna-high",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/gpt-6-luna-high",
+          "retrievedAt": 1793820817762,
+          "contentSha256": "5daf0e4f5502e4fb2929dc4ff776afdd36eeeb73e65305a1bf46da0ff661492c",
+          "recordSha256": "8d75f3e5bdd59be57eff53b58a7366dbc0443889c44a233d1690bee0ce9bf037",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 21.4,
+          "coding": null,
+          "agentic": null,
+          "toolUse": null,
+          "scientificReasoning": null,
+          "longContext": 79.3333333333333,
+          "instructionFollowing": null,
+          "knowledge": 39,
+          "faithfulness": 15.081967213114751
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 32.9471733086191,
+          "gpqa": null,
+          "critpt": 15.4285714285714
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": null,
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "unavailable",
+            "score": null
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.4444444444444444,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      },
+      {
+        "version": 4,
+        "provider": "openai-codex",
+        "model": "gpt-6-luna",
+        "thinkingLevel": "low",
+        "modelId": "bf9708d8-933d-44f6-affa-b696a7a650c9",
+        "capturedAt": 1793820818339,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793723448691,
+          "thinkingLevel": "low"
+        },
+        "source": {
+          "name": "GPT-6 Luna (Low)",
+          "slug": "gpt-6-luna-low",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/gpt-6-luna-low",
+          "retrievedAt": 1793820818086,
+          "contentSha256": "1e9550f9d38077f4d0218c5670ece6f136c05d71fb6ef5befc0578940dfd5047",
+          "recordSha256": "410e2e1c24c6eaa1cd7fb032f0032fa2b043d5baf8f5f7c2a52bba7c77d6351c",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 9.7,
+          "coding": null,
+          "agentic": null,
+          "toolUse": null,
+          "scientificReasoning": null,
+          "longContext": 74,
+          "instructionFollowing": null,
+          "knowledge": 36.1,
+          "faithfulness": 15.179968701095461
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 20.2502316960148,
+          "gpqa": null,
+          "critpt": 2.57142857142857
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": null,
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "unavailable",
+            "score": null
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.4444444444444444,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      },
+      {
+        "version": 4,
+        "provider": "openai-codex",
+        "model": "gpt-6-luna",
+        "thinkingLevel": "max",
+        "modelId": "6fb13851-40ce-4bda-ad3f-6b38e0c5daa7",
+        "capturedAt": 1793820818677,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793723449776,
+          "thinkingLevel": "max"
+        },
+        "source": {
+          "name": "GPT-6 Luna (Max)",
+          "slug": "gpt-6-luna",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/gpt-6-luna",
+          "retrievedAt": 1793820818424,
+          "contentSha256": "f3bbc10d0ca2476032ac10c350f8e7c85033c3c57fa0566178eb0af31988190a",
+          "recordSha256": "56144c8a8ce4b93c51b19316d4f1b49444c772c4d0a323d2a4dcf90cb5145cb1",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 27.9,
+          "coding": null,
+          "agentic": null,
+          "toolUse": null,
+          "scientificReasoning": null,
+          "longContext": 83.3333333333333,
+          "instructionFollowing": null,
+          "knowledge": 39.63333333333333,
+          "faithfulness": 20.651573716178902
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 38.5078776645042,
+          "gpqa": null,
+          "critpt": 19.428571428571402
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": null,
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "unavailable",
+            "score": null
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.4444444444444444,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      },
+      {
+        "version": 4,
+        "provider": "openai-codex",
+        "model": "gpt-6-luna",
+        "thinkingLevel": "medium",
+        "modelId": "36667da0-9222-4967-adbb-f7efa15ad213",
+        "capturedAt": 1793820819231,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793723450860,
+          "thinkingLevel": "medium"
+        },
+        "source": {
+          "name": "GPT-6 Luna (Medium)",
+          "slug": "gpt-6-luna-medium",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/gpt-6-luna-medium",
+          "retrievedAt": 1793820818977,
+          "contentSha256": "25a21165b41999b35bef9a6db2bc40a8c60b7226cbac3d3bae54bc5d8c9870e8",
+          "recordSha256": "ec20bb3f2e99108d2b6c547877d10720de6a6c3e441b7e1889ef31d1b68cb223",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 18.5,
+          "coding": null,
+          "agentic": null,
+          "toolUse": null,
+          "scientificReasoning": null,
+          "longContext": 78.3333333333333,
+          "instructionFollowing": null,
+          "knowledge": 38.7,
+          "faithfulness": 14.736269711799892
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 28.2669138090825,
+          "gpqa": null,
+          "critpt": 10.5714285714286
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": null,
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "unavailable",
+            "score": null
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.4444444444444444,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      },
+      {
+        "version": 4,
+        "provider": "openai-codex",
+        "model": "gpt-6-luna",
+        "thinkingLevel": "off",
+        "modelId": "63cb48ea-0b0c-4e07-8ded-6d28dec4fa28",
+        "capturedAt": 1793820819654,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793723451942,
+          "thinkingLevel": "off"
+        },
+        "source": {
+          "name": "GPT-6 Luna (Non-reasoning)",
+          "slug": "gpt-6-luna-non-reasoning",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/gpt-6-luna-non-reasoning",
+          "retrievedAt": 1793820819401,
+          "contentSha256": "be534d87d6a786452b65494357f717b8e7e9b442330e0a04c74ef90fb62f6b2d",
+          "recordSha256": "70bba7ddcd08388524cb21f3d4ac2b5f31bbad3ccb1a9cdf2ddb6e0efe7bd238",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 9.4,
+          "coding": null,
+          "agentic": null,
+          "toolUse": null,
+          "scientificReasoning": null,
+          "longContext": 39.6666666666667,
+          "instructionFollowing": null,
+          "knowledge": 30.099999999999998,
+          "faithfulness": 20.028612303290416
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 8.57275254865616,
+          "gpqa": null,
+          "critpt": 1.1428571428571401
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": null,
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "unavailable",
+            "score": null
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.4444444444444444,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": false
+        }
+      },
+      {
+        "version": 4,
+        "provider": "openai-codex",
+        "model": "gpt-6-luna",
+        "thinkingLevel": "xhigh",
+        "modelId": "19813eb2-460a-475c-af65-810bb8660fec",
+        "capturedAt": 1793820820215,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793723453119,
+          "thinkingLevel": "xhigh"
+        },
+        "source": {
+          "name": "GPT-6 Luna (Xhigh)",
+          "slug": "gpt-6-luna-xhigh",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/gpt-6-luna-xhigh",
+          "retrievedAt": 1793820819961,
+          "contentSha256": "79f8865f0809b943abc0f40b460ab5df1bb51179818d17643d7de652ca46275a",
+          "recordSha256": "410d4a01de07a6dbbbd59e7630f549ad6fe0a61fda4e544f7c5a3b08017237e2",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 23.5,
+          "coding": null,
+          "agentic": null,
+          "toolUse": null,
+          "scientificReasoning": null,
+          "longContext": 80,
+          "instructionFollowing": null,
+          "knowledge": 38.6,
+          "faithfulness": 16.015200868621065
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 34.3373493975904,
+          "gpqa": null,
+          "critpt": 17.4285714285714
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": null,
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "unavailable",
+            "score": null
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.4444444444444444,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      }
+    ]
+  },
+  "benchlm": {
+    "version": 1,
+    "runtimeId": "openai-codex/gpt-6-luna",
+    "canonicalId": "openai/gpt-6-luna",
+    "model": "GPT-6 Luna",
+    "creator": "OpenAI",
+    "capturedAt": 1793907107528,
+    "lastUpdated": "2026-11-05",
+    "methodologyVersion": "bench-align-v5.8-2026-09-30",
+    "sourceSnapshotId": "2026-11-05-3904bad35f77cff7",
+    "attribution": "Data from BenchLM.ai",
+    "license": "CC BY-NC 4.0",
+    "categoryScores": {
+      "coding": 51.41,
+      "agentic": 54.09,
+      "knowledge": 63.27,
+      "reasoning": 59.2,
+      "math": 83.7,
+      "multimodalGrounded": 82.1
+    },
+    "categoryProvenance": {
+      "coding": "leaderboard",
+      "agentic": "leaderboard",
+      "knowledge": "leaderboard",
+      "reasoning": "leaderboard",
+      "math": "leaderboard",
+      "multimodalGrounded": "leaderboard"
+    },
+    "categoryEvidence": {
+      "coding": {
+        "rows": 3,
+        "independentlyVerified": 2
+      },
+      "agentic": {
+        "rows": 5,
+        "independentlyVerified": 3
+      },
+      "knowledge": {
+        "rows": 5,
+        "independentlyVerified": 0
+      },
+      "reasoning": {
+        "rows": 4,
+        "independentlyVerified": 4
+      },
+      "math": {
+        "rows": 2,
+        "independentlyVerified": 2
+      },
+      "multimodalGrounded": {
+        "rows": 3,
+        "independentlyVerified": 3
+      }
+    },
+    "categories": [
+      {
+        "key": "agentic",
+        "label": "Agentic",
+        "score": 54.1,
+        "rank": 45,
+        "total": 135
+      },
+      {
+        "key": "coding",
+        "label": "Coding",
+        "score": 51.4,
+        "rank": 42,
+        "total": 156
+      },
+      {
+        "key": "reasoning",
+        "label": "Reasoning",
+        "score": 59.2,
+        "rank": 23,
+        "total": 26
+      },
+      {
+        "key": "multimodalGrounded",
+        "label": "Multimodal",
+        "score": null,
+        "rank": null,
+        "total": 58
+      },
+      {
+        "key": "knowledge",
+        "label": "Knowledge",
+        "score": 63.3,
+        "rank": 40,
+        "total": 177
+      },
+      {
+        "key": "multilingual",
+        "label": "Multilingual",
+        "score": null,
+        "rank": null,
+        "total": 17
+      },
+      {
+        "key": "instructionFollowing",
+        "label": "Instruction following",
+        "score": null,
+        "rank": null,
+        "total": 157
+      },
+      {
+        "key": "math",
+        "label": "Math",
+        "score": null,
+        "rank": null,
+        "total": 12
+      }
+    ],
+    "details": [
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "exploitGym",
+        "name": "ExploitGym",
+        "value": 11.6,
+        "formatted": "11.6%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6 Astra system card",
+          "url": "https://deploymentsafety.openai.com/gpt-6-astra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "hermesIndex",
+        "name": "Hermes Index",
+        "value": 33.89,
+        "formatted": "33.9%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Nous Research: Hermes Index leaderboard",
+          "url": "https://portal.nousresearch.com/bench",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "hermesBench",
+        "name": "Hermes Bench",
+        "value": 70.47,
+        "formatted": "70.5%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Nous Research: Hermes Index leaderboard",
+          "url": "https://portal.nousresearch.com/bench",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "mazeBench",
+        "name": "MazeBench",
+        "value": 0,
+        "formatted": "0%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "MazeBench AI leaderboard (ASCII mode)",
+          "url": "https://mazebench.com/leaderboard/ai?mode=ascii&tools=0&metric=gems&run=run-2026-09-22T19-30-28-581Z-d9f00a",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "osWorld21Offline",
+        "name": "OSWorld 2.1 Offline",
+        "value": 48.9,
+        "formatted": "48.9%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Anthropic: Claude Haiku 5.5 system card",
+          "url": "https://www-cdn.anthropic.com/e1080d6bf5ae2018ea3c2f414064be03232f5be5/Claude%20Haiku%205.5%20System%20Card.pdf",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "deepSwe",
+        "name": "DeepSWE",
+        "value": 66.6,
+        "formatted": "66.6%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: Introducing GPT-6 Sol and Luna",
+          "url": "https://openai.com/index/introducing-gpt-6-sol-and-luna/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "bug-hunt-bench",
+        "name": "Bug Hunt Bench",
+        "value": 18.3,
+        "formatted": "18.3 fixes",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Bug Hunt Bench public data",
+          "url": "https://bughunt.productcompass.pm/data/benchmark.json",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "frontierCode2",
+        "name": "FrontierCode 2.0",
+        "value": 21.9,
+        "formatted": "21.9%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Cognition: FrontierCode 2.0",
+          "url": "https://cognition.com/blog/frontier-code-2.0",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "reasoning",
+        "categoryLabel": "Reasoning",
+        "key": "arcAgi1",
+        "name": "ARC-AGI-1",
+        "value": 86.666667,
+        "formatted": "86.67%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ARC Prize: published Semi-Private results",
+          "url": "https://arcprize.org/results/openai-gpt-6-luna",
+          "retrievedAt": "2026-11-05T15:24:10.860Z"
+        }
+      },
+      {
+        "category": "reasoning",
+        "categoryLabel": "Reasoning",
+        "key": "arcAgi2",
+        "name": "ARC-AGI-2",
+        "value": 59.305556,
+        "formatted": "59.3%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ARC Prize: published Semi-Private results",
+          "url": "https://arcprize.org/results/openai-gpt-6-luna",
+          "retrievedAt": "2026-11-05T15:24:10.860Z"
+        }
+      },
+      {
+        "category": "reasoning",
+        "categoryLabel": "Reasoning",
+        "key": "arcAgi3",
+        "name": "ARC-AGI-3",
+        "value": 0.10361,
+        "formatted": "0.1%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ARC Prize: published Semi-Private results",
+          "url": "https://arcprize.org/results/openai-gpt-6-luna",
+          "retrievedAt": "2026-11-05T15:24:10.860Z"
+        }
+      },
+      {
+        "category": "reasoning",
+        "categoryLabel": "Reasoning",
+        "key": "arcAgi3ProviderAdapter",
+        "name": "ARC-AGI-3 Provider Adapter",
+        "value": 0.586839,
+        "formatted": "0.59%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ARC Prize: published Semi-Private results",
+          "url": "https://arcprize.org/results/openai-gpt-6-luna",
+          "retrievedAt": "2026-11-05T15:24:10.860Z"
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "extractBenchPro",
+        "name": "ExtractBench Pro",
+        "value": 0,
+        "formatted": "0%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ExtractBench Pro leaderboard, October 28, 2026 snapshot (LlamaIndex)",
+          "url": "https://www.extractbench.ai/pro#leaderboard",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "extractBenchLlamaIndex",
+        "name": "ExtractBench (LlamaIndex)",
+        "value": 91.01,
+        "formatted": "91.01%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ExtractBench leaderboard, November 5, 2026 snapshot (LlamaIndex)",
+          "url": "https://www.extractbench.ai/#leaderboard",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "parseBenchLlamaIndex",
+        "name": "ParseBench",
+        "value": 64.13,
+        "formatted": "64.13%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ParseBench leaderboard, November 5, 2026 snapshot (LlamaIndex)",
+          "url": "https://www.parsebench.ai/#leaderboard",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "healthBench",
+        "name": "HealthBench (raw)",
+        "value": 50,
+        "formatted": "50.0%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6 Astra system card",
+          "url": "https://deploymentsafety.openai.com/gpt-6-astra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "healthBenchLengthAdjusted",
+        "name": "HealthBench (length-adjusted)",
+        "value": 54.5,
+        "formatted": "54.5%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6 Astra system card",
+          "url": "https://deploymentsafety.openai.com/gpt-6-astra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "healthBenchProfessional",
+        "name": "HealthBench Professional",
+        "value": 60.8,
+        "formatted": "60.8%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6 Astra system card",
+          "url": "https://deploymentsafety.openai.com/gpt-6-astra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "healthBenchProfessionalRaw",
+        "name": "HealthBench Professional (raw)",
+        "value": 61.2,
+        "formatted": "61.2%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6 Astra system card",
+          "url": "https://deploymentsafety.openai.com/gpt-6-astra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "healthBenchHard",
+        "name": "HealthBench Hard",
+        "value": 31.4,
+        "formatted": "31.4%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6 Astra system card",
+          "url": "https://deploymentsafety.openai.com/gpt-6-astra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "math",
+        "categoryLabel": "Math",
+        "key": "frontierMathV2Tiers13",
+        "name": "FrontierMath v2 (Tiers 1-3)",
+        "value": 78.947,
+        "formatted": "78.947%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI FrontierMath v2 leaderboard",
+          "url": "https://epoch.ai/benchmarks/frontiermath-tiers-1-3-v2",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "math",
+        "categoryLabel": "Math",
+        "key": "frontierMathV2Tier4",
+        "name": "FrontierMath v2 (Tier 4)",
+        "value": 56.098,
+        "formatted": "56.098%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI FrontierMath v2 leaderboard",
+          "url": "https://epoch.ai/benchmarks/frontiermath-tier-4-v2?view=graph&tab=leaderboard",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "secBenchPro",
+        "name": "SEC-Bench Pro",
+        "value": 34.2,
+        "formatted": "34.2%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6 Astra system card",
+          "url": "https://deploymentsafety.openai.com/gpt-6-astra",
+          "retrievedAt": null
+        }
+      }
+    ],
+    "modelAliases": [
+      "openai-codex/gpt-6-luna"
+    ]
+  }
+}

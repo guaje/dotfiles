@@ -2,6 +2,7 @@ import { lstat, readFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { aaService } from "./service.ts";
+import { auditMethodology, describeMethodologyDrift } from "./methodology.ts";
 import { isThinkingLevel, validateBatchMappings, type ThinkingLevel } from "./schema.ts";
 
 const USAGE = `Usage: node agent/extensions/09-catalog/aa/cli.ts --missing|--check
@@ -9,9 +10,15 @@ const USAGE = `Usage: node agent/extensions/09-catalog/aa/cli.ts --missing|--che
        node agent/extensions/09-catalog/aa/cli.ts --add provider/model --aa-model-id ID [--thinking-level LEVEL]
        node agent/extensions/09-catalog/aa/cli.ts --replace-batch FILE
        node agent/extensions/09-catalog/aa/cli.ts --refresh provider/model|--refresh-all
+       node agent/extensions/09-catalog/aa/cli.ts --health
+       node agent/extensions/09-catalog/aa/cli.ts --methodology|--methodology-diff
 
 Snapshot-producing commands supplement null API evaluation components from the
-canonical public model page. They never map uncallable Pi reasoning variants.`;
+canonical public model page. They never map uncallable Pi reasoning variants.
+
+--methodology reports the methodology version AA publishes now against the local pin. --methodology-diff also
+re-scores every published metric from today's upstream values and classifies each metric as stable, drifted,
+gone, or indeterminate, which is the evidence used to re-review routing floors. Both are observation only.`;
 export interface CliIo { stdout(text: string): void; stderr(text: string): void; env: NodeJS.ProcessEnv; signal?: AbortSignal; }
 function output(stream: NodeJS.WriteStream): (text: string) => void { return (text) => { stream.write(text); }; }
 function tsv(value: string): string {
@@ -50,6 +57,30 @@ export async function runCli(args: string[], io: CliIo = { stdout: output(proces
       }
       case "--refresh": if (args.length !== 2) return usage(io); cleanupWarnings(io, await aaService.refresh(args[1]!, io.signal, io.env)); return 0;
       case "--refresh-all": if (args.length !== 1) return usage(io); cleanupWarnings(io, await aaService.refreshAll(io.signal, io.env)); return 0;
+      case "--health": {
+        if (args.length !== 1) return usage(io);
+        const health = await aaService.detectBenchmarkHealth(io.signal, io.env);
+        io.stdout(`benchmark health: ${Object.keys(health.fields).length} fields tracked${health.changed ? ", artifact updated" : ", artifact unchanged"}\n`);
+        for (const warning of health.warnings) io.stderr(`artificial-analysis: warning: ${safeDynamic(warning)}\n`);
+        return 0;
+      }
+      case "--methodology":
+      case "--methodology-diff": {
+        if (args.length !== 1) return usage(io);
+        const audit = await auditMethodology(io.signal, io.env);
+        const drift = describeMethodologyDrift(audit.drift);
+        io.stdout(`${drift.level === "warning" ? "WARN" : "OK  "} ${drift.text}\n`);
+        if (args[0] === "--methodology") return 0;
+        io.stdout("dimension           paired  meanDelta  maxDelta   rankRho  verdict\n");
+        const cell = (value: number | null, digits = 1) => (value === null ? "      —" : value.toFixed(digits).padStart(5 + digits));
+        for (const entry of audit.dimensions) {
+          io.stdout(`${entry.dimension.padEnd(18)}${String(`${entry.paired}/${entry.published}`).padStart(7)}  ${cell(entry.meanAbsDelta)}  ${cell(entry.maxAbsDelta)}  ${cell(entry.rankCorrelation, 2)}  ${entry.classification}${entry.classification === "stable" ? " *" : ""}\n`);
+        }
+        io.stdout(`\nstable across this methodology move:${audit.stableDimensions.length ? ` ${audit.stableDimensions.join(", ")}` : " none"}\n`);
+        io.stdout("Starred metrics may be used for interim comparison only. Floors, anchors, and coverage stay pinned until re-reviewed.\n");
+        for (const warning of audit.warnings) io.stderr(`artificial-analysis: warning: ${safeDynamic(warning)}\n`);
+        return 0;
+      }
       default: return usage(io);
     }
   } catch (error) { io.stderr(`artificial-analysis: ${safeDynamic(error instanceof Error ? error.message : "operation failed")}\n`); return 1; }

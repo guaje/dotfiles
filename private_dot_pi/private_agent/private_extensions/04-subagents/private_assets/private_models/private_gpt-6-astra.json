@@ -1,0 +1,1433 @@
+{
+  "version": 2,
+  "model": "gpt-6-astra",
+  "aa": {
+    "variants": [
+      {
+        "version": 4,
+        "provider": "openai-codex",
+        "model": "gpt-6-astra",
+        "thinkingLevel": "high",
+        "modelId": "e05a4828-0536-4876-870d-a235023f992b",
+        "capturedAt": 1793820815596,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793723440829,
+          "thinkingLevel": "high"
+        },
+        "source": {
+          "name": "GPT-6 Astra (High)",
+          "slug": "gpt-6-astra-high",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/gpt-6-astra-high",
+          "retrievedAt": 1793820815342,
+          "contentSha256": "ce496f4d8257a394cde172125f764a29760803abb814330a44bbfaea230cbbfd",
+          "recordSha256": "0a3d5760d6144e169c099c791ad42d225b74460d95eb8fc604448b43eacc8af4",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 54.8,
+          "coding": null,
+          "agentic": null,
+          "toolUse": 40,
+          "scientificReasoning": 58.95500840079156,
+          "longContext": 80,
+          "instructionFollowing": null,
+          "knowledge": 61.1,
+          "faithfulness": 57.49785775492716
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 53.058387395736794,
+          "gpqa": 94.94949494949499,
+          "critpt": 28.857142857142897
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": {
+              "normalizedScore": 40,
+              "sourceKind": "public-page",
+              "fieldPath": "tauBanking",
+              "benchmark": {
+                "id": "tau3-banking",
+                "version": "AA Intelligence Index v5.0.1",
+                "status": "current"
+              },
+              "retrievedAt": 1793820815342,
+              "sourceUrl": "https://artificialanalysis.ai/models/gpt-6-astra-high",
+              "sourceRecordDigest": "0a3d5760d6144e169c099c791ad42d225b74460d95eb8fc604448b43eacc8af4"
+            },
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "tau3-banking-single",
+            "score": 40
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.6666666666666666,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      },
+      {
+        "version": 4,
+        "provider": "openai-codex",
+        "model": "gpt-6-astra",
+        "thinkingLevel": "low",
+        "modelId": "a3f8100d-e38f-408b-b0fa-0085dae18dc1",
+        "capturedAt": 1793820816052,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793723441928,
+          "thinkingLevel": "low"
+        },
+        "source": {
+          "name": "GPT-6 Astra (Low)",
+          "slug": "gpt-6-astra-low",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/gpt-6-astra-low",
+          "retrievedAt": 1793820815798,
+          "contentSha256": "af5f4f0bac3a509e2840541d21714634a7ba8dc4aade57bc881974b4ff7fcef2",
+          "recordSha256": "4ef1ca78ef382c175c8f81c6d5addcf39772a346ff1883ec5173250e9eeff0c0",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 43.3,
+          "coding": null,
+          "agentic": null,
+          "toolUse": 31.958762886597903,
+          "scientificReasoning": 56.209753655536765,
+          "longContext": 80,
+          "instructionFollowing": null,
+          "knowledge": 58.599999999999994,
+          "faithfulness": 55.79710144927536
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 49.2122335495829,
+          "gpqa": 93.13131313131309,
+          "critpt": 26.285714285714302
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": {
+              "normalizedScore": 31.958762886597903,
+              "sourceKind": "public-page",
+              "fieldPath": "tauBanking",
+              "benchmark": {
+                "id": "tau3-banking",
+                "version": "AA Intelligence Index v5.0.1",
+                "status": "current"
+              },
+              "retrievedAt": 1793820815798,
+              "sourceUrl": "https://artificialanalysis.ai/models/gpt-6-astra-low",
+              "sourceRecordDigest": "4ef1ca78ef382c175c8f81c6d5addcf39772a346ff1883ec5173250e9eeff0c0"
+            },
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "tau3-banking-single",
+            "score": 31.958762886597903
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.6666666666666666,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      },
+      {
+        "version": 4,
+        "provider": "openai-codex",
+        "model": "gpt-6-astra",
+        "thinkingLevel": "max",
+        "modelId": "2f339a97-9a0d-499a-9cb5-e0db665bfa25",
+        "capturedAt": 1793820816385,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793723443019,
+          "thinkingLevel": "max"
+        },
+        "source": {
+          "name": "GPT-6 Astra (Max)",
+          "slug": "gpt-6-astra",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/gpt-6-astra",
+          "retrievedAt": 1793820816131,
+          "contentSha256": "096c255a384ce82cc1c075061bf070a2c8b2e0d05cbaf5179ca97903021b61d0",
+          "recordSha256": "f09f939d576eba7c7bc1bb342e6e828ef20b4b0ab835cde33e30bd65a36fc228",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 56.9,
+          "coding": null,
+          "agentic": null,
+          "toolUse": 41.4432989690722,
+          "scientificReasoning": 60.8183837581428,
+          "longContext": 80.6666666666667,
+          "instructionFollowing": null,
+          "knowledge": 61.56666666666667,
+          "faithfulness": 50.21682567215958
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 54.6802594995366,
+          "gpqa": 96.0606060606061,
+          "critpt": 31.7142857142857
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": {
+              "normalizedScore": 41.4432989690722,
+              "sourceKind": "public-page",
+              "fieldPath": "tauBanking",
+              "benchmark": {
+                "id": "tau3-banking",
+                "version": "AA Intelligence Index v5.0.1",
+                "status": "current"
+              },
+              "retrievedAt": 1793820816131,
+              "sourceUrl": "https://artificialanalysis.ai/models/gpt-6-astra",
+              "sourceRecordDigest": "f09f939d576eba7c7bc1bb342e6e828ef20b4b0ab835cde33e30bd65a36fc228"
+            },
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "tau3-banking-single",
+            "score": 41.4432989690722
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.6666666666666666,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      },
+      {
+        "version": 4,
+        "provider": "openai-codex",
+        "model": "gpt-6-astra",
+        "thinkingLevel": "medium",
+        "modelId": "e97a4ef5-e817-480e-9595-12f81dc4974f",
+        "capturedAt": 1793820816852,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793723444220,
+          "thinkingLevel": "medium"
+        },
+        "source": {
+          "name": "GPT-6 Astra (Medium)",
+          "slug": "gpt-6-astra-medium",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/gpt-6-astra-medium",
+          "retrievedAt": 1793820816601,
+          "contentSha256": "3b46afbeadd46df9651b236f5b1da116a0222f97ac08a43d0a66b46dcb5fec6a",
+          "recordSha256": "8e4d3961e472d6637ff93ed12ab0951025d2cd8d7e1a36db29abd18b9672820e",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 51.6,
+          "coding": null,
+          "agentic": null,
+          "toolUse": 35.4639175257732,
+          "scientificReasoning": 58.60542135240926,
+          "longContext": 79.6666666666667,
+          "instructionFollowing": null,
+          "knowledge": 59.63333333333334,
+          "faithfulness": 54.83071841453344
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 52.73401297497679,
+          "gpqa": 93.9393939393939,
+          "critpt": 29.1428571428571
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": {
+              "normalizedScore": 35.4639175257732,
+              "sourceKind": "public-page",
+              "fieldPath": "tauBanking",
+              "benchmark": {
+                "id": "tau3-banking",
+                "version": "AA Intelligence Index v5.0.1",
+                "status": "current"
+              },
+              "retrievedAt": 1793820816601,
+              "sourceUrl": "https://artificialanalysis.ai/models/gpt-6-astra-medium",
+              "sourceRecordDigest": "8e4d3961e472d6637ff93ed12ab0951025d2cd8d7e1a36db29abd18b9672820e"
+            },
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "tau3-banking-single",
+            "score": 35.4639175257732
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.6666666666666666,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      },
+      {
+        "version": 4,
+        "provider": "openai-codex",
+        "model": "gpt-6-astra",
+        "thinkingLevel": "xhigh",
+        "modelId": "1f541ef3-913f-4eb2-9d07-0e93c7a9a5e3",
+        "capturedAt": 1793820817366,
+        "methodology": {
+          "id": "artificial-analysis-intelligence-index",
+          "version": "5"
+        },
+        "mapping": {
+          "status": "mapped",
+          "matchBasis": "manual",
+          "reviewedAt": 1793723445415,
+          "thinkingLevel": "xhigh"
+        },
+        "source": {
+          "name": "GPT-6 Astra (Xhigh)",
+          "slug": "gpt-6-astra-xhigh",
+          "openrouterApiId": null
+        },
+        "publicPage": {
+          "url": "https://artificialanalysis.ai/models/gpt-6-astra-xhigh",
+          "retrievedAt": 1793820817112,
+          "contentSha256": "95502261e6305774e197595b25f79356f2fa6e3b84ab041622400b65ce0e2ab6",
+          "recordSha256": "66669fa149689706f23ed15f6f6a23ee75f6e0cba43e39dfd2c93b689fffe9ba",
+          "extractorVersion": "aa-current-model-rsc-v1",
+          "intelligenceIndexMethodologyVersion": "5.0.1"
+        },
+        "scores": {
+          "intelligence": 55.3,
+          "coding": null,
+          "agentic": null,
+          "toolUse": 43.0927835051546,
+          "scientificReasoning": 60.75959292826763,
+          "longContext": 80,
+          "instructionFollowing": null,
+          "knowledge": 61.03333333333333,
+          "faithfulness": 55.43199315654406
+        },
+        "subBenchmarks": {
+          "ifbench": null,
+          "hle": 54.587581093605195,
+          "gpqa": 96.2626262626263,
+          "critpt": 31.4285714285714
+        },
+        "toolUse": {
+          "components": {
+            "tau3Banking": {
+              "normalizedScore": 43.0927835051546,
+              "sourceKind": "public-page",
+              "fieldPath": "tauBanking",
+              "benchmark": {
+                "id": "tau3-banking",
+                "version": "AA Intelligence Index v5.0.1",
+                "status": "current"
+              },
+              "retrievedAt": 1793820817112,
+              "sourceUrl": "https://artificialanalysis.ai/models/gpt-6-astra-xhigh",
+              "sourceRecordDigest": "66669fa149689706f23ed15f6f6a23ee75f6e0cba43e39dfd2c93b689fffe9ba"
+            },
+            "gdpvalAaNormalized": null,
+            "tau2Telecom": null
+          },
+          "derivation": {
+            "version": "v2",
+            "rule": "tau3-banking-single",
+            "score": 43.0927835051546
+          }
+        },
+        "outputTokens": {},
+        "taskTimeMs": {},
+        "coverage": 0.6666666666666666,
+        "capabilities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      }
+    ]
+  },
+  "benchlm": {
+    "version": 1,
+    "runtimeId": "openai-codex/gpt-6-astra",
+    "canonicalId": "openai/gpt-6-astra",
+    "model": "GPT-6 Astra",
+    "creator": "OpenAI",
+    "capturedAt": 1793907107528,
+    "lastUpdated": "2026-11-05",
+    "methodologyVersion": "bench-align-v5.8-2026-09-30",
+    "sourceSnapshotId": "2026-11-05-3904bad35f77cff7",
+    "attribution": "Data from BenchLM.ai",
+    "license": "CC BY-NC 4.0",
+    "categoryScores": {
+      "coding": 74.51,
+      "agentic": 76,
+      "knowledge": 85.46,
+      "reasoning": 93.3,
+      "math": 97.3,
+      "multimodalGrounded": 88.2
+    },
+    "categoryProvenance": {
+      "coding": "leaderboard",
+      "agentic": "leaderboard",
+      "knowledge": "leaderboard",
+      "reasoning": "leaderboard",
+      "math": "leaderboard",
+      "multimodalGrounded": "leaderboard"
+    },
+    "categoryEvidence": {
+      "coding": {
+        "rows": 8,
+        "independentlyVerified": 4
+      },
+      "agentic": {
+        "rows": 16,
+        "independentlyVerified": 6
+      },
+      "instructionFollowing": {
+        "rows": 1,
+        "independentlyVerified": 0
+      },
+      "knowledge": {
+        "rows": 7,
+        "independentlyVerified": 0
+      },
+      "reasoning": {
+        "rows": 9,
+        "independentlyVerified": 5
+      },
+      "math": {
+        "rows": 2,
+        "independentlyVerified": 1
+      },
+      "multimodalGrounded": {
+        "rows": 5,
+        "independentlyVerified": 3
+      }
+    },
+    "categories": [
+      {
+        "key": "agentic",
+        "label": "Agentic",
+        "score": 76,
+        "rank": 7,
+        "total": 135
+      },
+      {
+        "key": "coding",
+        "label": "Coding",
+        "score": 74.5,
+        "rank": 5,
+        "total": 156
+      },
+      {
+        "key": "reasoning",
+        "label": "Reasoning",
+        "score": 93.3,
+        "rank": 1,
+        "total": 26
+      },
+      {
+        "key": "multimodalGrounded",
+        "label": "Multimodal",
+        "score": null,
+        "rank": null,
+        "total": 58
+      },
+      {
+        "key": "knowledge",
+        "label": "Knowledge",
+        "score": 85.5,
+        "rank": 4,
+        "total": 177
+      },
+      {
+        "key": "multilingual",
+        "label": "Multilingual",
+        "score": null,
+        "rank": null,
+        "total": 17
+      },
+      {
+        "key": "instructionFollowing",
+        "label": "Instruction following",
+        "score": null,
+        "rank": null,
+        "total": 157
+      },
+      {
+        "key": "math",
+        "label": "Math",
+        "score": null,
+        "rank": null,
+        "total": 12
+      }
+    ],
+    "details": [
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "lifeVal",
+        "name": "LifeVal",
+        "value": 80.6,
+        "formatted": "80.6%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: LifeVal",
+          "url": "https://openai.com/index/lifeval/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "browseComp",
+        "name": "BrowseComp",
+        "value": 91.5,
+        "formatted": "91.5%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-6 Astra",
+          "url": "https://openai.com/index/gpt-6-astra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "osWorld2",
+        "name": "OSWorld 2.0",
+        "value": 72.6,
+        "formatted": "72.6%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-6 Astra",
+          "url": "https://openai.com/index/gpt-6-astra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "terminalBench4",
+        "name": "Terminal-Bench 4.0",
+        "value": 57.9,
+        "formatted": "57.90%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-6 Astra",
+          "url": "https://openai.com/index/gpt-6-astra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "terminalBenchScience",
+        "name": "Terminal-Bench-Science 0.1",
+        "value": 64.6,
+        "formatted": "64.6%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-6 Astra",
+          "url": "https://openai.com/index/gpt-6-astra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "exploitGym",
+        "name": "ExploitGym",
+        "value": 42.4,
+        "formatted": "42.4%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-6 Astra",
+          "url": "https://openai.com/index/gpt-6-astra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "agentsLastExam",
+        "name": "Agents' Last Exam",
+        "value": 59.3,
+        "formatted": "59.3%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-6 Astra",
+          "url": "https://openai.com/index/gpt-6-astra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "automationBench",
+        "name": "AutomationBench",
+        "value": 41.4,
+        "formatted": "41.4%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-6 Astra",
+          "url": "https://openai.com/index/gpt-6-astra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "hleWithTools",
+        "name": "HLE w/ tools",
+        "value": 57.2,
+        "formatted": "57.2%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-6 Astra",
+          "url": "https://openai.com/index/gpt-6-astra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "valsTerminalBench21",
+        "name": "Terminal-Bench 2.1 (Vals)",
+        "value": 87.3,
+        "formatted": "87.3%",
+        "verificationStatus": "aggregator_verified",
+        "verificationLabel": "Verified",
+        "source": {
+          "label": "Vals AI: Terminal-Bench 2.1 leaderboard",
+          "url": "https://www.vals.ai/models/openai_gpt-6-astra",
+          "retrievedAt": null,
+          "publisher": "Vals AI",
+          "publisherUrl": "https://www.vals.ai/",
+          "sourceLabel": "Vals AI",
+          "sourceRole": "published-evaluation-results",
+          "scope": "Published leaderboard aggregates and evaluation settings only. Dataset contents are not included.",
+          "datasetContentsIncluded": false,
+          "licenseGrantIncluded": false,
+          "benchmarkUrl": "https://www.vals.ai/benchmarks/terminal-bench-2-1"
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "apprenticeBench",
+        "name": "ApprenticeBench",
+        "value": 68,
+        "formatted": "68%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "NeoCognition: ApprenticeBench GUI results",
+          "url": "https://neocognition.io/blog/apprentice-bench/#are-frontier-agents-ready-for-the-job",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "cweBenchV1",
+        "name": "CWE-bench v1",
+        "value": 68,
+        "formatted": "68.0%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Collinear: CWE-bench v1 leaderboard",
+          "url": "https://cwe-bench.com/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "hermesIndex",
+        "name": "Hermes Index",
+        "value": 56.25,
+        "formatted": "56.3%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Nous Research: Hermes Index leaderboard",
+          "url": "https://portal.nousresearch.com/bench",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "hermesBench",
+        "name": "Hermes Bench",
+        "value": 73.67,
+        "formatted": "73.7%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Nous Research: Hermes Index leaderboard",
+          "url": "https://portal.nousresearch.com/bench",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "mazeBench",
+        "name": "MazeBench",
+        "value": 23,
+        "formatted": "23%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "MazeBench AI leaderboard (ASCII mode)",
+          "url": "https://mazebench.com/leaderboard/ai?mode=ascii&tools=1&metric=gems&run=run-2026-09-07T20-06-12-768Z-cba537",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "osWorld21",
+        "name": "OSWorld 2.1",
+        "value": 75.8,
+        "formatted": "75.8%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Meta: Muse Wonder model card, October 12, 2026",
+          "url": "https://research.meta.ai/static/muse-wonder-model-card",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "scarfBench",
+        "name": "ScarfBench",
+        "value": 65.4,
+        "formatted": "65.4%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Kaggle: ScarfBench leaderboard (IBM Research)",
+          "url": "https://www.kaggle.com/benchmarks/ibm-research/scarfbench",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "deepSwe",
+        "name": "DeepSWE",
+        "value": 74.1,
+        "formatted": "74.1%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-6 Astra",
+          "url": "https://openai.com/index/gpt-6-astra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "frontierCode",
+        "name": "FrontierCode 1.1 Main",
+        "value": 53.3,
+        "formatted": "53.3%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-6 Astra",
+          "url": "https://openai.com/index/gpt-6-astra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "frontierCode11Extended",
+        "name": "FrontierCode 1.1 Extended",
+        "value": 64.5,
+        "formatted": "64.5%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-6 Astra",
+          "url": "https://openai.com/index/gpt-6-astra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "frontierSweV2",
+        "name": "FrontierSWE v2",
+        "value": 65.5,
+        "formatted": "65.5%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Proximal: FrontierSWE v2 leaderboard",
+          "url": "https://www.frontierswe.com/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "postTrainBench11",
+        "name": "PostTrainBench v1.1",
+        "value": 44.3,
+        "formatted": "44.3%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Google: Gemini 4 Argon launch chart",
+          "url": "https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-4-argon/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "bug-hunt-bench",
+        "name": "Bug Hunt Bench",
+        "value": 45,
+        "formatted": "45.0 fixes",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Bug Hunt Bench public data",
+          "url": "https://bughunt.productcompass.pm/data/benchmark.json",
+          "retrievedAt": "2026-11-05"
+        }
+      },
+      {
+        "category": "coding",
+        "categoryLabel": "Coding",
+        "key": "frontierCode2",
+        "name": "FrontierCode 2.0",
+        "value": 42.8,
+        "formatted": "42.8%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Cognition: FrontierCode 2.0",
+          "url": "https://cognition.com/blog/frontier-code-2.0",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "reasoning",
+        "categoryLabel": "Reasoning",
+        "key": "stemBench120",
+        "name": "STEMBench",
+        "value": 2.809,
+        "formatted": "2.81",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "STEMBench120 October 28, 2026 snapshot audit (Ulam)",
+          "url": "https://www.ulam.ai/stembench#full-run-results",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "reasoning",
+        "categoryLabel": "Reasoning",
+        "key": "arcAgi1",
+        "name": "ARC-AGI-1",
+        "value": 97.5,
+        "formatted": "97.50%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ARC Prize: published Semi-Private results",
+          "url": "https://arcprize.org/results/openai-gpt-6-astra",
+          "retrievedAt": "2026-11-05T15:24:10.860Z"
+        }
+      },
+      {
+        "category": "reasoning",
+        "categoryLabel": "Reasoning",
+        "key": "arcAgi2",
+        "name": "ARC-AGI-2",
+        "value": 95,
+        "formatted": "95%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ARC Prize: published Semi-Private results",
+          "url": "https://arcprize.org/results/openai-gpt-6-astra",
+          "retrievedAt": "2026-11-05T15:24:10.860Z"
+        }
+      },
+      {
+        "category": "reasoning",
+        "categoryLabel": "Reasoning",
+        "key": "arcAgi3",
+        "name": "ARC-AGI-3",
+        "value": 62.712802,
+        "formatted": "62.7%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ARC Prize: published Semi-Private results",
+          "url": "https://arcprize.org/results/openai-gpt-6-astra",
+          "retrievedAt": "2026-11-05T15:24:10.860Z"
+        }
+      },
+      {
+        "category": "reasoning",
+        "categoryLabel": "Reasoning",
+        "key": "geneBenchPro",
+        "name": "GeneBench-Pro",
+        "value": 37.8,
+        "formatted": "37.8%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-6 Astra",
+          "url": "https://openai.com/index/gpt-6-astra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "reasoning",
+        "categoryLabel": "Reasoning",
+        "key": "mrcrv2_256_512",
+        "name": "MRCR v2 256K-512K",
+        "value": 100,
+        "formatted": "100.0%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-6 Astra",
+          "url": "https://openai.com/index/gpt-6-astra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "reasoning",
+        "categoryLabel": "Reasoning",
+        "key": "mrcrv2_512_1m",
+        "name": "MRCR v2 512K-1M",
+        "value": 96.3,
+        "formatted": "96.3%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-6 Astra",
+          "url": "https://openai.com/index/gpt-6-astra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "reasoning",
+        "categoryLabel": "Reasoning",
+        "key": "graphwalksBfs256k1m",
+        "name": "GraphWalks BFS 256K–1M",
+        "value": 71.8,
+        "formatted": "71.8%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Google: Gemini 4 Argon launch chart",
+          "url": "https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-4-argon/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "reasoning",
+        "categoryLabel": "Reasoning",
+        "key": "arcAgi3ProviderAdapter",
+        "name": "ARC-AGI-3 Provider Adapter",
+        "value": 98.550743,
+        "formatted": "98.55%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ARC Prize: published Semi-Private results",
+          "url": "https://arcprize.org/results/openai-gpt-6-astra",
+          "retrievedAt": "2026-11-05T15:24:10.860Z"
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "extractBenchPro",
+        "name": "ExtractBench Pro",
+        "value": 58,
+        "formatted": "58%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ExtractBench Pro leaderboard, October 28, 2026 snapshot (LlamaIndex)",
+          "url": "https://www.extractbench.ai/pro#leaderboard",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "extractBenchLlamaIndex",
+        "name": "ExtractBench (LlamaIndex)",
+        "value": 91.91,
+        "formatted": "91.91%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ExtractBench leaderboard, November 5, 2026 snapshot (LlamaIndex)",
+          "url": "https://www.extractbench.ai/#leaderboard",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "parseBenchLlamaIndex",
+        "name": "ParseBench",
+        "value": 69.81,
+        "formatted": "69.81%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "ParseBench leaderboard, November 5, 2026 snapshot (LlamaIndex)",
+          "url": "https://www.parsebench.ai/#leaderboard",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "screenSpotPro",
+        "name": "ScreenSpot Pro",
+        "value": 92.7,
+        "formatted": "92.7%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-6 Astra",
+          "url": "https://openai.com/index/gpt-6-astra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "benchCadVision2CodeWithTools",
+        "name": "BenchCAD Vision2Code (tools)",
+        "value": 0.959,
+        "formatted": "0.959",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-6 Astra",
+          "url": "https://openai.com/index/gpt-6-astra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "gpqa",
+        "name": "GPQA",
+        "value": 96,
+        "formatted": "96%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-6 Astra",
+          "url": "https://openai.com/index/gpt-6-astra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "gpqaDiamond",
+        "name": "GPQA-D",
+        "value": 96,
+        "formatted": "96.0%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-6 Astra",
+          "url": "https://openai.com/index/gpt-6-astra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "healthBench",
+        "name": "HealthBench (raw)",
+        "value": 56.9,
+        "formatted": "56.9%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6 Astra system card",
+          "url": "https://deploymentsafety.openai.com/gpt-6-astra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "healthBenchLengthAdjusted",
+        "name": "HealthBench (length-adjusted)",
+        "value": 58.3,
+        "formatted": "58.3%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6 Astra system card",
+          "url": "https://deploymentsafety.openai.com/gpt-6-astra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "healthBenchProfessional",
+        "name": "HealthBench Professional",
+        "value": 64.7,
+        "formatted": "64.7%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6 Astra system card",
+          "url": "https://deploymentsafety.openai.com/gpt-6-astra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "healthBenchProfessionalRaw",
+        "name": "HealthBench Professional (raw)",
+        "value": 68.2,
+        "formatted": "68.2%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6 Astra system card",
+          "url": "https://deploymentsafety.openai.com/gpt-6-astra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "healthBenchHard",
+        "name": "HealthBench Hard",
+        "value": 36.6,
+        "formatted": "36.6%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6 Astra system card",
+          "url": "https://deploymentsafety.openai.com/gpt-6-astra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "instructionFollowing",
+        "categoryLabel": "Instruction following",
+        "key": "graySwanIpi15",
+        "name": "Gray Swan IPI (15 attempts)",
+        "value": 8.5,
+        "formatted": "8.5%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Google: Gemini 4 Argon launch chart",
+          "url": "https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-4-argon/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "math",
+        "categoryLabel": "Math",
+        "key": "frontierMathV2Tier4",
+        "name": "FrontierMath v2 (Tier 4)",
+        "value": 97.6,
+        "formatted": "97.600%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-6 Astra",
+          "url": "https://openai.com/index/gpt-6-astra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "math",
+        "categoryLabel": "Math",
+        "key": "frontierMathV2Tiers13",
+        "name": "FrontierMath v2 (Tiers 1-3)",
+        "value": 93.684,
+        "formatted": "93.684%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI FrontierMath v2 leaderboard",
+          "url": "https://epoch.ai/benchmarks/frontiermath-tiers-1-3-v2",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "exploitBench",
+        "name": "ExploitBench",
+        "value": 100,
+        "formatted": "100%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6 Astra system card",
+          "url": "https://deploymentsafety.openai.com/gpt-6-astra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "sreBench",
+        "name": "SRE-Bench",
+        "value": 88,
+        "formatted": "88.0%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-6 Astra",
+          "url": "https://openai.com/index/gpt-6-astra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "secBenchPro",
+        "name": "SEC-Bench Pro",
+        "value": 85.4,
+        "formatted": "85.4%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-6 Astra",
+          "url": "https://openai.com/index/gpt-6-astra/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "frontierCyber",
+        "name": "FrontierCyber",
+        "value": 38.1,
+        "formatted": "38.1%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Irregular: Assessing GPT-6 Astra",
+          "url": "https://www.irregular.com/research/assessing-gpt-6-astra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "cyScenarioBenchAverageSuccess",
+        "name": "CyScenarioBench success",
+        "value": 59,
+        "formatted": "59%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Irregular: Assessing GPT-6 Astra",
+          "url": "https://www.irregular.com/research/assessing-gpt-6-astra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "cyScenarioBenchScenariosSolved",
+        "name": "CyScenarioBench solved",
+        "value": 9,
+        "formatted": "9%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Irregular: Assessing GPT-6 Astra",
+          "url": "https://www.irregular.com/research/assessing-gpt-6-astra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "atomicNetworkAttackSimulation",
+        "name": "Atomic network attacks",
+        "value": 100,
+        "formatted": "100%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Irregular: Assessing GPT-6 Astra",
+          "url": "https://www.irregular.com/research/assessing-gpt-6-astra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "atomicVulnerabilityResearch",
+        "name": "Atomic vulnerability research",
+        "value": 100,
+        "formatted": "100%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Irregular: Assessing GPT-6 Astra",
+          "url": "https://www.irregular.com/research/assessing-gpt-6-astra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "atomicEvasion",
+        "name": "Atomic evasion",
+        "value": 52,
+        "formatted": "52%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Irregular: Assessing GPT-6 Astra",
+          "url": "https://www.irregular.com/research/assessing-gpt-6-astra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "advancedCyberCompletionRateStandard",
+        "name": "ACCR standard",
+        "value": 3.5,
+        "formatted": "3.5%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6 Astra system card",
+          "url": "https://deploymentsafety.openai.com/gpt-6-astra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "advancedCyberCompletionRateBlue",
+        "name": "ACCR Daybreak Blue",
+        "value": 3.5,
+        "formatted": "3.5%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6 Astra system card",
+          "url": "https://deploymentsafety.openai.com/gpt-6-astra",
+          "retrievedAt": null
+        }
+      }
+    ],
+    "modelAliases": [
+      "openai-codex/gpt-6-astra"
+    ]
+  }
+}

@@ -12,8 +12,8 @@
         "supportsReasoningEffort": false
       }
     },
-    "pi": {
-      "baseUrl": "https://jrguajeg-pi.tra160003.projects.jetstream-cloud.org/v1",
+    "model-testing": {
+      "baseUrl": "https://model-testing-litellm.tra160003.projects.jetstream-cloud.org/v1",
       "api": "openai-completions",
       "apiKey": "{{ (index ((secret "-d" (joinPath .chezmoi.sourceDir "secrets/private_dot_pi/private_agent/private_models.json.sops.yaml") | fromYaml).data | fromYaml) "apiKey__2") }}",
       "compat": {

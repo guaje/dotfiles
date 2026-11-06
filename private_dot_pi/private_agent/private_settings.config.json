@@ -1,7 +1,7 @@
 {
   "$schema": "https://pi.dev/schemas/settings.schema.json",
   "defaultModel": "qwen3.8-flash-next",
-  "defaultProvider": "pi",
+  "defaultProvider": "model-testing",
   "defaultThinkingLevel": "medium",
   "defaultTools": [
     "+codemode"
@@ -9,14 +9,18 @@
   "enabledModels": [
     "openai-codex/gpt-6-astra",
     "openai-codex/gpt-6.1-sol",
+    "openai-codex/gpt-6.1-terra",
     "openai-codex/gpt-5.6-sol",
-    "pi/qwen3.8-flash-next",
     "openai-codex/gpt-5.6-terra",
+    "model-testing/mimo-v2.6-pro",
+    "reallms-dev/glm-5.3-flash",
+    "model-testing/qwen3.8-flash-next",
     "openai-codex/gpt-6-luna",
-    "openai-codex/gpt-5.6-luna",
-    "pi/qwen3.8-27b",
+    "model-testing/mistral-large-4",
+    "model-testing/qwen3.8-27b",
     "reallms/qwen3.8-27b",
-    "kelley/Kimi-K2.6"
+    "kelley/Kimi-K2.6",
+    "model-testing/muse-glimmer"
   ],
   "extensions": [
     "extensions/00-hud/index.ts",
@@ -31,6 +35,19 @@
     "extensions/09-catalog/index.ts"
   ],
   "browse": {
+    "fallbackProviders": [
+      "tavily"
+    ],
+    "limits": {
+      "maxCalls": 8,
+      "maxFetchChars": 30000,
+      "maxResponseBytes": 1000000,
+      "maxResults": 8,
+      "pollIntervalMs": 1000,
+      "pollTimeoutMs": 120000,
+      "retries": 1,
+      "timeoutMs": 30000
+    },
     "providers": {
       "linkup": {
         "baseUrl": "https://api.linkup.so"
@@ -38,31 +55,24 @@
       "tavily": {
         "baseUrl": "https://api.tavily.com"
       }
-    },
-    "fallbackProviders": [
-      "tavily"
-    ],
-    "limits": {
-      "maxResults": 8,
-      "maxResponseBytes": 1000000,
-      "maxFetchChars": 30000,
-      "maxCalls": 8,
-      "timeoutMs": 30000,
-      "retries": 1,
-      "pollIntervalMs": 1000,
-      "pollTimeoutMs": 120000
     }
   },
   "catalog": {
+    "artificialAnalysis": {
+      "requestDelayMs": 250
+    },
+    "benchlm": {
+      "requestDelayMs": 250
+    },
     "refreshTtlMs": 14400000,
     "requestTimeoutMs": 10000
   },
   "handoff": {
-    "remoteRoot": "~/.local/state/pi/remote-sessions",
-    "hotkey": "ctrl+alt+s"
+    "hotkey": "ctrl+alt+s",
+    "remoteRoot": "~/.local/state/pi/remote-sessions"
   },
   "health": {
-    "cacheTtlMs": 900000,
+    "cacheTtlMs": 300000,
     "probeConcurrency": 8
   },
   "imageGenerationProviders": {
@@ -76,23 +86,31 @@
     }
   },
   "permissions": {
-    "managingStyle": "Empowerment",
     "empowermentDisposableRoots": [
       "@user-temp"
     ],
-    "sessionApprovalMaxRules": 100,
+    "managementStyleBackwardHotkey": "shift+ctrl+;",
     "managementStyleForwardHotkey": "ctrl+;",
-    "managementStyleBackwardHotkey": "shift+ctrl+;"
+    "managingStyle": "Empowerment",
+    "sessionApprovalMaxRules": 100
   },
   "quietStartup": "header",
   "subagents": {
-    "rosterCap": 10,
-    "rosterScope": "user",
-    "maxParallelTasks": 8,
-    "maxConcurrency": 4,
     "autoModelSelection": {
       "benchmarkSnapshotMaxAgeMs": 2592000000
-    }
+    },
+    "driftAlarmMinPoints": 12,
+    "driftWarmupRows": 20,
+    "healthProbeBudgetMs": 10000,
+    "maxConcurrency": 4,
+    "maxParallelTasks": 8,
+    "maxProbeLatencyMs": 5000,
+    "measuredSpeedMinimumRuns": 10,
+    "outcomeInfluenceFullAt": 60,
+    "outcomeWindow": 100,
+    "researchMinimumContextWindow": 131072,
+    "rosterCap": 10,
+    "rosterScope": "user"
   },
   "theme": "catppuccin-mocha"
 }

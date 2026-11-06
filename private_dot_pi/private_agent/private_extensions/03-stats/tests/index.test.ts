@@ -1,14 +1,29 @@
 // Run with: npx -y tsx --test agent/extensions/03-stats/tests/index.test.ts
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { after, before } from "node:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { installPackageStubs, releasePackageStubs } from "../../tests/helpers/package-stubs.ts";
 
+
+
 const EXTENSION_PATH = resolve("agent/extensions/03-stats/index.ts");
 
+// Local runtime state must not decide a unit test: isolate the outcome store in a scratch file so a real
+// `agent/subagent-outcomes.json` can never make "no usage data" assertions flaky.
+const originalOutcomesPath = process.env.PI_SUBAGENT_OUTCOMES_PATH;
+let outcomesRoot = "";
+before(() => {
+  outcomesRoot = mkdtempSync(resolve(tmpdir(), "pi-stats-outcomes-"));
+  process.env.PI_SUBAGENT_OUTCOMES_PATH = resolve(outcomesRoot, "subagent-outcomes.json");
+});
+after(() => {
+  if (originalOutcomesPath === undefined) delete process.env.PI_SUBAGENT_OUTCOMES_PATH;
+  else process.env.PI_SUBAGENT_OUTCOMES_PATH = originalOutcomesPath;
+  if (outcomesRoot) rmSync(outcomesRoot, { recursive: true, force: true });
+});
 function createModelsFixture() {
   const root = mkdtempSync(resolve(tmpdir(), "pi-stats-models-"));
   const modelsPath = resolve(root, "models.json");
@@ -33,6 +48,14 @@ async function loadExtension() {
 
 test.after(() => {
   releasePackageStubs();
+});
+
+test("stats renders recent local outcomes and drift flags", async () => {
+  const { formatStatsTable } = await loadExtension();
+  const row = { id: "1", finishedAt: 2, startedAt: 1, durationMs: 10, ttftMs: 2, session: "s", agent: "worker", profile: "coding", model: "test/model", selector: "benchmark", exitCode: 0, turns: 1, tokens: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 }, costUsd: 0, taskFingerprint: "x", taskHead: "build feature", outcome: "success", outcomeSource: "auto", expectedOutputTokens: 10 };
+  const lines = formatStatsTable({ main: [], subagents: [], modelChanges: [], hasCost: false, hasNotionalCost: false, recentOutcomes: [row], outcomeSummaries: [{ model: "test/model", profile: "coding", observations: 20, successes: 10, successRate: 0.5, effectiveCostPerDone: 0, effectiveTimePerDoneMs: 1, medianTurns: 1, successDrift: true, timeDrift: false, effortYield: {} }] });
+  assert.match(lines.join("\n"), /Recent subagent outcomes/);
+  assert.match(lines.join("\n"), /drift: test\/model\/coding success/);
 });
 
 test("calculateUsageCost uses Pi's USD-per-1M-token formula including 1h cache writes", async () => {

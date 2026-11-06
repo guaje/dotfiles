@@ -3,6 +3,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Key, matchesKey, truncateToWidth, type Component } from "@earendil-works/pi-tui";
+import { loadOutcomeStore, summarizeOutcomes, type OutcomeRow, type OutcomeSummary } from "../04-subagents/outcomes.ts";
+import { getSubagentExecutionSettings } from "../04-subagents/settings.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -71,6 +73,8 @@ export interface StatsSummary {
   hasCost: boolean;
   hasNotionalCost: boolean;
   unpricedModels?: string[];
+  recentOutcomes?: OutcomeRow[];
+  outcomeSummaries?: OutcomeSummary[];
 }
 
 interface StatsTheme {
@@ -447,7 +451,7 @@ export function formatStatsTable(summary: StatsSummary, theme: StatsTheme = PASS
   const lines: string[] = [];
   lines.push(theme.fg("mdLink", theme.bold("Session stats")));
 
-  if (summary.main.length === 0 && summary.subagents.length === 0) {
+  if (summary.main.length === 0 && summary.subagents.length === 0 && !summary.recentOutcomes?.length) {
     lines.push("");
     lines.push(theme.fg("muted", "No usage data available for this session."));
     return lines;
@@ -532,6 +536,20 @@ export function formatStatsTable(summary: StatsSummary, theme: StatsTheme = PASS
     lines.push(`  ${theme.fg("toolOutput", "Main session".padEnd(30))}  ${theme.fg("toolOutput", mainValues)}`);
     lines.push(`  ${theme.fg("toolOutput", "Subagents".padEnd(30))}  ${theme.fg("toolOutput", subagentValuesTotal)}`);
     lines.push(`  ${theme.fg("accent", theme.bold("Session total".padEnd(30)))}  ${theme.fg("accent", theme.bold(combinedValues))}`);
+  }
+
+  if (summary.recentOutcomes?.length) {
+    lines.push("");
+    lines.push(theme.fg("mdHeading", theme.bold("Recent subagent outcomes")));
+    for (const row of summary.recentOutcomes.slice(-8).reverse()) {
+      const flag = row.outcome === "success" ? theme.fg("success", "✓") : theme.fg("error", "✗");
+      lines.push(`  ${flag} ${theme.fg("text", truncate(row.model, 28))}  ${theme.fg("dim", `${row.profile} ${Math.round(row.durationMs)}ms ${truncate(row.taskHead, 40)}`)}`);
+    }
+    for (const item of summary.outcomeSummaries ?? []) {
+      const efforts = Object.entries(item.effortYield).map(([level, yieldRate]) => `${level}:${Math.round((yieldRate ?? 0) * 100)}%`).join(" ");
+      lines.push(theme.fg("dim", `  ${item.model}/${item.profile} success ${Math.round(item.successRate * 100)}% • done-time ${Math.round(item.effectiveTimePerDoneMs)}ms • done-cost ${fmtCost(item.effectiveCostPerDone)} • turns ${item.medianTurns}${efforts ? ` • effort ${efforts}` : ""}`));
+      if (item.successDrift || item.timeDrift) lines.push(theme.fg("warning", `  drift: ${item.model}/${item.profile}${item.successDrift ? " success" : ""}${item.timeDrift ? " time" : ""}`));
+    }
   }
 
   if (summary.hasNotionalCost) {
@@ -654,6 +672,9 @@ export default function statsExtension(pi: ExtensionAPI) {
         const entries = ctx.sessionManager.getBranch();
         const costRates = await loadModelCostRates(MODELS_PATH, MODEL_COST_OVERRIDES_PATH, ctx.modelRegistry as never);
         const summary = extractStats(entries as Array<any>, costRates);
+        const [outcomes, settings] = await Promise.all([loadOutcomeStore(), getSubagentExecutionSettings()]);
+        summary.recentOutcomes = outcomes.rows.slice(-8);
+        summary.outcomeSummaries = summarizeOutcomes(outcomes.rows, { warmupRows: settings.driftWarmupRows, alarmMinPoints: settings.driftAlarmMinPoints });
         await renderStatsTable(summary, ctx, pi);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

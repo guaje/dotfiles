@@ -137,6 +137,7 @@ export default async function permissions(pi: ExtensionAPI) {
       const inspection = inspectBash(event.input.command, executionContext);
       const decision = decideAnalysis(inspection.analysis, style as PersistedManagingStyle);
       const executionEnv = shellEnvironment?.();
+      const agentCommand = typeof event.input?.command === "string" ? event.input.command : "";
       const hasLocalExecutable = inspection.analysis.identityRequirements.some((requirement) => requirement.context.location === "local");
       let approvalAnalysis = inspection.analysis;
       let identityVeto = false;

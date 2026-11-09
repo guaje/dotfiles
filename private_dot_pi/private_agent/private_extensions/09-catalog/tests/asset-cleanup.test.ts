@@ -14,7 +14,11 @@ test("tracked deletions under the shared asset root run chezmoi forget then rm -
       [{ kind: "D", targetPath: target }, { kind: "M", targetPath: path.join(root, "aa-manifest.json") }],
       { root, run: async (command, args) => { calls.push([command, args]); return { code: 0 }; } },
     );
-    assert.deepEqual(calls, [["chezmoi", ["forget", target]], ["rm", ["-f", target]]]);
+    assert.equal(calls[0]?.[0], "chezmoi");
+    assert.deepEqual(calls[0]?.[1].slice(0, 1), ["forget"]);
+    assert.ok(calls[0]![1].includes("--force") && calls[0]![1].includes("--no-tty"), "forget must never ask a question the interface cannot answer");
+    assert.equal(calls[0]![1].at(-1), target);
+    assert.deepEqual(calls.slice(1), [["rm", ["-f", target]]], "the file removal follows the forget, never replaces it");
     assert.deepEqual(result.removed, [target]);
     assert.deepEqual(result.skipped, []);
     assert.deepEqual(result.warnings, []);

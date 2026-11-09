@@ -11,8 +11,16 @@ export interface AssetCleanupRunner { (command: string, args: readonly string[])
 export interface AssetCleanupResult { forgotten: string[]; removed: string[]; skipped: string[]; warnings: string[] }
 
 const DEFAULT_ASSET_ROOT = path.resolve(import.meta.dirname, "../04-subagents/assets");
+/**
+ * `chezmoi forget` asks "Remove <source path>?" before it acts. Inside a live TUI the child can still open
+ * `/dev/tty`, so it prints its prompt into the operator's terminal and waits for a keystroke the interface
+ * never forwards: the sync appears to freeze at exactly this call. `--force` answers the prompt and
+ * `--no-tty` removes the option of stealing the terminal; the timeout is the last resort so no child can
+ * hold a sync open indefinitely.
+ */
+const CLEANUP_TIMEOUT_MS = 30_000;
 const runByDefault: AssetCleanupRunner = (command, args) => new Promise((resolve) => {
-  execFile(command, [...args], { windowsHide: true }, (error, _stdout, stderr) => resolve({ code: error ? (typeof (error as NodeJS.ErrnoException & { code?: unknown }).code === "number" ? (error as unknown as { code: number }).code : 1) : 0, stderr: String(stderr) }));
+  execFile(command, [...args], { windowsHide: true, timeout: CLEANUP_TIMEOUT_MS }, (error, _stdout, stderr) => resolve({ code: error ? (typeof (error as NodeJS.ErrnoException & { code?: unknown }).code === "number" ? (error as unknown as { code: number }).code : 1) : 0, stderr: String(stderr) }));
 });
 
 function insideAssetRoot(root: string, targetPath: string): boolean {
@@ -36,7 +44,7 @@ export async function executeTrackedAssetDeletions(
   const forgotten: string[] = [], removed: string[] = [];
   if (!allowed.length) return { forgotten, removed, skipped, warnings };
   const unique = [...new Set(allowed)];
-  const forget = await run("chezmoi", ["forget", ...unique]);
+  const forget = await run("chezmoi", ["forget", "--force", "--no-tty", ...unique]);
   if (forget.code === 0) forgotten.push(...unique);
   else warnings.push(`chezmoi forget did not complete for ${unique.length} deleted asset path(s); rm -f still ran. ${forget.stderr?.trim() || ""}`.trim());
   const removal = await run("rm", ["-f", ...unique]);

@@ -1,87 +1,75 @@
 {
   "version": 1,
-  "generatedAt": 1793907107528,
+  "generatedAt": 1794001787441,
   "methodologyVersion": "bench-align-v5.8-2026-09-30",
-  "sourceSnapshotId": "2026-11-05-3904bad35f77cff7",
-  "digest": "01b9d601c6638d35388b00d234d90e30013a5208447fb2ed72e3aaf9874a7e4c",
+  "sourceSnapshotId": "2026-11-06-8d3e46af35e8fc5d",
+  "digest": "31c5c3a4ecac93a30244b92bc33469bf626fcbe44510bc9c329221413aab647c",
   "models": [
     {
       "runtimeId": "kelley/Kimi-K2.6",
       "canonicalId": "moonshotai/kimi-k2.6",
       "file": "kimi-k2.6.json",
-      "contentDigest": "7b10b9977c32a7df2f6c661e5b34e5c09581f8e98a28491b6024a6547fadd78f"
-    },
-    {
-      "runtimeId": "model-testing/mimo-v2.6-pro",
-      "canonicalId": "xiaomi/mimo-v2.6-pro",
-      "file": "mimo-v2.6-pro.json",
-      "contentDigest": "d5fcf2ec78eef6e7aeaf0bcd3879b34525fea23e95925641d5c49fe2b428a4e2"
-    },
-    {
-      "runtimeId": "model-testing/mistral-large-4",
-      "canonicalId": "mistralai/mistral-large-4",
-      "file": "mistral-large-4.json",
-      "contentDigest": "d68b652ee29e2824800882c5dc1cee16ecd27d6f09d6a1280fc4fd7e76330ec0"
+      "contentDigest": "dd6e04e57dfc97a4b9cd3b6f260604adef71a7641bb40db90f852505483ea568"
     },
     {
       "runtimeId": "model-testing/muse-glimmer",
       "canonicalId": "muse/muse-glimmer",
       "file": "muse-glimmer.json",
-      "contentDigest": "1f509b46f0d7d1c9390190009a31a4dc18ffddf01f21a462307762b2c0232893"
+      "contentDigest": "3fcddc13410c60b0febe3e68ab1ea802c5e6cfe9b5e9fe6e215d4f6b11306d5f"
     },
     {
       "runtimeId": "model-testing/qwen3.8-27b",
       "canonicalId": "qwen/qwen3.8-27b",
       "file": "qwen3.8-27b.json",
-      "contentDigest": "495537281d31f72c33898ef19cdbf87653891d0053d8a72e361f1813f0322de6"
+      "contentDigest": "96714b5684fff09777c12b79217993d54ac443b350c8c45778e9aa428d297e6f"
     },
     {
       "runtimeId": "model-testing/qwen3.8-flash-next",
       "canonicalId": "qwen/qwen3.8-flash-next",
       "file": "qwen3.8-flash-next.json",
-      "contentDigest": "a2b9e1b1544f3a94185e7dc0de99c6a2be92c579ae7ce50f7ac4405b6cadaba4"
+      "contentDigest": "6e34ea030c4f6d71f2a56231b67d45c9a19a37276933f3b964bd62df97eeaedb"
     },
     {
       "runtimeId": "openai-codex/gpt-5.6-sol",
       "canonicalId": "openai/gpt-5.6-sol",
       "file": "gpt-5.6-sol.json",
-      "contentDigest": "d50ff6544a3bf5bfe6505832457e4c1416b8c4767855b69a491847518049fc96"
+      "contentDigest": "187f1fe3a3107a7a1b96c218703e7a6e2d406aa1d80ac23dadd35843f3436033"
     },
     {
       "runtimeId": "openai-codex/gpt-5.6-terra",
       "canonicalId": "openai/gpt-5.6-terra",
       "file": "gpt-5.6-terra.json",
-      "contentDigest": "454296d491c93cbf3cde683bcbaf1d341a0e84a18b0904dd617a07df68b21471"
+      "contentDigest": "1219dba1597803b148d44d54eeab4ae812883b1bc25c6f72276399454aed54eb"
     },
     {
       "runtimeId": "openai-codex/gpt-6-astra",
       "canonicalId": "openai/gpt-6-astra",
       "file": "gpt-6-astra.json",
-      "contentDigest": "923d03257dd1396ead7fb81a06da62220ac95f4af42114fdee37f6396e6fcd6e"
+      "contentDigest": "f0738f0eb213e58c55e30b8b201fea796f31645e3c29f88a9c17052203f4e641"
     },
     {
       "runtimeId": "openai-codex/gpt-6-luna",
       "canonicalId": "openai/gpt-6-luna",
       "file": "gpt-6-luna.json",
-      "contentDigest": "ef2b011c155011285ffa2cbb02dd4f9c8ca4e2ffb8cb481d6d3ad47261b65e83"
+      "contentDigest": "c95bee8a2cb5d930b00cb3eea1446715c88a3653aa91bc53132e004ed2c38736"
     },
     {
       "runtimeId": "openai-codex/gpt-6.1-sol",
       "canonicalId": "openai/gpt-6.1-sol",
       "file": "gpt-6.1-sol.json",
-      "contentDigest": "d74016dd35bc391f341874a11c54dddaf8506ef4d1f249eb239e518d3716ab50"
+      "contentDigest": "b254b0bc2f827d17a6f6d2714249255a8cb7387985ee4c17a9acd41920600c04"
     },
     {
       "runtimeId": "openai-codex/gpt-6.1-terra",
       "canonicalId": "openai/gpt-6.1-terra",
       "file": "gpt-6.1-terra.json",
-      "contentDigest": "b8f4a5672f28ccf27f4800bb1b43eb11d3cc64586ccdd990a0c383ef9c61d366"
+      "contentDigest": "a179ba73429b0c13157e5041744a6a38dd5b55c5a1308003a77f6a284b353518"
     },
     {
       "runtimeId": "reallms-dev/glm-5.3-flash",
       "canonicalId": "z-ai/glm-5.3-flash",
       "file": "glm-5.3-flash.json",
-      "contentDigest": "a733d83ae97adc006bb2ec64650f5684a9b317777c7e80356317a86790128d63"
+      "contentDigest": "c381951bb12ff67a8e302fbd25f8a159d7129c05d989086a1464818dc326eeb2"
     }
   ]
 }

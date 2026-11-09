@@ -419,21 +419,24 @@
     "version": 1,
     "runtimeId": "openai-codex/gpt-6-astra",
     "canonicalId": "openai/gpt-6-astra",
+    "modelAliases": [
+      "openai-codex/gpt-6-astra"
+    ],
     "model": "GPT-6 Astra",
     "creator": "OpenAI",
-    "capturedAt": 1793907107528,
-    "lastUpdated": "2026-11-05",
+    "capturedAt": 1794001787441,
+    "lastUpdated": "2026-11-06",
     "methodologyVersion": "bench-align-v5.8-2026-09-30",
-    "sourceSnapshotId": "2026-11-05-3904bad35f77cff7",
+    "sourceSnapshotId": "2026-11-06-8d3e46af35e8fc5d",
     "attribution": "Data from BenchLM.ai",
     "license": "CC BY-NC 4.0",
     "categoryScores": {
-      "coding": 74.51,
-      "agentic": 76,
-      "knowledge": 85.46,
-      "reasoning": 93.3,
-      "math": 97.3,
-      "multimodalGrounded": 88.2
+      "coding": 74.83,
+      "agentic": 73.33,
+      "knowledge": 85.51,
+      "reasoning": 91.6,
+      "math": 93.8,
+      "multimodalGrounded": 88
     },
     "categoryProvenance": {
       "coding": "leaderboard",
@@ -461,7 +464,7 @@
         "independentlyVerified": 0
       },
       "reasoning": {
-        "rows": 9,
+        "rows": 10,
         "independentlyVerified": 5
       },
       "math": {
@@ -477,37 +480,37 @@
       {
         "key": "agentic",
         "label": "Agentic",
-        "score": 76,
-        "rank": 7,
-        "total": 135
+        "score": 73.3,
+        "rank": 8,
+        "total": 131
       },
       {
         "key": "coding",
         "label": "Coding",
-        "score": 74.5,
+        "score": 74.8,
         "rank": 5,
-        "total": 156
+        "total": 157
       },
       {
         "key": "reasoning",
         "label": "Reasoning",
-        "score": 93.3,
+        "score": 91.6,
         "rank": 1,
-        "total": 26
+        "total": 25
       },
       {
         "key": "multimodalGrounded",
         "label": "Multimodal",
         "score": null,
         "rank": null,
-        "total": 58
+        "total": 59
       },
       {
         "key": "knowledge",
         "label": "Knowledge",
         "score": 85.5,
         "rank": 4,
-        "total": 177
+        "total": 178
       },
       {
         "key": "multilingual",
@@ -882,7 +885,7 @@
         "source": {
           "label": "Bug Hunt Bench public data",
           "url": "https://bughunt.productcompass.pm/data/benchmark.json",
-          "retrievedAt": "2026-11-05"
+          "retrievedAt": "2026-11-06"
         }
       },
       {
@@ -897,6 +900,21 @@
         "source": {
           "label": "Cognition: FrontierCode 2.0",
           "url": "https://cognition.com/blog/frontier-code-2.0",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "reasoning",
+        "categoryLabel": "Reasoning",
+        "key": "bioBasicsBench",
+        "name": "BioBasicsBench",
+        "value": 66.98,
+        "formatted": "67.0%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: BioBasicsBench",
+          "url": "https://openai.com/index/measuring-how-ai-agents-handle-wet-lab-science/",
           "retrievedAt": null
         }
       },
@@ -927,7 +945,7 @@
         "source": {
           "label": "ARC Prize: published Semi-Private results",
           "url": "https://arcprize.org/results/openai-gpt-6-astra",
-          "retrievedAt": "2026-11-05T15:24:10.860Z"
+          "retrievedAt": "2026-11-06T18:02:09.380Z"
         }
       },
       {
@@ -942,7 +960,7 @@
         "source": {
           "label": "ARC Prize: published Semi-Private results",
           "url": "https://arcprize.org/results/openai-gpt-6-astra",
-          "retrievedAt": "2026-11-05T15:24:10.860Z"
+          "retrievedAt": "2026-11-06T18:02:09.380Z"
         }
       },
       {
@@ -957,7 +975,7 @@
         "source": {
           "label": "ARC Prize: published Semi-Private results",
           "url": "https://arcprize.org/results/openai-gpt-6-astra",
-          "retrievedAt": "2026-11-05T15:24:10.860Z"
+          "retrievedAt": "2026-11-06T18:02:09.380Z"
         }
       },
       {
@@ -1032,7 +1050,7 @@
         "source": {
           "label": "ARC Prize: published Semi-Private results",
           "url": "https://arcprize.org/results/openai-gpt-6-astra",
-          "retrievedAt": "2026-11-05T15:24:10.860Z"
+          "retrievedAt": "2026-11-06T18:02:09.380Z"
         }
       },
       {
@@ -1060,7 +1078,7 @@
         "verificationStatus": "benchmark_exact",
         "verificationLabel": "Benchmark exact",
         "source": {
-          "label": "ExtractBench leaderboard, November 5, 2026 snapshot (LlamaIndex)",
+          "label": "ExtractBench leaderboard, November 6, 2026 snapshot (LlamaIndex)",
           "url": "https://www.extractbench.ai/#leaderboard",
           "retrievedAt": null
         }
@@ -1075,7 +1093,7 @@
         "verificationStatus": "benchmark_exact",
         "verificationLabel": "Benchmark exact",
         "source": {
-          "label": "ParseBench leaderboard, November 5, 2026 snapshot (LlamaIndex)",
+          "label": "ParseBench leaderboard, November 6, 2026 snapshot (LlamaIndex)",
           "url": "https://www.parsebench.ai/#leaderboard",
           "retrievedAt": null
         }
@@ -1263,6 +1281,21 @@
       {
         "category": "external",
         "categoryLabel": "external",
+        "key": "clocktowerBench",
+        "name": "Clocktower Bench",
+        "value": 1859,
+        "formatted": "1859",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Clocktower Bench leaderboard",
+          "url": "https://clocktowerbench.com/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
         "key": "exploitBench",
         "name": "ExploitBench",
         "value": 100,
@@ -1424,10 +1457,67 @@
           "url": "https://deploymentsafety.openai.com/gpt-6-astra",
           "retrievedAt": null
         }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "exploitBenchInternalPort",
+        "name": "ExploitBench Internal Port",
+        "value": 39,
+        "formatted": "39.0%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-6 Cyber",
+          "url": "https://openai.com/index/introducing-gpt-6-cyber/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "exploitGymHardened",
+        "name": "ExploitGym Hardened",
+        "value": 29.7,
+        "formatted": "29.7%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6 Cyber system card",
+          "url": "https://deploymentsafety.openai.com/gpt-6-cyber",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "webPentestBlackbox",
+        "name": "Web Pentesting (black-box)",
+        "value": 32,
+        "formatted": "32.0%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: GPT-6 Cyber",
+          "url": "https://openai.com/index/introducing-gpt-6-cyber/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "exploitGymHoneypot",
+        "name": "ExploitGym Honeypot",
+        "value": 0,
+        "formatted": "0.00%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6 Cyber system card",
+          "url": "https://deploymentsafety.openai.com/gpt-6-cyber",
+          "retrievedAt": null
+        }
       }
-    ],
-    "modelAliases": [
-      "openai-codex/gpt-6-astra"
     ]
   }
 }

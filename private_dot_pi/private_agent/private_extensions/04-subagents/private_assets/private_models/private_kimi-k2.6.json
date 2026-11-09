@@ -103,21 +103,24 @@
     "version": 1,
     "runtimeId": "kelley/Kimi-K2.6",
     "canonicalId": "moonshotai/kimi-k2.6",
+    "modelAliases": [
+      "kelley/Kimi-K2.6"
+    ],
     "model": "Kimi K2.6",
     "creator": "Moonshot AI",
-    "capturedAt": 1793907107528,
-    "lastUpdated": "2026-11-05",
+    "capturedAt": 1794001787441,
+    "lastUpdated": "2026-11-06",
     "methodologyVersion": "bench-align-v5.8-2026-09-30",
-    "sourceSnapshotId": "2026-11-05-3904bad35f77cff7",
+    "sourceSnapshotId": "2026-11-06-8d3e46af35e8fc5d",
     "attribution": "Data from BenchLM.ai",
     "license": "CC BY-NC 4.0",
     "categoryScores": {
-      "coding": 42.88,
-      "agentic": 44.56,
+      "coding": 43.19,
+      "agentic": 44.16,
       "instructionFollowing": 83.5,
-      "knowledge": 59.2,
-      "math": 76.8,
-      "multimodalGrounded": 73.5
+      "knowledge": 59.22,
+      "math": 73.7,
+      "multimodalGrounded": 72.8
     },
     "categoryProvenance": {
       "coding": "leaderboard",
@@ -153,37 +156,37 @@
       {
         "key": "agentic",
         "label": "Agentic",
-        "score": 44.6,
-        "rank": 68,
-        "total": 135
+        "score": 44.2,
+        "rank": 63,
+        "total": 131
       },
       {
         "key": "coding",
         "label": "Coding",
-        "score": 42.9,
-        "rank": 63,
-        "total": 156
+        "score": 43.2,
+        "rank": 65,
+        "total": 157
       },
       {
         "key": "reasoning",
         "label": "Reasoning",
         "score": null,
         "rank": null,
-        "total": 26
+        "total": 25
       },
       {
         "key": "multimodalGrounded",
         "label": "Multimodal",
-        "score": 73.5,
+        "score": 72.8,
         "rank": 30,
-        "total": 58
+        "total": 59
       },
       {
         "key": "knowledge",
         "label": "Knowledge",
         "score": 59.2,
         "rank": 51,
-        "total": 177
+        "total": 178
       },
       {
         "key": "multilingual",
@@ -202,7 +205,7 @@
       {
         "key": "math",
         "label": "Math",
-        "score": 76.8,
+        "score": 73.7,
         "rank": 4,
         "total": 12
       }
@@ -811,9 +814,6 @@
           "retrievedAt": null
         }
       }
-    ],
-    "modelAliases": [
-      "kelley/Kimi-K2.6"
     ]
   }
 }

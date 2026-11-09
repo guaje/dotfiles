@@ -429,19 +429,22 @@
     "version": 1,
     "runtimeId": "openai-codex/gpt-6.1-terra",
     "canonicalId": "openai/gpt-6.1-terra",
+    "modelAliases": [
+      "openai-codex/gpt-6.1-terra"
+    ],
     "model": "GPT-6.1 Terra",
     "creator": "OpenAI",
-    "capturedAt": 1793907107528,
-    "lastUpdated": "2026-11-05",
+    "capturedAt": 1794001787441,
+    "lastUpdated": "2026-11-06",
     "methodologyVersion": "bench-align-v5.8-2026-09-30",
-    "sourceSnapshotId": "2026-11-05-3904bad35f77cff7",
+    "sourceSnapshotId": "2026-11-06-8d3e46af35e8fc5d",
     "attribution": "Data from BenchLM.ai",
     "license": "CC BY-NC 4.0",
     "categoryScores": {
-      "agentic": 76.68,
-      "knowledge": 77.25,
-      "reasoning": 81.8,
-      "math": 97.3,
+      "agentic": 75.99,
+      "knowledge": 77.37,
+      "reasoning": 80.1,
+      "math": 93.8,
       "multimodalGrounded": 91.6
     },
     "categoryProvenance": {
@@ -473,37 +476,37 @@
       {
         "key": "agentic",
         "label": "Agentic",
-        "score": 76.7,
-        "rank": 6,
-        "total": 135
+        "score": 76,
+        "rank": 5,
+        "total": 131
       },
       {
         "key": "coding",
         "label": "Coding",
         "score": null,
         "rank": null,
-        "total": 156
+        "total": 157
       },
       {
         "key": "reasoning",
         "label": "Reasoning",
         "score": null,
         "rank": null,
-        "total": 26
+        "total": 25
       },
       {
         "key": "multimodalGrounded",
         "label": "Multimodal",
         "score": 91.6,
         "rank": 4,
-        "total": 58
+        "total": 59
       },
       {
         "key": "knowledge",
         "label": "Knowledge",
-        "score": 77.2,
+        "score": 77.4,
         "rank": 10,
-        "total": 177
+        "total": 178
       },
       {
         "key": "multilingual",
@@ -613,7 +616,7 @@
         "verificationStatus": "benchmark_exact",
         "verificationLabel": "Benchmark exact",
         "source": {
-          "label": "ParseBench leaderboard, November 5, 2026 snapshot (LlamaIndex)",
+          "label": "ParseBench leaderboard, November 6, 2026 snapshot (LlamaIndex)",
           "url": "https://www.parsebench.ai/#leaderboard",
           "retrievedAt": null
         }
@@ -643,7 +646,7 @@
         "verificationStatus": "benchmark_exact",
         "verificationLabel": "Benchmark exact",
         "source": {
-          "label": "ExtractBench leaderboard, November 5, 2026 snapshot (LlamaIndex)",
+          "label": "ExtractBench leaderboard, November 6, 2026 snapshot (LlamaIndex)",
           "url": "https://www.extractbench.ai/#leaderboard",
           "retrievedAt": null
         }
@@ -797,10 +800,37 @@
           "url": "https://deploymentsafety.openai.com/gpt-6-1-terra",
           "retrievedAt": null
         }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "exploitBenchInternalPort",
+        "name": "ExploitBench Internal Port",
+        "value": 24.5,
+        "formatted": "24.5%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6.1 Terra system card addendum",
+          "url": "https://deploymentsafety.openai.com/gpt-6-1-terra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "exploitGymHoneypot",
+        "name": "ExploitGym Honeypot",
+        "value": 0,
+        "formatted": "0.00%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6.1 Terra system card addendum",
+          "url": "https://deploymentsafety.openai.com/gpt-6-1-terra",
+          "retrievedAt": null
+        }
       }
-    ],
-    "modelAliases": [
-      "openai-codex/gpt-6.1-terra"
     ]
   }
 }

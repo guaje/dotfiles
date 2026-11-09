@@ -429,21 +429,24 @@
     "version": 1,
     "runtimeId": "openai-codex/gpt-6-luna",
     "canonicalId": "openai/gpt-6-luna",
+    "modelAliases": [
+      "openai-codex/gpt-6-luna"
+    ],
     "model": "GPT-6 Luna",
     "creator": "OpenAI",
-    "capturedAt": 1793907107528,
-    "lastUpdated": "2026-11-05",
+    "capturedAt": 1794001787441,
+    "lastUpdated": "2026-11-06",
     "methodologyVersion": "bench-align-v5.8-2026-09-30",
-    "sourceSnapshotId": "2026-11-05-3904bad35f77cff7",
+    "sourceSnapshotId": "2026-11-06-8d3e46af35e8fc5d",
     "attribution": "Data from BenchLM.ai",
     "license": "CC BY-NC 4.0",
     "categoryScores": {
-      "coding": 51.41,
-      "agentic": 54.09,
-      "knowledge": 63.27,
-      "reasoning": 59.2,
-      "math": 83.7,
-      "multimodalGrounded": 82.1
+      "coding": 51.78,
+      "agentic": 53.53,
+      "knowledge": 63.28,
+      "reasoning": 57.5,
+      "math": 80.2,
+      "multimodalGrounded": 81.9
     },
     "categoryProvenance": {
       "coding": "leaderboard",
@@ -467,7 +470,7 @@
         "independentlyVerified": 0
       },
       "reasoning": {
-        "rows": 4,
+        "rows": 5,
         "independentlyVerified": 4
       },
       "math": {
@@ -483,37 +486,37 @@
       {
         "key": "agentic",
         "label": "Agentic",
-        "score": 54.1,
+        "score": 53.5,
         "rank": 45,
-        "total": 135
+        "total": 131
       },
       {
         "key": "coding",
         "label": "Coding",
-        "score": 51.4,
+        "score": 51.8,
         "rank": 42,
-        "total": 156
+        "total": 157
       },
       {
         "key": "reasoning",
         "label": "Reasoning",
-        "score": 59.2,
-        "rank": 23,
-        "total": 26
+        "score": 57.5,
+        "rank": 22,
+        "total": 25
       },
       {
         "key": "multimodalGrounded",
         "label": "Multimodal",
         "score": null,
         "rank": null,
-        "total": 58
+        "total": 59
       },
       {
         "key": "knowledge",
         "label": "Knowledge",
         "score": 63.3,
         "rank": 40,
-        "total": 177
+        "total": 178
       },
       {
         "key": "multilingual",
@@ -661,6 +664,21 @@
       {
         "category": "reasoning",
         "categoryLabel": "Reasoning",
+        "key": "bioBasicsBench",
+        "name": "BioBasicsBench",
+        "value": 37.56,
+        "formatted": "37.6%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: BioBasicsBench",
+          "url": "https://openai.com/index/measuring-how-ai-agents-handle-wet-lab-science/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "reasoning",
+        "categoryLabel": "Reasoning",
         "key": "arcAgi1",
         "name": "ARC-AGI-1",
         "value": 86.666667,
@@ -670,7 +688,7 @@
         "source": {
           "label": "ARC Prize: published Semi-Private results",
           "url": "https://arcprize.org/results/openai-gpt-6-luna",
-          "retrievedAt": "2026-11-05T15:24:10.860Z"
+          "retrievedAt": "2026-11-06T18:02:09.380Z"
         }
       },
       {
@@ -685,7 +703,7 @@
         "source": {
           "label": "ARC Prize: published Semi-Private results",
           "url": "https://arcprize.org/results/openai-gpt-6-luna",
-          "retrievedAt": "2026-11-05T15:24:10.860Z"
+          "retrievedAt": "2026-11-06T18:02:09.380Z"
         }
       },
       {
@@ -700,7 +718,7 @@
         "source": {
           "label": "ARC Prize: published Semi-Private results",
           "url": "https://arcprize.org/results/openai-gpt-6-luna",
-          "retrievedAt": "2026-11-05T15:24:10.860Z"
+          "retrievedAt": "2026-11-06T18:02:09.380Z"
         }
       },
       {
@@ -715,7 +733,7 @@
         "source": {
           "label": "ARC Prize: published Semi-Private results",
           "url": "https://arcprize.org/results/openai-gpt-6-luna",
-          "retrievedAt": "2026-11-05T15:24:10.860Z"
+          "retrievedAt": "2026-11-06T18:02:09.380Z"
         }
       },
       {
@@ -743,7 +761,7 @@
         "verificationStatus": "benchmark_exact",
         "verificationLabel": "Benchmark exact",
         "source": {
-          "label": "ExtractBench leaderboard, November 5, 2026 snapshot (LlamaIndex)",
+          "label": "ExtractBench leaderboard, November 6, 2026 snapshot (LlamaIndex)",
           "url": "https://www.extractbench.ai/#leaderboard",
           "retrievedAt": null
         }
@@ -758,7 +776,7 @@
         "verificationStatus": "benchmark_exact",
         "verificationLabel": "Benchmark exact",
         "source": {
-          "label": "ParseBench leaderboard, November 5, 2026 snapshot (LlamaIndex)",
+          "label": "ParseBench leaderboard, November 6, 2026 snapshot (LlamaIndex)",
           "url": "https://www.parsebench.ai/#leaderboard",
           "retrievedAt": null
         }
@@ -882,10 +900,37 @@
           "url": "https://deploymentsafety.openai.com/gpt-6-astra",
           "retrievedAt": null
         }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "exploitBenchInternalPort",
+        "name": "ExploitBench Internal Port",
+        "value": 0,
+        "formatted": "0.0%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6 Astra system card",
+          "url": "https://deploymentsafety.openai.com/gpt-6-astra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "exploitGymHoneypot",
+        "name": "ExploitGym Honeypot",
+        "value": 0,
+        "formatted": "0.00%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6 Astra system card",
+          "url": "https://deploymentsafety.openai.com/gpt-6-astra",
+          "retrievedAt": null
+        }
       }
-    ],
-    "modelAliases": [
-      "openai-codex/gpt-6-luna"
     ]
   }
 }

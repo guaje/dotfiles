@@ -359,21 +359,24 @@
     "version": 1,
     "runtimeId": "openai-codex/gpt-6.1-sol",
     "canonicalId": "openai/gpt-6.1-sol",
+    "modelAliases": [
+      "openai-codex/gpt-6.1-sol"
+    ],
     "model": "GPT-6.1 Sol",
     "creator": "OpenAI",
-    "capturedAt": 1793907107528,
-    "lastUpdated": "2026-11-05",
+    "capturedAt": 1794001787441,
+    "lastUpdated": "2026-11-06",
     "methodologyVersion": "bench-align-v5.8-2026-09-30",
-    "sourceSnapshotId": "2026-11-05-3904bad35f77cff7",
+    "sourceSnapshotId": "2026-11-06-8d3e46af35e8fc5d",
     "attribution": "Data from BenchLM.ai",
     "license": "CC BY-NC 4.0",
     "categoryScores": {
-      "coding": 70.03,
-      "agentic": 76.78,
-      "knowledge": 85.91,
-      "reasoning": 90.5,
-      "math": 97.3,
-      "multimodalGrounded": 88.2
+      "coding": 70.39,
+      "agentic": 75.84,
+      "knowledge": 85.95,
+      "reasoning": 88.8,
+      "math": 93.8,
+      "multimodalGrounded": 88
     },
     "categoryProvenance": {
       "coding": "leaderboard",
@@ -397,7 +400,7 @@
         "independentlyVerified": 0
       },
       "reasoning": {
-        "rows": 5,
+        "rows": 6,
         "independentlyVerified": 5
       },
       "math": {
@@ -413,37 +416,37 @@
       {
         "key": "agentic",
         "label": "Agentic",
-        "score": 76.8,
-        "rank": 5,
-        "total": 135
+        "score": 75.8,
+        "rank": 6,
+        "total": 131
       },
       {
         "key": "coding",
         "label": "Coding",
-        "score": 70,
+        "score": 70.4,
         "rank": 10,
-        "total": 156
+        "total": 157
       },
       {
         "key": "reasoning",
         "label": "Reasoning",
-        "score": 90.5,
+        "score": 88.8,
         "rank": 2,
-        "total": 26
+        "total": 25
       },
       {
         "key": "multimodalGrounded",
         "label": "Multimodal",
         "score": null,
         "rank": null,
-        "total": 58
+        "total": 59
       },
       {
         "key": "knowledge",
         "label": "Knowledge",
         "score": 85.9,
         "rank": 2,
-        "total": 177
+        "total": 178
       },
       {
         "key": "multilingual",
@@ -600,7 +603,7 @@
         "source": {
           "label": "Bug Hunt Bench public data",
           "url": "https://bughunt.productcompass.pm/data/benchmark.json",
-          "retrievedAt": "2026-11-05"
+          "retrievedAt": "2026-11-06"
         }
       },
       {
@@ -615,6 +618,21 @@
         "source": {
           "label": "Cognition: FrontierCode 2.0",
           "url": "https://cognition.com/blog/frontier-code-2.0",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "reasoning",
+        "categoryLabel": "Reasoning",
+        "key": "bioBasicsBench",
+        "name": "BioBasicsBench",
+        "value": 62.61,
+        "formatted": "62.6%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI: BioBasicsBench",
+          "url": "https://openai.com/index/measuring-how-ai-agents-handle-wet-lab-science/",
           "retrievedAt": null
         }
       },
@@ -645,7 +663,7 @@
         "source": {
           "label": "ARC Prize: published Semi-Private results",
           "url": "https://arcprize.org/results/openai-gpt-6-1-sol",
-          "retrievedAt": "2026-11-05T15:24:10.860Z"
+          "retrievedAt": "2026-11-06T18:02:09.380Z"
         }
       },
       {
@@ -660,7 +678,7 @@
         "source": {
           "label": "ARC Prize: published Semi-Private results",
           "url": "https://arcprize.org/results/openai-gpt-6-1-sol",
-          "retrievedAt": "2026-11-05T15:24:10.860Z"
+          "retrievedAt": "2026-11-06T18:02:09.380Z"
         }
       },
       {
@@ -675,7 +693,7 @@
         "source": {
           "label": "ARC Prize: published Semi-Private results",
           "url": "https://arcprize.org/results/openai-gpt-6-1-sol",
-          "retrievedAt": "2026-11-05T15:24:10.860Z"
+          "retrievedAt": "2026-11-06T18:02:09.380Z"
         }
       },
       {
@@ -690,7 +708,7 @@
         "source": {
           "label": "ARC Prize: published Semi-Private results",
           "url": "https://arcprize.org/results/openai-gpt-6-1-sol",
-          "retrievedAt": "2026-11-05T15:24:10.860Z"
+          "retrievedAt": "2026-11-06T18:02:09.380Z"
         }
       },
       {
@@ -703,7 +721,7 @@
         "verificationStatus": "benchmark_exact",
         "verificationLabel": "Benchmark exact",
         "source": {
-          "label": "ExtractBench leaderboard, November 5, 2026 snapshot (LlamaIndex)",
+          "label": "ExtractBench leaderboard, November 6, 2026 snapshot (LlamaIndex)",
           "url": "https://www.extractbench.ai/#leaderboard",
           "retrievedAt": null
         }
@@ -733,7 +751,7 @@
         "verificationStatus": "benchmark_exact",
         "verificationLabel": "Benchmark exact",
         "source": {
-          "label": "ParseBench leaderboard, November 5, 2026 snapshot (LlamaIndex)",
+          "label": "ParseBench leaderboard, November 6, 2026 snapshot (LlamaIndex)",
           "url": "https://www.parsebench.ai/#leaderboard",
           "retrievedAt": null
         }
@@ -846,6 +864,21 @@
       {
         "category": "external",
         "categoryLabel": "external",
+        "key": "clocktowerBench",
+        "name": "Clocktower Bench",
+        "value": 1734,
+        "formatted": "1734",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Clocktower Bench leaderboard",
+          "url": "https://clocktowerbench.com/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
         "key": "exploitBench",
         "name": "ExploitBench",
         "value": 99.7,
@@ -872,10 +905,37 @@
           "url": "https://cdn.openai.com/pdf/38e3efcf-545e-44cd-99ec-2b7eb395f4cc/oai_GPT_6_1_Sol.pdf",
           "retrievedAt": null
         }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "exploitBenchInternalPort",
+        "name": "ExploitBench Internal Port",
+        "value": 21.5,
+        "formatted": "21.5%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6.1 Sol system card addendum",
+          "url": "https://cdn.openai.com/pdf/38e3efcf-545e-44cd-99ec-2b7eb395f4cc/oai_GPT_6_1_Sol.pdf",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "exploitGymHoneypot",
+        "name": "ExploitGym Honeypot",
+        "value": 0,
+        "formatted": "0.00%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "OpenAI GPT-6.1 Sol system card addendum",
+          "url": "https://cdn.openai.com/pdf/38e3efcf-545e-44cd-99ec-2b7eb395f4cc/oai_GPT_6_1_Sol.pdf",
+          "retrievedAt": null
+        }
       }
-    ],
-    "modelAliases": [
-      "openai-codex/gpt-6.1-sol"
     ]
   }
 }

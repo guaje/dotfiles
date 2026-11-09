@@ -561,22 +561,25 @@
     "version": 1,
     "runtimeId": "openai-codex/gpt-5.6-terra",
     "canonicalId": "openai/gpt-5.6-terra",
+    "modelAliases": [
+      "openai-codex/gpt-5.6-terra"
+    ],
     "model": "GPT-5.6 Terra",
     "creator": "OpenAI",
-    "capturedAt": 1793907107528,
-    "lastUpdated": "2026-11-05",
+    "capturedAt": 1794001787441,
+    "lastUpdated": "2026-11-06",
     "methodologyVersion": "bench-align-v5.8-2026-09-30",
-    "sourceSnapshotId": "2026-11-05-3904bad35f77cff7",
+    "sourceSnapshotId": "2026-11-06-8d3e46af35e8fc5d",
     "attribution": "Data from BenchLM.ai",
     "license": "CC BY-NC 4.0",
     "categoryScores": {
-      "coding": 61.93,
-      "agentic": 60.73,
+      "coding": 62.12,
+      "agentic": 60.27,
       "instructionFollowing": 87.1,
-      "knowledge": 69.24,
-      "reasoning": 69.1,
-      "math": 90.1,
-      "multimodalGrounded": 84.7
+      "knowledge": 69.3,
+      "reasoning": 67.4,
+      "math": 86.6,
+      "multimodalGrounded": 84.2
     },
     "categoryProvenance": {
       "coding": "leaderboard",
@@ -617,37 +620,37 @@
       {
         "key": "agentic",
         "label": "Agentic",
-        "score": 60.7,
-        "rank": 27,
-        "total": 135
+        "score": 60.3,
+        "rank": 25,
+        "total": 131
       },
       {
         "key": "coding",
         "label": "Coding",
-        "score": 61.9,
+        "score": 62.1,
         "rank": 16,
-        "total": 156
+        "total": 157
       },
       {
         "key": "reasoning",
         "label": "Reasoning",
-        "score": 69.1,
-        "rank": 17,
-        "total": 26
+        "score": 67.4,
+        "rank": 16,
+        "total": 25
       },
       {
         "key": "multimodalGrounded",
         "label": "Multimodal",
-        "score": 84.7,
-        "rank": 14,
-        "total": 58
+        "score": 84.2,
+        "rank": 15,
+        "total": 59
       },
       {
         "key": "knowledge",
         "label": "Knowledge",
-        "score": 69.2,
-        "rank": 19,
-        "total": 177
+        "score": 69.3,
+        "rank": 18,
+        "total": 178
       },
       {
         "key": "multilingual",
@@ -993,7 +996,7 @@
         "source": {
           "label": "ARC Prize: published Semi-Private results",
           "url": "https://arcprize.org/results/openai-gpt-5-6-terra",
-          "retrievedAt": "2026-11-05T15:24:10.860Z"
+          "retrievedAt": "2026-11-06T18:02:09.380Z"
         }
       },
       {
@@ -1008,7 +1011,7 @@
         "source": {
           "label": "ARC Prize: published Semi-Private results",
           "url": "https://arcprize.org/results/openai-gpt-5-6-terra",
-          "retrievedAt": "2026-11-05T15:24:10.860Z"
+          "retrievedAt": "2026-11-06T18:02:09.380Z"
         }
       },
       {
@@ -1023,7 +1026,7 @@
         "source": {
           "label": "ARC Prize: published Semi-Private results",
           "url": "https://arcprize.org/results/openai-gpt-5-6-terra",
-          "retrievedAt": "2026-11-05T15:24:10.860Z"
+          "retrievedAt": "2026-11-06T18:02:09.380Z"
         }
       },
       {
@@ -1036,7 +1039,7 @@
         "verificationStatus": "benchmark_exact",
         "verificationLabel": "Benchmark exact",
         "source": {
-          "label": "ExtractBench leaderboard, November 5, 2026 snapshot (LlamaIndex)",
+          "label": "ExtractBench leaderboard, November 6, 2026 snapshot (LlamaIndex)",
           "url": "https://www.extractbench.ai/#leaderboard",
           "retrievedAt": null
         }
@@ -1051,7 +1054,7 @@
         "verificationStatus": "benchmark_exact",
         "verificationLabel": "Benchmark exact",
         "source": {
-          "label": "ParseBench leaderboard, November 5, 2026 snapshot (LlamaIndex)",
+          "label": "ParseBench leaderboard, November 6, 2026 snapshot (LlamaIndex)",
           "url": "https://www.parsebench.ai/#leaderboard",
           "retrievedAt": null
         }
@@ -1282,9 +1285,6 @@
           "retrievedAt": null
         }
       }
-    ],
-    "modelAliases": [
-      "openai-codex/gpt-5.6-terra"
     ]
   }
 }

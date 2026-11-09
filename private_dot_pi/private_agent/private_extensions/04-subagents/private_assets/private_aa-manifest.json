@@ -1,6 +1,6 @@
 {
-  "digest": "cd938f8870dc5a770c704b7af03c732c51ea82050c66457874df1b44e6c9f7d7",
-  "generatedAt": 1793820828821,
+  "digest": "a67be071b05e9bd4c93eea44b274be8e53ea95252f814da2328cdbc346da3ad7",
+  "generatedAt": 1793998296043,
   "methodology": {
     "id": "artificial-analysis-intelligence-index",
     "version": "5"
@@ -14,24 +14,6 @@
       "modelId": "0de67206-4d36-4d10-b8f6-cf37fa747a03",
       "provider": "kelley",
       "thinkingLevel": null
-    },
-    {
-      "capturedAt": 1793820803132,
-      "contentDigest": "b37187f00b5c2855b4b85657b196cfdfb9fe2e1ea47eb3c6afea0ba6fbc4897c",
-      "file": "mistral-large-4.json",
-      "model": "mistral-large-4",
-      "modelId": "ea5019ae-b0b7-49a5-80b3-0e584807af0f",
-      "provider": "model-testing",
-      "thinkingLevel": "high"
-    },
-    {
-      "capturedAt": 1793820803611,
-      "contentDigest": "4e1a3e701de6ab67518830c1ee2d51833f2bb953582151bd84668cfbdb3669e8",
-      "file": "mistral-large-4.json",
-      "model": "mistral-large-4",
-      "modelId": "27b24366-fd1a-44b7-8011-e24d7501318d",
-      "provider": "model-testing",
-      "thinkingLevel": "medium"
     },
     {
       "capturedAt": 1793820803995,
@@ -392,15 +374,6 @@
       "modelId": "b01dee41-c62b-48ed-8d16-984adc405e5c",
       "provider": "qwen",
       "thinkingLevel": "xhigh"
-    },
-    {
-      "capturedAt": 1793820828329,
-      "contentDigest": "91508e69dfdab20ea91670294e9510a63ed8bf7fcff8263197408ce20f4d83a9",
-      "file": "mimo-v2.6-pro.json",
-      "model": "mimo-v2.6-pro",
-      "modelId": "24d8fdfe-6241-424e-b7b7-1b6efb06e4fb",
-      "provider": "xiaomi",
-      "thinkingLevel": "off"
     },
     {
       "capturedAt": 1793820828821,

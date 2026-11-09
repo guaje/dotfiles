@@ -91,22 +91,25 @@
     "version": 1,
     "runtimeId": "model-testing/muse-glimmer",
     "canonicalId": "muse/muse-glimmer",
+    "modelAliases": [
+      "model-testing/muse-glimmer"
+    ],
     "model": "Muse Glimmer 30B",
     "creator": "Meta",
-    "capturedAt": 1793907107528,
-    "lastUpdated": "2026-11-05",
+    "capturedAt": 1794001787441,
+    "lastUpdated": "2026-11-06",
     "methodologyVersion": "bench-align-v5.8-2026-09-30",
-    "sourceSnapshotId": "2026-11-05-3904bad35f77cff7",
+    "sourceSnapshotId": "2026-11-06-8d3e46af35e8fc5d",
     "attribution": "Data from BenchLM.ai",
     "license": "CC BY-NC 4.0",
     "categoryScores": {
-      "coding": 23.87,
-      "agentic": 19.37,
+      "coding": 24.26,
+      "agentic": 19.27,
       "instructionFollowing": 81.1,
-      "knowledge": 38.16,
-      "reasoning": 82.2,
-      "math": 84.6,
-      "multimodalGrounded": 65.1
+      "knowledge": 38.15,
+      "reasoning": 80.5,
+      "math": 81.1,
+      "multimodalGrounded": 63.7
     },
     "categoryProvenance": {
       "coding": "leaderboard",
@@ -143,37 +146,37 @@
       {
         "key": "agentic",
         "label": "Agentic",
-        "score": 19.4,
-        "rank": 123,
-        "total": 135
+        "score": 19.3,
+        "rank": 118,
+        "total": 131
       },
       {
         "key": "coding",
         "label": "Coding",
-        "score": 23.9,
-        "rank": 123,
-        "total": 156
+        "score": 24.3,
+        "rank": 124,
+        "total": 157
       },
       {
         "key": "reasoning",
         "label": "Reasoning",
         "score": null,
         "rank": null,
-        "total": 26
+        "total": 25
       },
       {
         "key": "multimodalGrounded",
         "label": "Multimodal",
-        "score": 65.1,
-        "rank": 45,
-        "total": 58
+        "score": 63.7,
+        "rank": 46,
+        "total": 59
       },
       {
         "key": "knowledge",
         "label": "Knowledge",
         "score": 38.2,
         "rank": 123,
-        "total": 177
+        "total": 178
       },
       {
         "key": "multilingual",
@@ -408,9 +411,6 @@
           "retrievedAt": null
         }
       }
-    ],
-    "modelAliases": [
-      "model-testing/muse-glimmer"
     ]
   }
 }

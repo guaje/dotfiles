@@ -7,7 +7,7 @@ import { loadCatalogState } from "./state.ts";
 import { aaReviewThinkingLevelOptions, captureAaArtifactState, detectAaBenchmarkHealth, enforceAaScope, finalizeAaSync, hasGenericAaMapping, isCompleteAaCandidateReview, loadAaBenchmarkHealth, prepareAaCandidateReview, publishReviewedAaVariants, syncEnabledModels, type AaCandidate, type ReviewedAaVariant } from "./sync.ts";
 import type { CatalogResult } from "./aa/client.ts";
 import type { BenchmarkThinkingLevel } from "../04-subagents/benchmark-types.ts";
-import { syncBenchLm } from "./benchlm/service.ts";
+import { describeBenchLmSync, syncBenchLm } from "./benchlm/service.ts";
 import { executeTrackedAssetDeletions } from "./asset-cleanup.ts";
 import { loadCatalogRequestDelays } from "./catalog-settings.ts";
 import { collectBenchLmSummary } from "./benchlm-report.ts";
@@ -83,8 +83,8 @@ export default async function catalogExtension(pi: ExtensionAPI) {
           // previous reviewed generation serving while catalog and AA work continue, with the reason reported.
           ctx.ui.notify("BenchLM: pulling the reviewed generation (primary benchmark source)…", "info");
           const benchLmReport = await syncBenchLm({ enabledModels: enabledForBenchLm, signal: ctx.signal, requestDelayMs: loadCatalogRequestDelays().benchlm })
-            .then((entry) => ({ unmapped: entry.unmapped, warnings: entry.warnings }))
-            .catch((error: unknown) => ({ unmapped: [] as string[], warnings: [`BenchLM unavailable: ${error instanceof Error ? error.message : String(error)} — the previously published generation routes meanwhile.`] }));
+            .then((entry) => ({ unmapped: entry.unmapped, warnings: entry.warnings, note: describeBenchLmSync(entry), removed: entry.removed }))
+            .catch((error: unknown) => ({ unmapped: [] as string[], removed: [] as string[], warnings: [`BenchLM unavailable: ${error instanceof Error ? error.message : String(error)} — the previously published generation routes meanwhile.`] }));
           let publishedAaSucceeded = false; let changedAaGeneration = false;
           const reviewable = report.models.filter((model) => model.aaMissing || model.variantCapable);
           let suggestions = new Map<string, AaCandidate[]>();
@@ -181,7 +181,9 @@ export default async function catalogExtension(pi: ExtensionAPI) {
           const benchmarkHealthReport = await loadAaBenchmarkHealth();
           const benchLmSummary = await collectBenchLmSummary();
           ctx.ui.notify(benchLmSummary ? `BenchLM: reviewed generation is on disk (${benchLmSummary.models.length} model(s)).` : "BenchLM: no reviewed generation on disk — routing is using Artificial Analysis columns alone.", benchLmSummary ? "info" : "warning");
-          const cleanupResult = await executeTrackedAssetDeletions(finalized.aaArtifacts?.changes ?? []);
+          // De-scoped BenchLM composites are catalog-owned deletions like AA ones, so they go through
+          // the same forget-and-remove path instead of being left with a stale evidence block.
+          const cleanupResult = await executeTrackedAssetDeletions([...(finalized.aaArtifacts?.changes ?? []), ...benchLmReport.removed.map((targetPath) => ({ kind: "D", targetPath }))]);
           for (const warning of cleanupResult.warnings) ctx.ui.notify(warning, "warning");
           const summary = renderCatalogSync(report, finalized.aaArtifacts, benchmarkHealthReport, benchLmSummary, benchLmReport, cleanupResult, (Date.now() - syncStartedAt) / 1000);
           ctx.ui.notify(summary, report.unresolvedCosts.length || report.missingAa.length || !!finalized.aaArtifacts?.warnings.length ? "warning" : "info");

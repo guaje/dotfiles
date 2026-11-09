@@ -27,6 +27,10 @@ export interface BenchLmSnapshot { version: 1; runtimeId: string; canonicalId: s
 export const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 const text = (value: unknown): value is string => typeof value === "string" && value.length > 0 && !/[\x00-\x1f\x7f]/.test(value);
 const score = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100;
+/** A published detail figure, which need not be a 0-100 score: BenchLM publishes Clocktower Bench as a raw
+ * value (1591, 1859, ...). Rows are archived provenance and are never averaged into a category score, so the
+ * only requirement is that the number is real; `formatted` is what a human reads. */
+const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 const nullableScore = (value: unknown): value is number | null => value === null || score(value);
 const isCategory = (value: unknown): value is BenchLmCategory => BENCHLM_CATEGORIES.includes(value as BenchLmCategory);
 
@@ -74,8 +78,19 @@ export function parseDetails(value: unknown, expected: { methodologyVersion: str
     if (!record(item) || !text(item.key) || !nullableScore(item.score ?? null)) return [];
     return [{ key: item.key, ...(text(item.label) ? { label: item.label } : {}), score: item.score ?? null, rank: typeof item.rank === "number" ? item.rank : null, total: typeof item.total === "number" ? item.total : null }];
   });
-  const rows = (value[BENCHLM_DETAIL_ROWS_KEY] as unknown[]).map((item) => {
-    if (!record(item) || !text(item.category) || !text(item.key) || !text(item.name) || !score(item.value) || !text(item.formatted) || !VERIFICATION_STATUSES.includes(String(item.verificationStatus) as VerificationStatus) || !text(item.verificationLabel) || !record(item.source) || !text(item.source.label)) throw new Error("BenchLM detail payload is partial or malformed");
+  const rows = (value[BENCHLM_DETAIL_ROWS_KEY] as unknown[]).map((item, index) => {
+    // The reason is part of the contract: this validator stops the entire BenchLM generation, so an upstream
+    // shape change has to name the benchmark and field that triggered a review instead of failing at large.
+    const reason = (value: unknown): string | null => {
+      if (!record(value)) return "is not an object";
+      for (const field of ["category", "key", "name", "formatted", "verificationLabel"] as const) if (!text((value as Record<string, unknown>)[field])) return `${field} is missing or malformed`;
+      if (!finite(value.value)) return "value is not a finite number";
+      if (!VERIFICATION_STATUSES.includes(String(value.verificationStatus) as VerificationStatus)) return `verificationStatus ${JSON.stringify(value.verificationStatus)} is not a reviewed status`;
+      if (!record(value.source) || !text(value.source.label)) return "source.label is missing";
+      return null;
+    };
+    const failure = reason(item);
+    if (failure) throw new Error(`BenchLM detail payload is partial or malformed: benchmark #${index + 1}${record(item) && text(item.name) ? ` (${item.name})` : ""} ${failure}`);
     return item as unknown as BenchLmDetailRow;
   });
   if (!rows.length) throw new Error("BenchLM detail payload is empty");

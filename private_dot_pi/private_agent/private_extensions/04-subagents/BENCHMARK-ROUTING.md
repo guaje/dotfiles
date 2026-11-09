@@ -13,7 +13,8 @@ Profiles and weights are code-reviewed in `assets/routing-policy.json`. Its gene
 ## Asset maintenance
 
 - Runtime routing is network-free. Refresh BenchLM and Artificial Analysis only through `/catalog sync`, which publishes reviewed immutable assets into `assets/`.
-- `/catalog sync` executes `chezmoi forget` and `rm -f` automatically only for deletions confined to `agent/extensions/04-subagents/assets/` (`09-catalog/asset-cleanup.ts`). Every other chezmoi or git action stays printed for the owner.
+- `/catalog sync` executes `chezmoi forget --force --no-tty` and `rm -f` automatically only for deletions confined to `agent/extensions/04-subagents/assets/` (`09-catalog/asset-cleanup.ts`); it must never wait on a prompt the interface cannot answer. Every other chezmoi or git action stays printed for the owner.
+- De-scoping a model through `/scoped-models` removes its file from `assets/models/`. A composite shared with Artificial Analysis keeps the file until the AA cleanup reclaims it; only the withdrawn publisher's block is cleared first.
 - `agent/subagent-outcomes.json` is a bounded local work log. Never add it to chezmoi or git.
 - Routing diagnostics must preserve health-gate reasons, evidence sources, missing columns, confidence, exploration, and ETA disagreement.
 

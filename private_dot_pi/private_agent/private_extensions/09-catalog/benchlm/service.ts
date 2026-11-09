@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertNameCollisionSafe, compositeFileName, compositeModelKey, readComposite, writeCompositeBlock } from "../../04-subagents/asset-composite.ts";
@@ -17,7 +17,91 @@ async function loadBenchLmReview(file = MAPPINGS_PATH): Promise<{ methodologyVer
   return { methodologyVersion: value.methodologyVersion, mappings };
 }
 export async function loadBenchLmMappings(file = MAPPINGS_PATH): Promise<BenchLmMapping[]> { return (await loadBenchLmReview(file)).mappings; }
-export interface BenchLmSyncResult { manifest: BenchLmManifest | null; published: boolean; unmapped: string[]; warnings: string[] }
+export interface BenchLmSyncResult {
+  manifest: BenchLmManifest | null;
+  published: boolean;
+  status: "published" | "skipped";
+  /** Composites carrying data BenchLM had not published to us before. */
+  updated: number;
+  /** Composites re-verified against upstream and left byte-for-byte as published. */
+  unchanged: number;
+  unmapped: string[];
+  /** Composites this generation no longer serves, as absolute paths for the tracked-asset cleanup to forget and remove. */
+  removed: string[];
+  warnings: string[];
+}
+
+/**
+ * Capture provenance is not evidence. `capturedAt` moves with every fetch and `sourceSnapshotId` moves
+ * whenever upstream republishes identical figures under a new id, so neither may rewrite a reviewed file.
+ * New data means BenchLM's published figures, ranks, rows or methodology moved — or the set of endpoints
+ * sharing this model changed, because that is the file's join contract.
+ */
+function evidenceDigest(snapshot: Record<string, unknown>): string { return canonicalDigest({ ...snapshot, capturedAt: 0, sourceSnapshotId: "" }); }
+
+export function describeBenchLmSync(result: BenchLmSyncResult): string {
+  const parts: string[] = [];
+  if (result.status === "skipped") parts.push("BenchLM: publication skipped — no enabled model has a reviewed source page.");
+  else parts.push(`BenchLM: ${result.updated} model file(s) carry new data, ${result.unchanged} re-verified unchanged and left byte-for-byte as published.`);
+  if (result.removed.length) parts.push(`${result.removed.length} de-scoped model file(s) are queued for removal from assets/models/.`);
+  return parts.join(" ");
+}
+
+/**
+ * `/scoped-models` is the lifecycle authority for this generation, so de-scoping a model has to shrink the
+ * files too, not only the manifest. A composite that still carries Artificial Analysis variants keeps the
+ * file: only the BenchLM block is cleared, and the AA cleanup decides on the file itself. Deletion itself
+ * belongs to the tracked-asset cleanup, which forgets and removes inside the shared asset directory.
+ */
+/** Which composites the Artificial Analysis manifest still serves. A missing manifest means nothing is
+ * published; a present-but-unreadable one is unknown, and unknown never authorises a deletion. */
+async function aaReferencedFiles(root: string): Promise<Set<string> | null> {
+  let parsed: unknown;
+  try { parsed = JSON.parse(await readFile(path.join(root, "aa-manifest.json"), "utf8")); }
+  catch (error) { return (error as NodeJS.ErrnoException).code === "ENOENT" ? new Set<string>() : null; }
+  if (!record(parsed) || !Array.isArray(parsed.models)) return null;
+  return new Set(parsed.models.map((entry) => (record(entry) ? String(entry.file ?? "") : "")).filter((file) => file.length > 0));
+}
+
+async function pruneBenchLmGeneration(root: string, manifest: BenchLmManifest, neededFiles: ReadonlySet<string>): Promise<{ manifest: BenchLmManifest; removed: string[]; stripped: string[]; warnings: string[] }> {
+  const aaReferenced = await aaReferencedFiles(root);
+  const modelsDir = path.join(root, "models");
+  const kept: BenchLmManifest["models"] = []; const removed: string[] = []; const stripped: string[] = []; const warnings: string[] = [];
+  const orphaned = new Set<string>();
+  const handle = async (file: string): Promise<void> => {
+    if (orphaned.has(file)) return; orphaned.add(file);
+    const target = path.join(modelsDir, file);
+    if (aaReferenced === null) { warnings.push(`BenchLM cleanup left ${file} in place because the Artificial Analysis manifest is unreadable.`); return; }
+    const composite = await readComposite(target);
+    // The other publisher still serves this file: clear only this block and let its own cleanup reclaim it.
+    if (aaReferenced.has(file)) { await writeCompositeBlock(target, composite?.model ?? compositeModelKey(file.replace(/\.json$/, "")), "benchlm", null); stripped.push(file); return; }
+    // Nothing references it any more, including any stale AA block left behind by an earlier generation. The
+    // AA cleanup cannot be relied on here: it only runs when the AA generation changes, and a de-scoped model
+    // may have released its AA entries in a previous sync while this block kept the file protected.
+    removed.push(target);
+  };
+  for (const entry of manifest.models) {
+    const file = String(entry.file);
+    if (!/^[A-Za-z0-9._-]+\.json$/.test(file) || file.includes("..") || entry.file !== file) { warnings.push(`BenchLM cleanup left an unexpected file untouched: ${String(entry.file)}`); kept.push(entry); continue; }
+    if (neededFiles.has(file)) { kept.push(entry); continue; }
+    await handle(file);
+  }
+  // Self-healing. A composite nobody references serves nothing, whichever publisher released it last: it may
+  // still hold a BenchLM block from an interrupted publication, or have had that block cleared by an earlier
+  // sync while its stale Artificial Analysis variants pinned the file, because the AA cleanup only runs when
+  // the AA generation changes. Legacy single-snapshot files are left to the AA layout's own rules.
+  const listed = new Set(manifest.models.map((entry) => String(entry.file)));
+  if (aaReferenced) for (const file of await readdir(modelsDir).catch(() => [] as string[])) {
+    if (!file.endsWith(".json") || neededFiles.has(file) || listed.has(file)) continue;
+    if (!/^[A-Za-z0-9._-]+\.json$/.test(file) || file.includes("..")) { warnings.push(`BenchLM cleanup left an unexpected file untouched: ${file}`); continue; }
+    const composite = await readComposite(path.join(modelsDir, file));
+    if (!composite || composite.version !== 2 || composite.model !== compositeModelKey(file.replace(/\.json$/, ""))) continue;
+    if (composite.benchlm || !aaReferenced.has(file)) await handle(file);
+  }
+  const models = kept.sort((left, right) => left.runtimeId.localeCompare(right.runtimeId));
+  const next: BenchLmManifest = { ...manifest, digest: canonicalDigest(models), models };
+  return { manifest: next, removed, stripped, warnings };
+}
 export interface BenchLmManifest { version: 1; generatedAt: number; methodologyVersion: string; sourceSnapshotId: string; digest: string; models: Array<{ runtimeId: string; canonicalId: string; file: string; contentDigest: string }>; }
 const HARDWARE_DEPLOYMENT_SUFFIX = /-(?:h\d{2,4}|(?:a|b|l)\d{2,4}(?:-\d+gb)?|mi\d{3,4}x?|tpu-v\d[a-z]?)(?:-\d+gb)?$/i;
 const QUANTIZED_MODEL_SUFFIX = /-(?:fp[48]|nf4|int[48]|q[4568](?:_[a-z0-9]+)*|awq|gptq|gguf|mlx|[48]bit)$/i;
@@ -40,7 +124,23 @@ export function automaticBenchLmSlugCandidates(runtimeId: string): string[] {
 
 export async function syncBenchLm(options: { client?: BenchLmClient; mappingsFile?: string; root?: string; enabledModels: readonly string[]; signal?: AbortSignal; now?: number; requestDelayMs?: number }): Promise<BenchLmSyncResult> {
   const client = options.client ?? new BenchLmClient(), review = await loadBenchLmReview(options.mappingsFile), root = options.root ?? DEFAULT_BENCHLM_ROOT;
-  const requestDelayMs = options.requestDelayMs ?? 0;
+  const requestDelayMs = options.requestDelayMs ?? 0, capturedAt = options.now ?? Date.now();
+  const manifestPath = path.join(root, "benchlm-manifest.json");
+  let existing: BenchLmManifest | null = null; try { existing = JSON.parse(await readFile(manifestPath, "utf8")); } catch {}
+  // An empty scope means the caller could not read /scoped-models, not that every model was de-scoped, so no
+  // file may be removed on that reading. Reviewed and automatically persisted rows both live in the mappings
+  // file, which is enough to know which files the current scope still needs without touching the network.
+  const scopeKnown = options.enabledModels.length > 0;
+  const neededFromMappings = (): Set<string> => new Set(options.enabledModels.filter((id) => review.mappings.some((entry) => entry.runtimeId === id)).map((id) => compositeFileName(id)));
+  const writeIfChanged = async (target: string, next: string): Promise<void> => { const current = await readFile(target, "utf8").catch(() => null); if (current !== next) await writeFile(target, next, { mode: 0o600 }); };
+  const applyScope = async (manifest: BenchLmManifest, neededFiles: Set<string>) => {
+    if (!scopeKnown) return { manifest, removed: [] as string[], stripped: [] as string[], warnings: [] as string[] };
+    const pruned = await pruneBenchLmGeneration(root, manifest, neededFiles);
+    await writeIfChanged(manifestPath, `${JSON.stringify(pruned.manifest, null, 2)}\n`);
+    const warnings = [...pruned.warnings];
+    if (pruned.stripped.length) warnings.push(`BenchLM cleared its block from ${pruned.stripped.length} composite(s) that still hold Artificial Analysis evidence; the AA cleanup decides on those files.`);
+    return { ...pruned, warnings };
+  };
   const pace = async () => { if (requestDelayMs > 0) await sleep(requestDelayMs, options.signal); };
   const warnings: string[] = [];
   const leaderboard = parseLeaderboard(await client.leaderboard(options.signal)); await pace();
@@ -78,7 +178,10 @@ export async function syncBenchLm(options: { client?: BenchLmClient; mappingsFil
   const unmapped = options.enabledModels.filter((id) => !byRuntime.has(id));
   if (unmapped.length) warnings.push(`BenchLM has no reviewed row for ${unmapped.join(", ")} — automatic exact-slug matching found no authoritative page; those endpoints route on Artificial Analysis.`);
   const mappedModels = options.enabledModels.filter((id) => byRuntime.has(id));
-  if (!mappedModels.length) return { manifest: null, published: false, unmapped, warnings: [...warnings, "BenchLM publication skipped: none of the enabled models have reviewed rows."] };
+  if (!mappedModels.length) {
+    const scoped = existing ? await applyScope(existing, neededFromMappings()) : null;
+    return { manifest: scoped?.manifest ?? null, published: false, status: "skipped", updated: 0, unchanged: scoped?.manifest.models.length ?? 0, unmapped, removed: scoped?.removed ?? [], warnings: [...warnings, ...(scoped?.warnings ?? []), "BenchLM publication skipped: none of the enabled models have reviewed rows."] };
+  }
   const identities = new Map(leaderboard.rows.map((row) => [`${row.creator}\0${row.model}`, row]));
   // The published leaderboard lists only the top slice of the fleet (200 rows on 2026-10-29), so a model
   // we just enabled may not be on it. That must not make it unroutable: its own detail page is fetched and
@@ -96,10 +199,23 @@ export async function syncBenchLm(options: { client?: BenchLmClient; mappingsFil
     if (first && (first.slug !== item.mapping.slug || first.creator !== item.mapping.creator || first.model.toLowerCase() !== item.mapping.model.toLowerCase())) throw new Error(`BenchLM mappings disagree about the source page for ${modelKey}`);
     entries.push(item); selectedByModel.set(modelKey, entries);
   }
-  let existing: BenchLmManifest | null = null; try { existing = JSON.parse(await readFile(path.join(root, "benchlm-manifest.json"), "utf8")); } catch {}
   if (existing && existing.methodologyVersion !== leaderboard.envelope.methodologyVersion) throw new Error(`BenchLM methodology changed: reviewed ${existing.methodologyVersion}, upstream ${leaderboard.envelope.methodologyVersion}`);
-  if (existing) { const prior = existing.models.map((entry) => entry.runtimeId).sort(), next = selected.map((entry) => entry.mapping.runtimeId).sort(); const added = next.filter((id) => !prior.includes(id)), removed = prior.filter((id) => !next.includes(id)); if (added.length || removed.length) warnings.push(`BenchLM generation membership changed${added.length ? `, added: ${added.join(", ")}` : ""}${removed.length ? `, removed: ${removed.join(", ")}` : ""}`); }
-  const capturedAt = options.now ?? Date.now(), snapshots: Array<{ modelKey: string; snapshot: BenchLmSnapshot; file: string; contentDigest: string }> = [];
+  if (existing) {
+    // Membership means which endpoints the generation answers for. Endpoints of one model share a composite,
+    // so coverage comes from each published snapshot's alias list as well as the manifest's primary runtime;
+    // otherwise every refresh would warn about endpoints that were already served through a sibling.
+    const priorCoverage = new Set<string>();
+    for (const entry of existing.models) {
+      priorCoverage.add(entry.runtimeId);
+      if (!/^[A-Za-z0-9._-]+\.json$/.test(String(entry.file))) continue;
+      const published = await readComposite(path.join(root, "models", String(entry.file)));
+      for (const alias of ((published?.benchlm as Record<string, unknown> | undefined)?.modelAliases as string[] | undefined) ?? []) priorCoverage.add(alias);
+    }
+    const next = selected.map((entry) => entry.mapping.runtimeId);
+    const added = next.filter((id) => !priorCoverage.has(id)), removed = [...priorCoverage].filter((id) => !next.includes(id)).sort();
+    if (added.length || removed.length) warnings.push(`BenchLM generation membership changed${added.length ? `, added: ${added.join(", ")}` : ""}${removed.length ? `, removed: ${removed.join(", ")}` : ""}`);
+  }
+  const snapshots: Array<{ modelKey: string; snapshot: BenchLmSnapshot; file: string; contentDigest: string }> = [];
   for (const [modelKey, entries] of [...selectedByModel.entries()].sort(([left], [right]) => left.localeCompare(right))) {
     entries.sort((left, right) => left.mapping.runtimeId.localeCompare(right.mapping.runtimeId));
     const [{ mapping, row }] = entries;
@@ -129,16 +245,37 @@ export async function syncBenchLm(options: { client?: BenchLmClient; mappingsFil
     const snapshot: BenchLmSnapshot = { version: 1, runtimeId: mapping.runtimeId, canonicalId: mapping.canonicalId, modelAliases, model: mapping.model, creator: mapping.creator, capturedAt, lastUpdated: leaderboard.envelope.lastUpdated, methodologyVersion: leaderboard.envelope.methodologyVersion, sourceSnapshotId: leaderboard.envelope.sourceSnapshotId, attribution: details.envelope.attribution ?? "BenchLM", license: "CC BY-NC 4.0", categoryScores, categoryProvenance, categoryEvidence, categories: details.categories, details: details.rows };
     const contentDigest = canonicalDigest(snapshot); snapshots.push({ modelKey, snapshot, file: compositeFileName(modelKey), contentDigest });
   }
-  const models = snapshots.map(({ snapshot, file, contentDigest }) => ({ runtimeId: snapshot.runtimeId, canonicalId: snapshot.canonicalId, file, contentDigest })).sort((a, b) => a.runtimeId.localeCompare(b.runtimeId));
-  const manifest: BenchLmManifest = { version: 1, generatedAt: capturedAt, methodologyVersion: leaderboard.envelope.methodologyVersion, sourceSnapshotId: leaderboard.envelope.sourceSnapshotId, digest: canonicalDigest(models), models };
-  const manifestPath = path.join(root, "benchlm-manifest.json"); const modelsDir = path.join(root, "models"); await mkdir(modelsDir, { recursive: true, mode: 0o700 });
+  const modelsDir = path.join(root, "models"); await mkdir(modelsDir, { recursive: true, mode: 0o700 });
   assertNameCollisionSafe(snapshots.map((item) => ({ modelId: item.modelKey, target: item.file })));
+  const published: typeof snapshots = []; let updated = 0, unchanged = 0;
   for (const item of snapshots) {
-    const prior = await readComposite(path.join(modelsDir, item.file)); const preservedAa = prior?.aa ?? null;
-    await writeCompositeBlock(path.join(modelsDir, item.file), item.modelKey, "benchlm", item.snapshot);
-    if (preservedAa) await writeCompositeBlock(path.join(modelsDir, item.file), item.modelKey, "aa", preservedAa);
+    const target = path.join(modelsDir, item.file);
+    const prior = await readComposite(target); const preservedAa = prior?.aa ?? null, previous = prior?.benchlm;
+    // Same evidence under a newer capture: keep the reviewed file and the provenance it was published with,
+    // so a day where BenchLM republished nothing rewrites none of the model files.
+    if (previous && evidenceDigest(previous as Record<string, unknown>) === evidenceDigest(item.snapshot as unknown as Record<string, unknown>)) {
+      const carried = { ...item.snapshot, capturedAt: (previous as Record<string, unknown>).capturedAt, sourceSnapshotId: (previous as Record<string, unknown>).sourceSnapshotId } as typeof item.snapshot;
+      if (canonicalDigest(carried) === canonicalDigest(previous as Record<string, unknown>)) {
+        // The manifest digest must describe the bytes actually served, so it is the preserved snapshot's
+        // digest, not the fresh capture's: capturedAt and sourceSnapshotId are inside the digest.
+        published.push({ ...item, snapshot: carried, contentDigest: canonicalDigest(carried as unknown as Record<string, unknown>) }); unchanged += 1; continue;
+      }
+    }
+    await writeCompositeBlock(target, item.modelKey, "benchlm", item.snapshot);
+    if (preservedAa) await writeCompositeBlock(target, item.modelKey, "aa", preservedAa);
+    published.push(item); updated += 1;
   }
-  await writeFile(options.mappingsFile ?? path.join(root, "benchlm-mappings.json"), `${JSON.stringify({ version: 1, methodologyVersion: review.methodologyVersion, mappings }, null, 2)}\n`, { mode: 0o600 });
-  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });
-  return { manifest, published: true, unmapped, warnings };
+  const models = published.map(({ snapshot, file, contentDigest }) => ({ runtimeId: snapshot.runtimeId, canonicalId: snapshot.canonicalId, file, contentDigest })).sort((a, b) => a.runtimeId.localeCompare(b.runtimeId));
+  const built: BenchLmManifest = { version: 1, generatedAt: capturedAt, methodologyVersion: leaderboard.envelope.methodologyVersion, sourceSnapshotId: leaderboard.envelope.sourceSnapshotId, digest: canonicalDigest(models), models };
+  const scoped = await applyScope(built, new Set(published.map((item) => item.file)));
+  const manifest = scoped.manifest;
+  warnings.push(...scoped.warnings);
+  // generatedAt records when this generation was last verified upstream, which is what the staleness gate
+  // reads, so it is stamped even when every model file was confirmed unchanged. Content comparison keeps the
+  // reviewed artifacts byte-stable whenever nothing moved, instead of churning identical bytes.
+  const mappingsTarget = options.mappingsFile ?? path.join(root, "benchlm-mappings.json");
+  const mappingsNext = `${JSON.stringify({ version: 1, methodologyVersion: review.methodologyVersion, mappings }, null, 2)}\n`;
+  await writeIfChanged(mappingsTarget, mappingsNext);
+  await writeIfChanged(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  return { manifest, published: true, status: "published", updated, unchanged, unmapped, removed: scoped.removed, warnings };
 }

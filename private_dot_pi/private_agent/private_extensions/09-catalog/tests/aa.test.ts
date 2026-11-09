@@ -730,3 +730,24 @@ test("snapshot capability evidence accepts only declared pi modalities and reaso
     assert.equal(validateSnapshot({ ...base, capabilities }), false, `rejects ${JSON.stringify(capabilities)}`);
   }
 });
+
+test("cleanup removes a composite once a withdrawn BenchLM block stops protecting it", { concurrency: false }, async () => {
+  const item = await fixture(); let now = 1_700_000_002_000;
+  await secureWrite(item.env.PI_AA_SETTINGS_CONFIG!, { enabledModels: ["runtime/model"] });
+  const service = createAaService({ now: () => now++, fetchCatalog: async () => catalog(), fetchPublicModel: async () => publicPage() });
+  await service.add("runtime/model", ID1, null, undefined, item.env);
+  const { writeCompositeBlock } = await import("../../04-subagents/asset-composite.ts");
+  const file = JSON.parse(await readFile(path.join(item.root, "aa-manifest.json"), "utf8")).models[0].file;
+  const target = path.join(item.root, "models", file), modelKey = path.basename(file, ".json");
+  await writeCompositeBlock(target, modelKey, "benchlm", { version: 1, runtimeId: "runtime/model" });
+  // De-scoping drops the AA manifest entry, but the shared file still carries BenchLM evidence for readers.
+  await secureWrite(item.env.PI_AA_SETTINGS_CONFIG!, { enabledModels: ["companion/companion-model"] });
+  await service.enforceScope(undefined, item.env);
+  assert.deepEqual(await createAaService().cleanupObsoleteSnapshots(undefined, item.env), { deleted: [], warnings: [] });
+  assert.equal((await lstat(target)).isFile(), true, "a file another publisher still serves is never deleted here");
+  // Once BenchLM scope enforcement clears its block, the same cleanup must be able to reclaim the file.
+  await writeCompositeBlock(target, modelKey, "benchlm", null);
+  const cleanup = await createAaService().cleanupObsoleteSnapshots(undefined, item.env);
+  assert.deepEqual(cleanup.deleted, [`models/${file}`]);
+  await assert.rejects(lstat(target), { code: "ENOENT" });
+});

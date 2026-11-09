@@ -100,7 +100,7 @@ function isSafeArtifactTarget(targetPath: unknown): targetPath is string {
   return typeof targetPath === "string" && path.isAbsolute(targetPath) && !CONTROL_CHARACTER.test(targetPath);
 }
 
-export function renderCatalogSync(report: CatalogSyncReport, aaArtifacts?: AaArtifactChangeSummary, benchmarkHealth?: BenchmarkHealthState | null, benchLm?: BenchLmSyncSummary | null, benchLmReport?: { unmapped: string[]; warnings: string[] } | null, assetCleanup?: AssetCleanupResult, durationSeconds?: number): string {
+export function renderCatalogSync(report: CatalogSyncReport, aaArtifacts?: AaArtifactChangeSummary, benchmarkHealth?: BenchmarkHealthState | null, benchLm?: BenchLmSyncSummary | null, benchLmReport?: { unmapped: string[]; warnings: string[]; note?: string } | null, assetCleanup?: AssetCleanupResult, durationSeconds?: number): string {
   const benchById = new Map((benchLm?.models ?? []).flatMap((entry) => [entry.runtimeId, ...(entry.modelAliases ?? [])].map((id) => [id, entry] as const)));
   const lines = [durationSeconds === undefined ? "Catalog sync completed" : `Catalog sync completed in ${durationSeconds.toFixed(1)}s`];
   for (const model of report.models) {
@@ -123,6 +123,7 @@ export function renderCatalogSync(report: CatalogSyncReport, aaArtifacts?: AaArt
   }
   if (benchLm) lines.push("", `BenchLM generation: ${benchLm.models.length} models, methodology ${benchLm.methodologyVersion}, snapshot ${benchLm.sourceSnapshotId}, upstream data ${benchLm.lastUpdated}, ${benchLm.license} (non-commercial)`);
   else lines.push("", "BenchLM: no reviewed generation on disk — routing is using Artificial Analysis columns alone.");
+  if (benchLmReport?.note) lines.push(`  ${benchLmReport.note}`);
   if (benchLmReport?.unmapped.length) lines.push(`  BenchLM unmapped for review: ${benchLmReport.unmapped.join(", ")} — add a reviewed row to 04-subagents/assets/benchlm-mappings.json and sync again to publish.`);
   for (const message of benchLmReport?.warnings ?? []) lines.push(`  NOTE: ${message}`);
   if (report.missingAa.length) lines.push("", `AA mappings outstanding: ${report.missingAa.join(", ")} — /catalog sync offers interactive review for models with Artificial Analysis candidates.`);

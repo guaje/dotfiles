@@ -773,3 +773,13 @@ test("catalog sync shows reviewed source URLs beside AA variants and BenchLM evi
   assert.match(rendered, /    coding 43\.6 · agentic 44\.7 · reasoning 64\.3/);
   assert.match(rendered, /eligible on evidence for: balanced, coding, agentic/);
 });
+
+test("catalog sync reports the BenchLM refresh verdict even when nothing was published", () => {
+  // A quiet day legitimately rewrites nothing, so the report has to say so; a silent BenchLM section reads as
+  // a failure to the operator deciding whether to re-run.
+  const quiet = renderCatalogSync(emptySyncReport, undefined, undefined, null, { unmapped: [], warnings: [], note: "BenchLM: 0 model file(s) carry new data, 11 re-verified unchanged and left byte-for-byte as published." });
+  assert.match(quiet, /^  BenchLM: 0 model file\(s\) carry new data, 11 re-verified unchanged/m);
+  const silent = renderCatalogSync(emptySyncReport, undefined, undefined, null, { unmapped: [], warnings: [] });
+  assert.equal(silent.split("\n").filter((line) => line.startsWith("  BenchLM:")).length, 0, "a sync without a verdict adds no line");
+  assert.match(silent, /BenchLM generation on disk|no reviewed generation on disk/);
+});

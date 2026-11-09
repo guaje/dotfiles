@@ -424,19 +424,19 @@
     ],
     "model": "GPT-6 Astra",
     "creator": "OpenAI",
-    "capturedAt": 1794001787441,
-    "lastUpdated": "2026-11-06",
+    "capturedAt": 1794260307447,
+    "lastUpdated": "2026-11-09",
     "methodologyVersion": "bench-align-v5.8-2026-09-30",
-    "sourceSnapshotId": "2026-11-06-8d3e46af35e8fc5d",
+    "sourceSnapshotId": "2026-11-09-9a74371fc23ba454",
     "attribution": "Data from BenchLM.ai",
     "license": "CC BY-NC 4.0",
     "categoryScores": {
-      "coding": 74.83,
-      "agentic": 73.33,
-      "knowledge": 85.51,
-      "reasoning": 91.6,
+      "coding": 74.22,
+      "agentic": 73.44,
+      "knowledge": 84.27,
+      "reasoning": 80.84,
       "math": 93.8,
-      "multimodalGrounded": 88
+      "multimodalGrounded": 78.97
     },
     "categoryProvenance": {
       "coding": "leaderboard",
@@ -452,15 +452,15 @@
         "independentlyVerified": 4
       },
       "agentic": {
-        "rows": 16,
-        "independentlyVerified": 6
+        "rows": 19,
+        "independentlyVerified": 7
       },
       "instructionFollowing": {
         "rows": 1,
         "independentlyVerified": 0
       },
       "knowledge": {
-        "rows": 7,
+        "rows": 9,
         "independentlyVerified": 0
       },
       "reasoning": {
@@ -472,7 +472,7 @@
         "independentlyVerified": 1
       },
       "multimodalGrounded": {
-        "rows": 5,
+        "rows": 6,
         "independentlyVerified": 3
       }
     },
@@ -480,35 +480,35 @@
       {
         "key": "agentic",
         "label": "Agentic",
-        "score": 73.3,
-        "rank": 8,
-        "total": 131
+        "score": 73.4,
+        "rank": 9,
+        "total": 132
       },
       {
         "key": "coding",
         "label": "Coding",
-        "score": 74.8,
-        "rank": 5,
-        "total": 157
+        "score": 74.2,
+        "rank": 6,
+        "total": 158
       },
       {
         "key": "reasoning",
         "label": "Reasoning",
-        "score": 91.6,
+        "score": 80.8,
         "rank": 1,
-        "total": 25
+        "total": 156
       },
       {
         "key": "multimodalGrounded",
         "label": "Multimodal",
-        "score": null,
-        "rank": null,
-        "total": 59
+        "score": 79,
+        "rank": 4,
+        "total": 67
       },
       {
         "key": "knowledge",
         "label": "Knowledge",
-        "score": 85.5,
+        "score": 84.3,
         "rank": 4,
         "total": 178
       },
@@ -535,6 +535,21 @@
       }
     ],
     "details": [
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "terminalBench41",
+        "name": "Terminal-Bench 4.1",
+        "value": 60.3,
+        "formatted": "60.30%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Terminal-Bench 4.1 leaderboard",
+          "url": "https://www.tbench.ai/leaderboard/terminal-bench/4.1",
+          "retrievedAt": null
+        }
+      },
       {
         "category": "agentic",
         "categoryLabel": "Agentic",
@@ -780,6 +795,36 @@
         "source": {
           "label": "Meta: Muse Wonder model card, October 12, 2026",
           "url": "https://research.meta.ai/static/muse-wonder-model-card",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "roboDojoSim",
+        "name": "RoboDojo Sim",
+        "value": 29.8,
+        "formatted": "29.8%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Anthropic: Introducing Claude Fable 5.2 and Claude Mythos 5.2, November 9, 2026",
+          "url": "https://www.anthropic.com/claude-fable-and-mythos-5-2",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "rliAutomationRate",
+        "name": "Remote Labor Index",
+        "value": 20.8,
+        "formatted": "20.8%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Anthropic: Claude Fable 5.2 and Claude Mythos 5.2 system card, November 9, 2026",
+          "url": "https://assets.claude.com/27d60918d218125e7504bc7354c4b4626ec56b11.pdf",
           "retrievedAt": null
         }
       },
@@ -1129,6 +1174,21 @@
         }
       },
       {
+        "category": "multimodalGrounded",
+        "categoryLabel": "Multimodal",
+        "key": "biomedicalImageAnalysis",
+        "name": "Biomedical image analysis",
+        "value": 77.5,
+        "formatted": "77.5%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Anthropic: Claude Fable 5.2 and Claude Mythos 5.2 system card, November 9, 2026",
+          "url": "https://assets.claude.com/27d60918d218125e7504bc7354c4b4626ec56b11.pdf",
+          "retrievedAt": null
+        }
+      },
+      {
         "category": "knowledge",
         "categoryLabel": "Knowledge",
         "key": "gpqa",
@@ -1234,6 +1294,36 @@
         }
       },
       {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "physicianBench",
+        "name": "PhysicianBench",
+        "value": 48,
+        "formatted": "48.0%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Anthropic: Claude Fable 5.2 and Claude Mythos 5.2 system card, November 9, 2026",
+          "url": "https://assets.claude.com/27d60918d218125e7504bc7354c4b4626ec56b11.pdf",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "knowledge",
+        "categoryLabel": "Knowledge",
+        "key": "morphologyToMolecule",
+        "name": "Morphology-to-molecule matching",
+        "value": 22.8,
+        "formatted": "22.8%",
+        "verificationStatus": "provider_exact",
+        "verificationLabel": "Provider exact",
+        "source": {
+          "label": "Anthropic: Claude Fable 5.2 and Claude Mythos 5.2 system card, November 9, 2026",
+          "url": "https://assets.claude.com/27d60918d218125e7504bc7354c4b4626ec56b11.pdf",
+          "retrievedAt": null
+        }
+      },
+      {
         "category": "instructionFollowing",
         "categoryLabel": "Instruction following",
         "key": "graySwanIpi15",
@@ -1275,6 +1365,21 @@
         "source": {
           "label": "Epoch AI FrontierMath v2 leaderboard",
           "url": "https://epoch.ai/benchmarks/frontiermath-tiers-1-3-v2",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "maxxBench",
+        "name": "MaxxBench",
+        "value": 71.9,
+        "formatted": "71.9%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "MaxxBench leaderboard (unLAP)",
+          "url": "https://maxxbench.unlap.ai/",
           "retrievedAt": null
         }
       },

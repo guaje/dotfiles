@@ -96,23 +96,25 @@
     ],
     "model": "GLM-5.3-Flash",
     "creator": "Z.AI",
-    "capturedAt": 1794001787441,
-    "lastUpdated": "2026-11-06",
+    "capturedAt": 1794260307447,
+    "lastUpdated": "2026-11-09",
     "methodologyVersion": "bench-align-v5.8-2026-09-30",
-    "sourceSnapshotId": "2026-11-06-8d3e46af35e8fc5d",
+    "sourceSnapshotId": "2026-11-09-9a74371fc23ba454",
     "attribution": "Data from BenchLM.ai",
     "license": "CC BY-NC 4.0",
     "categoryScores": {
-      "coding": 47.44,
-      "agentic": 57.69,
-      "knowledge": 60,
+      "coding": 48.45,
+      "agentic": 58.28,
+      "knowledge": 60.34,
+      "reasoning": 50.29,
       "math": 56.9,
-      "multimodalGrounded": 80.8
+      "multimodalGrounded": 64.4
     },
     "categoryProvenance": {
       "coding": "leaderboard",
       "agentic": "leaderboard",
       "knowledge": "leaderboard",
+      "reasoning": "leaderboard",
       "math": "leaderboard",
       "multimodalGrounded": "leaderboard"
     },
@@ -122,8 +124,8 @@
         "independentlyVerified": 5
       },
       "agentic": {
-        "rows": 9,
-        "independentlyVerified": 4
+        "rows": 10,
+        "independentlyVerified": 5
       },
       "knowledge": {
         "rows": 2,
@@ -142,36 +144,36 @@
       {
         "key": "agentic",
         "label": "Agentic",
-        "score": 57.7,
-        "rank": 34,
-        "total": 131
+        "score": 58.3,
+        "rank": 35,
+        "total": 132
       },
       {
         "key": "coding",
         "label": "Coding",
-        "score": 47.4,
-        "rank": 54,
-        "total": 157
+        "score": 48.4,
+        "rank": 52,
+        "total": 158
       },
       {
         "key": "reasoning",
         "label": "Reasoning",
-        "score": null,
-        "rank": null,
-        "total": 25
+        "score": 50.3,
+        "rank": 53,
+        "total": 156
       },
       {
         "key": "multimodalGrounded",
         "label": "Multimodal",
-        "score": 80.8,
-        "rank": 19,
-        "total": 59
+        "score": 64.4,
+        "rank": 27,
+        "total": 67
       },
       {
         "key": "knowledge",
         "label": "Knowledge",
-        "score": 60,
-        "rank": 48,
+        "score": 60.3,
+        "rank": 45,
         "total": 178
       },
       {
@@ -197,6 +199,21 @@
       }
     ],
     "details": [
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "terminalBench41",
+        "name": "Terminal-Bench 4.1",
+        "value": 35.5,
+        "formatted": "35.50%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Terminal-Bench 4.1 leaderboard",
+          "url": "https://www.tbench.ai/leaderboard/terminal-bench/4.1",
+          "retrievedAt": null
+        }
+      },
       {
         "category": "agentic",
         "categoryLabel": "Agentic",
@@ -654,6 +671,21 @@
         "source": {
           "label": "Epoch AI FrontierMath v2 leaderboard",
           "url": "https://epoch.ai/benchmarks/frontiermath-tier-4-v2?view=graph&tab=leaderboard",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "maxxBench",
+        "name": "MaxxBench",
+        "value": 55.1,
+        "formatted": "55.1%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "MaxxBench leaderboard (unLAP)",
+          "url": "https://maxxbench.unlap.ai/",
           "retrievedAt": null
         }
       }

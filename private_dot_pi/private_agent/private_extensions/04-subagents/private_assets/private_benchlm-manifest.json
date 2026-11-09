@@ -1,75 +1,75 @@
 {
   "version": 1,
-  "generatedAt": 1794001787441,
+  "generatedAt": 1794260307447,
   "methodologyVersion": "bench-align-v5.8-2026-09-30",
-  "sourceSnapshotId": "2026-11-06-8d3e46af35e8fc5d",
-  "digest": "31c5c3a4ecac93a30244b92bc33469bf626fcbe44510bc9c329221413aab647c",
+  "sourceSnapshotId": "2026-11-09-9a74371fc23ba454",
+  "digest": "74304d4b4e00403bcb03ccae550cb33c1f685b06fb8e4aba87be722b6eca6092",
   "models": [
     {
       "runtimeId": "kelley/Kimi-K2.6",
       "canonicalId": "moonshotai/kimi-k2.6",
       "file": "kimi-k2.6.json",
-      "contentDigest": "dd6e04e57dfc97a4b9cd3b6f260604adef71a7641bb40db90f852505483ea568"
+      "contentDigest": "07eafbc4939f0bd3b54f3c1f0403dc19e014b966da39025199f2855f301e5204"
     },
     {
       "runtimeId": "model-testing/muse-glimmer",
       "canonicalId": "muse/muse-glimmer",
       "file": "muse-glimmer.json",
-      "contentDigest": "3fcddc13410c60b0febe3e68ab1ea802c5e6cfe9b5e9fe6e215d4f6b11306d5f"
+      "contentDigest": "f6d78047d4461d50ab7ac4ef309bcd38daaa32376f9b0c84fdce2174c9b8efb4"
     },
     {
       "runtimeId": "model-testing/qwen3.8-27b",
       "canonicalId": "qwen/qwen3.8-27b",
       "file": "qwen3.8-27b.json",
-      "contentDigest": "96714b5684fff09777c12b79217993d54ac443b350c8c45778e9aa428d297e6f"
+      "contentDigest": "e8fc0d83b910a99cc56bcb86f964f3ed2a3bcf74284a07dccbdae81d4cab116e"
     },
     {
       "runtimeId": "model-testing/qwen3.8-flash-next",
       "canonicalId": "qwen/qwen3.8-flash-next",
       "file": "qwen3.8-flash-next.json",
-      "contentDigest": "6e34ea030c4f6d71f2a56231b67d45c9a19a37276933f3b964bd62df97eeaedb"
+      "contentDigest": "5426c31cebbe978e4fae311e7f39f69a4441e78df3784b9a4cdaa075fbd8f8a7"
     },
     {
       "runtimeId": "openai-codex/gpt-5.6-sol",
       "canonicalId": "openai/gpt-5.6-sol",
       "file": "gpt-5.6-sol.json",
-      "contentDigest": "187f1fe3a3107a7a1b96c218703e7a6e2d406aa1d80ac23dadd35843f3436033"
+      "contentDigest": "ae3200cadab11ae680cab146aab2bca1550a6b6a5fae0634304fedf83f15ace9"
     },
     {
       "runtimeId": "openai-codex/gpt-5.6-terra",
       "canonicalId": "openai/gpt-5.6-terra",
       "file": "gpt-5.6-terra.json",
-      "contentDigest": "1219dba1597803b148d44d54eeab4ae812883b1bc25c6f72276399454aed54eb"
+      "contentDigest": "09f651096df069f01f0e3840f9340fbc358b4f1aae8e10879ea51c2d07b60c1c"
     },
     {
       "runtimeId": "openai-codex/gpt-6-astra",
       "canonicalId": "openai/gpt-6-astra",
       "file": "gpt-6-astra.json",
-      "contentDigest": "f0738f0eb213e58c55e30b8b201fea796f31645e3c29f88a9c17052203f4e641"
+      "contentDigest": "52a34a6f257003f53f1174bc4964ab98d52245fe78906c8c3911634aa116efba"
     },
     {
       "runtimeId": "openai-codex/gpt-6-luna",
       "canonicalId": "openai/gpt-6-luna",
       "file": "gpt-6-luna.json",
-      "contentDigest": "c95bee8a2cb5d930b00cb3eea1446715c88a3653aa91bc53132e004ed2c38736"
+      "contentDigest": "d94e7fde70cf532fd18355c9035f063cbf1f803d2a9a318f8b962ca28e7c9393"
     },
     {
       "runtimeId": "openai-codex/gpt-6.1-sol",
       "canonicalId": "openai/gpt-6.1-sol",
       "file": "gpt-6.1-sol.json",
-      "contentDigest": "b254b0bc2f827d17a6f6d2714249255a8cb7387985ee4c17a9acd41920600c04"
+      "contentDigest": "91e93c76461cc6c6f1d9bb44c02dc399813cdb678b40adebcb674c7509d4883f"
     },
     {
       "runtimeId": "openai-codex/gpt-6.1-terra",
       "canonicalId": "openai/gpt-6.1-terra",
       "file": "gpt-6.1-terra.json",
-      "contentDigest": "a179ba73429b0c13157e5041744a6a38dd5b55c5a1308003a77f6a284b353518"
+      "contentDigest": "1c2f51ee8978a515fe6846ea1043c4d57afec3b62b04e853df4d5a938c39767e"
     },
     {
       "runtimeId": "reallms-dev/glm-5.3-flash",
       "canonicalId": "z-ai/glm-5.3-flash",
       "file": "glm-5.3-flash.json",
-      "contentDigest": "c381951bb12ff67a8e302fbd25f8a159d7129c05d989086a1464818dc326eeb2"
+      "contentDigest": "949a1125a281a869080da83c18c444ce1bc9b5a6e0a7fe8037c5b2660386cee6"
     }
   ]
 }

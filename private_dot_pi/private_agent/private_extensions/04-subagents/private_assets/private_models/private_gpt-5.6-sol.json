@@ -566,20 +566,20 @@
     ],
     "model": "GPT-5.6 Sol",
     "creator": "OpenAI",
-    "capturedAt": 1794001787441,
-    "lastUpdated": "2026-11-06",
+    "capturedAt": 1794260307447,
+    "lastUpdated": "2026-11-09",
     "methodologyVersion": "bench-align-v5.8-2026-09-30",
-    "sourceSnapshotId": "2026-11-06-8d3e46af35e8fc5d",
+    "sourceSnapshotId": "2026-11-09-9a74371fc23ba454",
     "attribution": "Data from BenchLM.ai",
     "license": "CC BY-NC 4.0",
     "categoryScores": {
-      "coding": 67.27,
-      "agentic": 67.65,
+      "coding": 67.32,
+      "agentic": 68.01,
       "instructionFollowing": 89.1,
-      "knowledge": 76.34,
-      "reasoning": 74.5,
+      "knowledge": 75.9,
+      "reasoning": 74.02,
       "math": 92.3,
-      "multimodalGrounded": 89.7
+      "multimodalGrounded": 75.49
     },
     "categoryProvenance": {
       "coding": "leaderboard",
@@ -596,8 +596,8 @@
         "independentlyVerified": 10
       },
       "agentic": {
-        "rows": 11,
-        "independentlyVerified": 4
+        "rows": 12,
+        "independentlyVerified": 5
       },
       "instructionFollowing": {
         "rows": 1,
@@ -624,35 +624,35 @@
       {
         "key": "agentic",
         "label": "Agentic",
-        "score": 67.7,
-        "rank": 13,
-        "total": 131
+        "score": 68,
+        "rank": 14,
+        "total": 132
       },
       {
         "key": "coding",
         "label": "Coding",
         "score": 67.3,
-        "rank": 11,
-        "total": 157
+        "rank": 12,
+        "total": 158
       },
       {
         "key": "reasoning",
         "label": "Reasoning",
-        "score": 74.5,
-        "rank": 10,
-        "total": 25
+        "score": 74,
+        "rank": 11,
+        "total": 156
       },
       {
         "key": "multimodalGrounded",
         "label": "Multimodal",
-        "score": 89.7,
-        "rank": 7,
-        "total": 59
+        "score": 75.5,
+        "rank": 9,
+        "total": 67
       },
       {
         "key": "knowledge",
         "label": "Knowledge",
-        "score": 76.3,
+        "score": 75.9,
         "rank": 11,
         "total": 178
       },
@@ -679,6 +679,21 @@
       }
     ],
     "details": [
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "terminalBench41",
+        "name": "Terminal-Bench 4.1",
+        "value": 38.5,
+        "formatted": "38.50%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Terminal-Bench 4.1 leaderboard",
+          "url": "https://www.tbench.ai/leaderboard/terminal-bench/4.1",
+          "retrievedAt": null
+        }
+      },
       {
         "category": "agentic",
         "categoryLabel": "Agentic",
@@ -1406,6 +1421,21 @@
         "source": {
           "label": "OpenAI: GPT-5.6",
           "url": "https://openai.com/index/gpt-5-6/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "maxxBench",
+        "name": "MaxxBench",
+        "value": 69.1,
+        "formatted": "69.1%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "MaxxBench leaderboard (unLAP)",
+          "url": "https://maxxbench.unlap.ai/",
           "retrievedAt": null
         }
       },

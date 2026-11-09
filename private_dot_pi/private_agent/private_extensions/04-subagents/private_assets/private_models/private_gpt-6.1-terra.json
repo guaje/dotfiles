@@ -434,18 +434,18 @@
     ],
     "model": "GPT-6.1 Terra",
     "creator": "OpenAI",
-    "capturedAt": 1794001787441,
-    "lastUpdated": "2026-11-06",
+    "capturedAt": 1794260307447,
+    "lastUpdated": "2026-11-09",
     "methodologyVersion": "bench-align-v5.8-2026-09-30",
-    "sourceSnapshotId": "2026-11-06-8d3e46af35e8fc5d",
+    "sourceSnapshotId": "2026-11-09-9a74371fc23ba454",
     "attribution": "Data from BenchLM.ai",
     "license": "CC BY-NC 4.0",
     "categoryScores": {
-      "agentic": 75.99,
-      "knowledge": 77.37,
-      "reasoning": 80.1,
+      "agentic": 76.13,
+      "knowledge": 76.8,
+      "reasoning": 75.61,
       "math": 93.8,
-      "multimodalGrounded": 91.6
+      "multimodalGrounded": 77.26
     },
     "categoryProvenance": {
       "agentic": "leaderboard",
@@ -476,35 +476,35 @@
       {
         "key": "agentic",
         "label": "Agentic",
-        "score": 76,
-        "rank": 5,
-        "total": 131
+        "score": 76.1,
+        "rank": 6,
+        "total": 132
       },
       {
         "key": "coding",
         "label": "Coding",
         "score": null,
         "rank": null,
-        "total": 157
+        "total": 158
       },
       {
         "key": "reasoning",
         "label": "Reasoning",
-        "score": null,
-        "rank": null,
-        "total": 25
+        "score": 75.6,
+        "rank": 8,
+        "total": 156
       },
       {
         "key": "multimodalGrounded",
         "label": "Multimodal",
-        "score": 91.6,
-        "rank": 4,
-        "total": 59
+        "score": 77.3,
+        "rank": 8,
+        "total": 67
       },
       {
         "key": "knowledge",
         "label": "Knowledge",
-        "score": 77.4,
+        "score": 76.8,
         "rank": 10,
         "total": 178
       },

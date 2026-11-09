@@ -96,19 +96,19 @@
     ],
     "model": "Qwen3.8-Flash-Next",
     "creator": "Alibaba",
-    "capturedAt": 1794001787441,
-    "lastUpdated": "2026-11-06",
+    "capturedAt": 1794260307447,
+    "lastUpdated": "2026-11-09",
     "methodologyVersion": "bench-align-v5.8-2026-09-30",
-    "sourceSnapshotId": "2026-11-06-8d3e46af35e8fc5d",
+    "sourceSnapshotId": "2026-11-09-9a74371fc23ba454",
     "attribution": "Data from BenchLM.ai",
     "license": "CC BY-NC 4.0",
     "categoryScores": {
-      "coding": 50.83,
-      "agentic": 62.82,
+      "coding": 50.89,
+      "agentic": 63.04,
       "instructionFollowing": 91.2,
-      "knowledge": 56.49,
-      "reasoning": 78,
-      "multimodalGrounded": 85.5
+      "knowledge": 55.94,
+      "reasoning": 55.84,
+      "multimodalGrounded": 60.09
     },
     "categoryProvenance": {
       "coding": "leaderboard",
@@ -144,36 +144,36 @@
       {
         "key": "agentic",
         "label": "Agentic",
-        "score": 62.8,
-        "rank": 19,
-        "total": 131
+        "score": 63,
+        "rank": 20,
+        "total": 132
       },
       {
         "key": "coding",
         "label": "Coding",
-        "score": 50.8,
-        "rank": 45,
-        "total": 157
+        "score": 50.9,
+        "rank": 47,
+        "total": 158
       },
       {
         "key": "reasoning",
         "label": "Reasoning",
-        "score": null,
-        "rank": null,
-        "total": 25
+        "score": 55.8,
+        "rank": 43,
+        "total": 156
       },
       {
         "key": "multimodalGrounded",
         "label": "Multimodal",
-        "score": 85.5,
-        "rank": 14,
-        "total": 59
+        "score": 60.1,
+        "rank": 37,
+        "total": 67
       },
       {
         "key": "knowledge",
         "label": "Knowledge",
-        "score": 56.5,
-        "rank": 57,
+        "score": 55.9,
+        "rank": 58,
         "total": 178
       },
       {

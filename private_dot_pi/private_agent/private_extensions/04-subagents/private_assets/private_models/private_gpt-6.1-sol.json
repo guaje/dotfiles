@@ -364,19 +364,19 @@
     ],
     "model": "GPT-6.1 Sol",
     "creator": "OpenAI",
-    "capturedAt": 1794001787441,
-    "lastUpdated": "2026-11-06",
+    "capturedAt": 1794260307447,
+    "lastUpdated": "2026-11-09",
     "methodologyVersion": "bench-align-v5.8-2026-09-30",
-    "sourceSnapshotId": "2026-11-06-8d3e46af35e8fc5d",
+    "sourceSnapshotId": "2026-11-09-9a74371fc23ba454",
     "attribution": "Data from BenchLM.ai",
     "license": "CC BY-NC 4.0",
     "categoryScores": {
-      "coding": 70.39,
-      "agentic": 75.84,
-      "knowledge": 85.95,
-      "reasoning": 88.8,
+      "coding": 69.8,
+      "agentic": 75.77,
+      "knowledge": 84.64,
+      "reasoning": 80.35,
       "math": 93.8,
-      "multimodalGrounded": 88
+      "multimodalGrounded": 78.43
     },
     "categoryProvenance": {
       "coding": "leaderboard",
@@ -392,8 +392,8 @@
         "independentlyVerified": 3
       },
       "agentic": {
-        "rows": 6,
-        "independentlyVerified": 3
+        "rows": 7,
+        "independentlyVerified": 4
       },
       "knowledge": {
         "rows": 5,
@@ -417,35 +417,35 @@
         "key": "agentic",
         "label": "Agentic",
         "score": 75.8,
-        "rank": 6,
-        "total": 131
+        "rank": 7,
+        "total": 132
       },
       {
         "key": "coding",
         "label": "Coding",
-        "score": 70.4,
-        "rank": 10,
-        "total": 157
+        "score": 69.8,
+        "rank": 11,
+        "total": 158
       },
       {
         "key": "reasoning",
         "label": "Reasoning",
-        "score": 88.8,
+        "score": 80.3,
         "rank": 2,
-        "total": 25
+        "total": 156
       },
       {
         "key": "multimodalGrounded",
         "label": "Multimodal",
-        "score": null,
-        "rank": null,
-        "total": 59
+        "score": 78.4,
+        "rank": 5,
+        "total": 67
       },
       {
         "key": "knowledge",
         "label": "Knowledge",
-        "score": 85.9,
-        "rank": 2,
+        "score": 84.6,
+        "rank": 3,
         "total": 178
       },
       {
@@ -471,6 +471,21 @@
       }
     ],
     "details": [
+      {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "terminalBench41",
+        "name": "Terminal-Bench 4.1",
+        "value": 60.9,
+        "formatted": "60.90%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Terminal-Bench 4.1 leaderboard",
+          "url": "https://www.tbench.ai/leaderboard/terminal-bench/4.1",
+          "retrievedAt": null
+        }
+      },
       {
         "category": "agentic",
         "categoryLabel": "Agentic",

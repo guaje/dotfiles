@@ -43,18 +43,18 @@ export interface RoutingProfilePolicy {
   outputTokensMetric: RoutingProfile; expectedOutputTokens: number; qualityTolerance: number; defaultThinking: ThinkingLevel;
 }
 export interface RoutingInterimPolicy { stableDimensions: BenchmarkDimension[]; maxAssetAgeMs: number; basis: string; }
-export interface RoutingPolicy { version: string; methodology: BenchmarkMethodology; interim: RoutingInterimPolicy; anchors: Record<BenchmarkDimension, { minimum: number; maximum: number }>; profiles: Record<RoutingProfile, RoutingProfilePolicy>; }
+export interface RoutingPolicy { version: string; methodology: BenchmarkMethodology; history: { maxRankInfluence: number; basis: string }; interim: RoutingInterimPolicy; anchors: Record<BenchmarkDimension, { minimum: number; maximum: number }>; profiles: Record<RoutingProfile, RoutingProfilePolicy>; }
 export interface QualityDiagnostics {
   A: number; C: number; Q: number; totalWeight: number; availableWeight: number;
   availableWeightedDimensions: BenchmarkDimension[]; missingWeightedDimensions: BenchmarkDimension[];
   sources?: Partial<Record<BenchmarkDimension, string>>;
 }
 export type BenchmarkGateReason = "insufficientEvidence" | "insufficientProfileEvidence" | "invalidBenchmark";
-export type BenchmarkRejectionReason = "noSnapshot" | "staleCache" | "probeFailed" | "probeOverThreshold" | "unprobedBudget" | "capability" | BenchmarkGateReason | "speed";
-export interface CandidateEvaluationDiagnostics { modelId: string; benchmarkThinkingLevel?: BenchmarkThinkingLevel; eligible: boolean; gateReason?: BenchmarkGateReason; rejectionReasons: BenchmarkRejectionReason[]; quality?: QualityDiagnostics; confidence?: number; outsidePercentile?: number; ownPercentile?: number; combinedPercentile?: number; }
+export type BenchmarkRejectionReason = "noSnapshot" | "staleCache" | "probeFailed" | "probeOverThreshold" | "unprobedBudget" | "capability" | BenchmarkGateReason | "speed" | "driftAlarm";
+export interface CandidateEvaluationDiagnostics { modelId: string; benchmarkThinkingLevel?: BenchmarkThinkingLevel; basis?: "outside" | "history"; eligible: boolean; gateReason?: BenchmarkGateReason; rejectionReasons: BenchmarkRejectionReason[]; quality?: QualityDiagnostics; confidence?: number; outsidePercentile?: number; ownPercentile?: number; combinedPercentile?: number; }
 export interface BenchmarkRouteDiagnostics {
   policyVersion: string; routingProfile: RoutingProfile; snapshotDigest: string; benchmarkThinkingLevel: BenchmarkThinkingLevel;
   qualityScore: number; predictedCompletionMs: number; outputTokensSource: "artificial-analysis" | "profile-default";
   candidateCount: number; exclusions: Record<string, number>; candidates: CandidateEvaluationDiagnostics[];
-  sources?: string[]; unmeasured?: BenchmarkDimension[]; confidence?: number; exploration?: boolean; speedDisagreement?: boolean; interim?: true;
+  sources?: string[]; unmeasured?: BenchmarkDimension[]; confidence?: number; speedDisagreement?: boolean; historyBasis?: boolean; interim?: true;
 }

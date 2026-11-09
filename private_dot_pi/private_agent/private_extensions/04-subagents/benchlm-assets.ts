@@ -52,8 +52,8 @@ export async function loadRoutingBenchmarkAssets(aaRoot: string, benchRoot = DEF
     return [...matches.map((snapshot) => mergeSnapshot(entry, snapshot)), ...levelAgnostic];
   });
   // A model BenchLM no longer lists keeps ranking on Artificial Analysis evidence alone. Losing one
-  // publisher must never shrink the fleet (PLAN.md §8: "a model vanishes from the feed -> it loses those
-  // columns", not "it becomes unroutable").
+  // publisher must never shrink the fleet: a model that vanishes from the feed loses those columns
+  // (weights renormalise over what is left), it does not become unroutable.
   const unmatched = (aa?.snapshots ?? []).filter((snapshot) => !matched.has(`${snapshot.provider}/${snapshot.model}\0${snapshot.thinkingLevel ?? ""}`));
   const snapshots = [...merged, ...unmatched];
   return { manifest: { ...(aa?.manifest ?? { version: 4, generatedAt: bench.manifest.generatedAt, methodology: { id: "benchlm", version: bench.manifest.methodologyVersion }, models: [] }), digest: canonicalDigest([aa?.manifest.digest ?? "", bench.manifest.digest]) }, snapshots, benchLm: true } as LoadedBenchmarkAssets & { benchLm: boolean };

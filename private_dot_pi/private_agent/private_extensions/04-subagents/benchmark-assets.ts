@@ -9,7 +9,7 @@ import { BENCHMARK_DIMENSIONS, type BenchmarkHealthState, type BenchmarkManifest
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_SNAPSHOT_ROOT = path.join(__dirname, "assets");
 export const ROUTING_POLICY = policyJson as RoutingPolicy;
-export const ROUTING_POLICY_VERSION = "8";
+export const ROUTING_POLICY_VERSION = "10";
 const PROFILES = ["balanced", "coding", "agentic", "research", "planning", "review", "long-context"] as const;
 const DEFAULT_ROUTING_POLICY_PATH = path.join(__dirname, "assets", "routing-policy.json");
 const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -28,7 +28,8 @@ export async function describePolicyGenerationMismatch(policyPath = process.env.
 }
 
 export function validateRoutingPolicy(policy: unknown): policy is RoutingPolicy {
-  if (!isRecord(policy) || policy.version !== ROUTING_POLICY_VERSION || !isRecord(policy.methodology) || typeof policy.methodology.id !== "string" || typeof policy.methodology.version !== "string" || !isRecord(policy.anchors) || !isRecord(policy.profiles) || !isRecord(policy.interim)) return false;
+  if (!isRecord(policy) || policy.version !== ROUTING_POLICY_VERSION || !isRecord(policy.methodology) || typeof policy.methodology.id !== "string" || typeof policy.methodology.version !== "string" || !isRecord(policy.history) || !isRecord(policy.anchors) || !isRecord(policy.profiles) || !isRecord(policy.interim)) return false;
+  if (!sameKeys(policy.history, ["maxRankInfluence", "basis"]) || !finite(policy.history.maxRankInfluence, 0, 1) || typeof policy.history.basis !== "string") return false;
   if (!sameKeys(policy.anchors, BENCHMARK_DIMENSIONS) || !sameKeys(policy.profiles, PROFILES)) return false;
   if (!Array.isArray(policy.interim.stableDimensions) || !policy.interim.stableDimensions.length || policy.interim.stableDimensions.some((dimension) => !BENCHMARK_DIMENSIONS.includes(dimension as never)) || !finite(policy.interim.maxAssetAgeMs, 1, 31_536_000_000) || typeof policy.interim.basis !== "string") return false;
   for (const dimension of BENCHMARK_DIMENSIONS) {

@@ -118,6 +118,8 @@ export function summarizeOutcomes(rows: OutcomeRow[], settings: DriftSettings): 
     };
   });
 }
-export async function incrementExplorationCounter(profile: RoutingProfile, file = process.env.PI_SUBAGENT_OUTCOMES_PATH ?? DEFAULT_OUTCOMES_PATH): Promise<number> { const store = await loadOutcomeStore(file); const next = (store.explorationCounter[profile] ?? 0) + 1; store.explorationCounter[profile] = next; await saveOutcomeStore(store, file); return next; }
 export function confidenceFor(observations: number, fullAt: number): number { return Math.min(1, Math.max(0, observations) / Math.max(1, fullAt)); }
-export function blendPercentiles(outside: number, own: number, observations: number, fullAt: number): number { const confidence = confidenceFor(observations, fullAt); return confidence * own + (1 - confidence) * outside; }
+// History measures reliability, never capability, so its ranking weight is capped by policy: capability
+// evidence decides the route, and measured history only nudges near-ties (drift alarms veto separately).
+export function historyInfluence(observations: number, fullAt: number, maxInfluence: number): number { return Math.min(Math.max(0, maxInfluence), confidenceFor(observations, fullAt)); }
+export function blendPercentiles(outside: number, own: number, observations: number, fullAt: number, maxInfluence = 1): number { const weight = historyInfluence(observations, fullAt, maxInfluence); return weight * own + (1 - weight) * outside; }

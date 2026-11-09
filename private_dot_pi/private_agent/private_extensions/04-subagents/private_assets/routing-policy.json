@@ -1,8 +1,12 @@
 {
-  "version": "8",
+  "version": "10",
   "methodology": {
     "id": "delegation-routing-percentiles",
-    "version": "1"
+    "version": "3"
+  },
+  "history": {
+    "maxRankInfluence": 0.25,
+    "basis": "Capability ranks each model on the best evidence it has: a BenchLM/AA scorecard first, else the model's own measured history as the fallback basis, guarded by the drift warm-up observation minimum and cleared drift alarms. Scorecarded models are nudged by history at the maxRankInfluence cap (0.25 by default; weight = min(maxRankInfluence, observations / subagents.outcomeInfluenceFullAt)); drifting or zero-history models without a scorecard stay ineligible."
   },
   "anchors": {
     "coding": { "minimum": 0, "maximum": 100 },

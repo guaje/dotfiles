@@ -3,13 +3,14 @@ import { ROUTING_POLICY, validateRoutingPolicy } from "./benchmark-assets.ts";
 import { candidateHasCapabilities, evaluateBenchmarkGates, scoreFor, type BenchmarkGateMode } from "./benchmark-qualification.ts";
 import type { BenchmarkHealth, BenchmarkDimension, QualityDiagnostics } from "./benchmark-types.ts";
 import { aaModelIdForCanonical, canonicalIdForRuntime } from "./canonical-mappings.ts";
-import { blendPercentiles, confidenceFor, type OutcomeSummary } from "./outcomes.ts";
+import { historyInfluence, type OutcomeSummary } from "./outcomes.ts";
 
 export interface RouteCandidate { id: string; canonicalId?: string; reasoning?: boolean; supportsReasoningEffort?: boolean; supportsTools?: boolean; thinkingLevelMap?: Partial<Record<ThinkingLevel, string | null>>; contextWindow?: number; maxTokens?: number; input?: string[]; }
 export interface LocalHealth { id: string; latencyMs?: number; tokensPerSecond?: number; status?: string; service?: string; checkedAt?: number; }
 export interface BenchmarkRoute { modelId?: string; diagnostics: BenchmarkRouteDiagnostics; thinkingLevel?: ThinkingLevel; }
-export interface RouteOptions { maxProbeLatencyMs?: number; researchMinimumContextWindow?: number; taskChars?: number; outcomeSummaries?: OutcomeSummary[]; outcomeInfluenceFullAt?: number; measuredSpeedMinimumRuns?: number; explorationCounter?: number; }
-interface RankedCandidate { candidate: RouteCandidate; snapshot: BenchmarkSnapshot; health: LocalHealth; quality: QualityDiagnostics; predictedCompletionMs: number; outputTokensSource: "artificial-analysis" | "profile-default"; childThinking?: ThinkingLevel; confidence: number; outside: number; own: number; combined: number; speedDisagreement: boolean; }
+export interface RouteOptions { maxProbeLatencyMs?: number; researchMinimumContextWindow?: number; taskChars?: number; outcomeSummaries?: OutcomeSummary[]; outcomeInfluenceFullAt?: number; measuredSpeedMinimumRuns?: number; historyMinimumObservations?: number; }
+type EvidenceBasis = "outside" | "history";
+interface RankedCandidate { candidate: RouteCandidate; snapshot?: BenchmarkSnapshot; basis: EvidenceBasis; health: LocalHealth; quality?: QualityDiagnostics; predictedCompletionMs: number; outputTokensSource: "artificial-analysis" | "profile-default"; childThinking?: ThinkingLevel; confidence: number; outside: number; own: number; combined: number; speedDisagreement: boolean; }
 const snapshotKey = (id: string, level: BenchmarkThinkingLevel) => `${id}\0${level ?? ""}`;
 const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 const LEVELS: readonly ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
@@ -28,7 +29,7 @@ export function predictCompletionTime(profile: RoutingProfile, health: LocalHeal
 }
 
 export function routeBenchmarkModel(profile: RoutingProfile, candidates: RouteCandidate[], snapshots: BenchmarkSnapshot[], health: LocalHealth[], snapshotDigest: string, requestedThinking?: ThinkingLevel, benchmarkHealth?: BenchmarkHealth, mode: BenchmarkGateMode = "strict", options: RouteOptions = {}): BenchmarkRoute {
-  const exclusions: Record<string, number> = { noSnapshot: 0, staleCache: 0, probeFailed: 0, probeOverThreshold: 0, unprobedBudget: 0, capability: 0, insufficientEvidence: 0, insufficientProfileEvidence: 0, invalidBenchmark: 0, speed: 0, pareto: 0, qualityBand: 0 };
+  const exclusions: Record<string, number> = { noSnapshot: 0, staleCache: 0, probeFailed: 0, probeOverThreshold: 0, unprobedBudget: 0, capability: 0, insufficientEvidence: 0, insufficientProfileEvidence: 0, invalidBenchmark: 0, driftAlarm: 0, speed: 0, pareto: 0, qualityBand: 0 };
   const evaluations: CandidateEvaluationDiagnostics[] = [];
   const empty = (): BenchmarkRoute => ({ diagnostics: { policyVersion: ROUTING_POLICY.version, routingProfile: profile, snapshotDigest, benchmarkThinkingLevel: null, qualityScore: 0, predictedCompletionMs: 0, outputTokensSource: "profile-default", candidateCount: 0, exclusions, candidates: evaluations, ...(mode === "interim" ? { interim: true } : {}) } });
   if (!validateRoutingPolicy(ROUTING_POLICY)) return empty();
@@ -53,24 +54,36 @@ export function routeBenchmarkModel(profile: RoutingProfile, candidates: RouteCa
   for (const dimension of dimensions) distributions.set(dimension, resolved.flatMap(({ snapshot }) => { const value = snapshot ? scoreFor(snapshot, dimension) : null; return value === null ? [] : [value]; }));
   const byHealth = new Map(health.map((entry) => [entry.id, entry])), prelim: RankedCandidate[] = [];
   const outcomeRates = (options.outcomeSummaries ?? []).filter((entry) => entry.profile === profile && candidates.some((candidate) => candidate.id === entry.model)).map((entry) => entry.successRate);
+  const historyMinimumObservations = options.historyMinimumObservations ?? Infinity;
   for (const { candidate, snapshot, childThinking } of resolved) {
-    if (!snapshot) { exclusions.noSnapshot++; evaluations.push({ modelId: candidate.id, eligible: false, rejectionReasons: ["noSnapshot"] }); continue; }
-    const percentileSnapshot: BenchmarkSnapshot = { ...snapshot, scores: { ...snapshot.scores } };
-    for (const dimension of dimensions) { const raw = scoreFor(snapshot, dimension); (percentileSnapshot.scores as any)[dimension] = raw === null ? null : percentile(raw, distributions.get(dimension)!); }
+    const summary = options.outcomeSummaries?.find((entry) => entry.model === candidate.id && entry.profile === profile);
+    // Evidence-basis ladder: rank each model on the best evidence it actually has. A missing scorecard does
+    // not discard the model — its own measured record can be the basis — but no record means no ranking.
+    if (!snapshot) {
+      const warm = summary !== undefined && summary.observations >= historyMinimumObservations;
+      if (!warm || summary!.successDrift || summary!.timeDrift) { const reason = warm ? "driftAlarm" as const : "noSnapshot" as const; exclusions[reason]++; evaluations.push({ modelId: candidate.id, ...(warm ? { basis: "history" as const } : {}), eligible: false, rejectionReasons: [reason] }); continue; }
+    }
+    const basis: EvidenceBasis = snapshot ? "outside" : "history";
+    const percentileSnapshot: BenchmarkSnapshot | null = snapshot ? { ...snapshot, scores: { ...snapshot.scores } } : null;
+    if (percentileSnapshot) for (const dimension of dimensions) { const raw = scoreFor(snapshot!, dimension); (percentileSnapshot.scores as any)[dimension] = raw === null ? null : percentile(raw, distributions.get(dimension)!); }
     const reasons: CandidateEvaluationDiagnostics["rejectionReasons"] = [], local = byHealth.get(candidate.id);
     if (!local || local.status === "stale") reasons.push("staleCache");
     else if (local.status === "unprobed-budget") reasons.push("unprobedBudget");
     else if (local.status !== "ok" || (local.service ?? "chat") !== "chat" || !Number.isFinite(local.latencyMs) || !Number.isFinite(local.tokensPerSecond) || local.tokensPerSecond! <= 0) reasons.push("probeFailed");
     else if (local.latencyMs! > (options.maxProbeLatencyMs ?? Infinity)) reasons.push("probeOverThreshold");
     if (!candidateHasCapabilities(candidate, profile) || (profile === "research" && Number.isFinite(options.researchMinimumContextWindow) && (candidate.contextWindow ?? 0) < options.researchMinimumContextWindow!)) reasons.push("capability");
-    const evaluated = evaluateBenchmarkGates(percentileSnapshot, profile, benchmarkHealth, mode); if (evaluated.gateReason) reasons.push(evaluated.gateReason);
-    const summary = options.outcomeSummaries?.find((entry) => entry.model === candidate.id && entry.profile === profile);
+    // History-basis candidates skip the scorecard machinery (their record is the evidence, so quality stays
+    // undefined) but still pass the same hard gates as everyone else.
+    const evaluated = percentileSnapshot ? evaluateBenchmarkGates(percentileSnapshot, profile, benchmarkHealth, mode) : null; if (evaluated?.gateReason) reasons.push(evaluated.gateReason);
+    // A drift alarm means measured reliability is collapsing (or the provider swapped the model under the
+    // same name). History no longer ranks, so the veto is how measured experience still protects the fleet.
+    if (summary?.successDrift || summary?.timeDrift) reasons.push("driftAlarm");
     const completion = reasons.length ? null : predictCompletionTime(profile, local!, summary, options.measuredSpeedMinimumRuns ?? Infinity, options.taskChars ?? 2000); if (!reasons.length && !completion) reasons.push("speed");
-    const own = summary ? percentile(summary.successRate, outcomeRates) : evaluated.quality?.A ?? 0, outside = evaluated.quality?.A ?? 0, confidence = confidenceFor(summary?.observations ?? 0, options.outcomeInfluenceFullAt ?? 60), combined = blendPercentiles(outside, own, summary?.observations ?? 0, options.outcomeInfluenceFullAt ?? 60);
-    const evaluation: CandidateEvaluationDiagnostics = { modelId: candidate.id, benchmarkThinkingLevel: snapshot.thinkingLevel, eligible: reasons.length === 0, rejectionReasons: reasons, ...(evaluated.gateReason ? { gateReason: evaluated.gateReason } : {}), ...(evaluated.quality ? { quality: evaluated.quality } : {}), confidence, outsidePercentile: outside, ownPercentile: own, combinedPercentile: combined };
+    const own = basis === "history" ? percentile(summary!.successRate, outcomeRates) : summary ? percentile(summary.successRate, outcomeRates) : evaluated?.quality?.A ?? 0, outside = basis === "history" ? 0 : evaluated?.quality?.A ?? 0, confidence = basis === "history" ? 1 : historyInfluence(summary?.observations ?? 0, options.outcomeInfluenceFullAt ?? 60, ROUTING_POLICY.history.maxRankInfluence), combined = confidence * own + (1 - confidence) * outside;
+    const evaluation: CandidateEvaluationDiagnostics = { modelId: candidate.id, ...(snapshot ? { benchmarkThinkingLevel: snapshot.thinkingLevel } : {}), basis, eligible: reasons.length === 0, rejectionReasons: reasons, ...(evaluated?.gateReason ? { gateReason: evaluated.gateReason } : {}), ...(evaluated?.quality ? { quality: evaluated.quality } : {}), confidence, outsidePercentile: outside, ownPercentile: own, combinedPercentile: combined };
     evaluations.push(evaluation);
     if (reasons.length) { exclusions[reasons[0]] = (exclusions[reasons[0]] ?? 0) + 1; continue; }
-    prelim.push({ candidate, snapshot, health: local!, quality: evaluated.quality!, predictedCompletionMs: completion!.milliseconds, outputTokensSource: "profile-default", childThinking, confidence, outside, own, combined, speedDisagreement: completion!.speedDisagreement });
+    prelim.push({ candidate, snapshot, basis, health: local!, quality: evaluated?.quality, predictedCompletionMs: completion!.milliseconds, outputTokensSource: "profile-default", childThinking, confidence, outside, own, combined, speedDisagreement: completion!.speedDisagreement });
   }
   const dominates = (a: RankedCandidate, b: RankedCandidate) => a.combined >= b.combined && a.predictedCompletionMs <= b.predictedCompletionMs && (a.combined > b.combined || a.predictedCompletionMs < b.predictedCompletionMs);
   const pareto = prelim.filter((entry) => !prelim.some((other) => other !== entry && dominates(other, entry))); exclusions.pareto = prelim.length - pareto.length;
@@ -78,8 +91,6 @@ export function routeBenchmarkModel(profile: RoutingProfile, candidates: RouteCa
   const best = Math.max(...pareto.map((entry) => entry.combined)), tolerance = ROUTING_POLICY.profiles[profile].qualityTolerance;
   const band = pareto.filter((entry) => entry.combined >= best - tolerance); exclusions.qualityBand = pareto.length - band.length;
   band.sort((a, b) => b.combined - a.combined || a.predictedCompletionMs - b.predictedCompletionMs || (b.health.checkedAt ?? 0) - (a.health.checkedAt ?? 0) || compare(a.candidate.id, b.candidate.id));
-  let winner = band[0]!, exploration = false;
-  const low = prelim.filter((entry) => entry.confidence < 0.25).sort((a, b) => b.combined - a.combined || compare(a.candidate.id, b.candidate.id))[0];
-  if (low && winner.combined - low.combined <= 8 && (options.explorationCounter ?? 0) > 0 && options.explorationCounter! % 4 === 0) { winner = low; exploration = low !== band[0]; }
-  return { modelId: winner.candidate.id, thinkingLevel: winner.childThinking, diagnostics: { policyVersion: ROUTING_POLICY.version, routingProfile: profile, snapshotDigest, benchmarkThinkingLevel: winner.snapshot.thinkingLevel, qualityScore: winner.combined, predictedCompletionMs: winner.predictedCompletionMs, outputTokensSource: winner.outputTokensSource, candidateCount: prelim.length, exclusions, candidates: evaluations, sources: [...new Set(Object.values(winner.quality.sources ?? {}))], unmeasured: winner.quality.missingWeightedDimensions, confidence: winner.confidence, exploration, speedDisagreement: winner.speedDisagreement, ...(mode === "interim" ? { interim: true } : {}) } };
+  const winner = band[0]!, historyBasis = winner.basis === "history";
+  return { modelId: winner.candidate.id, thinkingLevel: winner.childThinking, diagnostics: { policyVersion: ROUTING_POLICY.version, routingProfile: profile, snapshotDigest, benchmarkThinkingLevel: winner.snapshot?.thinkingLevel ?? null, qualityScore: winner.combined, predictedCompletionMs: winner.predictedCompletionMs, outputTokensSource: winner.outputTokensSource, candidateCount: prelim.length, exclusions, candidates: evaluations, sources: historyBasis ? ["history"] : [...new Set(Object.values(winner.quality?.sources ?? {}))], ...(winner.quality ? { unmeasured: winner.quality.missingWeightedDimensions } : {}), confidence: winner.confidence, speedDisagreement: winner.speedDisagreement, ...(historyBasis ? { historyBasis: true } : {}), ...(mode === "interim" ? { interim: true } : {}) } };
 }

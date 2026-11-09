@@ -8,7 +8,7 @@ import { parseRoutingProfile } from "./task-profile.ts";
 import type { BenchmarkRouteDiagnostics, RoutingProfile, ThinkingLevel } from "./benchmark-types.ts";
 import { getSubagentExecutionSettings } from "./settings.ts";
 import { normalizeModelMetadata, type ModelMetadata } from "./model-metadata.ts";
-import { incrementExplorationCounter, loadOutcomeStore, summarizeOutcomes } from "./outcomes.ts";
+import { loadOutcomeStore, summarizeOutcomes } from "./outcomes.ts";
 
 export type { ThinkingLevel } from "./benchmark-types.ts";
 export type { ModelMetadata } from "./model-metadata.ts";
@@ -66,8 +66,7 @@ export async function selectModelForSubagent(options: SelectionOptions = {}): Pr
     const health = await refreshHealth(models, profile, assets.snapshots, healthSettings.cacheTtlMs, healthSettings.concurrency, subagentSettings.healthProbeBudgetMs, options.dependencies ?? {}, options.probeContext);
     const store = await loadOutcomeStore();
     const summaries = summarizeOutcomes(store.rows, { warmupRows: subagentSettings.driftWarmupRows, alarmMinPoints: subagentSettings.driftAlarmMinPoints });
-    const explorationCounter = await incrementExplorationCounter(profile);
-    const route = routeBenchmarkModel(profile, models, assets.snapshots, [...health.values()], assets.manifest.digest, options.thinking, benchmarkHealth?.fields, mode, { maxProbeLatencyMs: subagentSettings.maxProbeLatencyMs, researchMinimumContextWindow: subagentSettings.researchMinimumContextWindow, taskChars: options.task?.length ?? 0, outcomeSummaries: summaries, outcomeInfluenceFullAt: subagentSettings.outcomeInfluenceFullAt, measuredSpeedMinimumRuns: subagentSettings.measuredSpeedMinimumRuns, explorationCounter });
+    const route = routeBenchmarkModel(profile, models, assets.snapshots, [...health.values()], assets.manifest.digest, options.thinking, benchmarkHealth?.fields, mode, { maxProbeLatencyMs: subagentSettings.maxProbeLatencyMs, researchMinimumContextWindow: subagentSettings.researchMinimumContextWindow, taskChars: options.task?.length ?? 0, outcomeSummaries: summaries, outcomeInfluenceFullAt: subagentSettings.outcomeInfluenceFullAt, measuredSpeedMinimumRuns: subagentSettings.measuredSpeedMinimumRuns, historyMinimumObservations: subagentSettings.driftWarmupRows });
     return route.modelId ? { modelId: route.modelId, thinkingLevel: route.thinkingLevel, selector: mode === "interim" ? "interim" : "benchmark", benchmarkRoute: route.diagnostics } : { benchmarkRoute: route.diagnostics };
   } catch { return {}; }
 }

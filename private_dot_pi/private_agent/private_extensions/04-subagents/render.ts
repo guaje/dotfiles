@@ -237,7 +237,7 @@ export function renderSubagentResult(
 			if (routeTag(r.modelSelector)) header += ` ${theme.fg(isCertifiedRoute(r.modelSelector) ? "accent" : "dim", routeTag(r.modelSelector))}`;
 			if (r.benchmarkRoute) {
 				const route = r.benchmarkRoute;
-				const flags = [route.exploration ? "explore" : "", route.speedDisagreement ? "probe says fast, real work says slow" : ""].filter(Boolean).join(",");
+				const flags = [route.speedDisagreement ? "probe says fast, real work says slow" : ""].filter(Boolean).join(",");
 				header += ` ${theme.fg("dim", `${route.routingProfile} q:${route.qualityScore.toFixed(1)} ${Math.round(route.predictedCompletionMs)}ms conf:${Math.round((route.confidence ?? 0) * 100)}%${flags ? ` ${flags}` : ""}`)}`;
 			}
 			if (isError && r.stopReason) header += ` ${theme.fg("error", `[${r.stopReason}]`)}`;

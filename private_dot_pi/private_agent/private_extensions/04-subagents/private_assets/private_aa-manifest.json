@@ -1,6 +1,6 @@
 {
-  "digest": "a67be071b05e9bd4c93eea44b274be8e53ea95252f814da2328cdbc346da3ad7",
-  "generatedAt": 1793998296043,
+  "digest": "322bfa01c27729c371e6e9988a4137dcdf07bce5eaadb99b2bb077171b2b7131",
+  "generatedAt": 1794327167297,
   "methodology": {
     "id": "artificial-analysis-intelligence-index",
     "version": "5"
@@ -84,60 +84,6 @@
       "file": "gpt-5.6-sol.json",
       "model": "gpt-5.6-sol",
       "modelId": "d998db47-9b67-4727-a2bb-2e1261020ac0",
-      "provider": "openai-codex",
-      "thinkingLevel": "xhigh"
-    },
-    {
-      "capturedAt": 1793820811443,
-      "contentDigest": "cbe8d2421d4a6cef58a252e8a212f68201ddf3df2a4213d5ba9a3bd1d34a6039",
-      "file": "gpt-5.6-terra.json",
-      "model": "gpt-5.6-terra",
-      "modelId": "81972fba-1219-477e-bbfb-18c656a63ff7",
-      "provider": "openai-codex",
-      "thinkingLevel": "high"
-    },
-    {
-      "capturedAt": 1793820812954,
-      "contentDigest": "729305ad23580904db3cea754e0777d4f603ea2538fae9374d11aabd4c460b92",
-      "file": "gpt-5.6-terra.json",
-      "model": "gpt-5.6-terra",
-      "modelId": "cc4a20cd-09fe-4962-a430-119c815e85fa",
-      "provider": "openai-codex",
-      "thinkingLevel": "low"
-    },
-    {
-      "capturedAt": 1793820813378,
-      "contentDigest": "f2b231a98cc276e051da067dc4893ed815239d34420995afb848a5c35b29b627",
-      "file": "gpt-5.6-terra.json",
-      "model": "gpt-5.6-terra",
-      "modelId": "bcf8db0a-3bb6-4d82-9516-0f57370c85a6",
-      "provider": "openai-codex",
-      "thinkingLevel": "max"
-    },
-    {
-      "capturedAt": 1793820813927,
-      "contentDigest": "0960575a6719ba9ce2cb8ecfdb58d04c7ebd12150d6ea7032c29adaf24cb6b52",
-      "file": "gpt-5.6-terra.json",
-      "model": "gpt-5.6-terra",
-      "modelId": "26e0f83a-ca98-4f34-94ac-7c5e251ee410",
-      "provider": "openai-codex",
-      "thinkingLevel": "medium"
-    },
-    {
-      "capturedAt": 1793820814468,
-      "contentDigest": "c1bb187db8c74276338e304b7e4c1a9d245c53da4fe127535bc87f3f211f294b",
-      "file": "gpt-5.6-terra.json",
-      "model": "gpt-5.6-terra",
-      "modelId": "9b97a35e-6ac7-44d9-91c6-422fa678963e",
-      "provider": "openai-codex",
-      "thinkingLevel": "off"
-    },
-    {
-      "capturedAt": 1793820815046,
-      "contentDigest": "c068168c6f33add016040fec3edbeef198907f0c267a71220d37220787136581",
-      "file": "gpt-5.6-terra.json",
-      "model": "gpt-5.6-terra",
-      "modelId": "9e30696f-16fa-4b4f-ba53-161895a85fed",
       "provider": "openai-codex",
       "thinkingLevel": "xhigh"
     },

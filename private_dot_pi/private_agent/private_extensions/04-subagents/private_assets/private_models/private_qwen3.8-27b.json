@@ -343,19 +343,19 @@
     ],
     "model": "Qwen3.8-27B",
     "creator": "Alibaba",
-    "capturedAt": 1794260307447,
-    "lastUpdated": "2026-11-09",
+    "capturedAt": 1794327157791,
+    "lastUpdated": "2026-11-10",
     "methodologyVersion": "bench-align-v5.8-2026-09-30",
-    "sourceSnapshotId": "2026-11-09-9a74371fc23ba454",
+    "sourceSnapshotId": "2026-11-10-07782fd3ca428ba7",
     "attribution": "Data from BenchLM.ai",
     "license": "CC BY-NC 4.0",
     "categoryScores": {
       "coding": 46.89,
-      "agentic": 63.05,
+      "agentic": 63.03,
       "instructionFollowing": 86.9,
-      "knowledge": 49.09,
-      "reasoning": 43.21,
-      "multimodalGrounded": 60.15
+      "knowledge": 48.97,
+      "reasoning": 42.93,
+      "multimodalGrounded": 60.14
     },
     "categoryProvenance": {
       "coding": "leaderboard",
@@ -392,7 +392,7 @@
         "key": "agentic",
         "label": "Agentic",
         "score": 63,
-        "rank": 19,
+        "rank": 20,
         "total": 132
       },
       {
@@ -405,23 +405,23 @@
       {
         "key": "reasoning",
         "label": "Reasoning",
-        "score": 43.2,
-        "rank": 72,
-        "total": 156
+        "score": 42.9,
+        "rank": 73,
+        "total": 157
       },
       {
         "key": "multimodalGrounded",
         "label": "Multimodal",
         "score": 60.1,
-        "rank": 36,
+        "rank": 37,
         "total": 67
       },
       {
         "key": "knowledge",
         "label": "Knowledge",
-        "score": 49.1,
-        "rank": 83,
-        "total": 178
+        "score": 49,
+        "rank": 84,
+        "total": 179
       },
       {
         "key": "multilingual",
@@ -750,7 +750,7 @@
         "verificationStatus": "benchmark_exact",
         "verificationLabel": "Benchmark exact",
         "source": {
-          "label": "ExtractBench leaderboard, November 6, 2026 snapshot (LlamaIndex)",
+          "label": "ExtractBench leaderboard, November 9, 2026 snapshot (LlamaIndex)",
           "url": "https://www.extractbench.ai/#leaderboard",
           "retrievedAt": null
         }
@@ -765,7 +765,7 @@
         "verificationStatus": "benchmark_exact",
         "verificationLabel": "Benchmark exact",
         "source": {
-          "label": "ParseBench leaderboard, November 6, 2026 snapshot (LlamaIndex)",
+          "label": "ParseBench leaderboard, November 9, 2026 snapshot (LlamaIndex)",
           "url": "https://www.parsebench.ai/#leaderboard",
           "retrievedAt": null
         }
@@ -1038,6 +1038,36 @@
         "source": {
           "label": "Qwen3.8-27B model card",
           "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "stealthMark",
+        "name": "StealthMark",
+        "value": 51.7,
+        "formatted": "51.7",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "StealthMark 1.8.10 results (Stealth Models)",
+          "url": "https://stealthmodels.com/benchmarks",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "babaIsBench",
+        "name": "BabaIsBench",
+        "value": 21,
+        "formatted": "21%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "BabaIsBench leaderboard (Quesma)",
+          "url": "https://quesma.com/benchmarks/babaisbench/",
           "retrievedAt": null
         }
       },

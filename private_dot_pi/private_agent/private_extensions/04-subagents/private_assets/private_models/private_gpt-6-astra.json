@@ -424,19 +424,19 @@
     ],
     "model": "GPT-6 Astra",
     "creator": "OpenAI",
-    "capturedAt": 1794260307447,
-    "lastUpdated": "2026-11-09",
+    "capturedAt": 1794327157791,
+    "lastUpdated": "2026-11-10",
     "methodologyVersion": "bench-align-v5.8-2026-09-30",
-    "sourceSnapshotId": "2026-11-09-9a74371fc23ba454",
+    "sourceSnapshotId": "2026-11-10-07782fd3ca428ba7",
     "attribution": "Data from BenchLM.ai",
     "license": "CC BY-NC 4.0",
     "categoryScores": {
-      "coding": 74.22,
-      "agentic": 73.44,
-      "knowledge": 84.27,
-      "reasoning": 80.84,
+      "coding": 73.99,
+      "agentic": 73.59,
+      "knowledge": 83.85,
+      "reasoning": 80.7,
       "math": 93.8,
-      "multimodalGrounded": 78.97
+      "multimodalGrounded": 78.95
     },
     "categoryProvenance": {
       "coding": "leaderboard",
@@ -452,8 +452,8 @@
         "independentlyVerified": 4
       },
       "agentic": {
-        "rows": 19,
-        "independentlyVerified": 7
+        "rows": 20,
+        "independentlyVerified": 8
       },
       "instructionFollowing": {
         "rows": 1,
@@ -480,23 +480,23 @@
       {
         "key": "agentic",
         "label": "Agentic",
-        "score": 73.4,
+        "score": 73.6,
         "rank": 9,
         "total": 132
       },
       {
         "key": "coding",
         "label": "Coding",
-        "score": 74.2,
+        "score": 74,
         "rank": 6,
         "total": 158
       },
       {
         "key": "reasoning",
         "label": "Reasoning",
-        "score": 80.8,
-        "rank": 1,
-        "total": 156
+        "score": 80.7,
+        "rank": 2,
+        "total": 157
       },
       {
         "key": "multimodalGrounded",
@@ -508,9 +508,9 @@
       {
         "key": "knowledge",
         "label": "Knowledge",
-        "score": 84.3,
-        "rank": 4,
-        "total": 178
+        "score": 83.8,
+        "rank": 5,
+        "total": 179
       },
       {
         "key": "multilingual",
@@ -829,6 +829,21 @@
         }
       },
       {
+        "category": "agentic",
+        "categoryLabel": "Agentic",
+        "key": "cweBenchV2",
+        "name": "CWE-bench",
+        "value": 64.2,
+        "formatted": "64.2%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Collinear: CWE-bench v2 leaderboard",
+          "url": "https://cwe-bench.com/",
+          "retrievedAt": null
+        }
+      },
+      {
         "category": "coding",
         "categoryLabel": "Coding",
         "key": "scarfBench",
@@ -930,7 +945,7 @@
         "source": {
           "label": "Bug Hunt Bench public data",
           "url": "https://bughunt.productcompass.pm/data/benchmark.json",
-          "retrievedAt": "2026-11-06"
+          "retrievedAt": "2026-11-09"
         }
       },
       {
@@ -990,7 +1005,7 @@
         "source": {
           "label": "ARC Prize: published Semi-Private results",
           "url": "https://arcprize.org/results/openai-gpt-6-astra",
-          "retrievedAt": "2026-11-06T18:02:09.380Z"
+          "retrievedAt": "2026-11-09T20:44:35.250Z"
         }
       },
       {
@@ -1005,7 +1020,7 @@
         "source": {
           "label": "ARC Prize: published Semi-Private results",
           "url": "https://arcprize.org/results/openai-gpt-6-astra",
-          "retrievedAt": "2026-11-06T18:02:09.380Z"
+          "retrievedAt": "2026-11-09T20:44:35.250Z"
         }
       },
       {
@@ -1020,7 +1035,7 @@
         "source": {
           "label": "ARC Prize: published Semi-Private results",
           "url": "https://arcprize.org/results/openai-gpt-6-astra",
-          "retrievedAt": "2026-11-06T18:02:09.380Z"
+          "retrievedAt": "2026-11-09T20:44:35.250Z"
         }
       },
       {
@@ -1095,7 +1110,7 @@
         "source": {
           "label": "ARC Prize: published Semi-Private results",
           "url": "https://arcprize.org/results/openai-gpt-6-astra",
-          "retrievedAt": "2026-11-06T18:02:09.380Z"
+          "retrievedAt": "2026-11-09T20:44:35.250Z"
         }
       },
       {
@@ -1108,7 +1123,7 @@
         "verificationStatus": "benchmark_exact",
         "verificationLabel": "Benchmark exact",
         "source": {
-          "label": "ExtractBench Pro leaderboard, October 28, 2026 snapshot (LlamaIndex)",
+          "label": "ExtractBench Pro leaderboard, November 9, 2026 snapshot (LlamaIndex)",
           "url": "https://www.extractbench.ai/pro#leaderboard",
           "retrievedAt": null
         }
@@ -1123,7 +1138,7 @@
         "verificationStatus": "benchmark_exact",
         "verificationLabel": "Benchmark exact",
         "source": {
-          "label": "ExtractBench leaderboard, November 6, 2026 snapshot (LlamaIndex)",
+          "label": "ExtractBench leaderboard, November 9, 2026 snapshot (LlamaIndex)",
           "url": "https://www.extractbench.ai/#leaderboard",
           "retrievedAt": null
         }
@@ -1138,7 +1153,7 @@
         "verificationStatus": "benchmark_exact",
         "verificationLabel": "Benchmark exact",
         "source": {
-          "label": "ParseBench leaderboard, November 6, 2026 snapshot (LlamaIndex)",
+          "label": "ParseBench leaderboard, November 9, 2026 snapshot (LlamaIndex)",
           "url": "https://www.parsebench.ai/#leaderboard",
           "retrievedAt": null
         }
@@ -1365,6 +1380,156 @@
         "source": {
           "label": "Epoch AI FrontierMath v2 leaderboard",
           "url": "https://epoch.ai/benchmarks/frontiermath-tiers-1-3-v2",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "jokeArena",
+        "name": "Joke Arena",
+        "value": 1562,
+        "formatted": "1562",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Joke Arena leaderboard (Kaggle)",
+          "url": "https://www.kaggle.com/benchmarks/kaggle/joke-arena",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "chartArena",
+        "name": "Chart Arena",
+        "value": 1617,
+        "formatted": "1617",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Chart Arena leaderboard (Kaggle)",
+          "url": "https://www.kaggle.com/benchmarks/kaggle/chart-arena",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "landingPageArena",
+        "name": "Landing Page Arena",
+        "value": 1665,
+        "formatted": "1665",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Landing Page Arena leaderboard (Kaggle)",
+          "url": "https://www.kaggle.com/benchmarks/kaggle/landing-page-arena",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "code2Video",
+        "name": "Code2Video",
+        "value": 1565,
+        "formatted": "1565",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Code2Video leaderboard (HeyGen on Kaggle)",
+          "url": "https://www.kaggle.com/benchmarks/heygen/code2video",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "failureSensorIq",
+        "name": "FailureSensorIQ",
+        "value": 69.6,
+        "formatted": "69.6%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "FailureSensorIQ leaderboard (IBM Research on Kaggle)",
+          "url": "https://www.kaggle.com/benchmarks/ibm-research/asset-ops-bench",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "dayjobHealthcare",
+        "name": "DAYJOB Healthcare",
+        "value": 11.2,
+        "formatted": "11.2%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "DAYJOB Healthcare leaderboard (Surge AI on Kaggle)",
+          "url": "https://www.kaggle.com/benchmarks/surge-ai/dayjob-healthcare",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "dayjob",
+        "name": "DAYJOB",
+        "value": 17.4,
+        "formatted": "17.4%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "DAYJOB leaderboard (Surge AI on Kaggle)",
+          "url": "https://www.kaggle.com/benchmarks/surge-ai/dayjob",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "factsMultimodal",
+        "name": "FACTS Multimodal",
+        "value": 55.2,
+        "formatted": "55.2%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "FACTS Multimodal leaderboard (Google DeepMind and Google Research on Kaggle)",
+          "url": "https://www.kaggle.com/benchmarks/google/facts-multimodal",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "stealthMark",
+        "name": "StealthMark",
+        "value": 74.6,
+        "formatted": "74.6",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "StealthMark 1.8.10 results (Stealth Models)",
+          "url": "https://stealthmodels.com/benchmarks",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "babaIsBench",
+        "name": "BabaIsBench",
+        "value": 100,
+        "formatted": "100%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "BabaIsBench leaderboard (Quesma)",
+          "url": "https://quesma.com/benchmarks/babaisbench/",
           "retrievedAt": null
         }
       },
@@ -1620,6 +1785,111 @@
         "source": {
           "label": "OpenAI GPT-6 Cyber system card",
           "url": "https://deploymentsafety.openai.com/gpt-6-cyber",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "spireClimb",
+        "name": "SpireClimb",
+        "value": 34,
+        "formatted": "34.0%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI SpireClimb leaderboard",
+          "url": "https://epoch.ai/benchmarks/spireclimb",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "chessPuzzles",
+        "name": "Chess Puzzles",
+        "value": 74,
+        "formatted": "74.0%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI Chess Puzzles leaderboard",
+          "url": "https://epoch.ai/benchmarks/chess-puzzles",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "mysteryGamePuzzles",
+        "name": "Mystery Game Puzzles",
+        "value": 84,
+        "formatted": "84.0%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI Mystery Game Puzzles leaderboard",
+          "url": "https://epoch.ai/benchmarks/mystery-game-puzzles",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "furnitureAssembly",
+        "name": "Furniture Assembly",
+        "value": 80,
+        "formatted": "80.0%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI Furniture Assembly leaderboard",
+          "url": "https://epoch.ai/benchmarks/furniture-assembly",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "ebrBench",
+        "name": "EBR-bench",
+        "value": 76.2,
+        "formatted": "76.2%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI EBR-bench leaderboard",
+          "url": "https://epoch.ai/benchmarks/ebr-bench",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "mirrorCode",
+        "name": "MirrorCode",
+        "value": 46.7,
+        "formatted": "46.7%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI MirrorCode leaderboard",
+          "url": "https://epoch.ai/benchmarks/mirrorcode",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "epochAutomationReports",
+        "name": "Epoch Automation Reports",
+        "value": 65.1,
+        "formatted": "65.1%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI Epoch Automation Reports leaderboard",
+          "url": "https://epoch.ai/benchmarks/epoch-automation-reports",
           "retrievedAt": null
         }
       }

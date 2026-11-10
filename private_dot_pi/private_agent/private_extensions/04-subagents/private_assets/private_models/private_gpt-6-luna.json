@@ -434,19 +434,19 @@
     ],
     "model": "GPT-6 Luna",
     "creator": "OpenAI",
-    "capturedAt": 1794260307447,
-    "lastUpdated": "2026-11-09",
+    "capturedAt": 1794327157791,
+    "lastUpdated": "2026-11-10",
     "methodologyVersion": "bench-align-v5.8-2026-09-30",
-    "sourceSnapshotId": "2026-11-09-9a74371fc23ba454",
+    "sourceSnapshotId": "2026-11-10-07782fd3ca428ba7",
     "attribution": "Data from BenchLM.ai",
     "license": "CC BY-NC 4.0",
     "categoryScores": {
-      "coding": 51.77,
-      "agentic": 53.77,
-      "knowledge": 62.5,
-      "reasoning": 54.65,
+      "coding": 51.69,
+      "agentic": 53.78,
+      "knowledge": 62.21,
+      "reasoning": 54.35,
       "math": 80.2,
-      "multimodalGrounded": 63.86
+      "multimodalGrounded": 63.83
     },
     "categoryProvenance": {
       "coding": "leaderboard",
@@ -487,36 +487,36 @@
         "key": "agentic",
         "label": "Agentic",
         "score": 53.8,
-        "rank": 46,
+        "rank": 47,
         "total": 132
       },
       {
         "key": "coding",
         "label": "Coding",
-        "score": 51.8,
+        "score": 51.7,
         "rank": 42,
         "total": 158
       },
       {
         "key": "reasoning",
         "label": "Reasoning",
-        "score": 54.6,
-        "rank": 45,
-        "total": 156
+        "score": 54.4,
+        "rank": 46,
+        "total": 157
       },
       {
         "key": "multimodalGrounded",
         "label": "Multimodal",
-        "score": 63.9,
+        "score": 63.8,
         "rank": 29,
         "total": 67
       },
       {
         "key": "knowledge",
         "label": "Knowledge",
-        "score": 62.5,
-        "rank": 41,
-        "total": 178
+        "score": 62.2,
+        "rank": 42,
+        "total": 179
       },
       {
         "key": "multilingual",
@@ -718,7 +718,7 @@
         "source": {
           "label": "ARC Prize: published Semi-Private results",
           "url": "https://arcprize.org/results/openai-gpt-6-luna",
-          "retrievedAt": "2026-11-06T18:02:09.380Z"
+          "retrievedAt": "2026-11-09T20:44:35.250Z"
         }
       },
       {
@@ -733,7 +733,7 @@
         "source": {
           "label": "ARC Prize: published Semi-Private results",
           "url": "https://arcprize.org/results/openai-gpt-6-luna",
-          "retrievedAt": "2026-11-06T18:02:09.380Z"
+          "retrievedAt": "2026-11-09T20:44:35.250Z"
         }
       },
       {
@@ -748,7 +748,7 @@
         "source": {
           "label": "ARC Prize: published Semi-Private results",
           "url": "https://arcprize.org/results/openai-gpt-6-luna",
-          "retrievedAt": "2026-11-06T18:02:09.380Z"
+          "retrievedAt": "2026-11-09T20:44:35.250Z"
         }
       },
       {
@@ -763,7 +763,7 @@
         "source": {
           "label": "ARC Prize: published Semi-Private results",
           "url": "https://arcprize.org/results/openai-gpt-6-luna",
-          "retrievedAt": "2026-11-06T18:02:09.380Z"
+          "retrievedAt": "2026-11-09T20:44:35.250Z"
         }
       },
       {
@@ -791,7 +791,7 @@
         "verificationStatus": "benchmark_exact",
         "verificationLabel": "Benchmark exact",
         "source": {
-          "label": "ExtractBench Pro leaderboard, October 28, 2026 snapshot (LlamaIndex)",
+          "label": "ExtractBench Pro leaderboard, November 9, 2026 snapshot (LlamaIndex)",
           "url": "https://www.extractbench.ai/pro#leaderboard",
           "retrievedAt": null
         }
@@ -806,7 +806,7 @@
         "verificationStatus": "benchmark_exact",
         "verificationLabel": "Benchmark exact",
         "source": {
-          "label": "ExtractBench leaderboard, November 6, 2026 snapshot (LlamaIndex)",
+          "label": "ExtractBench leaderboard, November 9, 2026 snapshot (LlamaIndex)",
           "url": "https://www.extractbench.ai/#leaderboard",
           "retrievedAt": null
         }
@@ -821,7 +821,7 @@
         "verificationStatus": "benchmark_exact",
         "verificationLabel": "Benchmark exact",
         "source": {
-          "label": "ParseBench leaderboard, November 6, 2026 snapshot (LlamaIndex)",
+          "label": "ParseBench leaderboard, November 9, 2026 snapshot (LlamaIndex)",
           "url": "https://www.parsebench.ai/#leaderboard",
           "retrievedAt": null
         }
@@ -934,6 +934,111 @@
       {
         "category": "external",
         "categoryLabel": "external",
+        "key": "jokeArena",
+        "name": "Joke Arena",
+        "value": 1471,
+        "formatted": "1471",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Joke Arena leaderboard (Kaggle)",
+          "url": "https://www.kaggle.com/benchmarks/kaggle/joke-arena",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "chartArena",
+        "name": "Chart Arena",
+        "value": 1424,
+        "formatted": "1424",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Chart Arena leaderboard (Kaggle)",
+          "url": "https://www.kaggle.com/benchmarks/kaggle/chart-arena",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "code2Video",
+        "name": "Code2Video",
+        "value": 1469,
+        "formatted": "1469",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Code2Video leaderboard (HeyGen on Kaggle)",
+          "url": "https://www.kaggle.com/benchmarks/heygen/code2video",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "dayjobHealthcare",
+        "name": "DAYJOB Healthcare",
+        "value": 1.2,
+        "formatted": "1.2%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "DAYJOB Healthcare leaderboard (Surge AI on Kaggle)",
+          "url": "https://www.kaggle.com/benchmarks/surge-ai/dayjob-healthcare",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "dayjob",
+        "name": "DAYJOB",
+        "value": 1.2,
+        "formatted": "1.2%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "DAYJOB leaderboard (Surge AI on Kaggle)",
+          "url": "https://www.kaggle.com/benchmarks/surge-ai/dayjob",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "factsMultimodal",
+        "name": "FACTS Multimodal",
+        "value": 38.7,
+        "formatted": "38.7%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "FACTS Multimodal leaderboard (Google DeepMind and Google Research on Kaggle)",
+          "url": "https://www.kaggle.com/benchmarks/google/facts-multimodal",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "stealthMark",
+        "name": "StealthMark",
+        "value": 39.1,
+        "formatted": "39.1",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "StealthMark 1.8.10 results (Stealth Models)",
+          "url": "https://stealthmodels.com/benchmarks",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
         "key": "maxxBench",
         "name": "MaxxBench",
         "value": 51.7,
@@ -988,6 +1093,81 @@
         "source": {
           "label": "OpenAI GPT-6 Astra system card",
           "url": "https://deploymentsafety.openai.com/gpt-6-astra",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "spireClimb",
+        "name": "SpireClimb",
+        "value": 0,
+        "formatted": "0.0%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI SpireClimb leaderboard",
+          "url": "https://epoch.ai/benchmarks/spireclimb",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "chessPuzzles",
+        "name": "Chess Puzzles",
+        "value": 36,
+        "formatted": "36.0%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI Chess Puzzles leaderboard",
+          "url": "https://epoch.ai/benchmarks/chess-puzzles",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "mysteryGamePuzzles",
+        "name": "Mystery Game Puzzles",
+        "value": 7,
+        "formatted": "7.0%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI Mystery Game Puzzles leaderboard",
+          "url": "https://epoch.ai/benchmarks/mystery-game-puzzles",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "furnitureAssembly",
+        "name": "Furniture Assembly",
+        "value": 44.2,
+        "formatted": "44.2%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI Furniture Assembly leaderboard",
+          "url": "https://epoch.ai/benchmarks/furniture-assembly",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "mirrorCode",
+        "name": "MirrorCode",
+        "value": 26.7,
+        "formatted": "26.7%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI MirrorCode leaderboard",
+          "url": "https://epoch.ai/benchmarks/mirrorcode",
           "retrievedAt": null
         }
       }

@@ -96,18 +96,18 @@
     ],
     "model": "Muse Glimmer 30B",
     "creator": "Meta",
-    "capturedAt": 1794260307447,
-    "lastUpdated": "2026-11-09",
+    "capturedAt": 1794327157791,
+    "lastUpdated": "2026-11-10",
     "methodologyVersion": "bench-align-v5.8-2026-09-30",
-    "sourceSnapshotId": "2026-11-09-9a74371fc23ba454",
+    "sourceSnapshotId": "2026-11-10-07782fd3ca428ba7",
     "attribution": "Data from BenchLM.ai",
     "license": "CC BY-NC 4.0",
     "categoryScores": {
-      "coding": 24.55,
-      "agentic": 19.56,
+      "coding": 24.58,
+      "agentic": 19.68,
       "instructionFollowing": 81.1,
-      "knowledge": 37.84,
-      "reasoning": 28.87,
+      "knowledge": 37.56,
+      "reasoning": 28.09,
       "math": 81.1,
       "multimodalGrounded": 41.66
     },
@@ -146,7 +146,7 @@
       {
         "key": "agentic",
         "label": "Agentic",
-        "score": 19.6,
+        "score": 19.7,
         "rank": 119,
         "total": 132
       },
@@ -160,9 +160,9 @@
       {
         "key": "reasoning",
         "label": "Reasoning",
-        "score": 28.9,
-        "rank": 127,
-        "total": 156
+        "score": 28.1,
+        "rank": 128,
+        "total": 157
       },
       {
         "key": "multimodalGrounded",
@@ -174,9 +174,9 @@
       {
         "key": "knowledge",
         "label": "Knowledge",
-        "score": 37.8,
-        "rank": 122,
-        "total": 178
+        "score": 37.6,
+        "rank": 124,
+        "total": 179
       },
       {
         "key": "multilingual",

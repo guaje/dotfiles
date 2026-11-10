@@ -108,18 +108,18 @@
     ],
     "model": "Kimi K2.6",
     "creator": "Moonshot AI",
-    "capturedAt": 1794260307447,
-    "lastUpdated": "2026-11-09",
+    "capturedAt": 1794327157791,
+    "lastUpdated": "2026-11-10",
     "methodologyVersion": "bench-align-v5.8-2026-09-30",
-    "sourceSnapshotId": "2026-11-09-9a74371fc23ba454",
+    "sourceSnapshotId": "2026-11-10-07782fd3ca428ba7",
     "attribution": "Data from BenchLM.ai",
     "license": "CC BY-NC 4.0",
     "categoryScores": {
-      "coding": 43.29,
-      "agentic": 44.4,
+      "coding": 43.27,
+      "agentic": 44.39,
       "instructionFollowing": 83.5,
-      "knowledge": 58.78,
-      "reasoning": 48.33,
+      "knowledge": 58.52,
+      "reasoning": 47.82,
       "math": 73.7,
       "multimodalGrounded": 59.19
     },
@@ -172,9 +172,9 @@
       {
         "key": "reasoning",
         "label": "Reasoning",
-        "score": 48.3,
-        "rank": 57,
-        "total": 156
+        "score": 47.8,
+        "rank": 58,
+        "total": 157
       },
       {
         "key": "multimodalGrounded",
@@ -186,9 +186,9 @@
       {
         "key": "knowledge",
         "label": "Knowledge",
-        "score": 58.8,
-        "rank": 50,
-        "total": 178
+        "score": 58.5,
+        "rank": 51,
+        "total": 179
       },
       {
         "key": "multilingual",
@@ -813,6 +813,66 @@
         "source": {
           "label": "Epoch AI FrontierMath v2 leaderboard",
           "url": "https://epoch.ai/benchmarks/frontiermath-tier-4-v2?view=graph&tab=leaderboard",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "chessPuzzles",
+        "name": "Chess Puzzles",
+        "value": 20,
+        "formatted": "20.0%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI Chess Puzzles leaderboard",
+          "url": "https://epoch.ai/benchmarks/chess-puzzles",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "mysteryGamePuzzles",
+        "name": "Mystery Game Puzzles",
+        "value": 18,
+        "formatted": "18.0%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI Mystery Game Puzzles leaderboard",
+          "url": "https://epoch.ai/benchmarks/mystery-game-puzzles",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "furnitureAssembly",
+        "name": "Furniture Assembly",
+        "value": 21.7,
+        "formatted": "21.7%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI Furniture Assembly leaderboard",
+          "url": "https://epoch.ai/benchmarks/furniture-assembly",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "ebrBench",
+        "name": "EBR-bench",
+        "value": 2.4,
+        "formatted": "2.4%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI EBR-bench leaderboard",
+          "url": "https://epoch.ai/benchmarks/ebr-bench",
           "retrievedAt": null
         }
       }

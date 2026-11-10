@@ -96,19 +96,19 @@
     ],
     "model": "GLM-5.3-Flash",
     "creator": "Z.AI",
-    "capturedAt": 1794260307447,
-    "lastUpdated": "2026-11-09",
+    "capturedAt": 1794327157791,
+    "lastUpdated": "2026-11-10",
     "methodologyVersion": "bench-align-v5.8-2026-09-30",
-    "sourceSnapshotId": "2026-11-09-9a74371fc23ba454",
+    "sourceSnapshotId": "2026-11-10-07782fd3ca428ba7",
     "attribution": "Data from BenchLM.ai",
     "license": "CC BY-NC 4.0",
     "categoryScores": {
-      "coding": 48.45,
-      "agentic": 58.28,
-      "knowledge": 60.34,
-      "reasoning": 50.29,
+      "coding": 48.48,
+      "agentic": 58.26,
+      "knowledge": 60.07,
+      "reasoning": 49.82,
       "math": 56.9,
-      "multimodalGrounded": 64.4
+      "multimodalGrounded": 64.38
     },
     "categoryProvenance": {
       "coding": "leaderboard",
@@ -151,16 +151,16 @@
       {
         "key": "coding",
         "label": "Coding",
-        "score": 48.4,
+        "score": 48.5,
         "rank": 52,
         "total": 158
       },
       {
         "key": "reasoning",
         "label": "Reasoning",
-        "score": 50.3,
+        "score": 49.8,
         "rank": 53,
-        "total": 156
+        "total": 157
       },
       {
         "key": "multimodalGrounded",
@@ -172,9 +172,9 @@
       {
         "key": "knowledge",
         "label": "Knowledge",
-        "score": 60.3,
-        "rank": 45,
-        "total": 178
+        "score": 60.1,
+        "rank": 46,
+        "total": 179
       },
       {
         "key": "multilingual",
@@ -503,7 +503,7 @@
         "verificationStatus": "benchmark_exact",
         "verificationLabel": "Benchmark exact",
         "source": {
-          "label": "ExtractBench leaderboard, November 6, 2026 snapshot (LlamaIndex)",
+          "label": "ExtractBench leaderboard, November 9, 2026 snapshot (LlamaIndex)",
           "url": "https://www.extractbench.ai/#leaderboard",
           "retrievedAt": null
         }
@@ -518,7 +518,7 @@
         "verificationStatus": "benchmark_exact",
         "verificationLabel": "Benchmark exact",
         "source": {
-          "label": "ParseBench leaderboard, November 6, 2026 snapshot (LlamaIndex)",
+          "label": "ParseBench leaderboard, November 9, 2026 snapshot (LlamaIndex)",
           "url": "https://www.parsebench.ai/#leaderboard",
           "retrievedAt": null
         }
@@ -677,6 +677,51 @@
       {
         "category": "external",
         "categoryLabel": "external",
+        "key": "chartArena",
+        "name": "Chart Arena",
+        "value": 1445,
+        "formatted": "1445",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Chart Arena leaderboard (Kaggle)",
+          "url": "https://www.kaggle.com/benchmarks/kaggle/chart-arena",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "code2Video",
+        "name": "Code2Video",
+        "value": 1467,
+        "formatted": "1467",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Code2Video leaderboard (HeyGen on Kaggle)",
+          "url": "https://www.kaggle.com/benchmarks/heygen/code2video",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "babaIsBench",
+        "name": "BabaIsBench",
+        "value": 67,
+        "formatted": "67%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "BabaIsBench leaderboard (Quesma)",
+          "url": "https://quesma.com/benchmarks/babaisbench/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
         "key": "maxxBench",
         "name": "MaxxBench",
         "value": 55.1,
@@ -686,6 +731,36 @@
         "source": {
           "label": "MaxxBench leaderboard (unLAP)",
           "url": "https://maxxbench.unlap.ai/",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "chessPuzzles",
+        "name": "Chess Puzzles",
+        "value": 21,
+        "formatted": "21.0%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI Chess Puzzles leaderboard",
+          "url": "https://epoch.ai/benchmarks/chess-puzzles",
+          "retrievedAt": null
+        }
+      },
+      {
+        "category": "external",
+        "categoryLabel": "external",
+        "key": "mysteryGamePuzzles",
+        "name": "Mystery Game Puzzles",
+        "value": 8,
+        "formatted": "8.0%",
+        "verificationStatus": "benchmark_exact",
+        "verificationLabel": "Benchmark exact",
+        "source": {
+          "label": "Epoch AI Mystery Game Puzzles leaderboard",
+          "url": "https://epoch.ai/benchmarks/mystery-game-puzzles",
           "retrievedAt": null
         }
       }

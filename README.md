@@ -38,17 +38,9 @@ When you run `chezmoi add <file>`, the script triggers and provides several opti
 
 Options 1 and 2 safely finish the conversion and then stop the original `chezmoi add` command. Add sensitive files one at a time so each choice can be reviewed.
 
-Before the menu, the hook prints a preview of every matching line (`line<TAB>detector<TAB>source line`) to your terminal so you can confirm exactly what was detected. The values are shown verbatim and are never written to the source directory, so do not run `chezmoi add` on a secret file over a shared or logged terminal session.
+Before the menu, the hook prints a preview of every matching line (`line<TAB>detector<TAB>source line`) to your terminal so you can confirm exactly what was detected.
 
 The hook marks the templates it creates, so it will not overwrite templates maintained by hand. Normal value changes are updated automatically. If secret fields are added, removed, or renamed, the hook stops without changing anything and asks for a manual migration.
-
-#### 🔑 Age identity bootstrap and `.sops.yaml`
-
-The private age key (`key.txt`) never lives in the repository. On a fresh machine, `run_onchange_before_decrypt-private-key.sh.tmpl` restores it from the passphrase-protected `key.txt.age` backup: it decrypts into a hidden temporary file, verifies the identity's public key against the `recipient` configured in `chezmoi.toml`, and only then installs it atomically with `0600` permissions. An existing key is never overwritten; a key that contradicts the configured recipient fails the update with a message explaining how to re-bootstrap.
-
-The repository also carries a `.sops.yaml` with creation rules for `secrets/*.sops.yaml`. The `check-secrets.sh` hook always passes its recipient explicitly, so the rules are a safety net for manual `sops` usage: any ciphertext created under `secrets/` is always encrypted with this checkout's age key.
-
-For a manual migration, back up the existing template and encrypted SOPS file outside the source directory, move the old pair aside, and run `chezmoi add` again. Test the new result before deleting the backup, and restore the backup if anything fails. Never place a decrypted backup in the repository.
 
 #### 🚀 Usage
 
@@ -126,20 +118,21 @@ bash ./scripts/test_check-removed-files.sh
 bash ./scripts/test_bootstrap.sh
 ```
 
-On macOS, install a current version of Bash and the required tools with Homebrew:
-
-```bash
-brew install bash chezmoi sops age jq
-```
-
-It is fine to launch `chezmoi` from zsh. The hooks themselves run with the Homebrew version of Bash found in `PATH`; macOS's built-in Bash 3.2 is too old.
-
 ### 🗑️ Removed Files After Updates
 
-Before an update, `scripts/check-removed-files.sh` quickly records which source files belong to which destination files. After the update, it looks only at files deleted or renamed by Git. If an old destination may need to be removed, the hook asks about it individually—there is no “delete all” option.
+Before an update, `scripts/check-removed-files.sh` quickly records which source files belong to which destination files. After the update, it looks only at files deleted or renamed by Git, removing the destinations whose sources are gone. This makes the repository the source of truth. Stopping tracking a file *is* the decision to remove it, and `chezmoi update` is where that decision gets carried out.
 
-The hook never deletes directories and leaves a file alone if it was modified, is still managed, or cannot be checked safely. Dry runs and non-interactive updates do not delete anything. `jq` is required; if it or any needed information is unavailable, the hook reports the file instead of removing it.
+It never deletes on a guess. A target is unlinked only when it is a regular file or a symlink inside the destination directory, nothing in chezmoi manages it any more, its source is provably absent from `HEAD`, and its contents have not changed since the update started. `jq` is required; if it, or any information needed to be sure, is unavailable, the file is reported instead of deleted. How many files a commit removed is never itself a reason to doubt it, and every destination is still checked on its own.
 
-### 🔧 Configuration
+A directory goes when the files it was made for go. Once a run has removed every file chezmoi tracked inside one, it tries `rmdir` on it and on each parent up to the destination directory. That needs no confirmation and has no undo, because `rmdir` only succeeds on a directory that is genuinely empty, hidden files included: one untracked leftover, or one directory chezmoi still manages, and the directory stays. Only directories on the way up from a file this run actually removed are considered — a directory that never held a tracked file is not this hook's business, and nothing it holds is ever opened. That is also why nothing here keeps a copy of what it deleted: a deletion that could not be checked is left where it is, and the file it removes is still in the git history named in the message.
 
-The system is configured via `.chezmoi.toml.tmpl`, which sets up the `SOPS_AGE_KEY_FILE` environment variable and defines the `secret` command using a portable shell wrapper to ensure path expansion (e.g., `~` or `$HOME`) works correctly on all machines.
+What a run could not carry out goes to a pending ledger under `~/.cache/chezmoi/check-removed-files/`—a preview, a target that failed one of the checks above, a source Git could not be asked about. Nothing is dropped and nothing has to be remembered: the next `chezmoi update` settles that ledger as part of finishing itself. `clean` is there for when you want to look by hand, and it re-verifies every entry rather than trusting the note:
+
+```bash
+./scripts/check-removed-files.sh clean           # settle the list
+./scripts/check-removed-files.sh clean --list    # look; nothing is removed
+```
+
+`clean` needs no hook environment—a `--destination` override is recovered by asking chezmoi itself—and refuses to run while an update holds its lock. State lives under `~/.cache/chezmoi/check-removed-files/` in a directory named after the working tree it belongs to, because that cache directory is shared by every chezmoi source on the machine; a second source can neither act on another's targets nor discard a baseline it still owes.
+
+State outlives the update that wrote it: the snapshot a successful post consumed is kept as a baseline, so a removal whose update never reached the pre hook—an interrupted apply, a `git pull` followed by `chezmoi apply` instead of `chezmoi update`, an update that pulled nothing—is still carried out later instead of being silently forgotten. A report is not repeated forever: the next update that brings its own snapshot advances the baseline, and a target that is already gone is never offered again. State is written and read by this one script and nothing else, so anything it cannot parse is dropped rather than acted on; deleting the state directory simply means the next update starts from a fresh snapshot, and abandoned scratch files are reaped after a day.

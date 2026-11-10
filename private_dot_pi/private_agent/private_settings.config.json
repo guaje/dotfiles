@@ -70,7 +70,9 @@
   },
   "health": {
     "cacheTtlMs": 300000,
-    "probeConcurrency": 8
+    "probeConcurrency": 8,
+    "probeEscalation": true,
+    "probeTimeoutMs": 20000
   },
   "imageGenerationProviders": {
     "reallms-dev": {
@@ -98,10 +100,10 @@
     },
     "driftAlarmMinPoints": 12,
     "driftWarmupRows": 20,
-    "healthProbeBudgetMs": 10000,
+    "healthProbeBudgetMs": 30000,
     "maxConcurrency": 4,
     "maxParallelTasks": 8,
-    "maxProbeLatencyMs": 5000,
+    "maxProbeLatencyMs": 15000,
     "measuredSpeedMinimumRuns": 10,
     "outcomeInfluenceFullAt": 60,
     "outcomeWindow": 100,

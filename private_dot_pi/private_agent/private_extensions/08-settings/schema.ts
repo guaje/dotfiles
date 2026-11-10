@@ -13,3 +13,7 @@ export function nonNegativeSafeInteger(value: unknown, fallback: number, maximum
 export function stringSetting(value: unknown, fallback: string): string {
   return typeof value === "string" && value.trim() ? value : fallback;
 }
+
+export function booleanSetting(value: unknown, fallback: boolean): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}

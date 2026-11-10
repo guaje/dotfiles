@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { completeSimple } from "@earendil-works/pi-ai";
+import { streamSimple } from "@earendil-works/pi-ai";
 import { Container, Text } from "@earendil-works/pi-tui";
 import { MODEL_HEALTH_CACHE_TTL_MS as POLICY_CACHE_TTL_MS, MODEL_PROBE_CONCURRENCY_LIMIT as POLICY_PROBE_CONCURRENCY_LIMIT } from "./policy.ts";
 import { getModelHealthSettings } from "./settings.ts";
@@ -64,10 +64,25 @@ export interface ModelHealthResult {
    * on caches written before per-result freshness was introduced; treated as
    * stale by `getFreshCachedModelResult` so a single-model refresh is forced. */
   checkedAt?: number;
-  /** End-to-end latency (ms) of the chat probe request, when measured. */
+  /** End-to-end latency (ms) of the chat probe request, thinking included, when measured. */
   latencyMs?: number;
-  /** Estimated completion throughput (tokens/sec) from the 8-token probe sample. */
+  /** Wall-clock ms from the probe request to the model's first generated token (thinking or
+   * visible). Normally the gap between this and `latencyMs` is the decode window
+   * `tokensPerSecond` is measured over; when `throughputSource` is "escalated" the timing comes
+   * from the second sample and does not pair with `latencyMs`. Absent when the response streamed
+   * no generated content or the cache entry predates first-token timing. */
+  firstTokenMs?: number;
+  /** Estimated completion throughput (tokens/sec) over the decode window (first generated token
+   * to completion), not end to end: delegation routing adds probe latency and then divides
+   * expected output by this number, so thinking time must be counted exactly once. Falls back to
+   * end-to-end latency when the window is too short to divide by (see `probeTokensPerSecond`). */
   tokensPerSecond?: number;
+  /** How `tokensPerSecond` was measured, so routing diagnostics can tell estimates apart:
+   * "decode-window" first generated token to completion; "end-to-end" the window was too thin to
+   * divide by; "escalated" the window came from a second, longer-answer probe of this same model
+   * (see the escalation prompt); "truncated" the sample hit the output ceiling without visible
+   * text, so the rate is generated-tokens-per-second end to end and says nothing about answering. */
+  throughputSource?: "decode-window" | "end-to-end" | "escalated" | "truncated";
   /** Resource source bucket matching Pi's reload resource list style. */
   source?: "auth" | "user";
 }
@@ -92,6 +107,17 @@ export interface ModelHealthOptions {
   cacheTtlMs?: number;
   /** Concurrency limit for probing */
   concurrencyLimit?: number;
+  /** Wall-clock ceiling for one model probe, covering every attempt for that model. */
+  probeTimeoutMs?: number;
+  /** Set false to publish conservative end-to-end rates instead of paying for one longer-answer
+   * probe when a model's decode window is too thin to time (see the probe escalation). */
+  probeEscalation?: boolean;
+}
+
+/** Resolved per-probe runtime knobs, threaded from `health.*` settings or caller overrides. */
+interface ProbeRuntime {
+  probeTimeoutMs: number;
+  probeEscalation: boolean;
 }
 
 async function readSettingsFile(filePath: string): Promise<SettingsFile | null> {
@@ -301,6 +327,7 @@ export async function mergeModelResult(result: ModelHealthResult): Promise<void>
 export async function probeModelHealth(
   modelId: string,
   ctx: ProbeContext,
+  options: { probeTimeoutMs?: number; probeEscalation?: boolean } = {},
 ): Promise<ModelHealthResult> {
   const allModels = await getEnabledModelsMetadata(ctx);
   const metadata = allModels.find((m) => m.id === modelId);
@@ -314,7 +341,11 @@ export async function probeModelHealth(
     await mergeModelResult(result);
     return result;
   }
-  const result = await probeModel(metadata, ctx);
+  const configured = await getModelHealthSettings();
+  const result = await probeModel(metadata, ctx, {
+    probeTimeoutMs: options.probeTimeoutMs ?? configured.probeTimeoutMs,
+    probeEscalation: options.probeEscalation ?? configured.probeEscalation,
+  });
   await mergeModelResult(result);
   return result;
 }
@@ -345,7 +376,7 @@ function modelHealthResult(
   metadata: ModelMetadata,
   status: ModelHealthResult["status"],
   error?: string,
-  metrics?: { latencyMs?: number; tokensPerSecond?: number },
+  metrics?: { latencyMs?: number; firstTokenMs?: number; tokensPerSecond?: number; throughputSource?: ModelHealthResult["throughputSource"] },
 ): ModelHealthResult {
   return {
     id: metadata.id,
@@ -356,9 +387,15 @@ function modelHealthResult(
     source: metadata.source,
     checkedAt: Date.now(),
     ...(metrics?.latencyMs !== undefined ? { latencyMs: metrics.latencyMs } : {}),
+    ...(metrics?.firstTokenMs !== undefined ? { firstTokenMs: metrics.firstTokenMs } : {}),
     ...(metrics?.tokensPerSecond !== undefined ? { tokensPerSecond: metrics.tokensPerSecond } : {}),
+    ...(metrics?.throughputSource !== undefined ? { throughputSource: metrics.throughputSource } : {}),
   };
 }
+
+/** Image generation is a different shape of request from a chat probe, so it keeps its own
+ * ceiling instead of `health.probeTimeoutMs`. */
+const PROBE_IMAGE_TIMEOUT_MS = 10_000;
 
 async function probeImageGenerationModel(metadata: ModelMetadata): Promise<ModelHealthResult> {
   const parts = splitModelId(metadata.id);
@@ -394,7 +431,7 @@ async function probeImageGenerationModel(metadata: ModelMetadata): Promise<Model
         size: "16x16",
         response_format: "b64_json",
       }),
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(PROBE_IMAGE_TIMEOUT_MS),
     });
 
     const text = await response.text();
@@ -417,31 +454,166 @@ async function probeImageGenerationModel(metadata: ModelMetadata): Promise<Model
   }
 }
 
-/** Probe-only target that switches reasoning off for reasoning models, so the fixed
- * token budget is spent on visible text instead of reasoning tokens. openai-completions models
- * carry the toggle in a cloned compat block (`chat_template_kwargs`); openai-responses models
- * carry it as probe options (`reasoning_effort: none`). Endpoints that reject the toggle make
- * this attempt fail, and the probe retries with the plain model. */
-function withThinkingDisabledForProbe(model: any): { target: any; options?: { reasoningEffort?: "off" } } {
-  if (model.api === "openai-completions" && model.reasoning) {
-    return {
-      target: {
-        ...model,
-        compat: {
-          ...(model.compat ?? {}),
-          thinkingFormat: "chat-template",
-          chatTemplateKwargs: { ...(model.compat?.chatTemplateKwargs ?? {}), enable_thinking: false },
-        },
-      },
-    };
-  }
-  if (model.api === "openai-responses" && model.reasoning) {
-    return { target: model, options: { reasoningEffort: "off" } };
-  }
-  return { target: model };
+/** Output ceiling for a chat probe. The prompt is one short sentence, so this only bounds the
+ * sample; it has to leave room for thinking tokens now that probes run with thinking on. */
+const PROBE_MAX_TOKENS = 512;
+
+/** Standard probe prompt. Kept short on purpose: probe latency is itself a routing input
+ * (`turns × latency + expectedOutput ÷ throughput`), so a longer sample would inflate every
+ * predicted task, not just the measurement. */
+const PROBE_PROMPT = "Write exactly one short sentence about the sea.";
+
+/** Escalation prompt, used once for a model whose standard sample answered but decoded too few
+ * tokens to time. Three sentences roughly triple the visible tail, which is what the decode window
+ * needs; only models that measure into that regime pay for it. */
+const PROBE_ESCALATION_PROMPT = "Write exactly three short sentences about the sea.";
+
+/** Thinking levels ordered cheapest first. Every reasoning-capable model is probed at the
+ * cheapest level it declares, never with thinking switched off: delegation routing turns probe
+ * latency and tokens/sec into task ETA and a latency gate, so a fleet where some models think and
+ * others do not gets ranked on thinking policy instead of speed. Pinning the cheapest level keeps
+ * the samples comparable and bounded. */
+const PROBE_THINKING_LEVELS = ["minimal", "low", "medium"] as const;
+
+interface ProbeAttempt {
+  target: any;
+  options: { reasoning?: (typeof PROBE_THINKING_LEVELS)[number] };
 }
 
-async function probeModel(metadata: ModelMetadata, ctx: ProbeContext): Promise<ModelHealthResult> {
+interface ProbeRun {
+  response: any;
+  latencyMs: number;
+  firstTokenMs?: number;
+}
+
+/** Cheapest thinking level the model declares (levels mapped to `null` are unsupported). Models
+ * that declare no map get the cheapest generic level; pi-ai clamps the request to whatever the
+ * provider actually supports, and the plain attempt below covers endpoints that reject it. */
+function cheapestProbeThinkingLevel(model: any): (typeof PROBE_THINKING_LEVELS)[number] | undefined {
+  if (!model?.reasoning) return undefined;
+  const declared = PROBE_THINKING_LEVELS.find((level) => typeof model.thinkingLevelMap?.[level] === "string");
+  return declared ?? PROBE_THINKING_LEVELS[0];
+}
+
+/** Ordered probe attempts for a model: the cheapest thinking-on request first, then the
+ * registered model unchanged, so an endpoint that rejects the reasoning override is still probed
+ * exactly as Pi would call it. Non-reasoning models have nothing to pin and go straight in. */
+function probeAttemptsForModel(model: any): ProbeAttempt[] {
+  const plain: ProbeAttempt = { target: model, options: {} };
+  const level = cheapestProbeThinkingLevel(model);
+  return level ? [{ target: model, options: { reasoning: level } }, plain] : [plain];
+}
+
+/** Events that carry model-generated content. The first one to arrive opens the decode window;
+ * everything before it is queueing, prompt processing, and thinking time. */
+const GENERATED_CONTENT_EVENTS = new Set([
+  "thinking_start",
+  "thinking_delta",
+  "text_start",
+  "text_delta",
+  "toolcall_start",
+  "toolcall_delta",
+]);
+
+/** Absolute noise floor for a decode window. An endpoint that buffers its whole answer emits the
+ * first and last token together, so the window is a few milliseconds of serialization, not
+ * generation; dividing by it would report absurd speed. */
+const MIN_DECODE_WINDOW_MS = 100;
+
+/** A window must also cover this share of the round trip. It bounds how far a decode rate can
+ * drift above the end-to-end rate (at most 1/this ratio), so a sample too small to time reliably —
+ * or a response that only trickles out at the very end — keeps its conservative end-to-end number. */
+const MIN_DECODE_WINDOW_RATIO = 0.05;
+
+/** Estimated completion throughput for a probe sample.
+ *
+ * Delegation routing builds a task ETA as `turns × probeLatency + expectedTokens ÷ probeTokSec`,
+ * so thinking time may be counted once: it stays inside `latencyMs` (end to end, probed with
+ * thinking enabled) and out of this denominator, which starts at the first generated token. That
+ * definition is self-consistent per provider — endpoints that bill thinking tokens report them in
+ * `usage.output` and stream them inside the window, endpoints that do not bill them stream only
+ * visible text inside the window — so every model is measured as "tokens generated per second while
+ * generating" instead of a rate distorted by thinking policy. */
+export function probeTokensPerSecond(
+  outputTokens: number,
+  timing: { firstTokenMs?: number; elapsedMs: number },
+): number | undefined {
+  if (!(outputTokens > 0)) return undefined;
+  const decodeMs = timing.firstTokenMs === undefined ? 0 : timing.elapsedMs - timing.firstTokenMs;
+  const reliable = decodeMs >= MIN_DECODE_WINDOW_MS && decodeMs >= timing.elapsedMs * MIN_DECODE_WINDOW_RATIO;
+  const windowMs = reliable ? decodeMs : timing.elapsedMs;
+  if (!(windowMs > 0)) return undefined;
+  return outputTokens / (windowMs / 1000);
+}
+
+/** What a single probe sample supports.
+ * - `measurable`: answered naturally with a decode window long enough to divide by.
+ * - `unmeasurable-window`: answered, but the window is too thin to time (typically a long think
+ *   followed by ~12 visible tokens). This is the only verdict worth escalating.
+ * - `truncated`: hit the output ceiling without emitting visible text, i.e. the ceiling was eaten
+ *   entirely by thinking. Escalating such a model only buys more thinking, never an answer.
+ * - `failed`: the request errored or aborted (handled by the attempt loop before classification).
+ * - `no-usage`: the endpoint returned no token counts, so no rate exists and a longer sample
+ *   would not create one. */
+export type ProbeSampleVerdict = "measurable" | "unmeasurable-window" | "truncated" | "failed" | "no-usage";
+
+export interface ProbeSample {
+  stopReason: string;
+  /** Characters of visible answer text; zero means the model never answered within the ceiling. */
+  visibleChars: number;
+  outputTokens: number;
+  firstTokenMs?: number;
+  elapsedMs: number;
+}
+
+/** Read a sample: which verdict it earns, and the throughput plus `throughputSource` to publish. */
+export function probeSampleMetrics(sample: ProbeSample): {
+  verdict: ProbeSampleVerdict;
+  tokensPerSecond?: number;
+  throughputSource?: NonNullable<ModelHealthResult["throughputSource"]>;
+} {
+  if (sample.stopReason === "error" || sample.stopReason === "aborted") return { verdict: "failed" };
+  if (!(sample.outputTokens > 0)) return { verdict: "no-usage" };
+  // A silent, ceiling-bounded sample still reports how fast it generated tokens, and those tokens
+  // are all thinking. Measure it end to end: the decode window here says nothing about answers,
+  // and a window rate would flatter a model that never produced one.
+  if (sample.stopReason === "length" && sample.visibleChars === 0) {
+    return {
+      verdict: "truncated",
+      ...(sample.elapsedMs > 0 ? { tokensPerSecond: sample.outputTokens / (sample.elapsedMs / 1000), throughputSource: "truncated" as const } : {}),
+    };
+  }
+
+  const decodeMs = sample.firstTokenMs === undefined ? 0 : sample.elapsedMs - sample.firstTokenMs;
+  if (decodeMs < MIN_DECODE_WINDOW_MS || decodeMs < sample.elapsedMs * MIN_DECODE_WINDOW_RATIO) {
+    return {
+      verdict: "unmeasurable-window",
+      ...(probeTokensPerSecond(sample.outputTokens, { elapsedMs: sample.elapsedMs }) !== undefined
+        ? { tokensPerSecond: probeTokensPerSecond(sample.outputTokens, { elapsedMs: sample.elapsedMs }), throughputSource: "end-to-end" as const }
+        : {}),
+    };
+  }
+  return {
+    verdict: "measurable",
+    ...(probeTokensPerSecond(sample.outputTokens, { firstTokenMs: sample.firstTokenMs, elapsedMs: sample.elapsedMs }) !== undefined
+      ? { tokensPerSecond: probeTokensPerSecond(sample.outputTokens, { firstTokenMs: sample.firstTokenMs, elapsedMs: sample.elapsedMs }), throughputSource: "decode-window" as const }
+      : {}),
+  };
+}
+
+function sampleFromRun(run: ProbeRun): ProbeSample {
+  const blocks: any[] = Array.isArray(run.response?.content) ? run.response.content : [];
+  const visibleChars = blocks.reduce((total, block) => total + (block?.type === "text" ? String(block.text ?? "").length : 0), 0);
+  return {
+    stopReason: String(run.response?.stopReason ?? "stop"),
+    visibleChars,
+    outputTokens: run.response?.usage?.output ?? 0,
+    firstTokenMs: run.firstTokenMs,
+    elapsedMs: run.latencyMs,
+  };
+}
+
+async function probeModel(metadata: ModelMetadata, ctx: ProbeContext, runtime: ProbeRuntime): Promise<ModelHealthResult> {
   if (metadata.service === "imageGeneration") {
     return probeImageGenerationModel(metadata);
   }
@@ -462,53 +634,101 @@ async function probeModel(metadata: ModelMetadata, ctx: ProbeContext): Promise<M
       return modelHealthResult(metadata, "auth-missing", auth.ok ? "No API key or request headers available" : (auth.error || "Authentication unavailable"));
     }
 
-    const request = {
-      messages: [{ role: "user", content: "Write exactly one short sentence about the sea.", timestamp: Date.now() }],
-    };
-    const runProbe = async (target: unknown, extraOptions: { reasoningEffort?: "off" }) => {
+    const requestFor = (prompt: string) => ({ messages: [{ role: "user", content: prompt, timestamp: Date.now() }] });
+    // One deadline per model, shared by every attempt including any escalation: a rejected override
+    // costs only the time it actually took, and a wedged endpoint cannot quietly spend the ceiling twice.
+    const deadline = AbortSignal.timeout(runtime.probeTimeoutMs);
+    const runProbe = async (attempt: ProbeAttempt, prompt: string): Promise<ProbeRun> => {
       const start = Date.now();
-      const response = await completeSimple(
-        target as never,
-        request,
+      // Streaming instead of a single completion call is what makes first-token timing visible; the
+      // stream is drained and its final message carries usage and stopReason. Pi's own adapters
+      // return the stream synchronously, so awaiting costs only a microtask.
+      const stream = (await streamSimple(
+        attempt.target as never,
+        requestFor(prompt) as never,
         {
           apiKey: auth.apiKey,
           headers: auth.headers,
-          maxTokens: 128,
-          signal: AbortSignal.timeout(8000),
-          ...extraOptions,
+          maxTokens: PROBE_MAX_TOKENS,
+          signal: deadline,
+          ...attempt.options,
         },
-      );
-      return { response, latencyMs: Date.now() - start };
-    };
-    const { target: thinkingOffTarget, options: thinkingOffOptions } = withThinkingDisabledForProbe(model);
-    let probe: Awaited<ReturnType<typeof runProbe>>;
-    if (thinkingOffTarget !== model || thinkingOffOptions) {
-      try {
-        probe = await runProbe(thinkingOffTarget, thinkingOffOptions ?? {});
-        if (probe.response.stopReason === "error" || probe.response.stopReason === "aborted") {
-          throw new Error(probe.response.errorMessage || `model stopped: ${probe.response.stopReason}`);
+      )) as unknown as AsyncIterable<{ type?: string }> & { result(): Promise<any> };
+
+      let firstTokenAt: number | undefined;
+      for await (const event of stream) {
+        if (firstTokenAt === undefined && event?.type && GENERATED_CONTENT_EVENTS.has(event.type)) {
+          firstTokenAt = Date.now();
         }
       }
-      catch {
-        probe = await runProbe(model, {});
+      const response = await stream.result();
+      const latencyMs = Date.now() - start;
+      return {
+        response,
+        latencyMs,
+        firstTokenMs: firstTokenAt === undefined ? undefined : Math.max(0, firstTokenAt - start),
+      };
+    };
+
+    // Provider adapters do not throw on model-level errors; a non-ok stopReason means the request
+    // reached the API but the model answered badly. Only the last attempt's failure is reported,
+    // so a reasoning override an endpoint rejects falls back to the plain request.
+    let success: ProbeRun | undefined;
+    let successAttempt: ProbeAttempt | undefined;
+    let failure: { error: string; latencyMs?: number } | undefined;
+    for (const attempt of probeAttemptsForModel(model)) {
+      try {
+        const run = await runProbe(attempt, PROBE_PROMPT);
+        if (run.response.stopReason === "error" || run.response.stopReason === "aborted") {
+          success = undefined;
+          failure = { error: run.response.errorMessage || `model stopped: ${run.response.stopReason}`, latencyMs: run.latencyMs };
+          continue;
+        }
+        success = run;
+        successAttempt = attempt;
+        failure = undefined;
+        break;
+      } catch (error) {
+        success = undefined;
+        failure = { error: formatProbeError(error) };
       }
     }
-    else {
-      probe = await runProbe(model, {});
-    }
-    const { response, latencyMs } = probe;
 
-    // completeSimple does not throw on model-level errors; a non-ok stopReason
-    // means the request reached the API but the model is not usable (e.g. it
-    // aborted or errored mid-generation). Surface that as an error instead of
-    // a false-positive "ok".
-    if (response.stopReason === "error" || response.stopReason === "aborted") {
-      return modelHealthResult(metadata, "error", response.errorMessage || `model stopped: ${response.stopReason}`, { latencyMs });
+    if (!success) {
+      const failed = failure ?? { error: "Probe did not complete" };
+      return modelHealthResult(metadata, "error", failed.error, failed.latencyMs !== undefined ? { latencyMs: failed.latencyMs } : undefined);
+    }
+    const { latencyMs, firstTokenMs } = success;
+
+    // The standard sample decides health and latency. When it answered but decoded too few tokens
+    // to time — a long think followed by ~12 visible tokens is exactly that — one escalation probe
+    // asks for a longer answer so the decode window becomes measurable. It runs at most once per
+    // model probe, never for a truncated (thinking-only) sample, and can only improve the rate:
+    // status, latency, and the standard sample's numbers stay published if it does not measure.
+    // `health.probeEscalation: false` (or the probeEscalation option) skips it entirely, leaving
+    // those models on their conservative end-to-end rate.
+    const standard = probeSampleMetrics(sampleFromRun(success));
+    let metrics = standard;
+    let metricsFirstTokenMs = firstTokenMs;
+    if (runtime.probeEscalation && standard.verdict === "unmeasurable-window" && successAttempt) {
+      try {
+        const escalationRun = await runProbe(successAttempt, PROBE_ESCALATION_PROMPT);
+        const escalation = probeSampleMetrics(sampleFromRun(escalationRun));
+        if (escalation.verdict === "measurable" && escalation.tokensPerSecond !== undefined) {
+          metrics = { verdict: escalation.verdict, tokensPerSecond: escalation.tokensPerSecond, throughputSource: "escalated" };
+          metricsFirstTokenMs = escalationRun.firstTokenMs;
+        }
+      } catch {
+        // The escalation is a bonus; whatever the standard sample measured stands.
+      }
     }
 
-    const outputTokens = response.usage?.output ?? 0;
-    const tokensPerSecond = latencyMs > 0 && outputTokens > 0 ? outputTokens / (latencyMs / 1000) : undefined;
-    return modelHealthResult(metadata, "ok", undefined, { latencyMs, ...(tokensPerSecond !== undefined ? { tokensPerSecond } : {}) });
+    return modelHealthResult(metadata, "ok", undefined, {
+      latencyMs,
+      ...(metricsFirstTokenMs !== undefined ? { firstTokenMs: metricsFirstTokenMs } : {}),
+      ...(metrics.tokensPerSecond !== undefined ? { tokensPerSecond: metrics.tokensPerSecond } : {}),
+      ...(metrics.throughputSource !== undefined ? { throughputSource: metrics.throughputSource } : {}),
+    });
   } catch (error) {
     return modelHealthResult(metadata, "error", formatProbeError(error));
   }
@@ -569,6 +789,10 @@ export async function checkModelHealth(ctx: ProbeContext, options: ModelHealthOp
   const configured = await getModelHealthSettings();
   const cacheTtlMs = options.cacheTtlMs ?? configured.cacheTtlMs;
   const concurrencyLimit = options.concurrencyLimit ?? configured.concurrency;
+  const runtime: ProbeRuntime = {
+    probeTimeoutMs: options.probeTimeoutMs ?? configured.probeTimeoutMs,
+    probeEscalation: options.probeEscalation ?? configured.probeEscalation,
+  };
 
   const models = await getEnabledModelsMetadata(ctx);
 
@@ -596,7 +820,7 @@ export async function checkModelHealth(ctx: ProbeContext, options: ModelHealthOp
     }
   }
 
-  const results = await mapWithConcurrency(models, concurrencyLimit, (model) => probeModel(model, ctx));
+  const results = await mapWithConcurrency(models, concurrencyLimit, (model) => probeModel(model, ctx, runtime));
   await writeCacheFile(results);
 
   if (options.notify) notifyProbeSummary(results, ctx, false);

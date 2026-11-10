@@ -20,9 +20,9 @@ Profiles and weights are code-reviewed in `assets/routing-policy.json`. Its gene
 
 ## Health and ETA
 
-Health is an unconditional gate. Missing/stale entries are refreshed on demand, capability-filtered and best-evidence-first, within `subagents.healthProbeBudgetMs` and health probe concurrency. Diagnostics distinguish stale cache, failed probe, over-threshold latency, and `unprobed (budget)`. Logged success never bypasses this gate.
+Health is an unconditional gate. Missing/stale entries are refreshed on demand, capability-filtered and best-evidence-first, within `subagents.healthProbeBudgetMs` and health probe concurrency. Diagnostics distinguish stale cache, failed probe, over-threshold latency, and `unprobed (budget)`. Every health cache entry names how its throughput was measured (`throughputSource`: `decode-window`, `end-to-end`, `escalated`, or `truncated`); routing reads the rate, and diagnostics should carry the source so a conservative estimate is never mistaken for a measured one. Logged success never bypasses this gate.
 
-Cold ETA is probe latency plus expected output divided by probe throughput. After `measuredSpeedMinimumRuns` successful runs for an endpoint/profile, warm ETA uses median turns × current probe latency plus expected output divided by effective output tokens per wall second. Task size scales expected output by `clamp(chars / 2000, 0.5, 3)`. Effective throughput includes tools and thinking; it is not decode speed. A >2× probe/log disagreement is reported.
+Cold ETA is probe latency plus expected output divided by probe throughput. Probe throughput is a decode-window rate (first generated token to completion, with a floor guard for buffered endpoints), so thinking time is charged once — through probe latency — instead of twice. After `measuredSpeedMinimumRuns` successful runs for an endpoint/profile, warm ETA uses median turns × current probe latency plus expected output divided by effective output tokens per wall second. Task size scales expected output by `clamp(chars / 2000, 0.5, 3)`. Effective throughput includes tools and thinking; it is not decode speed, which is why a heavy thinker can legitimately show a >2× probe/log gap: the `speedDisagreement` flag reports that mismatch, it never vetoes a route.
 
 ## Local outcomes
 

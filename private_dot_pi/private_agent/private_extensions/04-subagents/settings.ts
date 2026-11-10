@@ -11,8 +11,10 @@ export interface SubagentExecutionSettings {
 export const DEFAULT_BENCHMARK_SNAPSHOT_MAX_AGE_MS = 2_592_000_000;
 const defaults = {
   researchMinimumContextWindow: 131072, outcomeWindow: 100, outcomeInfluenceFullAt: 60,
-  maxProbeLatencyMs: 5000, measuredSpeedMinimumRuns: 10, driftWarmupRows: 20,
-  driftAlarmMinPoints: 12, healthProbeBudgetMs: 10000,
+  // Probes run with thinking enabled at the cheapest level (see 06-health), so a healthy
+  // reasoning model legitimately takes seconds, not the sub-second of a no-thinking ping.
+  maxProbeLatencyMs: 15_000, measuredSpeedMinimumRuns: 10, driftWarmupRows: 20,
+  driftAlarmMinPoints: 12, healthProbeBudgetMs: 30_000,
 } as const;
 function nestedOrFlatInteger(settings: Record<string, unknown>, path: string, flatKey: string, minimum: number, maximum: number): unknown {
   const nested = getNested(settings, path);

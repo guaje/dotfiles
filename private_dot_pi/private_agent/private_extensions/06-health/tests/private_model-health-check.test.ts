@@ -90,9 +90,50 @@ async function loadExtension() {
     exports: "./index.js",
   }));
   writeFileSync(resolve(PI_AI_PACKAGE_DIR, "index.js"), [
+    "const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));",
+    "function streamFromMessage(message, timing) {",
+    "  const t = timing || {};",
+    "  const firstTokenDelayMs = t.firstTokenDelayMs ?? 30;",
+    "  const totalDelayMs = t.totalDelayMs ?? 190;",
+    "  const events = [{ type: 'start', partial: message }];",
+    "  if ((message.content || []).some((c) => c && c.type === 'text')) {",
+    "    events.push({ type: 'text_start', contentIndex: 0 }, { type: 'text_delta', contentIndex: 0, delta: 'OK' }, { type: 'text_end', contentIndex: 0, content: 'OK' });",
+    "  }",
+    "  const stopped = message.stopReason === 'error' || message.stopReason === 'aborted';",
+    "  events.push(stopped",
+    "    ? { type: 'error', reason: message.stopReason, error: message }",
+    "    : { type: 'done', reason: message.stopReason || 'stop', message });",
+    "  const startedAt = Date.now();",
+    "  let index = 0;",
+    "  return {",
+    "    [Symbol.asyncIterator]() {",
+    "      return {",
+    "        async next() {",
+    "          if (index >= events.length) return { value: undefined, done: true };",
+    "          const event = events[index];",
+    "          // Deliver a realistic first-token gap so default samples measure a decode window",
+    "          // instead of every probe looking buffered and paying for an escalation.",
+    "          const targetMs = index === 0 ? 0 : (index === events.length - 1 ? totalDelayMs : firstTokenDelayMs);",
+    "          const remaining = targetMs - (Date.now() - startedAt);",
+    "          if (remaining > 0) await wait(remaining);",
+    "          index += 1;",
+    "          return { value: event, done: false };",
+    "        },",
+    "      };",
+    "    },",
+    "    async result() { return message; },",
+    "  };",
+    "}",
     "export async function completeSimple(model, context, options) {",
     "  if (typeof globalThis.__completeSimpleMock === 'function') return globalThis.__completeSimpleMock(model, context, options);",
     "  return { stopReason: 'stop', content: [{ type: 'text', text: 'OK' }] };",
+    "}",
+    "export async function streamSimple(model, context, options) {",
+    "  if (typeof globalThis.__streamSimpleMock === 'function') return globalThis.__streamSimpleMock(model, context, options);",
+    "  const message = typeof globalThis.__completeSimpleMock === 'function'",
+    "    ? await globalThis.__completeSimpleMock(model, context, options)",
+    "    : { stopReason: 'stop', content: [{ type: 'text', text: 'OK' }], usage: { output: 12 } };",
+    "  return streamFromMessage(message, globalThis.__probeStreamTiming);",
     "}",
   ].join("\n"));
 
@@ -134,6 +175,8 @@ test.beforeEach(() => {
     writeFileSync(CACHE_PATH, ORIGINAL_CACHE);
   }
   delete (globalThis as any).__completeSimpleMock;
+  delete (globalThis as any).__streamSimpleMock;
+  delete (globalThis as any).__probeStreamTiming;
 });
 
 test("checks model health with a concurrency limit and caches results", async () => {
@@ -695,61 +738,41 @@ test("probeModelHealth returns not-found for an unknown model", async () => {
   assert.equal(result.status, "not-found");
 });
 
-test("probes reasoning openai-completions models with thinking switched off", async () => {
+test("every reasoning model is probed with thinking on at its cheapest thinking level", async () => {
   writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
   writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
   const mod = await loadExtension();
   rmSync(CACHE_PATH, { force: true });
 
-  const seen: any[] = [];
-  (globalThis as any).__completeSimpleMock = async (model: any) => {
-    seen.push(model);
-    return { stopReason: "stop", usage: { output: 2 }, content: [{ type: "text", text: "OK" }] };
-  };
-  try {
-    const result = await mod.probeModelHealth("test-provider/fast-model", {
-      modelRegistry: {
-        find: () => ({ provider: "test-provider", id: "fast-model", api: "openai-completions", reasoning: true, compat: { supportsReasoningEffort: true } }),
-        async getApiKeyAndHeaders() { return { ok: true, apiKey: "fixture-key" }; },
-      },
-    });
-    assert.equal(result.status, "ok");
-    assert.equal(seen.length, 1, "thinking-off probe must not retry on success");
-    assert.equal(seen[0].compat.thinkingFormat, "chat-template");
-    assert.equal(seen[0].compat.chatTemplateKwargs.enable_thinking, false);
-    assert.equal(seen[0].compat.supportsReasoningEffort, true, "existing compat flags survive the probe clone");
-  } finally {
-    delete (globalThis as any).__completeSimpleMock;
+  const apis = ["openai-completions", "openai-responses", "openai-codex-responses"];
+  for (const api of apis) {
+    const seen: Array<{ model: any; options: any }> = [];
+    (globalThis as any).__completeSimpleMock = async (model: any, _context: any, options: any) => {
+      seen.push({ model, options });
+      return { stopReason: "stop", usage: { output: 10 }, content: [{ type: "text", text: "OK" }] };
+    };
+    try {
+      const registered = { provider: "test-provider", id: "fast-model", api, reasoning: true, compat: { supportsReasoningEffort: true } };
+      const result = await mod.probeModelHealth("test-provider/fast-model", {
+        modelRegistry: {
+          find: () => registered,
+          async getApiKeyAndHeaders() { return { ok: true, apiKey: "fixture-key" }; },
+        },
+      });
+      assert.equal(result.status, "ok", api);
+      assert.equal(seen.length, 1, `${api}: a supported thinking level must not need a retry`);
+      assert.equal(seen[0].model, registered, `${api}: probes use the registered model unchanged`);
+      assert.equal(seen[0].options.reasoning, "minimal", `${api}: thinking on at the cheapest level keeps metrics comparable`);
+      assert.ok(seen[0].options.maxTokens > 128, `${api}: the sample ceiling has to leave room for thinking tokens`);
+    } finally {
+      delete (globalThis as any).__completeSimpleMock;
+    }
   }
 });
 
-test("falls back to a plain probe when the endpoint rejects the thinking toggle", async () => {
-  const mod = await loadExtension();
-  rmSync(CACHE_PATH, { force: true });
-
-  const seen: any[] = [];
-  (globalThis as any).__completeSimpleMock = async (model: any) => {
-    seen.push(model);
-    if (seen.length === 1) return { stopReason: "error", errorMessage: "unknown parameter: chat_template_kwargs" };
-    return { stopReason: "stop", usage: { output: 2 }, content: [{ type: "text", text: "OK" }] };
-  };
-  try {
-    const result = await mod.probeModelHealth("test-provider/fast-model", {
-      modelRegistry: {
-        find: () => ({ provider: "test-provider", id: "fast-model", api: "openai-completions", reasoning: true, compat: { supportsReasoningEffort: true } }),
-        async getApiKeyAndHeaders() { return { ok: true, apiKey: "fixture-key" }; },
-      },
-    });
-    assert.equal(result.status, "ok");
-    assert.equal(seen.length, 2);
-    assert.equal(seen[0].compat.chatTemplateKwargs.enable_thinking, false);
-    assert.equal(seen[1].compat.thinkingFormat, undefined, "fallback probe uses the registered model unchanged");
-  } finally {
-    delete (globalThis as any).__completeSimpleMock;
-  }
-});
-
-test("probes openai-responses reasoning models with reasoning effort off", async () => {
+test("probes at the cheapest thinking level the model actually declares", async () => {
+  writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
   const mod = await loadExtension();
   rmSync(CACHE_PATH, { force: true });
 
@@ -759,49 +782,155 @@ test("probes openai-responses reasoning models with reasoning effort off", async
     return { stopReason: "stop", usage: { output: 10 }, content: [{ type: "text", text: "OK" }] };
   };
   try {
-    const registered = { provider: "openai-codex", id: "test-built-in", api: "openai-responses", reasoning: true };
+    const result = await mod.probeModelHealth("openai-codex/test-built-in", {
+      modelRegistry: {
+        find: () => ({
+          provider: "openai-codex",
+          id: "test-built-in",
+          api: "openai-codex-responses",
+          reasoning: true,
+          thinkingLevelMap: { off: "none", minimal: null, low: "low", medium: "medium" },
+        }),
+        async getApiKeyAndHeaders() { return { ok: true, apiKey: "fixture-key" }; },
+      },
+    });
+    assert.equal(result.status, "ok");
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0].options.reasoning, "low", "levels mapped to null are unsupported and skipped");
+  } finally {
+    delete (globalThis as any).__completeSimpleMock;
+  }
+});
+
+test("models that could omit reasoning are still probed with thinking on", async () => {
+  writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
+  const mod = await loadExtension();
+  rmSync(CACHE_PATH, { force: true });
+
+  const seen: Array<{ model: any; options: any }> = [];
+  (globalThis as any).__completeSimpleMock = async (model: any, _context: any, options: any) => {
+    seen.push({ model, options });
+    return { stopReason: "stop", usage: { output: 10 }, content: [{ type: "text", text: "OK" }] };
+  };
+  try {
+    const result = await mod.probeModelHealth("openai-codex/test-built-in", {
+      modelRegistry: {
+        find: () => ({
+          provider: "openai-codex",
+          id: "test-built-in",
+          api: "openai-codex-responses",
+          reasoning: true,
+          thinkingLevelMap: { off: null, minimal: "low", low: "low", medium: "medium", high: "high" },
+        }),
+        async getApiKeyAndHeaders() { return { ok: true, apiKey: "fixture-key" }; },
+      },
+    });
+    assert.equal(result.status, "ok");
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0].options.reasoning, "minimal", "routing ETA needs every model measured with thinking on");
+  } finally {
+    delete (globalThis as any).__completeSimpleMock;
+  }
+});
+
+test("falls back to the plain model when the endpoint rejects the thinking override", async () => {
+  writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
+  const mod = await loadExtension();
+  rmSync(CACHE_PATH, { force: true });
+
+  const seen: Array<{ model: any; options: any }> = [];
+  (globalThis as any).__completeSimpleMock = async (model: any, _context: any, options: any) => {
+    seen.push({ model, options });
+    if (seen.length === 1) return { stopReason: "error", errorMessage: "This reasoning level isn't available for the selected model in your workspace." };
+    return { stopReason: "stop", usage: { output: 10 }, content: [{ type: "text", text: "OK" }] };
+  };
+  try {
+    const registered = { provider: "openai-codex", id: "test-built-in", api: "openai-codex-responses", reasoning: true, thinkingLevelMap: { off: "none", minimal: "low", low: "low", medium: "medium", high: "high" } };
     const result = await mod.probeModelHealth("openai-codex/test-built-in", {
       modelRegistry: {
         find: () => registered,
         async getApiKeyAndHeaders() { return { ok: true, apiKey: "fixture-key" }; },
       },
     });
-    assert.equal(result.status, "ok");
-    assert.equal(seen.length, 1, "effort-off probe must not retry on success");
-    assert.equal(seen[0].model, registered, "openai-responses probes use the registered model unchanged");
-    assert.equal(seen[0].options.reasoningEffort, "off");
+    assert.equal(result.status, "ok", "a rejected thinking level must not report the model as unhealthy");
+    assert.equal(seen.length, 2);
+    assert.equal(seen[0].options.reasoning, "minimal");
+    assert.equal(seen[1].options.reasoning, undefined, "fallback probe uses plain options");
+    assert.equal(seen[1].model, registered, "fallback probe uses the registered model unchanged");
   } finally {
     delete (globalThis as any).__completeSimpleMock;
   }
 });
 
-test("falls back to a plain probe when the reasoning effort toggle is rejected", async () => {
+test("reports the last attempt's failure when thinking and plain probes both fail", async () => {
+  writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
   const mod = await loadExtension();
   rmSync(CACHE_PATH, { force: true });
 
   const seen: Array<{ model: any; options: any }> = [];
   (globalThis as any).__completeSimpleMock = async (model: any, _context: any, options: any) => {
     seen.push({ model, options });
-    if (seen.length === 1) throw new Error("400: unsupported value for reasoning_effort");
-    return { stopReason: "stop", usage: { output: 10 }, content: [{ type: "text", text: "OK" }] };
+    return { stopReason: "error", errorMessage: `rejected reasoning=${options?.reasoning ?? "default"}` };
   };
   try {
-    const result = await mod.probeModelHealth("openai-codex/test-built-in", {
+    const result = await mod.probeModelHealth("test-provider/fast-model", {
       modelRegistry: {
-        find: () => ({ provider: "openai-codex", id: "test-built-in", api: "openai-responses", reasoning: true }),
+        find: () => ({ provider: "test-provider", id: "fast-model", api: "openai-completions", reasoning: true }),
         async getApiKeyAndHeaders() { return { ok: true, apiKey: "fixture-key" }; },
       },
     });
-    assert.equal(result.status, "ok");
+    assert.equal(result.status, "error");
     assert.equal(seen.length, 2);
-    assert.equal(seen[0].options.reasoningEffort, "off");
-    assert.equal(seen[1].options.reasoningEffort, undefined, "fallback probe uses plain options");
+    assert.match(result.error || "", /rejected reasoning=default$/, "reports the plain probe failure, not the override failure");
   } finally {
     delete (globalThis as any).__completeSimpleMock;
   }
 });
 
-test("non-reasoning models are probed without a thinking toggle", async () => {
+test("one probe deadline covers every attempt for a model", async () => {
+  writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
+  const mod = await loadExtension();
+  rmSync(CACHE_PATH, { force: true });
+
+  const seen: Array<{ model: any; options: any }> = [];
+  (globalThis as any).__completeSimpleMock = async (model: any, _context: any, options: any) => {
+    seen.push({ model, options });
+    if (seen.length === 1) {
+      await new Promise<void>((resolve) => {
+        if (options.signal?.aborted) return resolve();
+        options.signal?.addEventListener("abort", () => resolve(), { once: true });
+      });
+      return { stopReason: "aborted", errorMessage: "probe deadline exceeded" };
+    }
+    throw new Error(`second attempt saw aborted=${options.signal?.aborted}`);
+  };
+  try {
+    const startedAt = Date.now();
+    const result = await mod.probeModelHealth("test-provider/fast-model", {
+      modelRegistry: {
+        find: () => ({ provider: "test-provider", id: "fast-model", api: "openai-completions", reasoning: true }),
+        async getApiKeyAndHeaders() { return { ok: true, apiKey: "fixture-key" }; },
+      },
+    }, { probeTimeoutMs: 200 });
+    const elapsed = Date.now() - startedAt;
+
+    assert.equal(seen.length, 2);
+    assert.equal(seen[0].options.signal, seen[1].options.signal, "attempts share one deadline instead of getting a fresh ceiling each");
+    assert.ok(elapsed < 5_000, `the configured ceiling bounds the whole model probe (took ${elapsed}ms)`);
+    assert.equal(result.status, "error");
+    assert.equal(result.error, "second attempt saw aborted=true", "an exhausted deadline is not re-armed for the fallback attempt");
+  } finally {
+    delete (globalThis as any).__completeSimpleMock;
+  }
+});
+
+test("non-reasoning models are probed without a thinking override", async () => {
+  writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
   const mod = await loadExtension();
   rmSync(CACHE_PATH, { force: true });
 
@@ -819,12 +948,316 @@ test("non-reasoning models are probed without a thinking toggle", async () => {
       },
     });
     assert.equal(result.status, "ok");
-    assert.equal(seen.length, 1);
+    assert.equal(seen.length, 1, "a model that cannot think has nothing to pin");
     assert.equal(seen[0].model, registered);
-    assert.equal(seen[0].options.reasoningEffort, undefined);
-    assert.equal(seen[0].model.compat?.chatTemplateKwargs?.enable_thinking, undefined);
+    assert.equal(seen[0].options.reasoning, undefined);
   } finally {
     delete (globalThis as any).__completeSimpleMock;
+  }
+});
+
+test("probe throughput divides by the decode window, not end-to-end latency", async () => {
+  const mod = await loadExtension();
+
+  // Four seconds of thinking, then 60 tokens decoded in one second.
+  assert.equal(mod.probeTokensPerSecond(60, { firstTokenMs: 4_000, elapsedMs: 5_000 }), 60);
+  // A short but genuinely streamed tail: 12 visible tokens in 216ms of a 3.678s round trip.
+  assert.ok(Math.abs(mod.probeTokensPerSecond(12, { firstTokenMs: 3_462, elapsedMs: 3_678 })! - 55.6) < 0.5,
+    "a thin but genuine 216ms tail is still a decode window (got " + mod.probeTokensPerSecond(12, { firstTokenMs: 3_462, elapsedMs: 3_678 }) + ")");
+  // A buffered endpoint delivers everything at once: the window is noise, so fall back to E2E.
+  assert.equal(mod.probeTokensPerSecond(20, { firstTokenMs: 990, elapsedMs: 1_000 }), 20);
+  // A window under 5% of the round trip is too thin to trust however many ms it is.
+  assert.equal(mod.probeTokensPerSecond(10, { firstTokenMs: 3_850, elapsedMs: 4_000 }), 2.5);
+  assert.equal(mod.probeTokensPerSecond(20, { elapsedMs: 1_000 }), 20, "no first-token timing falls back to E2E");
+  assert.equal(mod.probeTokensPerSecond(0, { firstTokenMs: 100, elapsedMs: 1_000 }), undefined, "no sample, no rate");
+  assert.equal(mod.probeTokensPerSecond(5, { elapsedMs: 0 }), undefined, "no time elapsed, no rate");
+});
+
+test("records first-token timing and measures a streamed probe over its decode window", async () => {
+  writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
+  const mod = await loadExtension();
+  rmSync(CACHE_PATH, { force: true });
+
+  const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  const seen: Array<{ model: any; options: any }> = [];
+  (globalThis as any).__streamSimpleMock = async (model: any, _context: any, options: any) => {
+    seen.push({ model, options });
+    const message = { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "The sea shimmers." }], usage: { output: 40 } };
+    const events = [
+      { type: "start", partial: message },
+      { type: "thinking_delta", contentIndex: 0, delta: "hm", partial: message },
+      { type: "text_delta", contentIndex: 0, delta: "The sea shimmers.", partial: message },
+      { type: "done", reason: "stop", message },
+    ];
+    const scheduleMs = [0, 300, 600, 900];
+    const startedAt = Date.now();
+    let index = 0;
+    return {
+      [Symbol.asyncIterator]() {
+        return {
+          async next() {
+            if (index >= events.length) return { value: undefined, done: true };
+            const event = events[index]!;
+            const waitMs = scheduleMs[index]! - (Date.now() - startedAt);
+            if (waitMs > 0) await wait(waitMs);
+            index += 1;
+            return { value: event, done: false };
+          },
+        };
+      },
+      async result() { return message; },
+    };
+  };
+  try {
+    const registered = { provider: "test-provider", id: "fast-model", api: "openai-completions", reasoning: true };
+    const result = await mod.probeModelHealth("test-provider/fast-model", {
+      modelRegistry: {
+        find: () => registered,
+        async getApiKeyAndHeaders() { return { ok: true, apiKey: "fixture-key" }; },
+      },
+    });
+
+    assert.equal(result.status, "ok");
+    assert.equal(seen.length, 1, "a streamed probe is still one request");
+    assert.ok((result.firstTokenMs ?? 0) >= 200 && (result.firstTokenMs ?? 0) <= 800,
+      `first token arrives when thinking starts, not when the answer does (got ${result.firstTokenMs}ms)`);
+    assert.ok((result.latencyMs ?? 0) >= 850, `latency stays end to end (got ${result.latencyMs}ms)`);
+    assert.ok((result.tokensPerSecond ?? 0) > 50 && (result.tokensPerSecond ?? 0) < 110,
+      `throughput divides by the ~600ms decode window, not the ~900ms round trip (got ${result.tokensPerSecond})`);
+  } finally {
+    delete (globalThis as any).__streamSimpleMock;
+  }
+});
+
+function scriptedStream(message: any, timing: { firstTokenMs: number; totalMs: number }) {
+  const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  const text = (message.content || []).filter((c: any) => c && c.type === "text").map((c: any) => c.text).join("");
+  const events: any[] = [{ type: "start", partial: message }];
+  if (text) {
+    events.push({ type: "text_start", contentIndex: 0 }, { type: "text_delta", contentIndex: 0, delta: text, partial: message });
+  }
+  const stopped = message.stopReason === "error" || message.stopReason === "aborted";
+  events.push(stopped
+    ? { type: "error", reason: message.stopReason, error: message }
+    : { type: "done", reason: message.stopReason || "stop", message });
+  const startedAt = Date.now();
+  let index = 0;
+  return {
+    [Symbol.asyncIterator]() {
+      return {
+        async next() {
+          if (index >= events.length) return { value: undefined, done: true };
+          const event = events[index]!;
+          const targetMs = index === 0 ? 0 : (index === events.length - 1 ? timing.totalMs : timing.firstTokenMs);
+          const remaining = targetMs - (Date.now() - startedAt);
+          if (remaining > 0) await wait(remaining);
+          index += 1;
+          return { value: event, done: false };
+        },
+      };
+    },
+    async result() { return message; },
+  };
+}
+
+function thinWindowMessage() {
+  // A long think followed by ~13 visible tokens: healthy, but the window is 40ms of a 1s call.
+  return { message: { stopReason: "stop", content: [{ type: "text", text: "The sea shimmers." }], usage: { output: 13 } }, timing: { firstTokenMs: 960, totalMs: 1000 } };
+}
+
+test("classifies probe samples by what they can support", async () => {
+  const mod = await loadExtension();
+
+  assert.deepEqual(mod.probeSampleMetrics({ stopReason: "stop", visibleChars: 40, outputTokens: 60, firstTokenMs: 4_000, elapsedMs: 5_000 }),
+    { verdict: "measurable", tokensPerSecond: 60, throughputSource: "decode-window" });
+  assert.deepEqual(mod.probeSampleMetrics({ stopReason: "stop", visibleChars: 12, outputTokens: 13, firstTokenMs: 960, elapsedMs: 1_000 }),
+    { verdict: "unmeasurable-window", tokensPerSecond: 13, throughputSource: "end-to-end" },
+    "a thin window keeps its conservative end-to-end rate");
+  assert.deepEqual(mod.probeSampleMetrics({ stopReason: "length", visibleChars: 0, outputTokens: 512, firstTokenMs: 10, elapsedMs: 5_120 }),
+    { verdict: "truncated", tokensPerSecond: 100, throughputSource: "truncated" },
+    "a thinking-only sample is measured end to end, never as decode speed");
+  assert.deepEqual(mod.probeSampleMetrics({ stopReason: "error", visibleChars: 0, outputTokens: 0, elapsedMs: 100 }), { verdict: "failed" });
+  assert.deepEqual(mod.probeSampleMetrics({ stopReason: "stop", visibleChars: 40, outputTokens: 0, firstTokenMs: 10, elapsedMs: 500 }), { verdict: "no-usage" });
+});
+
+test("escalates a model whose standard sample answered but decoded too little to time", async () => {
+  writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
+  const mod = await loadExtension();
+  rmSync(CACHE_PATH, { force: true });
+
+  const thin = thinWindowMessage();
+  const prompts: string[] = [];
+  let call = 0;
+  (globalThis as any).__streamSimpleMock = async (_model: any, context: any, _options: any) => {
+    prompts.push(context.messages[0].content as string);
+    call += 1;
+    if (call === 1) return scriptedStream(thin.message, thin.timing);
+    return scriptedStream(
+      { stopReason: "stop", content: [{ type: "text", text: "The sea is calm. Waves roll in. Salt hangs in the air." }], usage: { output: 32 } },
+      { firstTokenMs: 1_000, totalMs: 1_500 },
+    );
+  };
+  try {
+    const result = await mod.probeModelHealth("test-provider/fast-model", {
+      modelRegistry: {
+        find: () => ({ provider: "test-provider", id: "fast-model", api: "openai-completions", reasoning: true }),
+        async getApiKeyAndHeaders() { return { ok: true, apiKey: "fixture-key" }; },
+      },
+    });
+
+    assert.equal(result.status, "ok");
+    assert.equal(prompts.length, 2, "one escalation request for the model that needs it");
+    assert.match(prompts[1]!, /three short sentences/, "the escalation asks for a longer answer, not a different model or level");
+    assert.equal(result.throughputSource, "escalated");
+    assert.ok((result.tokensPerSecond ?? 0) > 50 && (result.tokensPerSecond ?? 0) < 80,
+      `throughput comes from the escalated 500ms window, not 13 tokens over 1s (got ${result.tokensPerSecond})`);
+    assert.ok((result.latencyMs ?? 0) < 1_400, `latency stays the standard sample (got ${result.latencyMs}ms)`);
+    assert.ok((result.firstTokenMs ?? 0) >= 900 && (result.firstTokenMs ?? 0) < 1_400,
+      `first-token timing pairs with the published window (got ${result.firstTokenMs}ms)`);
+  } finally {
+    delete (globalThis as any).__streamSimpleMock;
+  }
+});
+
+test("health.probeEscalation false keeps the conservative rate", async () => {
+  writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
+  const mod = await loadExtension();
+  rmSync(CACHE_PATH, { force: true });
+
+  const thin = thinWindowMessage();
+  const registry = {
+    modelRegistry: {
+      find: () => ({ provider: "test-provider", id: "fast-model", api: "openai-completions", reasoning: true }),
+      async getApiKeyAndHeaders() { return { ok: true, apiKey: "fixture-key" }; },
+    },
+  };
+  const probe = () => mod.probeModelHealth("test-provider/fast-model", registry);
+  try {
+    let calls = 0;
+    (globalThis as any).__streamSimpleMock = async () => {
+      calls += 1;
+      return scriptedStream(thin.message, thin.timing);
+    };
+    const disabled = await mod.probeModelHealth("test-provider/fast-model", registry, { probeEscalation: false });
+
+    assert.equal(disabled.status, "ok");
+    assert.equal(calls, 1, "the switch must not spend a second request");
+    assert.equal(disabled.throughputSource, "end-to-end");
+    assert.ok(Math.abs((disabled.tokensPerSecond ?? 0) - 13) < 2, `conservative end-to-end rate (got ${disabled.tokensPerSecond})`);
+
+    // Same model, switch left at its policy default: the escalation runs and lifts the rate.
+    rmSync(CACHE_PATH, { force: true });
+    calls = 0;
+    (globalThis as any).__streamSimpleMock = async () => {
+      calls += 1;
+      if (calls === 1) return scriptedStream(thin.message, thin.timing);
+      return scriptedStream(
+        { stopReason: "stop", content: [{ type: "text", text: "The sea is calm. Waves roll in. Salt hangs in the air." }], usage: { output: 32 } },
+        { firstTokenMs: 1_000, totalMs: 1_500 },
+      );
+    };
+    const enabled = await probe();
+    assert.equal(calls, 2, "policy default still escalates");
+    assert.equal(enabled.throughputSource, "escalated");
+    assert.ok((enabled.tokensPerSecond ?? 0) > 50, `escalated decode window (got ${enabled.tokensPerSecond})`);
+  } finally {
+    delete (globalThis as any).__streamSimpleMock;
+  }
+});
+
+test("does not escalate a thinking-only sample and reports it as truncated", async () => {
+  writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
+  const mod = await loadExtension();
+  rmSync(CACHE_PATH, { force: true });
+
+  const prompts: string[] = [];
+  (globalThis as any).__streamSimpleMock = async (_model: any, context: any, _options: any) => {
+    prompts.push(context.messages[0].content as string);
+    // The output ceiling eaten by thinking: 512 tokens, no answer. A longer prompt would only buy
+    // more thinking, so this verdict must not escalate.
+    return scriptedStream({ stopReason: "length", content: [], usage: { output: 512 } }, { firstTokenMs: 100, totalMs: 1_000 });
+  };
+  try {
+    const result = await mod.probeModelHealth("test-provider/fast-model", {
+      modelRegistry: {
+        find: () => ({ provider: "test-provider", id: "fast-model", api: "openai-completions", reasoning: true }),
+        async getApiKeyAndHeaders() { return { ok: true, apiKey: "fixture-key" }; },
+      },
+    });
+
+    assert.equal(result.status, "ok", "the endpoint is reachable, so health is not in question");
+    assert.equal(prompts.length, 1, "escalating a truncated sample spends quota on more thinking");
+    assert.equal(result.throughputSource, "truncated");
+    assert.ok((result.tokensPerSecond ?? 0) > 400 && (result.tokensPerSecond ?? 0) < 650,
+      `512 generated tokens over the whole round trip (got ${result.tokensPerSecond})`);
+  } finally {
+    delete (globalThis as any).__streamSimpleMock;
+  }
+});
+
+test("keeps the standard numbers when the escalation request fails", async () => {
+  writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
+  const mod = await loadExtension();
+  rmSync(CACHE_PATH, { force: true });
+
+  const thin = thinWindowMessage();
+  let call = 0;
+  (globalThis as any).__streamSimpleMock = async () => {
+    call += 1;
+    if (call === 1) return scriptedStream(thin.message, thin.timing);
+    throw new Error("deadline shared with the model probe expired");
+  };
+  try {
+    const result = await mod.probeModelHealth("test-provider/fast-model", {
+      modelRegistry: {
+        find: () => ({ provider: "test-provider", id: "fast-model", api: "openai-completions", reasoning: true }),
+        async getApiKeyAndHeaders() { return { ok: true, apiKey: "fixture-key" }; },
+      },
+    });
+    assert.equal(result.status, "ok", "a failed bonus probe cannot make a healthy model unhealthy");
+    assert.equal(result.throughputSource, "end-to-end");
+    assert.ok(Math.abs((result.tokensPerSecond ?? 0) - 13) < 2);
+  } finally {
+    delete (globalThis as any).__streamSimpleMock;
+  }
+});
+
+test("keeps the standard numbers when the escalation cannot measure either", async () => {
+  writeFileSync(SETTINGS_CONFIG_PATH, ORIGINAL_SETTINGS_CONFIG);
+  writeFileSync(SETTINGS_PATH, ORIGINAL_SETTINGS);
+  const mod = await loadExtension();
+  rmSync(CACHE_PATH, { force: true });
+
+  const thin = thinWindowMessage();
+  let call = 0;
+  (globalThis as any).__streamSimpleMock = async () => {
+    call += 1;
+    if (call === 1) return scriptedStream(thin.message, thin.timing);
+    return scriptedStream(
+      { stopReason: "stop", content: [{ type: "text", text: "The sea is calm. Waves roll in. Salt hangs." }], usage: { output: 24 } },
+      { firstTokenMs: 1_490, totalMs: 1_500 },
+    );
+  };
+  try {
+    const result = await mod.probeModelHealth("test-provider/fast-model", {
+      modelRegistry: {
+        find: () => ({ provider: "test-provider", id: "fast-model", api: "openai-completions", reasoning: true }),
+        async getApiKeyAndHeaders() { return { ok: true, apiKey: "fixture-key" }; },
+      },
+    });
+
+    assert.equal(result.status, "ok");
+    assert.equal(call, 2);
+    assert.equal(result.throughputSource, "end-to-end", "an escalation that fails to measure leaves the conservative rate alone");
+    assert.ok(Math.abs((result.tokensPerSecond ?? 0) - 13) < 2, `the standard sample's rate stands (got ${result.tokensPerSecond})`);
+    assert.ok((result.latencyMs ?? 0) < 1_400);
+  } finally {
+    delete (globalThis as any).__streamSimpleMock;
   }
 });
 

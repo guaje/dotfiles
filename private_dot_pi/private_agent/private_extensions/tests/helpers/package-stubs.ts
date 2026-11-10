@@ -43,6 +43,14 @@ const PACKAGES: Record<string, string> = {
   "@earendil-works/pi-ai": [
     "export function StringEnum(values, options = {}) { return { type: 'string', enum: [...values], ...options }; }",
     "export async function completeSimple() { return { role: 'assistant', content: [], usage: {} }; }",
+    // Health probes stream, so the stub must stay iterable and resolve a final message.
+    "export function streamSimple() {",
+    "  const message = { role: 'assistant', content: [], usage: {} };",
+    "  return {",
+    "    [Symbol.asyncIterator]() { let sent = false; return { next() { return Promise.resolve(sent ? { value: undefined, done: true } : { value: { type: 'done', message }, done: false }); } }; },",
+    "    async result() { return message; },",
+    "  };",
+    "}",
   ].join("\n"),
   "@earendil-works/pi-coding-agent": [
     "export function getAgentDir() { return globalThis.__subagentAgentDir || '/nonexistent-subagent-test'; }",

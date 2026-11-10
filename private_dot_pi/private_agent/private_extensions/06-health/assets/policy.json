@@ -1,4 +1,6 @@
 {
   "cacheTtlMs": { "default": 900000, "minimum": 1000, "maximum": 86400000 },
-  "probeConcurrency": { "default": 3, "minimum": 1, "maximum": 16 }
+  "probeConcurrency": { "default": 3, "minimum": 1, "maximum": 16 },
+  "probeTimeoutMs": { "default": 20000, "minimum": 2000, "maximum": 120000 },
+  "probeEscalation": { "default": true }
 }

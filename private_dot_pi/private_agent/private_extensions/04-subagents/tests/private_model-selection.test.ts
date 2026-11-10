@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { normalizeModelMetadata } from "../model-metadata.ts";
+import { resolveSubagentExecutionSettings } from "../settings.ts";
 import { DIMENSIONS as AA_DIMENSIONS, METHODOLOGY, PUBLIC_METHODOLOGY_VERSION } from "../../09-catalog/aa/schema.ts";
 import { writePackageStubs } from "./_stubs.ts";
 
@@ -56,12 +57,16 @@ const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(ca
 let sandbox = "";
 let selectionModule: any;
 
-/** Bare package stubs for the sandbox copy. The completion API throws and counts calls so a
+/** Bare package stubs for the sandbox copy. Both completion APIs throw and count calls so a
  * regression that routes model selection through an LLM fails loudly instead of silently. */
 function writeSandboxPackages(extensionsDir: string): void {
 	const packages: Record<string, string> = {
 		"@earendil-works/pi-ai": [
 			"export async function completeSimple() {",
+			"  globalThis.__modelSelectionCompletionCalls = (globalThis.__modelSelectionCompletionCalls ?? 0) + 1;",
+			"  throw new Error('model selection must not call a completion API');",
+			"}",
+			"export function streamSimple() {",
 			"  globalThis.__modelSelectionCompletionCalls = (globalThis.__modelSelectionCompletionCalls ?? 0) + 1;",
 			"  throw new Error('model selection must not call a completion API');",
 			"}",
@@ -294,7 +299,9 @@ test("health refresh budget excludes candidates the probe never reached", async 
 	const snapshotRoot = writeBenchmarkAssets(sandbox, Date.now()); writeHealthCache(1, []);
 	try {
 		let calls = 0;
-		const exhausted = await selectionModule.selectModelForSubagent({ models: [{ id: "p/m", input: ["text"] }], snapshotRoot, snapshotMaxAgeMs: FIXTURE_MAX_AGE_MS, dependencies: { now: (() => { let n = 0; return () => n++ ? 20_000 : 0; })(), probe: async () => { calls++; return HEALTHY; }, merge: async () => {} } });
+		// The fake clock jumps past the configured refresh budget so the probe is never reached.
+		const beyondBudget = resolveSubagentExecutionSettings({}).healthProbeBudgetMs + 1;
+		const exhausted = await selectionModule.selectModelForSubagent({ models: [{ id: "p/m", input: ["text"] }], snapshotRoot, snapshotMaxAgeMs: FIXTURE_MAX_AGE_MS, dependencies: { now: (() => { let n = 0; return () => n++ ? beyondBudget : 0; })(), probe: async () => { calls++; return HEALTHY; }, merge: async () => {} } });
 		assert.equal(calls, 0); assert.equal(exhausted.benchmarkRoute?.candidates[0]?.rejectionReasons[0], "unprobedBudget");
 		const routed = await selectionModule.selectModelForSubagent({ models: [{ id: "p/m", input: ["text"] }], snapshotRoot, snapshotMaxAgeMs: FIXTURE_MAX_AGE_MS, dependencies: { now: () => 0, probe: async () => ({ ...HEALTHY, checkedAt: Date.now() }), merge: async () => {} } });
 		assert.equal(routed.modelId, "p/m");

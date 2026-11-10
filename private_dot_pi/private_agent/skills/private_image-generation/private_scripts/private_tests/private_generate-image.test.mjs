@@ -63,7 +63,7 @@ async function createFixture(t) {
     ],
   }));
   await mkdir(join(extensionsDir, '06-health', 'assets'), { recursive: true });
-  await writeFile(join(extensionsDir, '06-health', 'assets', 'policy.json'), JSON.stringify({ cacheTtlMs: { default: 900000, minimum: 1000, maximum: 86400000 }, probeConcurrency: { default: 3, minimum: 1, maximum: 8 } }));
+  await writeFile(join(extensionsDir, '06-health', 'assets', 'policy.json'), JSON.stringify({ cacheTtlMs: { default: 900000, minimum: 1000, maximum: 86400000 }, probeConcurrency: { default: 3, minimum: 1, maximum: 8 }, probeTimeoutMs: { default: 20000, minimum: 2000, maximum: 120000 }, probeEscalation: { default: true } }));
   await writeFile(join(agentDir, 'models.json'), JSON.stringify({
     providers: {
       'test-provider': {

@@ -397,7 +397,24 @@ function modelHealthResult(
  * ceiling instead of `health.probeTimeoutMs`. */
 const PROBE_IMAGE_TIMEOUT_MS = 10_000;
 
+/**
+ * One-shot deadline for a probe. `AbortSignal.timeout` is deliberately avoided: its timer is
+ * unref'd, so in a process with nothing else scheduled (a test runner, or an idle CLI between
+ * handles) the ceiling never fires and the awaited probe stays pending forever instead of
+ * aborting. A ref'd timer makes the ceiling an actual ceiling; the caller must run `cancel()` in a
+ * finally so a completed probe never leaves a timer behind.
+ */
+function probeDeadline(timeoutMs: number): { signal: AbortSignal; cancel(): void } {
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(new Error(`health probe exceeded its ${timeoutMs}ms ceiling`)),
+    timeoutMs,
+  );
+  return { signal: controller.signal, cancel: () => clearTimeout(timer) };
+}
+
 async function probeImageGenerationModel(metadata: ModelMetadata): Promise<ModelHealthResult> {
+  let cancelDeadline: (() => void) | undefined;
   const parts = splitModelId(metadata.id);
   if (!parts) {
     return modelHealthResult(metadata, "error", "Invalid model id");
@@ -418,6 +435,8 @@ async function probeImageGenerationModel(metadata: ModelMetadata): Promise<Model
       return modelHealthResult(metadata, "auth-missing", "No API key available");
     }
 
+    const deadline = probeDeadline(PROBE_IMAGE_TIMEOUT_MS);
+    cancelDeadline = deadline.cancel;
     const response = await fetch(`${provider.baseUrl.replace(/\/$/, "")}/images/generations`, {
       method: "POST",
       headers: {
@@ -431,7 +450,7 @@ async function probeImageGenerationModel(metadata: ModelMetadata): Promise<Model
         size: "16x16",
         response_format: "b64_json",
       }),
-      signal: AbortSignal.timeout(PROBE_IMAGE_TIMEOUT_MS),
+      signal: deadline.signal,
     });
 
     const text = await response.text();
@@ -451,6 +470,8 @@ async function probeImageGenerationModel(metadata: ModelMetadata): Promise<Model
     return modelHealthResult(metadata, "ok");
   } catch (error) {
     return modelHealthResult(metadata, "error", formatProbeError(error));
+  } finally {
+    cancelDeadline?.();
   }
 }
 
@@ -614,6 +635,7 @@ function sampleFromRun(run: ProbeRun): ProbeSample {
 }
 
 async function probeModel(metadata: ModelMetadata, ctx: ProbeContext, runtime: ProbeRuntime): Promise<ModelHealthResult> {
+  let cancelDeadline: (() => void) | undefined;
   if (metadata.service === "imageGeneration") {
     return probeImageGenerationModel(metadata);
   }
@@ -637,7 +659,8 @@ async function probeModel(metadata: ModelMetadata, ctx: ProbeContext, runtime: P
     const requestFor = (prompt: string) => ({ messages: [{ role: "user", content: prompt, timestamp: Date.now() }] });
     // One deadline per model, shared by every attempt including any escalation: a rejected override
     // costs only the time it actually took, and a wedged endpoint cannot quietly spend the ceiling twice.
-    const deadline = AbortSignal.timeout(runtime.probeTimeoutMs);
+    const deadline = probeDeadline(runtime.probeTimeoutMs);
+    cancelDeadline = deadline.cancel;
     const runProbe = async (attempt: ProbeAttempt, prompt: string): Promise<ProbeRun> => {
       const start = Date.now();
       // Streaming instead of a single completion call is what makes first-token timing visible; the
@@ -650,7 +673,7 @@ async function probeModel(metadata: ModelMetadata, ctx: ProbeContext, runtime: P
           apiKey: auth.apiKey,
           headers: auth.headers,
           maxTokens: PROBE_MAX_TOKENS,
-          signal: deadline,
+          signal: deadline.signal,
           ...attempt.options,
         },
       )) as unknown as AsyncIterable<{ type?: string }> & { result(): Promise<any> };
@@ -731,6 +754,8 @@ async function probeModel(metadata: ModelMetadata, ctx: ProbeContext, runtime: P
     });
   } catch (error) {
     return modelHealthResult(metadata, "error", formatProbeError(error));
+  } finally {
+    cancelDeadline?.();
   }
 }
 

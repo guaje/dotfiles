@@ -777,6 +777,10 @@ test("probes at the cheapest thinking level the model actually declares", async 
   rmSync(CACHE_PATH, { force: true });
 
   const seen: Array<{ model: any; options: any }> = [];
+  // This mock resolves only when the abort event fires, so keep the event loop open explicitly.
+  // Without it Node can exit with the probe still pending ("promise resolution is still pending but
+  // the event loop has already resolved"), which cancels every later test in the file.
+  const keepAlive = setTimeout(() => {}, 30_000);
   (globalThis as any).__completeSimpleMock = async (model: any, _context: any, options: any) => {
     seen.push({ model, options });
     return { stopReason: "stop", usage: { output: 10 }, content: [{ type: "text", text: "OK" }] };
@@ -809,6 +813,10 @@ test("models that could omit reasoning are still probed with thinking on", async
   rmSync(CACHE_PATH, { force: true });
 
   const seen: Array<{ model: any; options: any }> = [];
+  // This mock resolves only when the abort event fires, so keep the event loop open explicitly.
+  // Without it Node can exit with the probe still pending ("promise resolution is still pending but
+  // the event loop has already resolved"), which cancels every later test in the file.
+  const keepAlive = setTimeout(() => {}, 30_000);
   (globalThis as any).__completeSimpleMock = async (model: any, _context: any, options: any) => {
     seen.push({ model, options });
     return { stopReason: "stop", usage: { output: 10 }, content: [{ type: "text", text: "OK" }] };
@@ -841,6 +849,10 @@ test("falls back to the plain model when the endpoint rejects the thinking overr
   rmSync(CACHE_PATH, { force: true });
 
   const seen: Array<{ model: any; options: any }> = [];
+  // This mock resolves only when the abort event fires, so keep the event loop open explicitly.
+  // Without it Node can exit with the probe still pending ("promise resolution is still pending but
+  // the event loop has already resolved"), which cancels every later test in the file.
+  const keepAlive = setTimeout(() => {}, 30_000);
   (globalThis as any).__completeSimpleMock = async (model: any, _context: any, options: any) => {
     seen.push({ model, options });
     if (seen.length === 1) return { stopReason: "error", errorMessage: "This reasoning level isn't available for the selected model in your workspace." };
@@ -871,6 +883,10 @@ test("reports the last attempt's failure when thinking and plain probes both fai
   rmSync(CACHE_PATH, { force: true });
 
   const seen: Array<{ model: any; options: any }> = [];
+  // This mock resolves only when the abort event fires, so keep the event loop open explicitly.
+  // Without it Node can exit with the probe still pending ("promise resolution is still pending but
+  // the event loop has already resolved"), which cancels every later test in the file.
+  const keepAlive = setTimeout(() => {}, 30_000);
   (globalThis as any).__completeSimpleMock = async (model: any, _context: any, options: any) => {
     seen.push({ model, options });
     return { stopReason: "error", errorMessage: `rejected reasoning=${options?.reasoning ?? "default"}` };
@@ -897,6 +913,10 @@ test("one probe deadline covers every attempt for a model", async () => {
   rmSync(CACHE_PATH, { force: true });
 
   const seen: Array<{ model: any; options: any }> = [];
+  // This mock resolves only when the abort event fires, so keep the event loop open explicitly.
+  // Without it Node can exit with the probe still pending ("promise resolution is still pending but
+  // the event loop has already resolved"), which cancels every later test in the file.
+  const keepAlive = setTimeout(() => {}, 30_000);
   (globalThis as any).__completeSimpleMock = async (model: any, _context: any, options: any) => {
     seen.push({ model, options });
     if (seen.length === 1) {
@@ -924,6 +944,7 @@ test("one probe deadline covers every attempt for a model", async () => {
     assert.equal(result.status, "error");
     assert.equal(result.error, "second attempt saw aborted=true", "an exhausted deadline is not re-armed for the fallback attempt");
   } finally {
+    clearTimeout(keepAlive);
     delete (globalThis as any).__completeSimpleMock;
   }
 });
@@ -936,6 +957,10 @@ test("non-reasoning models are probed without a thinking override", async () => 
 
   const registered = { provider: "test-provider", id: "fast-model", api: "openai-completions", reasoning: false };
   const seen: Array<{ model: any; options: any }> = [];
+  // This mock resolves only when the abort event fires, so keep the event loop open explicitly.
+  // Without it Node can exit with the probe still pending ("promise resolution is still pending but
+  // the event loop has already resolved"), which cancels every later test in the file.
+  const keepAlive = setTimeout(() => {}, 30_000);
   (globalThis as any).__completeSimpleMock = async (model: any, _context: any, options: any) => {
     seen.push({ model, options });
     return { stopReason: "stop", usage: { output: 2 }, content: [{ type: "text", text: "OK" }] };

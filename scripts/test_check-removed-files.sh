@@ -399,6 +399,43 @@ run_post
 [[ -f $DEST/.config/keeper ]] || fail 'pruning removed a file it was never asked about'
 pass 'a directory the cleanup emptied is removed with its files'
 
+# The shape a generated asset generation really has: one manifest beside a directory
+# of per-model snapshots. The manifest sorts before the snapshots, so walking up from
+# each removed file reaches the parent while the snapshot directory is still inside it.
+# An update that removed every file in that tree has to come back for the parent once
+# the child is gone, or the shell of the tree survives in the destination forever.
+new_case
+mkdir -p "$DEST/.config/generation/models"
+printf 'keep me' > "$DEST/.config/keeper"
+printf 'manifest\n' > "$SRC/generation-manifest.json"
+printf 'one\n' > "$SRC/generation-one.json"
+printf 'two\n' > "$SRC/generation-two.json"
+cp "$SRC/generation-manifest.json" "$DEST/.config/generation/manifest.json"
+cp "$SRC/generation-one.json" "$DEST/.config/generation/models/one.json"
+cp "$SRC/generation-two.json" "$DEST/.config/generation/models/two.json"
+{
+    printf '%s\t%s\n' "$DEST/.config/generation/manifest.json" "$SRC/generation-manifest.json"
+    printf '%s\t%s\n' "$DEST/.config/generation/models/one.json" "$SRC/generation-one.json"
+    printf '%s\t%s\n' "$DEST/.config/generation/models/two.json" "$SRC/generation-two.json"
+} >> "$MAP"
+set_managed "$DEST/.config/generation/manifest.json" \
+    "$DEST/.config/generation/models/one.json" "$DEST/.config/generation/models/two.json"
+commit_all initial
+run_hook pre
+rm "$SRC"/generation-manifest.json "$SRC"/generation-one.json "$SRC"/generation-two.json
+commit_all remove
+clear_managed
+run_post
+[[ ! -e $DEST/.config/generation ]] \
+    || fail 'a directory left empty by the removal of its own subdirectory survived'
+grep -Fq "removed empty directory $DEST/.config/generation/models." "$CASE/session.txt" \
+    || fail 'the emptied subdirectory was not reported'
+grep -Fq "removed empty directory $DEST/.config/generation." "$CASE/session.txt" \
+    || fail 'the emptied parent was not reported'
+[[ -d $DEST/.config ]] || fail 'pruning walked past a directory that still holds a file'
+[[ -f $DEST/.config/keeper ]] || fail 'pruning removed a file it was never asked about'
+pass 'a parent emptied by the removal of its subdirectory is pruned too'
+
 # The promise that no data is lost rests on rmdir succeeding only on an empty
 # directory: one untracked leftover, and the shell stays.
 new_case

@@ -197,7 +197,7 @@ SCRATCH_MAX_AGE_MINUTES=1440
 reap_scratch() {
     find "$STATE_ROOT" -maxdepth 1 -type f -mmin +"$SCRATCH_MAX_AGE_MINUTES" \
         \( -name '.pending.*' -o -name '.diff.*' -o -name '.managed.*' -o -name '.managed-check.*' \
-            -o -name '.managed-json.*' \) \
+            -o -name '.managed-json.*' -o -name '.managed-prune.*' \) \
         -delete 2>/dev/null || true
     find "$STATE_ROOT" -maxdepth 1 -type d -mmin +"$SCRATCH_MAX_AGE_MINUTES" \
         \( -name '.transaction.*' -o -name '.last.*' \) \
@@ -435,30 +435,80 @@ prune_emptied_dirs() { # <removed-path> ...
     # files included, so one untracked leftover stops it. A directory chezmoi still
     # manages is left alone, as is anything along a .git path, and the walk upwards
     # stops at the destination directory itself.
-    local path dir contents
-    local -A seen=()
+    #
+    # Every candidate is collected before any is removed, then tried in passes that
+    # stop when a pass removes nothing. A parent is therefore judged only after its
+    # children had their turn, which is what makes a nested removal work: the usual
+    # layout is a directory holding both loose files and a subdirectory of generated
+    # ones, so a single walk-up per file reaches that parent while the subdirectory
+    # is still in it, and the parent would survive an update that emptied all of it.
+    #
+    # Management is answered from one bulk listing taken after the deletions rather
+    # than by a `chezmoi managed` per candidate: a bulk cleanup of a hundred generated
+    # directories would otherwise cost a hundred chezmoi runs.
+    local path dir contents removed listing target
+    local -a candidates=()
+    local -A collected=() rejected=() managed_set=()
     [[ -n $DEST_DIR && $DEST_DIR != / ]] || return 0
     for path in "$@"; do
         dir=$(dirname -- "$path")
         while [[ $dir == "$DEST_DIR"/* && $dir != "$DEST_DIR" ]]; do
-            # One decision per directory: a bulk cleanup of a thousand generated
-            # assets must not ask chezmoi about the same parent a thousand times.
-            [[ -z ${seen[$dir]+x} ]] || break
-            seen[$dir]=1
             case $dir in
                 */.git | */.git/*) break ;;
             esac
+            # A parent that is not a real directory ends the chain: nothing above a
+            # symlink is inside the destination directory in any sense that matters.
             [[ -d $dir && ! -L $dir ]] || break
-            # The cheap test goes first: most walk-ups stop at an ancestor that
-            # still holds something, and that answer must not cost a chezmoi call.
-            # A directory that cannot be listed is not known to be empty.
-            contents=$(ls -A -- "$dir" 2>/dev/null) || break
-            [[ -z $contents ]] || break
-            is_confidently_unmanaged "$dir" || break
-            rmdir -- "$dir" 2>/dev/null || break
-            log "check-removed-files: removed empty directory $dir."
+            [[ -z ${collected[$dir]+x} ]] || break
+            collected[$dir]=1
+            candidates+=("$dir")
             dir=$(dirname -- "$dir")
         done
+    done
+    (( ${#candidates[@]} > 0 )) || return 0
+
+    listing=$(mktemp "$STATE_ROOT/.managed-prune.XXXXXXXX") || return 0
+    if ! write_managed_mapping "$listing" all; then
+        # Without the list there is no way to know which of these directories chezmoi
+        # still owns, so none of them is touched.
+        rm -f "$listing"
+        return 0
+    fi
+    while IFS= read -r -d '' _ignored \
+        && IFS= read -r -d '' target \
+        && IFS= read -r -d '' _ignored \
+        && IFS= read -r -d '' _ignored; do
+        managed_set[$target]=1
+    done < "$listing"
+    rm -f "$listing"
+
+    while true; do
+        removed=false
+        for dir in ${candidates[@]+"${candidates[@]}"}; do
+            [[ -z ${rejected[$dir]+x} ]] || continue
+            [[ -z ${managed_set[$dir]+x} ]] || continue
+            if [[ ! -d $dir || -L $dir ]]; then
+                rejected[$dir]=1
+                continue
+            fi
+            # A directory that cannot be listed is not known to be empty.
+            contents=$(ls -A -- "$dir" 2>/dev/null) || {
+                rejected[$dir]=1
+                continue
+            }
+            # Not empty yet: it may well empty later in this same loop, so this is the
+            # one refusal that is worth asking about again on the next pass.
+            [[ -z $contents ]] || continue
+            # rmdir cannot remove anything but an empty directory, which is the whole
+            # reason no further check is needed here.
+            if ! rmdir -- "$dir" 2>/dev/null; then
+                rejected[$dir]=1
+                continue
+            fi
+            log "check-removed-files: removed empty directory $dir."
+            removed=true
+        done
+        [[ $removed == true ]] || break
     done
     return 0
 }

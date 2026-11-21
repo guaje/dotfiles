@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "searxng": {
+      "url": "https://search.wg.rescloud.dev/mcp",
+      "description": "Private web search and page reader on a NetBird overlay (no key). searxng_web_search: required `query`; knobs `categories` (it|news|science|packages|general), `time_range` (day|week|month|year), `num_results` (1-20), `pageno`, `min_score` (0-1), `language`, `safesearch`; returns title + snippet + URL + relevance, no answer text. web_url_read: `url` -> clean markdown, with `maxLength`/`startChar`/`section`/`paragraphRange`/`readHeadings`; no JavaScript, rejects PDF and binary. Unreliable upstream engines surface as `unresponsive_engines`-style gaps, not errors: retry with `categories=it` or rephrase rather than assuming downtime.",
+      "exposure": "codemode",
+      "toolExposure": {
+        "searxng_web_search": "codemode",
+        "web_url_read": "codemode",
+        "searxng_search_suggestions": "hidden",
+        "searxng_instance_info": "hidden"
+      },
+      "timeout": 120
+    }
+  }
+}

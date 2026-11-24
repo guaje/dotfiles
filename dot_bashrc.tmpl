@@ -3,3 +3,5 @@
 {{ includeTemplate ".chezmoitemplates/shell_starship.sh.tmpl" (dict "shell" "bash") }}
 {{ includeTemplate ".chezmoitemplates/shell_openstack.sh.tmpl" . }}
 {{ includeTemplate ".chezmoitemplates/shell_history.sh.tmpl" (dict "shell" "bash") }}
+# Herdr sync-panes toggle (last: it installs a DEBUG trap nothing should follow)
+{{ includeTemplate ".chezmoitemplates/shell_herdr.sh" . }}

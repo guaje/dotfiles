@@ -1,0 +1,106 @@
+onboarding = false
+
+[ui]
+status_indicators = "dots"
+
+# Persistent status pill, right edge of the tab bar. Herdr re-runs the command
+# on the server every interval_seconds and renders the last line of successful
+# output; empty output clears the entry. herdr-status.sh prints a line only
+# while herdr-sync is ON, so this is the permanent "sync on" indicator.
+# Herdr starts with the spaces/agents panel collapsed; ctrl+alt+b brings it back.
+sidebar_start_collapsed = true
+
+tab_bar_right = [
+  { type = "command", command = "~/.config/herdr/scripts/herdr-status.sh", interval_seconds = 1, timeout_seconds = 2 },
+]
+
+[ui.sound]
+enabled = true
+
+[ui.toast]
+delivery = "herdr"
+
+# ─── Keybindings: tmux muscle memory ───────────────────────────────────────
+# Every tmux chord is ADDED to Herdr's default via array syntax, so nothing
+# built in is lost. Prefix is already tmux's ctrl+b.
+# Verified with: herdr config check
+[keys]
+
+# Detach — tmux prefix+d, Herdr prefix+q
+detach = ["prefix+q", "prefix+d"]
+
+# Pickers — tmux prefix+w (choose-tree) and prefix+s (SessionX).
+# Settings moves out of the way to prefix+shift+s.
+workspace_picker = ["prefix+w", "prefix+s"]
+settings = "prefix+shift+s"
+
+# Splits — tmux % = pane right, tmux " = pane below.
+# NB: Herdr names these by divider orientation, so the words look inverted
+# vs tmux: split_vertical = side-by-side (right), split_horizontal = below.
+split_vertical = ["prefix+v", "prefix+percent"]
+split_horizontal = ["prefix+minus", "prefix+shift+quote"]
+
+# Pane focus — Herdr's h/j/k/l plus tmux's prefix+arrow
+focus_pane_left = ["prefix+h", "prefix+left"]
+focus_pane_down = ["prefix+j", "prefix+down"]
+focus_pane_up = ["prefix+k", "prefix+up"]
+focus_pane_right = ["prefix+l", "prefix+right"]
+
+# Resize — prefix+Alt+arrow (unbound in Herdr by default)
+resize_pane_left = "prefix+alt+left"
+resize_pane_down = "prefix+alt+down"
+resize_pane_up = "prefix+alt+up"
+resize_pane_right = "prefix+alt+right"
+
+# Pane cycling — tmux prefix+o / prefix+O (Herdr uses tab / shift+tab)
+cycle_pane_next = ["prefix+tab", "prefix+o"]
+cycle_pane_previous = ["prefix+shift+tab", "prefix+shift+o"]
+open_notification_target = "prefix+alt+o"
+
+# tmux niceties on chords Herdr leaves free
+last_pane = "prefix+semicolon"   # tmux prefix+;
+clear_pane = "prefix+t"          # tmux prefix+t (clear-history)
+edit_scrollback = "prefix+shift+e"  # vacates prefix+e for herdr-sync (see below)
+
+# Renaming / closing — tmux , $ & Q  (+ Herdr's shift chords)
+rename_tab = ["prefix+shift+t", "prefix+comma"]
+rename_workspace = ["prefix+shift+w", "prefix+shift+4"]
+close_tab = ["prefix+shift+x", "prefix+ampersand"]
+close_workspace = ["prefix+shift+d", "prefix+shift+q"]
+
+# Workspace switching — tmux prefix+( / prefix+)
+previous_workspace = "prefix+shift+9"
+next_workspace = "prefix+shift+0"
+
+# Panel show/hide — direct ctrl+alt chord (the family Herdr surveyed as free
+# across Ghostty/iTerm2/kitty/WezTerm/Windows Terminal) plus tmux-era prefix+b,
+# which is free here because tmux's `prefix+b` is break-pane and Herdr has no
+# bindable break-pane action.
+toggle_sidebar = ["prefix+b", "ctrl+alt+b"]
+
+# Tab reorder — tmux prefix+{ / prefix+}. Herdr rejects brace/bracket key
+# names, so these use the ctrl+alt family its docs call safest.
+move_tab_previous = "ctrl+alt+shift+left"
+move_tab_next = "ctrl+alt+shift+right"
+
+# ─── synchronize-panes (tmux prefix+e), as a real toggle ──────────────────
+# ON: runs each command you execute in this tab's panes in the other idle panes of
+# the same tab too, until you toggle it again - per tab, like tmux's
+# synchronize-panes, which is a per-window option. type = "shell" runs detached, so
+# focus never leaves your pane and you keep typing; the pill in the tab bar plus the
+# ON/OFF toast is the signal. Every pane's shell must have sourced the hook, which is
+# what `herdr-sync doctor` reports on (--fix reloads panes that predate the rc lines).
+[[keys.command]]
+key = "prefix+e"
+type = "shell"
+command = "{{ .chezmoi.homeDir }}/.config/herdr/scripts/herdr-sync.sh toggle"
+
+# One-shot, no state change: opens a narrow pane under the current one, pre-typed with
+# "herdr-sync bcast -- ". Type the command, press Enter, and it runs in every
+# mirrorable pane of the tab; the scratch pane then closes itself. Agent panes are
+# skipped, and lines that would close or hijack panes (exit, shutdown, herdr, ...) are
+# refused. Close it by hand with `herdr-sync cancel <pane>` if you change your mind.
+[[keys.command]]
+key = "prefix+alt+e"
+type = "shell"
+command = "{{ .chezmoi.homeDir }}/.config/herdr/scripts/herdr-sync.sh compose"

@@ -2,24 +2,17 @@ name: macOS tests
 
 # macOS is the only supported host that runs a BSD userland, so the hook and test
 # scripts are executed here under brew bash as well as on the ubuntu runner. Paths
-# are limited to what reaches a macOS host: the scripts and templates chezmoi applies
-# there, and the SwiftBar plugins, which mean nothing anywhere else. 
+# filters now live in ci.yml, so this file is free to say only "when Herdr or macOS
+# content changes, a macOS host must run it". Two things only a macOS runner can catch:
+# BSD userland (stat, sed, find differ from GNU) and the stock /etc/zshrc, which hard-sets
+# HISTFILE=${ZDOTDIR:-$HOME}/.zsh_history and has already moved a test fixture's history
+# file once. /bin/bash 3.2 is parsed here natively rather than through a container.
 
+# Called from ci.yml, which owns the path filters (a workflow reached through
+# workflow_call never evaluates its own "on:"). To run just this file: gh workflow run
+# macos-tests.yml --ref <branch>
 on:
-  push:
-    paths:
-      - 'scripts/**'
-      - '.chezmoi.toml.tmpl'
-      - '.chezmoiignore'
-      - 'dot_config/swiftbar/**'
-      - '.github/workflows/macos-tests.yml'
-  pull_request:
-    paths:
-      - 'scripts/**'
-      - '.chezmoi.toml.tmpl'
-      - '.chezmoiignore'
-      - 'dot_config/swiftbar/**'
-      - '.github/workflows/macos-tests.yml'
+  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -133,9 +126,88 @@ jobs:
           cd "$HOME"
           "$BREW_BASH" "$GITHUB_WORKSPACE/scripts/test_scan-secrets.sh"
 
+      - name: Render the Herdr wiring on macOS
+        shell: bash
+        run: |
+          # Same contract as linux-tests.yml: the rc fragment must be included by both
+          # shells and the templated config must resolve homeDir. BSD grep, BSD sed.
+          set -euo pipefail
+          chezmoi cat ~/.zshrc | grep -q 'herdr/scripts/herdr-sync-hook.sh'
+          chezmoi cat ~/.zshrc | grep -q 'HERDR_HIST_SEED='
+          chezmoi cat ~/.bashrc | grep -q 'herdr/scripts/herdr-sync-hook.sh'
+          cfg="$(chezmoi cat ~/.config/herdr/config.toml)"
+          if printf '%s\n' "$cfg" | grep -q '{{ .chezmoi'; then
+            echo "unrendered template left in config.toml"; exit 1
+          fi
+          printf '%s\n' "$cfg" | grep -q "$HOME/.config/herdr/scripts/herdr-sync.sh toggle"
+
       - name: Run ShellCheck on macOS
         shell: bash
         run: |
           shellcheck "$GITHUB_WORKSPACE"/scripts/*.sh
           # The SwiftBar plugins are macOS-only content, so this is their only linter.
           shellcheck "$GITHUB_WORKSPACE"/dot_config/swiftbar/*/*.sh
+
+  herdr-suite:
+    name: Herdr scripts (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check the tools the suite expects
+        shell: bash
+        run: |
+          set -euo pipefail
+          # jq, zsh and expect all ship on the runner image. Asserting them here rather
+          # than installing them: if a runner image drops expect, the PTY cases would
+          # exit 77 (skip) and the run would stay green while interactive coverage
+          # disappeared, which is exactly the silent-loss failure this job exists to catch.
+          for t in jq zsh expect stat; do command -v "$t" >/dev/null || { echo "missing: $t"; exit 1; }; done
+
+      - name: Materialize the scripts the way chezmoi applies them
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Source names carry chezmoi prefixes; the suite resolves siblings by plain name.
+          dest="$RUNNER_TEMP/applied"
+          mkdir -p "$dest"
+          ( cd dot_config/herdr
+            find . -type f ! -name '*.tmpl' | while IFS= read -r rel; do
+              # Strip the prefix from the BASENAME only: ${var#pat} anchors at the start
+              # of the string, so "scripts/executable_foo.sh" would keep it forever.
+              dir=$(dirname "$rel"); base=$(basename "$rel")
+              base=${base#dot_}; base=${base#executable_}; base=${base#create_}; base=${base#empty_}
+              case $dir in
+                .) out=$base ;;
+                *) out=${dir#./}/$base ;;
+              esac
+              mkdir -p "$dest/.config/herdr/$(dirname "$out")"
+              cp "$rel" "$dest/.config/herdr/$out"
+              case "$rel" in *executable_*) chmod +x "$dest/.config/herdr/$out" ;; esac
+            done )
+          echo "SUITE=$dest/.config/herdr/scripts/tests/run-tests.sh" >> "$GITHUB_ENV"
+
+      - name: Parse with the system bash (3.2) and zsh
+        shell: bash
+        run: |
+          set -euo pipefail
+          /bin/bash --version | head -1
+          for f in dot_config/herdr/scripts/executable_*.sh dot_config/herdr/scripts/herdr-sync-hook.sh \
+                   dot_config/herdr/scripts/tests/executable_*.sh; do
+            /bin/bash -n "$f" || { echo "/bin/bash 3.2 cannot parse $f"; exit 1; }
+            zsh -n "$f"      || { echo "zsh cannot parse $f"; exit 1; }
+            sh -n "$f"       || { echo "sh cannot parse $f"; exit 1; }
+          done
+
+      - name: Run the suite
+        shell: bash
+        run: |
+          set -uo pipefail
+          log="$RUNNER_TEMP/suite.log"
+          bash "$SUITE" 2>&1 | tee "$log"
+          status=${PIPESTATUS[0]}
+          summary="$(grep '^summary ' "$log" | tail -1)"
+          echo "suite: $summary"
+          echo "$summary" | grep -q 'failed=0' || { echo "::error::herdr suite reported failures"; exit 1; }
+          echo "$summary" | grep -q 'skipped=0' || { echo "::error::unexpected skip on macOS (pty driver or zsh missing?)"; exit 1; }
+          [ "$status" = 0 ] || exit "$status"

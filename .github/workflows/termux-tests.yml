@@ -5,23 +5,16 @@ name: Termux tests
 # exercises the shortcut by stubbing pkg, npm, pi, chezmoi, and the termux-* tools, so
 # this is a plain bash plus node job. Real Termux behavior (apt history, $PREFIX,
 # termux-notification and its toast fallback) cannot be checked on a hosted runner and
-# is verified on the device by running the same suite:
+# is verified on the device by running the same suite. The Herdr script suite is included
+# in that on-device run, and it is the reason the suite must pass with zsh absent — Termux
+# gives you bash, and the hosted jobs can only imitate that by deleting zsh from a runner:
 #
 #   bash dot_termux/tests/test_system-update-shortcut.sh
 
+# Called from ci.yml, which owns the path filters (workflow_call ignores this file's own
+# "on:"). Run alone with: gh workflow run termux-tests.yml --ref <branch>
 on:
-  push:
-    paths:
-      - 'private_dot_shortcuts/**'
-      - 'dot_termux/**'
-      - '.chezmoiignore'
-      - '.github/workflows/termux-tests.yml'
-  pull_request:
-    paths:
-      - 'private_dot_shortcuts/**'
-      - 'dot_termux/**'
-      - '.chezmoiignore'
-      - '.github/workflows/termux-tests.yml'
+  workflow_call:
   workflow_dispatch:
 
 permissions:

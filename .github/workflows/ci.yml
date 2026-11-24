@@ -1,8 +1,20 @@
 name: CI
 
-# The ubuntu half of the host-independent test matrix: the chezmoi hooks, the secret
-# tooling, and rendering. Platform components keep their own files: macOS in
-# macos-tests.yml, the Termux shortcut in termux-tests.yml, Pi in pi-tests.yml.
+# Orchestrator. No tests live here: each platform's suite is a reusable workflow in this
+# directory, called below, and "required-check" at the bottom is the one status to make
+# branch-protection required. That split buys three things — a suite can only go red on a
+# host that actually runs it, one check gates a branch instead of four, and concurrency is
+# decided once for the whole fan-out.
+#
+# Path filters belong to the caller: GitHub ignores "on:" in a workflow reached through
+# workflow_call, so a leaf cannot filter itself. Consequence worth knowing: anything
+# matching the union below schedules all four suites, so these filters are what they
+# collectively read. If macOS minutes get expensive, the fix is a changed-paths job here
+# passing an output into the macos call's "if:", not moving filters back into the leaf.
+#
+# Do not convert this to "on: workflow_run": that fires only after another workflow has
+# already finished, runs against a default-branch checkout, and cannot see the called
+# jobs' results without passing artifacts around — none of which is what a fan-out needs.
 
 on:
   push:
@@ -10,101 +22,81 @@ on:
       - 'scripts/**'
       - '.chezmoi.toml.tmpl'
       - '.chezmoiignore'
-      - '.github/workflows/ci.yml'
+      - '.chezmoitemplates/**'
+      - 'dot_bashrc.tmpl'
+      - 'dot_zshrc.tmpl'
+      - 'dot_config/**'
+      - 'dot_local/**'
+      - 'dot_termux/**'
+      - 'private_dot_*/**'
+      - 'secrets/**'
+      - '.github/workflows/**'
+      - 'README.md'
   pull_request:
     paths:
       - 'scripts/**'
       - '.chezmoi.toml.tmpl'
       - '.chezmoiignore'
-      - '.github/workflows/ci.yml'
+      - '.chezmoitemplates/**'
+      - 'dot_bashrc.tmpl'
+      - 'dot_zshrc.tmpl'
+      - 'dot_config/**'
+      - 'dot_local/**'
+      - 'dot_termux/**'
+      - 'private_dot_*/**'
+      - 'secrets/**'
+      - '.github/workflows/**'
       - 'README.md'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  linux:
+    name: Linux
+    uses: ./.github/workflows/linux-tests.yml
+
+  macos:
+    name: macOS
+    uses: ./.github/workflows/macos-tests.yml
+
+  termux:
+    name: Termux
+    uses: ./.github/workflows/termux-tests.yml
+
+  pi:
+    name: Pi
+    uses: ./.github/workflows/pi-tests.yml
+
+  required-check:
+    # if: always() matters: without it GitHub skips this job when any suite fails, and
+    # a skipped check never satisfies a required status, so a red suite would look like
+    # a pending or missing check instead of a failure.
+    name: All suites
+    needs: [linux, macos, termux, pi]
+    if: always()
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-
-      - name: Install dependencies
+      - name: Aggregate
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
         run: |
-          sudo apt-get update
-          sudo apt-get install -y zsh fish age curl jq
-          mkdir -p "$HOME/.local/bin"
-          # Install chezmoi
-          sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
-          # Install sops
-          SOPS_VERSION=3.8.1
-          curl -LO "https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.amd64"
-          mv "sops-v${SOPS_VERSION}.linux.amd64" "$HOME/.local/bin/sops"
-          chmod +x "$HOME/.local/bin/sops"
-          # Ubuntu's package can lag behind the directives used by this repo.
-          SHELLCHECK_VERSION=0.11.0
-          curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
-            | tar -xJ -C /tmp
-          mv "/tmp/shellcheck-v${SHELLCHECK_VERSION}/shellcheck" "$HOME/.local/bin/shellcheck"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Setup environment and age key
-        shell: bash
-        run: |
-          mkdir -p "$HOME/.config/chezmoi"
-          # Generate a new age key for CI
-          age-keygen -o "$HOME/.config/chezmoi/key.txt"
-          # Extract public key and save to GITHUB_ENV
-          PUBKEY=$(grep "public key:" "$HOME/.config/chezmoi/key.txt" | cut -d: -f2 | xargs)
-          echo "CI_PUBKEY=$PUBKEY" >> "$GITHUB_ENV"
-
-      - name: Initialize chezmoi
-        shell: bash
-        run: |
-          set -euo pipefail
-          # Generate config for this checkout
-          chezmoi init --source .
-          # Point chezmoi's default source path at the checked out repository so hooks resolve correctly
-          mkdir -p "$HOME/.local/share"
-          rm -rf "$HOME/.local/share/chezmoi"
-          ln -s "$PWD" "$HOME/.local/share/chezmoi"
-          # Ensure the generated config uses the CI age key and recipient
-          sed -i "s/recipient = \".*\"/recipient = \"$CI_PUBKEY\"/" "$HOME/.config/chezmoi/chezmoi.toml"
-          # Verify sops can use the key (sanity check)
-          export SOPS_AGE_KEY_FILE="$HOME/.config/chezmoi/key.txt"
-          echo "test: value" > test_sops.yaml
-          sops --encrypt --age "$CI_PUBKEY" test_sops.yaml > test_sops.enc.yaml
-          sops --decrypt test_sops.enc.yaml | grep -q "test: value"
-          test "$(chezmoi source-path)" = "$HOME/.local/share/chezmoi"
-
-      - name: Test secret add hook
-        shell: bash
-        run: |
-          cd "$HOME"
-          bash "$GITHUB_WORKSPACE/scripts/test_check-secrets.sh"
-
-      - name: Test removed-file update hook
-        shell: bash
-        run: |
-          cd "$HOME"
-          bash "$GITHUB_WORKSPACE/scripts/test_check-removed-files.sh"
-
-      - name: Test bootstrap hook
-        shell: bash
-        run: |
-          cd "$HOME"
-          bash "$GITHUB_WORKSPACE/scripts/test_bootstrap.sh"
-
-      - name: Test secret rendering
-        shell: bash
-        run: |
-          cd "$HOME"
-          bash "$GITHUB_WORKSPACE/scripts/test_apply-secrets.sh"
-
-      - name: Test reusable secret scanner
-        shell: bash
-        run: |
-          cd "$HOME"
-          bash "$GITHUB_WORKSPACE/scripts/test_scan-secrets.sh"
-
-      - name: Run ShellCheck
-        shell: bash
-        run: |
-          shellcheck "$GITHUB_WORKSPACE"/scripts/*.sh
+          printf 'suite results: %s\n' "$RESULTS"
+          # "success" only; skipped/cancelled are treated as failures on purpose, because
+          # a suite that silently stopped running is the failure mode this whole restructure
+          # is trying to avoid.
+          printf '%s' "$RESULTS" | grep -q '"success"' || { echo 'no suite reported success'; exit 1; }
+          if printf '%s' "$RESULTS" | grep -Eq '"(failure|cancelled)"'; then
+            echo '::error::at least one platform suite failed'
+            exit 1
+          fi
+          if printf '%s' "$RESULTS" | grep -q '"skipped"'; then
+            echo '::error::a platform suite was skipped, which hides lost coverage'
+            exit 1
+          fi
+          echo 'all platform suites passed'

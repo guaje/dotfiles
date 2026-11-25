@@ -53,8 +53,13 @@ permissions:
   contents: read
 
 concurrency:
+  # Named with the event so dispatching a leaf by hand cannot cancel the push run that
+  # is already testing the same commit.
   group: ci-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A push to main is the run that produces the result for the published commit, and
+  # jobs still queued count as in progress: cancelling them leaves the tip with no
+  # macOS suite at all. Only branches and PRs get superseded.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   linux:

@@ -86,22 +86,43 @@ jobs:
     needs: [linux, macos, termux, pi]
     if: always()
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     steps:
       - name: Aggregate
         env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
           RESULTS: ${{ toJSON(needs.*.result) }}
         run: |
-          printf 'suite results: %s\n' "$RESULTS"
-          # "success" only; skipped/cancelled are treated as failures on purpose, because
-          # a suite that silently stopped running is the failure mode this whole restructure
-          # is trying to avoid.
-          printf '%s' "$RESULTS" | grep -q '"success"' || { echo 'no suite reported success'; exit 1; }
-          if printf '%s' "$RESULTS" | grep -Eq '"(failure|cancelled)"'; then
-            echo '::error::at least one platform suite failed'
+          set -uo pipefail
+          printf 'needs results: %s\n' "$RESULTS"
+          printf '%s' "$RESULTS" | grep -Eq '"(failure|cancelled|skipped)"' && {
+            echo '::error::a platform job reported a non-success result'
+            exit 1
+          }
+          # needs.*.result is not sufficient by itself: it read "success" for the macOS job
+          # while the job inside that reusable workflow sat queued and was cancelled, so this
+          # gate passed a run whose macOS suite never executed a step. The run's own job
+          # records are the authority. Every one must have succeeded, and every platform must
+          # appear, because an empty list would satisfy "all succeeded" vacuously.
+          rows=$(gh api "repos/{owner}/{repo}/actions/runs/$RUN_ID/jobs" --paginate \
+                   --jq '.jobs[] | select(.name != "All suites") | "\(.conclusion)\t\(.name)"')
+          if [ -z "$rows" ]; then
+            echo '::error::no job records visible; refusing to pass on an empty list'
             exit 1
           fi
-          if printf '%s' "$RESULTS" | grep -q '"skipped"'; then
-            echo '::error::a platform suite was skipped, which hides lost coverage'
-            exit 1
-          fi
+          bad=0
+          while IFS=$'\t' read -r concl name; do
+            printf '  %-46s %s\n' "$name" "$concl"
+            [ "$concl" = success ] || bad=1
+          done <<< "$rows"
+          for p in Linux macOS Termux Pi; do
+            printf '%s\n' "$rows" | awk -F'\t' -v p="$p / " 'index($2, p) == 1 { found = 1 } END { exit !found }' || {
+              echo "::error::$p suite left no job record at all"
+              bad=1
+            }
+          done
+          [ "$bad" = 0 ] || { echo '::error::at least one job did not succeed'; exit 1; }
           echo 'all platform suites passed'

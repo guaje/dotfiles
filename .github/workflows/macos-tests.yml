@@ -148,12 +148,10 @@ jobs:
           # The SwiftBar plugins are macOS-only content, so this is their only linter.
           shellcheck "$GITHUB_WORKSPACE"/dot_config/swiftbar/*/*.sh
 
-  herdr-suite:
-    name: Herdr scripts (macOS)
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v5
-
+      # The Herdr suite was its own job here until it became the reason the suite next to it
+      # stopped running: two macOS jobs means one waits for a runner lease, and a macOS job
+      # still queued at 15 minutes is cancelled without ever executing a step, which killed
+      # test-macos twice while its own steps stayed green. One job, one lease.
       - name: Check the tools the suite expects
         shell: bash
         run: |

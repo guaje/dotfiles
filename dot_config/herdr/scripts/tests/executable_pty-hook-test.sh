@@ -86,7 +86,14 @@ if command -v expect >/dev/null 2>&1; then
 set timeout 25
 log_user 0
 spawn -noecho sh $work/launch.sh
-sleep 2
+# Wait for the shell's own prompt instead of guessing how long startup takes. On a
+# loaded Linux runner a blind sleep types the first command before zle has taken the
+# tty over, and its leading bytes are dropped: echo arrived as "cho".
+expect { -re "HERDRTEST> " {} timeout { exit 6 } }
+# A bare newline absorbs whatever the editor swallowed while it was starting up, and
+# the reprinted prompt proves it reads and echoes before anything is asserted on.
+send -- "\r"
+expect { -re "HERDRTEST> " {} timeout { exit 6 } }
 send -- "echo $marker\r"
 expect { -re "echo $marker" {} timeout { exit 3 } }
 sleep 1
@@ -101,7 +108,9 @@ EOF
   expect -f "$work/drive.exp" >/dev/null 2>&1
   rc=$?
 elif script --version 2>&1 | grep -qi 'util-linux'; then
-  { sleep 2; printf 'echo %s\n' "$marker"; sleep 1
+  # Same flush the expect driver sends, plus a longer first wait: this branch has no
+  # prompt to wait on, so it can only guess, and a cold container needs the room.
+  { sleep 3; printf '\n'; sleep 1; printf 'echo %s\n' "$marker"; sleep 1
     printf '. %s/probe.sh\n' "$work"; printf 'echo PROBE-DONE-%s\n' "$marker"; sleep 1; printf 'exit\n'
   } | script -q -e -c "sh $work/launch.sh" /dev/null >/dev/null 2>&1
   rc=$?

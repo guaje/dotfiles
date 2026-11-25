@@ -49,7 +49,14 @@ skip_if_missing() { # $1=shell $2=label; 0 means "caller should continue to next
 # Permission string via BSD or GNU stat. Deliberately no "assume correct" fallback:
 # when neither flavour works this prints unknown, which fails the assertion loudly
 # instead of silently passing on the other platform.
-mode_of() { stat -f '%Sp' "$1" 2>/dev/null || stat -c '%A' "$1" 2>/dev/null || printf 'unknown'; }
+# GNU stat must be tried first: it reads -f as --file-system, prints a filesystem
+# table and exits 0, so a BSD-first order "succeeds" with the wrong answer on Linux.
+mode_of() { stat -c '%A' "$1" 2>/dev/null || stat -f '%Sp' "$1" 2>/dev/null || printf 'unknown'; }
+# The fake CLI separates its log fields with real tabs. grep in a single-quoted
+# pattern gets a literal backslash-t, which GNU BRE reads as the letter t: the want-0
+# assertions below would then pass without matching anything at all. $'\t' is a real
+# tab in bash, which runs this suite.
+TAB=$'\t'
 # Cases that only need *some* interactive-ish shell to source the hook use whichever
 # one exists, so a bash-only box still exercises them.
 PROBE_SHELL=zsh; have zsh || PROBE_SHELL=bash
@@ -194,7 +201,7 @@ chk "no warning once a pane can mirror" "0" "$(grep -c 'no pane in this tab can 
 fresh; turn_on
 env HERDR_ACTIVE_PANE_ID=w1:p2 HERDR_ACTIVE_TAB_ID=w1:t1 bash "$S" compose >"$D/compose" 2>&1
 chk "compose opens a scratch pane" "1" "$(grep -c 'w1:p9' "$D/compose")"
-chk "compose pre-types the broadcast prefix" "1" "$(log | grep -c 'TEXT\tw1:p9\therdr-sync bcast -- ')"
+chk "compose pre-types the broadcast prefix" "1" "$(log | grep -c "TEXT${TAB}w1:p9${TAB}herdr-sync bcast -- ")"
 chk "compose complains without Herdr context" "1" \
   "$(env -u HERDR_PANE_ID -u HERDR_TAB_ID -u HERDR_ACTIVE_PANE_ID -u HERDR_ACTIVE_TAB_ID bash "$S" compose 2>&1 | grep -c 'cannot determine')"
 
@@ -202,16 +209,16 @@ b() { env HERDR_PANE_ID=w1:p9 HERDR_TAB_ID=w1:t1 bash "$S" bcast "$@" 2>&1; }
 fresh; turn_on
 b -- echo hi >"$D/b1" 2>&1
 chk "bcast runs the line in the tab's shells" "w1:p2 w1:p3 " "$(runs)"
-chk "bcast skips the agent pane in the same tab" "0" "$(log | grep -c 'RUN\tw1:p1')"
-chk "bcast closes the scratch pane it was typed in" "1" "$(log | grep -c 'CLOSE\tw1:p9')"
-chk "bcast leaves the other tab and workspace alone" "0" "$(log | grep -cE 'RUN\tw1:p4|RUN\tw2:p5')"
+chk "bcast skips the agent pane in the same tab" "0" "$(log | grep -c "RUN${TAB}w1:p1")"
+chk "bcast closes the scratch pane it was typed in" "1" "$(log | grep -c "CLOSE${TAB}w1:p9")"
+chk "bcast leaves the other tab and workspace alone" "0" "$(log | grep -cE "RUN${TAB}w1:p4|RUN${TAB}w2:p5")"
 chk "bcast reports what it did" "1" "$(grep -c 'ran "echo hi" in 2 pane' "$D/b1")"
 fresh; turn_on
 chk "bcast refuses a line that would close the tab" "1" "$(b -- exit | grep -c 'refusing to broadcast')"
-chk "bcast refused without typing anything" "0" "$(log | grep -c 'RUN\t')"
+chk "bcast refused without typing anything" "0" "$(log | grep -c "RUN${TAB}")"
 chk "bcast refuses to run itself" "1" "$(b -- herdr-sync off | grep -c 'refusing to broadcast')"
 chk "bcast needs a command" "2" "$(b >/dev/null 2>&1; echo $?)"
-chk "cancel closes a scratch pane" "1" "$(bash "$S" cancel w1:p9 >/dev/null 2>&1; log | grep -c 'CLOSE\tw1:p9')"
+chk "cancel closes a scratch pane" "1" "$(bash "$S" cancel w1:p9 >/dev/null 2>&1; log | grep -c "CLOSE${TAB}w1:p9")"
 
 # --- folding pane history back, then deleting it --------------------------
 # Per-pane files must not accumulate: leftovers get merged into the shared file and
